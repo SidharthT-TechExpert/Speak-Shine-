@@ -46,7 +46,7 @@ async function startBot() {
       msg.message.extendedTextMessage?.text;
 
     // 🎥 mark completed
-    if (msg.message.videoMessage || text?.toLowerCase().includes("#done1")) {
+    if (msg.message.videoMessage || text?.toLowerCase().includes("#done132")) {
       completedUsers.add(user);
 
       await sock.sendMessage(chatId, {
