@@ -15,6 +15,23 @@ connectDB();
 const TARGET_GROUP = process.env.TARGET_GROUP;
 const TEST_MODE = process.env.TEST_MODE === "true";
 
+// ✅ SAFE SEND (retry + timeout fix)
+const safeSend = async (sock, jid, msg) => {
+  try {
+    await sock.sendMessage(jid, msg);
+  } catch (err) {
+    console.log("❌ Send failed, retrying...", err?.message);
+
+    setTimeout(async () => {
+      try {
+        await sock.sendMessage(jid, msg);
+      } catch {
+        console.log("❌ Retry failed");
+      }
+    }, 2000);
+  }
+};
+
 // 🔥 LOAD USERS
 async function loadGroup(sock) {
   try {
@@ -40,16 +57,21 @@ async function startBot() {
     version,
     auth: state,
     browser: ["Ubuntu", "Chrome", "20.0.04"],
-    keepAliveIntervalMs: 30000,
+
+    // 🔥 IMPORTANT FIXES
+    keepAliveIntervalMs: 60000,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
   });
 
   sock.ev.on("creds.update", saveCreds);
 
+  // =============================
   // 📩 MESSAGE HANDLER
+  // =============================
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message) return;
-    if (msg.key.fromMe) return;
+    if (!msg.message || msg.key.fromMe) return;
 
     const chatId = msg.key.remoteJid;
     if (chatId !== TARGET_GROUP) return;
@@ -64,7 +86,6 @@ async function startBot() {
 
     if (!content) return;
 
-    // ✅ FIXED TEXT PARSER
     const text =
       content?.conversation ||
       content?.extendedTextMessage?.text ||
@@ -73,7 +94,6 @@ async function startBot() {
 
     console.log("📩 TEXT:", text);
 
-    // 🔥 GROUP META
     const groupMeta = await sock.groupMetadata(TARGET_GROUP);
     const isAdmin = groupMeta.participants.find(
       (p) => p.id === user && p.admin,
@@ -83,12 +103,11 @@ async function startBot() {
     // 🧠 COMMANDS
     // =============================
 
-    // ✅ /fine
     if (text?.trim() === "/fine") {
       const users = await User.find();
 
       if (users.length === 0) {
-        return sock.sendMessage(chatId, {
+        return safeSend(sock, chatId, {
           text: "⚠️ No users found!",
         });
       }
@@ -99,53 +118,45 @@ async function startBot() {
         msgText += `@${u.userId.split("@")[0]} → ₹${u.fine}\n`;
       });
 
-      return sock.sendMessage(chatId, {
+      return safeSend(sock, chatId, {
         text: msgText,
         mentions: users.map((u) => u.userId),
       });
     }
 
-    // ✅ /reset
     if (text?.trim() === "/reset") {
       if (!isAdmin) {
-        return sock.sendMessage(chatId, {
+        return safeSend(sock, chatId, {
           text: "❌ Only admin can reset",
         });
       }
 
       await User.deleteMany({});
-
-      return sock.sendMessage(chatId, {
-        text: "🧹 All data reset!",
-      });
+      return safeSend(sock, chatId, { text: "🧹 All data reset!" });
     }
 
-    // ✅ /resetday
     if (text?.trim() === "/resetday") {
       if (!isAdmin) {
-        return sock.sendMessage(chatId, {
+        return safeSend(sock, chatId, {
           text: "❌ Only admin can reset day",
         });
       }
 
       await User.updateMany({}, { completed: false });
-
-      return sock.sendMessage(chatId, {
+      return safeSend(sock, chatId, {
         text: "🔄 Today's attendance reset!",
       });
     }
 
-    // ✅ /resetweek
     if (text?.trim() === "/resetweek") {
       if (!isAdmin) {
-        return sock.sendMessage(chatId, {
+        return safeSend(sock, chatId, {
           text: "❌ Only admin can reset week",
         });
       }
 
       await User.updateMany({}, { fine: 0 });
-
-      return sock.sendMessage(chatId, {
+      return safeSend(sock, chatId, {
         text: "💰 Weekly fines reset!",
       });
     }
@@ -164,7 +175,7 @@ async function startBot() {
     const duration = video.seconds || 0;
 
     if (duration < 60) {
-      return sock.sendMessage(chatId, {
+      return safeSend(sock, chatId, {
         text: `❌ @${user.split("@")[0]} video must be at least 1 minute!`,
         mentions: [user],
       });
@@ -173,7 +184,7 @@ async function startBot() {
     const existing = await User.findOne({ userId: user });
 
     if (existing?.completed) {
-      return sock.sendMessage(chatId, {
+      return safeSend(sock, chatId, {
         text: `⚠️ @${user.split("@")[0]} already submitted`,
         mentions: [user],
       });
@@ -185,17 +196,18 @@ async function startBot() {
       { upsert: true },
     );
 
-    await sock.sendMessage(chatId, {
+    await safeSend(sock, chatId, {
       text: `✅ @${user.split("@")[0]} completed task`,
       mentions: [user],
     });
   });
 
+  // =============================
   // ⏰ REMINDER
+  // =============================
   cron.schedule(TEST_MODE ? "*/2 * * * *" : "30 3,7,11,15 * * *", async () => {
     const users = await User.find();
     const notDone = users.filter((u) => !u.completed);
-
     if (notDone.length === 0) return;
 
     let msg = "⏰ *Reminder! Submit your video 🎥*\n\n";
@@ -204,13 +216,15 @@ async function startBot() {
       msg += `@${u.userId.split("@")[0]}\n`;
     });
 
-    await sock.sendMessage(TARGET_GROUP, {
+    await safeSend(sock, TARGET_GROUP, {
       text: msg,
       mentions: notDone.map((u) => u.userId),
     });
   });
 
+  // =============================
   // 🚨 FINAL REPORT
+  // =============================
   cron.schedule(TEST_MODE ? "*/3 * * * *" : "30 6 * * *", async () => {
     const users = await User.find();
     const notDone = users.filter((u) => !u.completed);
@@ -237,20 +251,22 @@ async function startBot() {
       await u.save();
     }
 
-    await sock.sendMessage(TARGET_GROUP, {
+    await safeSend(sock, TARGET_GROUP, {
       text: msg,
       mentions: notDone.map((u) => u.userId),
     });
   });
 
+  // =============================
   // 🧠 DAILY QUESTION (11 AM IST)
+  // =============================
   cron.schedule(TEST_MODE ? "*/1 * * * *" : "30 5 * * *", async () => {
     console.log("📢 Daily Question...");
 
     const count = await Question.countDocuments();
 
     if (count === 0) {
-      return sock.sendMessage(TARGET_GROUP, {
+      return safeSend(sock, TARGET_GROUP, {
         text: "🎉 All questions finished!",
       });
     }
@@ -260,7 +276,6 @@ async function startBot() {
 
     if (!question) return;
 
-    // ❌ DELETE permanently
     await Question.findByIdAndDelete(question._id);
 
     const msg =
@@ -268,19 +283,30 @@ async function startBot() {
       `💬 "${question.quote}"\n\n` +
       `👉 ${question.question}`;
 
-    await sock.sendMessage(TARGET_GROUP, { text: msg });
+    await safeSend(sock, TARGET_GROUP, { text: msg });
   });
 
+  // =============================
   // 🔗 CONNECTION
+  // =============================
   sock.ev.on("connection.update", ({ connection }) => {
     if (connection === "open") {
-      console.log("✅ Stable connection established");
+      console.log("✅ Connected (Stable)");
+      setTimeout(() => loadGroup(sock), 3000);
     }
 
     if (connection === "close") {
       console.log("⚠️ Reconnecting...");
       startBot();
     }
+  });
+
+  if (sock.authState?.creds?.me?.id) {
+    console.log("🔐 Session restored");
+  }
+
+  sock.ev.on("connection.update", ({ qr }) => {
+    if (qr) qrcode.generate(qr, { small: true });
   });
 }
 
