@@ -131,8 +131,17 @@ async function startBot() {
         });
       }
 
-      await User.deleteMany({});
-      return safeSend(sock, chatId, { text: "🧹 All data reset!" });
+      await User.updateMany(
+        {},
+        {
+          fine: 0,
+          completed: false,
+        },
+      );
+
+      return safeSend(sock, chatId, {
+        text: "🔄 All fines & attendance reset!",
+      });
     }
 
     if (text?.trim() === "/resetday") {
@@ -225,7 +234,7 @@ async function startBot() {
   // =============================
   // 🚨 FINAL REPORT
   // =============================
-  cron.schedule(TEST_MODE ? "*/3 * * * *" : "30 6 * * *", async () => {
+  cron.schedule(TEST_MODE ? "*/3 * * * *" : "30 18 * * *", async () => {
     const users = await User.find();
     const notDone = users.filter((u) => !u.completed);
 
