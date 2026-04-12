@@ -144,7 +144,7 @@ async function startBot() {
   // 🚨 11:50 PM WARNING + AI VOICE
   // =============================
   cron.schedule(
-    TEST_MODE ? "*/2 * * * *" : "50 21 * * *",
+    TEST_MODE ? "*/2 * * * *" : "58 21 * * *",
     async () => {
       const users = await User.find();
       const pending = users.filter((u) => !u.completed);
@@ -164,20 +164,29 @@ async function startBot() {
       // 🔊 AI VOICE
       const filePath = "./temp-warning.mp3";
 
-      await generateVoice(
-        "Last 10 minutes. Submit your video now or fine will be applied.",
-        filePath,
-      );
+      try {
+        await generateVoice(
+          "Last 10 minutes. Submit your video now or fine will be applied.",
+          filePath,
+        );
 
-      await sock.sendMessage(TARGET_GROUP, {
-        audio: fs.readFileSync(filePath),
-        mimetype: "audio/mp4",
-        ptt: true,
-      });
+        if (!fs.existsSync(filePath)) {
+          console.log("❌ Audio file not created");
+          return;
+        }
 
-      fs.unlinkSync(filePath);
+        await sock.sendMessage(TARGET_GROUP, {
+          audio: { url: filePath }, // ✅ IMPORTANT CHANGE
+          mimetype: "audio/mpeg",
+          ptt: true,
+        });
 
-      console.log("🚨 11:50 warning + voice sent");
+        fs.unlinkSync(filePath);
+
+        console.log("🎤 Voice sent successfully");
+      } catch (err) {
+        console.log("❌ Voice error:", err.message);
+      }
     },
     { timezone: TIMEZONE },
   );
@@ -257,9 +266,19 @@ async function startBot() {
     { timezone: TIMEZONE },
   );
 
-  sock.ev.on("connection.update", ({ connection, qr }) => {
-    if (qr) qrcode.generate(qr, { small: true });
-    if (connection === "close") startBot();
+  sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
+    if (connection === "close") {
+      console.log("⚠️ Reconnecting...");
+
+      // 🔥 clear auth if session error
+      const shouldReset = lastDisconnect?.error?.output?.statusCode !== 401;
+
+      if (!shouldReset) {
+        console.log("❌ Session corrupted. Delete auth & restart.");
+      }
+
+      startBot();
+    }
   });
 }
 
