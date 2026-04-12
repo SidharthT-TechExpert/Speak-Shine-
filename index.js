@@ -144,7 +144,7 @@ async function startBot() {
   // 🚨 11:50 PM WARNING + AI VOICE
   // =============================
   cron.schedule(
-    TEST_MODE ? "*/2 * * * *" : "58 21 * * *",
+    TEST_MODE ? "*/2 * * * *" : "05 22 * * *",
     async () => {
       const users = await User.find();
       const pending = users.filter((u) => !u.completed);
@@ -171,21 +171,23 @@ async function startBot() {
         );
 
         if (!fs.existsSync(filePath)) {
-          console.log("❌ Audio file not created");
+          console.log("❌ Audio not created");
           return;
         }
 
+        const audioBuffer = fs.readFileSync(filePath);
+
         await sock.sendMessage(TARGET_GROUP, {
-          audio: { url: filePath }, // ✅ IMPORTANT CHANGE
+          audio: audioBuffer,
           mimetype: "audio/mpeg",
           ptt: true,
         });
 
         fs.unlinkSync(filePath);
 
-        console.log("🎤 Voice sent successfully");
+        console.log("🎤 Voice sent SUCCESS");
       } catch (err) {
-        console.log("❌ Voice error:", err.message);
+        console.log("❌ Audio error:", err);
       }
     },
     { timezone: TIMEZONE },

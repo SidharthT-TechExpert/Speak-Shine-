@@ -17,8 +17,10 @@ export default async function generateVoice(text, filePath) {
         response.pipe(file);
 
         file.on("finish", () => {
-          file.close();
-          resolve();
+          file.close(() => {
+            // ✅ wait properly
+            setTimeout(resolve, 500);
+          });
         });
       })
       .on("error", (err) => {
