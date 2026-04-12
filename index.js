@@ -76,7 +76,7 @@ async function startBot() {
     // 🔥 GROUP META
     const groupMeta = await sock.groupMetadata(TARGET_GROUP);
     const isAdmin = groupMeta.participants.find(
-      (p) => p.id === user && p.admin
+      (p) => p.id === user && p.admin,
     );
 
     // =============================
@@ -182,7 +182,7 @@ async function startBot() {
     await User.findOneAndUpdate(
       { userId: user },
       { completed: true },
-      { upsert: true }
+      { upsert: true },
     );
 
     await sock.sendMessage(chatId, {
@@ -272,15 +272,13 @@ async function startBot() {
   });
 
   // 🔗 CONNECTION
-  sock.ev.on("connection.update", async ({ connection, qr }) => {
-    if (qr) qrcode.generate(qr, { small: true });
-
+  sock.ev.on("connection.update", ({ connection }) => {
     if (connection === "open") {
-      console.log("✅ Connected!");
-      setTimeout(() => loadGroup(sock), 3000);
+      console.log("✅ Stable connection established");
     }
 
     if (connection === "close") {
+      console.log("⚠️ Reconnecting...");
       startBot();
     }
   });
