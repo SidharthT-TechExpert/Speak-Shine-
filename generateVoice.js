@@ -1,34 +1,38 @@
-import * as googleTTS from "google-tts-api";
+import { getAudioUrl } from "google-tts-api";
 import fs from "fs";
 import https from "https";
+import { finished } from "stream/promises";
 
 export default async function generateVoice(text, filePath) {
-  const url = googleTTS.getAudioUrl(text, {
+  // Caution: text must be under 200 characters for this specific method
+  const url = getAudioUrl(text, {
     lang: "en",
     slow: false,
     host: "https://translate.google.com",
   });
 
-  return new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(filePath);
+  const file = fs.createWriteStream(filePath);
 
+  return new Promise((resolve, reject) => {
     https
-      .get(url, (response) => {
+      .get(url, async (response) => {
         if (response.statusCode !== 200) {
-          reject(new Error("Failed to fetch audio"));
-          return;
+          file.destroy();
+          fs.unlink(filePath, () => {});
+          return reject(
+            new Error(`Failed to fetch audio: ${response.statusCode}`),
+          );
         }
 
         response.pipe(file);
 
-        file.on("finish", () => {
-          file.close(() => resolve(true));
-        });
-
-        file.on("error", (err) => {
+        try {
+          await finished(file);
+          resolve(true);
+        } catch (err) {
           fs.unlink(filePath, () => {});
           reject(err);
-        });
+        }
       })
       .on("error", (err) => {
         fs.unlink(filePath, () => {});
