@@ -247,6 +247,7 @@ async function startBot() {
       const users = await User.find({ userId: { $ne: null } });
       const completed = users.filter((u) => u.completed);
       const pending = users.filter((u) => !u.completed);
+      const status = await Status.findOne();
 
       // Apply ₹2 fine to pending users
       if (pending.length && !status.fineAppliedToday) {
@@ -292,7 +293,6 @@ async function startBot() {
       // Reset daily status
       await User.updateMany({}, { completed: false });
 
-      const status = await Status.findOne();
       if (status) {
         status.questionSentToday = false;
         status.notifiedEmpty = false;
