@@ -296,6 +296,7 @@ async function startBot() {
       if (status) {
         status.questionSentToday = false;
         status.notifiedEmpty = false;
+        status.fineAppliedToday = false; // ✅ ADD THIS
         await status.save();
       }
     } catch (err) {
@@ -530,7 +531,7 @@ async function startBot() {
 
   cron.schedule("30 10,23 * * *", finalWarning, { timezone: TIMEZONE });
 
-  cron.schedule("0 0 * * *", dailyReport, { timezone: TIMEZONE });
+  cron.schedule("3 0,2 * * *", dailyReport, { timezone: TIMEZONE });
 
   cron.schedule(
     "0 13,18,20 * * *",
