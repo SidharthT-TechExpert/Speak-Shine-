@@ -413,7 +413,7 @@ async function startBot() {
 
         // 💰 Get amount (optional)
         const parts = text.split(" ");
-        const amount = parseInt(parts[1]) || 2;
+        const amount = parseInt(parts[2]) || 2;
 
         // 🧠 Update DB
         await User.findOneAndUpdate(
