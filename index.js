@@ -239,6 +239,7 @@ async function startBot() {
       console.log("⚡ Recovery check...");
       await sendQuestion();
     }
+    console.log("Flag:", questionSentToday);
     console.log("⏰ Current time:", now.toLocaleTimeString("en-US", { timeZone: TIMEZONE }));
   });
 
