@@ -8,8 +8,6 @@ import dotenv from "dotenv";
 import { connectDB } from "./db.js";
 import User from "./models/userSchema.js";
 import Question from "./models/questionSchema.js";
-import generateVoice from "./generateAudio.js";
-import fs from "fs";
 
 dotenv.config();
 connectDB();
@@ -17,22 +15,24 @@ connectDB();
 const TARGET_GROUP = process.env.TARGET_GROUP;
 const TIMEZONE = "Asia/Kolkata";
 
-// ✅ Prevent duplicate question
 let questionSentToday = false;
 
 // =============================
-// ✅ SAFE SEND
+// ✅ SAFE SEND (RELIABLE)
 // =============================
 const safeSend = async (sock, jid, msg) => {
   try {
     if (!sock?.user) {
       console.log("⚠️ Socket not ready");
-      return;
+      return false;
     }
+
     await sock.sendMessage(jid, msg);
+    console.log("✅ Message sent");
+    return true;
   } catch (err) {
-    console.log("Retry send...");
-    setTimeout(() => sock.sendMessage(jid, msg), 2000);
+    console.log("❌ Send failed:", err);
+    return false;
   }
 };
 
@@ -198,14 +198,11 @@ async function startBot() {
   });
 
   // =============================
-  // 🧠 DAILY QUESTION FUNCTION
+  // 🧠 DAILY QUESTION (SAFE)
   // =============================
   const sendQuestion = async () => {
     try {
-      if (questionSentToday) {
-        console.log("⚠️ Already sent today");
-        return;
-      }
+      if (questionSentToday) return;
 
       console.log("🔥 Sending Question...");
 
@@ -216,71 +213,44 @@ async function startBot() {
       const q = await Question.findOne().skip(randomIndex);
       if (!q) return;
 
-      await Question.findByIdAndDelete(q._id);
-
-      await safeSend(sock, TARGET_GROUP, {
+      // ✅ SEND FIRST
+      const sent = await safeSend(sock, TARGET_GROUP, {
         text: `🧠 Daily Question\n\n💬 "${q.quote}"\n\n👉 ${q.question}`,
       });
 
-      questionSentToday = true;
+      // ✅ DELETE ONLY IF SENT
+      if (sent) {
+        await Question.findByIdAndDelete(q._id);
+        questionSentToday = true;
+      } else {
+        console.log("⚠️ Send failed, will retry...");
+      }
     } catch (err) {
       console.log("❌ QUESTION ERROR:", err);
     }
   };
 
-  // ✅ MAIN TIME
-  cron.schedule("45 9 * * *", sendQuestion, { timezone: TIMEZONE });
+  // ⏰ MAIN TIME
+  cron.schedule("5 10 * * *", sendQuestion, { timezone: TIMEZONE });
 
-  // ✅ RECOVERY SYSTEM
+  // 🔁 RECOVERY (FULL WINDOW)
   cron.schedule("*/2 * * * *", async () => {
     const now = new Date();
 
-    if (now.getHours() === 9 && now.getMinutes() <= 45) {
+    if (now.getHours() === 10 && now.getMinutes() <= 15) {
       console.log("⚡ Recovery check...");
       await sendQuestion();
     }
   });
 
   // =============================
-  // 🔁 REMINDERS
-  // =============================
-  const sendReminder = async (title) => {
-    const users = await User.find();
-    const pending = users.filter((u) => !u.completed);
-
-    if (!pending.length) {
-      return safeSend(sock, TARGET_GROUP, {
-        text: "🎉 All completed!",
-      });
-    }
-
-    let msg = `${title}\n\n`;
-    pending.forEach((u) => {
-      msg += `👉 @${u.userId.split("@")[0]}\n`;
-    });
-
-    await safeSend(sock, TARGET_GROUP, {
-      text: msg,
-      mentions: pending.map((u) => u.userId),
-    });
-  };
-
-  cron.schedule("0 9,13,17 * * *", () =>
-    sendReminder("⏰ Reminder: Submit video 🎥"),
-  );
-
-  cron.schedule("0 21,22 * * *", () =>
-    sendReminder("🌙 Night Reminder"),
-  );
-
-  // =============================
-  // 🌙 MIDNIGHT RESET
+  // 🌙 RESET
   // =============================
   cron.schedule(
     "0 0 * * *",
     () => {
       questionSentToday = false;
-      console.log("🌙 Reset question flag");
+      console.log("🌙 Reset done");
     },
     { timezone: TIMEZONE },
   );
@@ -291,13 +261,13 @@ async function startBot() {
   sock.ev.on("connection.update", ({ connection, qr }) => {
     if (qr) qrcode.generate(qr, { small: true });
 
+    if (connection === "open") {
+      console.log("✅ Bot connected");
+    }
+
     if (connection === "close") {
       console.log("🔄 Reconnecting...");
       startBot();
-    }
-
-    if (connection === "open") {
-      console.log("✅ Bot connected");
     }
   });
 }
