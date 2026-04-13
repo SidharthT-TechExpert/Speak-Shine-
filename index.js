@@ -383,7 +383,7 @@ async function startBot() {
 
   cron.schedule("0 23 * * *", sendDMReminder, { timezone: TIMEZONE });
 
-  cron.schedule("52 17 * * *", finalWarning, { timezone: TIMEZONE });
+  cron.schedule("12 18 * * *", finalWarning, { timezone: TIMEZONE });
 
   cron.schedule("0 0 * * *", dailyReport, { timezone: TIMEZONE });
 
