@@ -209,7 +209,7 @@ async function startBot() {
       new Date().toLocaleString("en-US", { timeZone: TIMEZONE })
     );
 
-    if (now.getHours() === 10 && now.getMinutes() <= 59) {
+    if (now.getHours() === 11 && now.getMinutes() <= 59) {
       console.log("⚡ Recovery...");
       await sendQuestion();
     }
