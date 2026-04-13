@@ -269,7 +269,7 @@ async function startBot() {
 
     console.log("⏰ IST Time:", now.getHours(), now.getMinutes());
 
-    if (now.getHours() === 10 && now.getMinutes() <= 59) {
+    if (now.getHours() === 11 && now.getMinutes() <= 59) {
       console.log("⚡ Recovery check...");
       await sendQuestion();
     }
