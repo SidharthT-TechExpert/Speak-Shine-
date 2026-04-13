@@ -76,7 +76,7 @@ async function startBot() {
 
       const groupMeta = await sock.groupMetadata(TARGET_GROUP);
       const isAdmin = groupMeta.participants.find(
-        (p) => p.id === user && p.admin
+        (p) => p.id === user && p.admin,
       );
 
       if (cmd.startsWith("/remaining")) {
@@ -135,7 +135,7 @@ async function startBot() {
       await User.findOneAndUpdate(
         { userId: user },
         { completed: true },
-        { upsert: true }
+        { upsert: true },
       );
 
       await safeSend(sock, chatId, {
@@ -201,15 +201,15 @@ async function startBot() {
   };
 
   // ⏰ MAIN
-  cron.schedule("20 10 * * *", sendQuestion, { timezone: TIMEZONE });
+  cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
 
   // 🔁 RECOVERY
   cron.schedule("*/2 * * * *", async () => {
     const now = new Date(
-      new Date().toLocaleString("en-US", { timeZone: TIMEZONE })
+      new Date().toLocaleString("en-US", { timeZone: TIMEZONE }),
     );
 
-    if (now.getHours() === 11 && now.getMinutes() <= 59) {
+    if (now.getHours() === 8 && now.getMinutes() <= 20) {
       console.log("⚡ Recovery...");
       await sendQuestion();
     }
@@ -227,7 +227,7 @@ async function startBot() {
       }
       console.log("🌙 Reset done");
     },
-    { timezone: TIMEZONE }
+    { timezone: TIMEZONE },
   );
 
   // 🔄 CONNECTION
