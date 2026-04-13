@@ -176,7 +176,7 @@ async function startBot() {
   // 🧠 DAILY QUESTION
   // =============================
   cron.schedule(
-  "15 9 * * *",
+  "30 9 * * *",
   async () => {
     const count = await Question.countDocuments();
     if (!count) return;
