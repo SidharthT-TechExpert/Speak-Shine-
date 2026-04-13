@@ -9,6 +9,10 @@ const statusSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  notifiedLast: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 export default mongoose.model("Status", statusSchema);

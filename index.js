@@ -54,13 +54,6 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("auth");
   const { version } = await fetchLatestBaileysVersion();
 
-  // 🧹 CLEAN INVALID USERS (RUN ONCE)
-  await User.deleteMany({
-    $or: [{ userId: null }, { userId: "" }, { userId: { $exists: false } }],
-  });
-
-  console.log("🧹 Cleaned invalid users");
-
   const sock = makeWASocket({
     version,
     auth: state,
@@ -177,6 +170,17 @@ async function startBot() {
     }
   };
 
+  // ================= GOOD MORNING =================
+  const sendGoodMorning = async () => {
+    try {
+      await safeSend(sock, TARGET_GROUP, {
+        text: `🌅 *Good Morning Team!*\n\n━━━━━━━━━━━━━━━\n💪 _New day, new chance to improve!_\n\n🎯 Don't forget today's speaking challenge.\n\n🔥 _Stay consistent. Stay focused._`,
+      });
+    } catch (err) {
+      console.log("❌ Good morning error:", err);
+    }
+  };
+
   // ================= FINAL WARNING =================
   const finalWarning = async () => {
     try {
@@ -194,26 +198,26 @@ async function startBot() {
       // 🎤 Generate MP3 (ONLY ONCE ✅)
       await generateVoice(
         "Final warning. Please submit your speaking video before deadline.",
-        mp3Path,
+        mp3,
       );
 
       // ✅ Check file exists
-      if (!fs.existsSync(mp3Path)) {
+      if (!fs.existsSync(mp3)) {
         console.log("❌ MP3 file missing");
         return;
       }
 
       // 🎧 Convert MP3 → OGG
-      await convertToOgg(mp3Path, oggPath);
+      await convertToOgg(mp3, ogg);
 
       // ✅ Check OGG exists
-      if (!fs.existsSync(oggPath)) {
+      if (!fs.existsSync(ogg)) {
         console.log("❌ OGG file missing");
         return;
       }
 
       // 📖 Read OGG
-      const audioBuffer = fs.readFileSync(oggPath);
+      const audioBuffer = fs.readFileSync(ogg);
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
@@ -228,8 +232,8 @@ async function startBot() {
       });
 
       // 🗑 Clean files
-      fs.unlinkSync(mp3Path);
-      fs.unlinkSync(oggPath);
+      fs.unlinkSync(mp3);
+      fs.unlinkSync(ogg);
 
       console.log("🎤 Voice sent");
     } catch (err) {
@@ -425,6 +429,22 @@ async function startBot() {
         });
       }
 
+      if (cmd === "/cleanusers") {
+        if (!isAdmin) return;
+
+        await User.deleteMany({
+          $or: [
+            { userId: null },
+            { userId: "" },
+            { userId: { $exists: false } },
+          ],
+        });
+
+        return safeSend(sock, chatId, {
+          text: "🧹 Invalid users cleaned!",
+        });
+      }
+
       // 🔄 RESET DAY
       if (cmd.startsWith("/resetday")) {
         if (!isAdmin)
@@ -477,6 +497,8 @@ async function startBot() {
   });
 
   // ================= CRON =================
+  cron.schedule("30 7 * * *", sendGoodMorning, { timezone: TIMEZONE });
+
   cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
 
   cron.schedule(
@@ -503,7 +525,7 @@ async function startBot() {
 
   cron.schedule("30 22 * * *", sendDMReminder, { timezone: TIMEZONE });
 
-  cron.schedule("30 23 * * *", finalWarning, { timezone: TIMEZONE });
+  cron.schedule("35 1,23 * * *", finalWarning, { timezone: TIMEZONE });
 
   cron.schedule("0 0 * * *", dailyReport, { timezone: TIMEZONE });
 
