@@ -376,6 +376,44 @@ async function startBot() {
         });
       }
 
+      if (cmd.startsWith("/addfine")) {
+        // 🔒 Admin check
+        if (!isAdmin) {
+          return safeSend(sock, chatId, {
+            text: "❌ Only admins can use this command",
+          });
+        }
+
+        // 📌 Get mentioned user
+        const mentioned =
+          msg.message?.extendedTextMessage?.contextInfo?.mentionedJid;
+
+        if (!mentioned || !mentioned.length) {
+          return safeSend(sock, chatId, {
+            text: "❌ Tag a user\nExample: /addfine @user 5",
+          });
+        }
+
+        const targetUser = mentioned[0];
+
+        // 💰 Get amount (optional)
+        const parts = text.split(" ");
+        const amount = parseInt(parts[1]) || 2;
+
+        // 🧠 Update DB
+        await User.findOneAndUpdate(
+          { userId: targetUser },
+          { $inc: { fine: amount } },
+          { upsert: true },
+        );
+
+        // ✅ Response
+        return safeSend(sock, chatId, {
+          text: `💸 ₹${amount} fine added to @${targetUser.split("@")[0]}`,
+          mentions: [targetUser],
+        });
+      }
+
       // 🔄 RESET DAY
       if (cmd.startsWith("/resetday")) {
         if (!isAdmin)
