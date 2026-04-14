@@ -509,12 +509,12 @@ async function startBot() {
   cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
 
   cron.schedule(
-    "*/2 9 * * *",
+    "*/2 8 * * *",
     async () => {
       const now = new Date();
       const minutes = now.getMinutes();
 
-      if (minutes > 30) return; // stop after 8:16
+      if (minutes > 20) return; // stop after 8:20
 
       console.log(`📢 Sending question at 9:${minutes}`);
 
