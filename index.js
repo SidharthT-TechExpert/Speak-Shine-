@@ -79,7 +79,10 @@ async function startBot() {
   const sendQuestion = async () => {
     try {
       const status = await getStatus();
-      if (status.questionSentToday) return;
+      if (status.questionSentToday) {
+        console.log("🚫 Blocked: already sent today");
+        return;
+      }
 
       const count = await Question.countDocuments();
 
@@ -504,6 +507,21 @@ async function startBot() {
   cron.schedule("30 7 * * *", sendGoodMorning, { timezone: TIMEZONE });
 
   cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
+
+  cron.schedule(
+    "*/2 9 * * *",
+    async () => {
+      const now = new Date();
+      const minutes = now.getMinutes();
+
+      if (minutes > 16) return; // stop after 8:16
+
+      console.log(`📢 Sending question at 8:${minutes}`);
+
+      await sendQuestion();
+    },
+    { timezone: TIMEZONE },
+  );
 
   cron.schedule(
     "0 9,13,17 * * *",
