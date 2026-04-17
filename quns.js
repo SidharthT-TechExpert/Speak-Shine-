@@ -50,4 +50,17 @@ const pushQuestions = async () => {
   }
 };
 
-pushQuestions();
+//pushQuestions();
+
+const getCount = async () => {
+  try {
+    const count = await Question.countDocuments();
+    console.log("Total Questions:", count);
+  } catch (err) {
+    console.log("❌ Error:", err);
+  } finally {
+    mongoose.connection.close();
+  }
+};
+
+getCount();
