@@ -81,10 +81,10 @@ async function startBot() {
     try {
       const status = await getStatus();
 
-      if (status.questionSentToday) {
-        console.log("🚫 Blocked: already sent today");
-        return;
-      }
+      // if (status.questionSentToday) {
+      //   console.log("🚫 Blocked: already sent today");
+      //   return;
+      // }
 
       const count = await Question.countDocuments();
 
