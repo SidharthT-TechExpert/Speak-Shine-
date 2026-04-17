@@ -81,10 +81,10 @@ async function startBot() {
     try {
       const status = await getStatus();
 
-      // if (status.questionSentToday) {
-      //   console.log("🚫 Blocked: already sent today");
-      //   return;
-      // }
+      if (status.questionSentToday) {
+        console.log("🚫 Blocked: already sent today");
+        return;
+      }
 
       const count = await Question.countDocuments();
 
@@ -133,9 +133,9 @@ async function startBot() {
 
       // ✅ Success
       if (sent) {
-        // await Question.findByIdAndDelete(question._id);
+        await Question.findByIdAndDelete(question._id);
 
-        // status.questionSentToday = true;
+        status.questionSentToday = true;
         await status.save();
 
         console.log("✅ Poster question sent");
