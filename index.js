@@ -550,7 +550,7 @@ async function startBot() {
   );
 
   cron.schedule(
-    "0 9,13,17 * * *",
+    "0 15 * * *",
     () =>
       sendReminder(
         `⏰ *Reminder*\n\n🗣️ _Don't forget to submit your speaking video today!_`,
@@ -561,7 +561,7 @@ async function startBot() {
   );
 
   cron.schedule(
-    "0 21,22 * * *",
+    "0 21 * * *",
     () =>
       sendReminder(
         `🌙 *Night Reminder*\n\n😴 _It's getting late — submit your video before midnight!_`,
