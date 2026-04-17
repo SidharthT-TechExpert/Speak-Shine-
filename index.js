@@ -133,7 +133,7 @@ async function startBot() {
 
       // ✅ Success
       if (sent) {
-        await Question.findByIdAndDelete(question._id);
+      //  await Question.findByIdAndDelete(question._id);
 
         status.questionSentToday = true;
         await status.save();
