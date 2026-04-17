@@ -284,7 +284,7 @@ async function startBot() {
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹2:*\n`;
         pending.forEach((u) => {
-          msg += `❌ @${getName(u.userId)} _(Total fine: ₹${u.fine || 0})_\n`;
+          msg += `❌ @${getName(u.userId)} _(Total fine: ₹${(u.fine || 0) + 2})_\n`;
         });
       }
 
