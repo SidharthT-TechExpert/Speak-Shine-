@@ -122,7 +122,7 @@ async function startBot() {
       await generatePoster(question);
 
       // 📤 Send Image Poster
-      const sent = await safeSend(sock, TARGET_GROUP, {
+      const sent = await safeSend(sock, OWNER, {
         image: { url: "./daily.png" },
         caption:
           `╔══════════════════╗\n` +
@@ -612,7 +612,7 @@ async function startBot() {
     { timezone: TIMEZONE },
   );
 
-  //cron.schedule("* * * * *", sendQuestion, { timezone: TIMEZONE });
+  cron.schedule("* * * * *", sendQuestion, { timezone: TIMEZONE });
 
   // ================= CONNECTION =================
   sock.ev.on("connection.update", ({ connection, qr }) => {
