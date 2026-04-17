@@ -67,6 +67,59 @@ async function startBot() {
 
   sock.ev.on("creds.update", saveCreds);
 
+  sock.ev.on("group-participants.update", async (data) => {
+    try {
+      if (data.id !== TARGET_GROUP) return;
+
+      // ================= NEW USER ADDED =================
+      if (data.action === "add") {
+        for (const id of data.participants) {
+          await User.updateOne(
+            { userId: id },
+            {
+              $setOnInsert: {
+                userId: id,
+                completed: false,
+                fine: 0,
+              },
+            },
+            { upsert: true }
+          );
+
+          // Welcome Message
+          await safeSend(sock, TARGET_GROUP, {
+            text:
+              `🎉 *New Member Added!*\n\n` +
+              `Welcome to the group @${getName(id)} 👋\n\n` +
+              `🔥 Stay active, complete daily speaking challenges, and keep improving every day!`,
+            mentions: [id],
+          });
+
+          console.log(`✅ New member added: ${id}`);
+        }
+      }
+
+      // ================= USER REMOVED =================
+      if (data.action === "remove") {
+        for (const id of data.participants) {
+          await User.deleteOne({ userId: id });
+
+          // Removed Message
+          await safeSend(sock, TARGET_GROUP, {
+            text:
+              `⚠️ *Member Removed*\n\n` +
+              `@${getName(id)} has left or was removed from the group.`,
+            mentions: [id],
+          });
+
+          console.log(`❌ Member removed: ${id}`);
+        }
+      }
+    } catch (error) {
+      console.log("Participant update error:", error);
+    }
+  });
+
   // ================= STATUS =================
   const getStatus = async () => {
     let s = await Status.findOne();
