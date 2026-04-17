@@ -59,12 +59,10 @@ async function startBot() {
     version,
     auth: state,
     printQRInTerminal: true,
-
-    // 🔥 IMPORTANT FIXES
     syncFullHistory: false,
-    markOnlineOnConnect: true,
-    defaultQueryTimeoutMs: undefined,
-    retryRequestDelayMs: 500,
+    markOnlineOnConnect: false,
+    defaultQueryTimeoutMs: 60000,
+    retryRequestDelayMs: 1000,
   });
 
   sock.ev.on("creds.update", saveCreds);
