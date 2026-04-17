@@ -459,6 +459,55 @@ async function startBot() {
         });
       }
 
+      // 💸 REMOVE FINE
+      if (cmd.startsWith("/removefine")) {
+        if (!isAdmin) {
+          return safeSend(sock, chatId, {
+            text: "❌ Only admins can use this command",
+          });
+        }
+
+        const mentioned =
+          msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+        const parts = text.trim().split(" ");
+
+        let targetUser;
+        let amount = 2;
+
+        // If mention exists → remove from mentioned user
+        if (mentioned.length > 0) {
+          targetUser = mentioned[0];
+          amount = parseInt(parts[2]) || 2;
+        }
+        // No mention = self
+        else {
+          targetUser = user;
+          amount = parseInt(parts[1]) || 2;
+        }
+
+        const existingUser = await User.findOne({ userId: targetUser });
+
+        if (!existingUser) {
+          return safeSend(sock, chatId, {
+            text: "❌ User not found",
+          });
+        }
+
+        const currentFine = existingUser.fine || 0;
+        const newFine = Math.max(0, currentFine - amount);
+
+        await User.updateOne(
+          { userId: targetUser },
+          { fine: newFine }
+        );
+
+        return safeSend(sock, chatId, {
+          text: `💰 ₹${amount} fine removed from @${targetUser.split("@")[0]}\nRemaining Fine: ₹${newFine}`,
+          mentions: [targetUser],
+        });
+      }
+
       if (cmd === "/cleanusers") {
         if (!isAdmin) return;
 
