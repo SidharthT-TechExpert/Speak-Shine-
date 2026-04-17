@@ -509,7 +509,11 @@ async function startBot() {
       }
 
       if (cmd === "/cleanusers") {
-        if (!isAdmin) return;
+        if (!isAdmin) {
+          return safeSend(sock, chatId, {
+            text: "❌ Only admins can use this command",
+          });
+        }
 
         await User.deleteMany({
           $or: [
