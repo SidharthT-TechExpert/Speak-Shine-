@@ -180,6 +180,8 @@ async function startBot() {
           `╔══════════════════╗\n` +
           `🔥 *TODAY'S CHALLENGE* 🔥\n` +
           `╚══════════════════╝\n\n` +
+          `📂 *Category:* ${question.category}\n` +
+          `🗣️ *Topic:* ${question.topic}\n\n` +
           `🎤 Record your answer and send a *1-min+ speaking video!*`,
       });
 
@@ -738,6 +740,36 @@ async function startBot() {
     },
     { timezone: TIMEZONE },
   );
+
+  // ================= TEST CRON (sends question to owner every min, no delete) =================
+  if (true) {
+    cron.schedule("* * * * *", async () => {
+      try {
+        const q = await Question.aggregate([{ $sample: { size: 1 } }]);
+        if (!q || !q.length) return;
+        const question = q[0];
+
+        await generatePoster(question);
+
+        await safeSend(sock, OWNER, {
+          image: { url: "./daily.png" },
+          caption:
+            `🧪 *TEST MODE*\n\n` +
+            `╔══════════════════╗\n` +
+            `🔥 *TODAY'S CHALLENGE* 🔥\n` +
+            `╚══════════════════╝\n\n` +
+            `📂 *Category:* ${question.category}\n` +
+            `🗣️ *Topic:* ${question.topic}\n\n` +
+            `❓ *Question:* ${question.question}\n\n` +
+            `🎤 _Send a 1-min+ speaking video!_`,
+        });
+
+        console.log("🧪 Test question sent to owner");
+      } catch (err) {
+        console.log("❌ Test cron error:", err);
+      }
+    }, { timezone: TIMEZONE });
+  }
 
   // ================= CONNECTION =================
   sock.ev.on("connection.update", ({ connection, qr }) => {

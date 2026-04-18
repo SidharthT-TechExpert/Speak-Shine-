@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 
 const questionSchema = new mongoose.Schema(
   {
-    quote: String,
+    category: String,
+    topic: String,
     question: String,
   },
   { timestamps: true },
