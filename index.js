@@ -550,8 +550,6 @@ async function startBot() {
 
         const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const parts = text.trim().split(/\s+/);
-        
-        // Parse format: /addfine @user1 11 @user2 5 @user3 7
         const userAmounts = [];
         
         if (mentioned.length === 0) {
@@ -560,7 +558,11 @@ async function startBot() {
           const amount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
           userAmounts.push({ userId: user, amount });
         } else {
-          // Parse mentions and amounts
+          // Check if last part is a number (applies to all without individual amounts)
+          const lastPart = parts[parts.length - 1];
+          const defaultAmount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
+          
+          // Parse mentions and individual amounts
           let mentionIndex = 0;
           
           for (let i = 1; i < parts.length && mentionIndex < mentioned.length; i++) {
@@ -570,11 +572,11 @@ async function startBot() {
             if (part.startsWith("@")) {
               const userId = mentioned[mentionIndex];
               
-              // Check if next part is a number
-              let amount = FINE_AMOUNT;
-              if (i + 1 < parts.length && !isNaN(parts[i + 1]) && parts[i + 1] !== "") {
+              // Check if next part is a number (and not the last part which is default)
+              let amount = defaultAmount;
+              if (i + 1 < parts.length - 1 && !isNaN(parts[i + 1]) && parts[i + 1] !== "") {
                 amount = parseInt(parts[i + 1]);
-                i++; // Skip the number in next iteration
+                i++; // Skip the number
               }
               
               userAmounts.push({ userId, amount });
@@ -582,14 +584,10 @@ async function startBot() {
             }
           }
           
-          // If parsing failed, apply same amount to all
-          if (userAmounts.length === 0) {
-            const lastPart = parts[parts.length - 1];
-            const amount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
-            
-            for (const userId of mentioned) {
-              userAmounts.push({ userId, amount });
-            }
+          // If we didn't parse all mentions, add remaining with default amount
+          while (mentionIndex < mentioned.length) {
+            userAmounts.push({ userId: mentioned[mentionIndex], amount: defaultAmount });
+            mentionIndex++;
           }
         }
 
@@ -620,8 +618,6 @@ async function startBot() {
 
         const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const parts = text.trim().split(/\s+/);
-        
-        // Parse format: /removefine @user1 11 @user2 5 @user3 7
         const userAmounts = [];
         
         if (mentioned.length === 0) {
@@ -630,7 +626,11 @@ async function startBot() {
           const amount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
           userAmounts.push({ userId: user, amount });
         } else {
-          // Parse mentions and amounts
+          // Check if last part is a number (applies to all without individual amounts)
+          const lastPart = parts[parts.length - 1];
+          const defaultAmount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
+          
+          // Parse mentions and individual amounts
           let mentionIndex = 0;
           
           for (let i = 1; i < parts.length && mentionIndex < mentioned.length; i++) {
@@ -640,11 +640,11 @@ async function startBot() {
             if (part.startsWith("@")) {
               const userId = mentioned[mentionIndex];
               
-              // Check if next part is a number
-              let amount = FINE_AMOUNT;
-              if (i + 1 < parts.length && !isNaN(parts[i + 1]) && parts[i + 1] !== "") {
+              // Check if next part is a number (and not the last part which is default)
+              let amount = defaultAmount;
+              if (i + 1 < parts.length - 1 && !isNaN(parts[i + 1]) && parts[i + 1] !== "") {
                 amount = parseInt(parts[i + 1]);
-                i++; // Skip the number in next iteration
+                i++; // Skip the number
               }
               
               userAmounts.push({ userId, amount });
@@ -652,14 +652,10 @@ async function startBot() {
             }
           }
           
-          // If parsing failed, apply same amount to all
-          if (userAmounts.length === 0) {
-            const lastPart = parts[parts.length - 1];
-            const amount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
-            
-            for (const userId of mentioned) {
-              userAmounts.push({ userId, amount });
-            }
+          // If we didn't parse all mentions, add remaining with default amount
+          while (mentionIndex < mentioned.length) {
+            userAmounts.push({ userId: mentioned[mentionIndex], amount: defaultAmount });
+            mentionIndex++;
           }
         }
 
