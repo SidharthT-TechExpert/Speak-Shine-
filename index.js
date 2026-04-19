@@ -63,7 +63,6 @@ async function startBot() {
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: true,
     syncFullHistory: false,
     markOnlineOnConnect: false,
     defaultQueryTimeoutMs: 60000,
