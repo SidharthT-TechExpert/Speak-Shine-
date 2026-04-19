@@ -524,9 +524,8 @@ async function startBot() {
 
         const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const parts = text.trim().split(" ");
-        // last part is amount if it's a number
         const lastPart = parts[parts.length - 1];
-        const amount = !isNaN(lastPart) && mentioned.length > 0 ? parseInt(lastPart) : FINE_AMOUNT;
+        const amount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
         const targets = mentioned.length > 0 ? mentioned : [user];
 
         await User.updateMany(
@@ -553,7 +552,7 @@ async function startBot() {
         const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const parts = text.trim().split(" ");
         const lastPart = parts[parts.length - 1];
-        const amount = !isNaN(lastPart) && mentioned.length > 0 ? parseInt(lastPart) : FINE_AMOUNT;
+        const amount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
         const targets = mentioned.length > 0 ? mentioned : [user];
 
         const results = [];
