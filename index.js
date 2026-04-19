@@ -442,7 +442,7 @@ async function startBot() {
             safeSend(sock, OWNER, { text: feedbackText });
           })
           .catch((err) => {
-            console.log("❌ Owner test feedback error:", err);
+            console.log("❌ Owner test feedback error:", err.message);
             safeSend(sock, OWNER, { text: `❌ Feedback failed: ${err.message}` });
           });
         return;
@@ -687,7 +687,10 @@ async function startBot() {
         .then((feedbackText) => {
           safeSend(sock, chatId, { text: feedbackText, mentions: [user] });
         })
-        .catch((err) => console.log("❌ Feedback error:", err));
+        .catch((err) => {
+          console.log("❌ Feedback error:", err.message);
+          safeSend(sock, chatId, { text: `⚠️ _Feedback unavailable: ${err.message}_`, mentions: [user] });
+        });
     } catch (err) {
       console.log("❌ Message error:", err);
     }
