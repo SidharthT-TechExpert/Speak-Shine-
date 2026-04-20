@@ -12,13 +12,13 @@ import fs from "fs";
  * @param {number} durationSeconds - Video duration in seconds
  * @param {string|null} questionTopic - Today's speaking topic (optional, for relevance check)
  */
-export async function generateFeedback(msg, user, durationSeconds, questionTopic = null, questionText = null) {
+export async function generateFeedback(msg, user, durationSeconds, questionTopic = null, questionText = null, sock = null) {
   const id = Date.now();
   let videoPath, audioPath;
 
   try {
-    // 1. Download video
-    videoPath = await downloadVideo(msg, id);
+    // 1. Download video (pass sock for media key re-fetch)
+    videoPath = await downloadVideo(msg, id, sock);
 
     // 2. Extract audio
     audioPath = await extractAudio(videoPath, id);

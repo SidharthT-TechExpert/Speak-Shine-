@@ -413,9 +413,14 @@ async function startBot() {
       if (!msg || !msg.message) return;
 
       const chatId = msg.key.remoteJid;
+
+      // Extract video from all possible message types including view-once
       const dmVideo =
         msg.message?.videoMessage ||
-        msg.message?.ephemeralMessage?.message?.videoMessage;
+        msg.message?.ephemeralMessage?.message?.videoMessage ||
+        msg.message?.viewOnceMessage?.message?.videoMessage ||
+        msg.message?.viewOnceMessageV2?.message?.videoMessage ||
+        msg.message?.viewOnceMessageV2Extension?.message?.videoMessage;
 
       // Get message text early
       const text =
@@ -438,7 +443,7 @@ async function startBot() {
       setTimeout(() => processedMsgIds.delete(msgId), 60000);
       if (isOwnerDM && dmVideo) {
         const ownerStatus = await getStatus();
-        generateFeedback(msg, OWNER, dmVideo.seconds || 60, ownerStatus?.todayTopic || null, ownerStatus?.todayQuestion || null)
+        generateFeedback(msg, OWNER, dmVideo.seconds || 60, ownerStatus?.todayTopic || null, ownerStatus?.todayQuestion || null, sock)
           .then((feedbackText) => {
             safeSend(sock, OWNER, { text: feedbackText });
           })
@@ -904,7 +909,10 @@ async function startBot() {
       // 🎥 VIDEO CHECK
       const video =
         msg.message?.videoMessage ||
-        msg.message?.ephemeralMessage?.message?.videoMessage;
+        msg.message?.ephemeralMessage?.message?.videoMessage ||
+        msg.message?.viewOnceMessage?.message?.videoMessage ||
+        msg.message?.viewOnceMessageV2?.message?.videoMessage ||
+        msg.message?.viewOnceMessageV2Extension?.message?.videoMessage;
 
       if (video) {
         if ((video.seconds || 0) < 60) {
@@ -942,7 +950,7 @@ async function startBot() {
         const todayStatus = await getStatus();
 
         // 🤖 AI Feedback (runs async, won't block submission)
-        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null, todayStatus?.todayQuestion || null)
+        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null, todayStatus?.todayQuestion || null, sock)
           .then((feedbackText) => {
             safeSend(sock, chatId, { text: feedbackText, mentions: [dbUser] });
           })
