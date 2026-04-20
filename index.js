@@ -427,28 +427,20 @@ async function startBot() {
         msg.message?.videoMessage ||
         msg.message?.ephemeralMessage?.message?.videoMessage;
 
+      // Get message text early
+      const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        "";
+
       // Match owner by phone number since WhatsApp may use @lid format
       const ownerNumber = OWNER.replace("@s.whatsapp.net", "").replace("@lid", "");
       const isOwnerDM = chatId === OWNER ||
         chatId.includes(ownerNumber) ||
         (msg.key.fromMe && dmVideo && !chatId.includes("@g.us"));
 
-      // Get message text early
-      const text =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        "";
-      
-      const isCommand = text.trim().startsWith("/");
-      const isGroupMessage = chatId.includes("@g.us");
-
-      // Block fromMe except: owner DM videos, commands in group, or text messages in target group
-      if (msg.key.fromMe && 
-          !(isOwnerDM && dmVideo) && 
-          !(isGroupMessage && isCommand) &&
-          !(chatId === TARGET_GROUP && text.trim().length > 0)) {
-        return;
-      }
+      // Block fromMe except owner DM videos
+      if (msg.key.fromMe && !(isOwnerDM && dmVideo)) return;
 
       const msgId = msg.key.id;
       if (processedMsgIds.has(msgId)) return;
@@ -874,96 +866,87 @@ async function startBot() {
         msg.message?.videoMessage ||
         msg.message?.ephemeralMessage?.message?.videoMessage;
 
-      if (!video) return;
+      if (video) {
+        if ((video.seconds || 0) < 60) {
+          return safeSend(sock, chatId, {
+            text: `❌ *Video Too Short!*\n\n━━━━━━━━━━━━━━━\n⏱️ Minimum duration is *1 minute*.\n\n🔁 _Please re-record and send again._`,
+          });
+        }
 
-      if ((video.seconds || 0) < 60) {
-        return safeSend(sock, chatId, {
-          text: `❌ *Video Too Short!*\n\n━━━━━━━━━━━━━━━\n⏱️ Minimum duration is *1 minute*.\n\n🔁 _Please re-record and send again._`,
+        const existing = await User.findOne({ userId: user });
+
+        if (existing?.completed) {
+          return safeSend(sock, chatId, {
+            text: `⚠️ *Already Submitted!*\n\n━━━━━━━━━━━━━━━\n✅ You've already sent your video for today.\n\n😎 _Sit back and relax — see you tomorrow!_`,
+          });
+        }
+   
+        await User.findOneAndUpdate(
+          { userId: user },
+          { completed: true },
+          { upsert: true },
+        );
+
+        const username = user.split("@")[0];
+        await safeSend(sock, chatId, {
+          text: `🔥 *Great work, @${username}!*\n\n✅ Submission received!\n\n💪 _Keep showing up every day — consistency is what separates the best from the rest. You're on the right track!_ 🚀`,
+          mentions: [user],
         });
+
+        await safeSend(sock, chatId, {
+          text: `🤖 ⏳ _Analyzing your video... feedback coming shortly!_`,
+          mentions: [user],
+        });
+
+        // 🤖 AI Feedback (runs async, won't block submission)
+        generateFeedback(msg, user, video.seconds || 60)
+          .then((feedbackText) => {
+            safeSend(sock, chatId, { text: feedbackText, mentions: [user] });
+          })
+          .catch((err) => {
+            console.log("❌ Feedback error:", err.message);
+            safeSend(sock, chatId, { text: `⚠️ _Feedback unavailable: ${err.message}_`, mentions: [user] });
+          });
+
+        return; // Done with video
       }
 
-      const existing = await User.findOne({ userId: user });
+      // ✍️ GRAMMAR ANALYSIS FOR TEXT MESSAGES
+      if (!text || text.trim().length === 0) return;
 
-      if (existing?.completed) {
-        return safeSend(sock, chatId, {
-          text: `⚠️ *Already Submitted!*\n\n━━━━━━━━━━━━━━━\n✅ You've already sent your video for today.\n\n😎 _Sit back and relax — see you tomorrow!_`,
-        });
+      const grammarSettings = await GrammarSettings.findOne({ groupId: chatId }) || {
+        grammarEnabled: true,
+        tenseEnabled: true,
+        vocabEnabled: true,
+        cooldownMinutes: 2,
+      };
+
+      if (!grammarSettings.grammarEnabled) return;
+
+      if (isOnCooldown(user, chatId, grammarSettings.cooldownMinutes)) {
+        console.log(`⏱️ ${getName(user)} on cooldown`);
+        return;
       }
- 
-      await User.findOneAndUpdate(
-        { userId: user },
-        { completed: true },
-        { upsert: true },
-      );
 
-      const username = user.split("@")[0];
-      await safeSend(sock, chatId, {
-        text: `🔥 *Great work, @${username}!*\n\n✅ Submission received!\n\n💪 _Keep showing up every day — consistency is what separates the best from the rest. You're on the right track!_ 🚀`,
-        mentions: [user],
-      });
+      console.log(`✍️ Analyzing: "${text}" from ${getName(user)}`);
+      const grammarResult = await processMessage(text, grammarSettings, OPENAI_API_KEY);
 
-      await safeSend(sock, chatId, {
-        text: `🤖 ⏳ _Analyzing your video... feedback coming shortly!_`,
-        mentions: [user],
-      });
+      if (grammarResult) {
+        setCooldown(user, chatId);
 
-      // 🤖 AI Feedback (runs async, won't block submission)
-      generateFeedback(msg, user, video.seconds || 60)
-        .then((feedbackText) => {
-          safeSend(sock, chatId, { text: feedbackText, mentions: [user] });
-        })
-        .catch((err) => {
-          console.log("❌ Feedback error:", err.message);
-          safeSend(sock, chatId, { text: `⚠️ _Feedback unavailable: ${err.message}_`, mentions: [user] });
-        });
-      
-      return; // Don't process text after video
-    
+        await UserStats.updateOne(
+          { userId: user, groupId: chatId },
+          { $inc: { totalCorrections: 1 }, $set: { lastMessageTime: new Date() } },
+          { upsert: true }
+        );
 
-    // ✍️ GRAMMAR ANALYSIS FOR TEXT MESSAGES
-    // Get grammar settings
-    const grammarSettings = await GrammarSettings.findOne({ groupId: chatId }) || {
-      grammarEnabled: true,
-      tenseEnabled: true,
-      vocabEnabled: true,
-      cooldownMinutes: 2,
-    };
+        const response = formatResponse(grammarResult, getName(user));
+        await safeSend(sock, chatId, { text: response, mentions: [user] });
+        console.log(`✍️ Grammar feedback sent to ${getName(user)}`);
+      } else {
+        console.log(`✅ No corrections needed for ${getName(user)}`);
+      }
 
-    // Check if grammar is enabled
-    if (!grammarSettings.grammarEnabled) return;
-
-    // Check cooldown
-    if (isOnCooldown(user, chatId, grammarSettings.cooldownMinutes)) {
-      console.log(`⏱️ ${getName(user)} on cooldown`);
-      return;
-    }
-
-    // Process message for grammar
-    const grammarResult = await processMessage(text, grammarSettings, OPENAI_API_KEY);
-
-    if (grammarResult) {
-      // Set cooldown
-      setCooldown(user, chatId);
-
-      // Update user stats
-      await UserStats.updateOne(
-        { userId: user, groupId: chatId },
-        {
-          $inc: { totalCorrections: 1 },
-          $set: { lastMessageTime: new Date() },
-        },
-        { upsert: true }
-      );
-
-      // Send grammar feedback
-      const response = formatResponse(grammarResult, getName(user));
-      await safeSend(sock, chatId, {
-        text: response,
-        mentions: [user],
-      });
-
-      console.log(`✍️ Grammar feedback sent to ${getName(user)}`);
-    }
     } catch (err) {
       console.log("❌ Message error:", err);
     }
