@@ -11,10 +11,14 @@ import { connectDB } from "./db.js";
 import User from "./models/userSchema.js";
 import Question from "./models/questionSchema.js";
 import Status from "./models/statusSchema.js";
+import GrammarSettings from "./models/grammarSettingsSchema.js";
+import UserStats from "./models/userStatsSchema.js";
 import generateVoice from "./generateVoice.js";
 import generatePoster from "./poster.js";
 import { resetStatus } from "./resetStatus.js";
 import { generateFeedback } from "./ai/feedback.js";
+import { processMessage, formatResponse } from "./grammar/processor.js";
+import { isOnCooldown, setCooldown, getRemainingCooldown } from "./grammar/cooldown.js";
 import fs from "fs";
 import { exec } from "child_process";
 
@@ -25,6 +29,7 @@ const TARGET_GROUP = process.env.TARGET_GROUP;
 const OWNER = process.env.OWNER_NUMBER;
 const TIMEZONE = "Asia/Kolkata";
 const FINE_AMOUNT = Number(process.env.FINE_AMOUNT) || 2;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
 const convertToOgg = (input, output) => {
   return new Promise((resolve, reject) => {
@@ -738,6 +743,123 @@ async function startBot() {
         });
       }
 
+      // ✍️ GRAMMAR COMMANDS
+      if (cmd === "/grammar on") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
+        
+        await GrammarSettings.updateOne(
+          { groupId: chatId },
+          { grammarEnabled: true },
+          { upsert: true }
+        );
+        
+        return safeSend(sock, chatId, {
+          text: "✅ *Grammar Assistant Enabled!*\n\n📝 I'll now help members improve their English.",
+        });
+      }
+
+      if (cmd === "/grammar off") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
+        
+        await GrammarSettings.updateOne(
+          { groupId: chatId },
+          { grammarEnabled: false },
+          { upsert: true }
+        );
+        
+        return safeSend(sock, chatId, {
+          text: "⏸️ *Grammar Assistant Disabled*\n\n📝 I won't analyze messages anymore.",
+        });
+      }
+
+      if (cmd === "/grammar status") {
+        const settings = await GrammarSettings.findOne({ groupId: chatId }) || {
+          grammarEnabled: true,
+          tenseEnabled: true,
+          vocabEnabled: true,
+          cooldownMinutes: 2,
+        };
+        
+        return safeSend(sock, chatId, {
+          text: `📊 *Grammar Assistant Status*\n\n` +
+                `✍️ Grammar: ${settings.grammarEnabled ? "✅ ON" : "❌ OFF"}\n` +
+                `⏰ Tense Check: ${settings.tenseEnabled ? "✅ ON" : "❌ OFF"}\n` +
+                `📚 Vocab: ${settings.vocabEnabled ? "✅ ON" : "❌ OFF"}\n` +
+                `⏱️ Cooldown: ${settings.cooldownMinutes} minutes`,
+        });
+      }
+
+      if (cmd === "/tense on") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
+        await GrammarSettings.updateOne({ groupId: chatId }, { tenseEnabled: true }, { upsert: true });
+        return safeSend(sock, chatId, { text: "✅ Tense checking enabled!" });
+      }
+
+      if (cmd === "/tense off") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
+        await GrammarSettings.updateOne({ groupId: chatId }, { tenseEnabled: false }, { upsert: true });
+        return safeSend(sock, chatId, { text: "⏸️ Tense checking disabled!" });
+      }
+
+      if (cmd === "/vocab on") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
+        await GrammarSettings.updateOne({ groupId: chatId }, { vocabEnabled: true }, { upsert: true });
+        return safeSend(sock, chatId, { text: "✅ Vocabulary suggestions enabled!" });
+      }
+
+      if (cmd === "/vocab off") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
+        await GrammarSettings.updateOne({ groupId: chatId }, { vocabEnabled: false }, { upsert: true });
+        return safeSend(sock, chatId, { text: "⏸️ Vocabulary suggestions disabled!" });
+      }
+
+      if (cmd === "/mystats") {
+        const stats = await UserStats.findOne({ userId: user, groupId: chatId });
+        
+        if (!stats || stats.totalCorrections === 0) {
+          return safeSend(sock, chatId, {
+            text: `📊 *Your English Stats*\n\n` +
+                  `@${getName(user)}, you haven't received any corrections yet!\n\n` +
+                  `💬 Keep chatting in English to get feedback.`,
+            mentions: [user],
+          });
+        }
+        
+        return safeSend(sock, chatId, {
+          text: `📊 *Your English Stats*\n\n` +
+                `👤 @${getName(user)}\n` +
+                `✍️ Total Corrections: ${stats.totalCorrections}\n` +
+                `📈 Grammar Score: ${stats.grammarScore}/100\n` +
+                `🔥 Streak: ${stats.streakDays} days\n\n` +
+                `💪 Keep improving!`,
+          mentions: [user],
+        });
+      }
+
+      if (cmd === "/toplearners") {
+        const topUsers = await UserStats.find({ groupId: chatId })
+          .sort({ totalCorrections: -1 })
+          .limit(5);
+        
+        if (!topUsers.length) {
+          return safeSend(sock, chatId, {
+            text: "📊 *Top Learners*\n\nNo stats yet! Start chatting in English.",
+          });
+        }
+        
+        let msg = "🏆 *Top English Learners*\n\n";
+        const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
+        
+        topUsers.forEach((u, i) => {
+          msg += `${medals[i]} @${getName(u.userId)} - ${u.totalCorrections} corrections\n`;
+        });
+        
+        return safeSend(sock, chatId, {
+          text: msg,
+          mentions: topUsers.map(u => u.userId),
+        });
+      }
+
       // 🎥 VIDEO CHECK
       const video =
         msg.message?.videoMessage ||
@@ -785,6 +907,54 @@ async function startBot() {
           console.log("❌ Feedback error:", err.message);
           safeSend(sock, chatId, { text: `⚠️ _Feedback unavailable: ${err.message}_`, mentions: [user] });
         });
+      
+      return; // Don't process text after video
+    
+
+    // ✍️ GRAMMAR ANALYSIS FOR TEXT MESSAGES
+    // Get grammar settings
+    const grammarSettings = await GrammarSettings.findOne({ groupId: chatId }) || {
+      grammarEnabled: true,
+      tenseEnabled: true,
+      vocabEnabled: true,
+      cooldownMinutes: 2,
+    };
+
+    // Check if grammar is enabled
+    if (!grammarSettings.grammarEnabled) return;
+
+    // Check cooldown
+    if (isOnCooldown(user, chatId, grammarSettings.cooldownMinutes)) {
+      console.log(`⏱️ ${getName(user)} on cooldown`);
+      return;
+    }
+
+    // Process message for grammar
+    const grammarResult = await processMessage(text, grammarSettings, OPENAI_API_KEY);
+
+    if (grammarResult) {
+      // Set cooldown
+      setCooldown(user, chatId);
+
+      // Update user stats
+      await UserStats.updateOne(
+        { userId: user, groupId: chatId },
+        {
+          $inc: { totalCorrections: 1 },
+          $set: { lastMessageTime: new Date() },
+        },
+        { upsert: true }
+      );
+
+      // Send grammar feedback
+      const response = formatResponse(grammarResult, getName(user));
+      await safeSend(sock, chatId, {
+        text: response,
+        mentions: [user],
+      });
+
+      console.log(`✍️ Grammar feedback sent to ${getName(user)}`);
+    }
     } catch (err) {
       console.log("❌ Message error:", err);
     }
