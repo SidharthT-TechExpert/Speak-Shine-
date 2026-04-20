@@ -923,17 +923,10 @@ async function startBot() {
 
       if (!grammarSettings.grammarEnabled) return;
 
-      if (isOnCooldown(user, chatId, grammarSettings.cooldownMinutes)) {
-        console.log(`⏱️ ${getName(user)} on cooldown`);
-        return;
-      }
-
       console.log(`✍️ Analyzing: "${text}" from ${getName(user)}`);
       const grammarResult = await processMessage(text, grammarSettings, OPENAI_API_KEY);
 
       if (grammarResult) {
-        setCooldown(user, chatId);
-
         await UserStats.updateOne(
           { userId: user, groupId: chatId },
           { $inc: { totalCorrections: 1 }, $set: { lastMessageTime: new Date() } },
