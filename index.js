@@ -707,6 +707,40 @@ async function startBot() {
         });
       }
 
+      // 🧪 TEST REPORT (Admin only - triggers daily report immediately)
+      if (cmd === "/testreport") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
+
+        await safeSend(sock, chatId, { text: `🧪 _Running test report... (fines will NOT be applied in test mode)_` });
+        
+        const users = await User.find({ userId: { $ne: null, $exists: true } });
+        const completed = users.filter((u) => u.completed);
+        const pending = users.filter((u) => !u.completed);
+
+        let msg = `╔══════════════════╗\n📊 *TEST REPORT*\n╚══════════════════╝\n\n`;
+        msg += `✅ *Submitted:* ${completed.length}\n`;
+        msg += `❌ *Missed:* ${pending.length}\n`;
+        msg += `💸 *Fine would be:* ₹${pending.length * FINE_AMOUNT}\n`;
+        msg += `━━━━━━━━━━━━━━━`;
+
+        if (completed.length) {
+          msg += `\n\n🏅 *Submitted:*\n`;
+          completed.forEach((u) => { msg += `✅ @${getName(u.userId)}\n`; });
+        }
+
+        if (pending.length) {
+          msg += `\n\n⚠️ *Would be fined ₹${FINE_AMOUNT}:*\n`;
+          pending.forEach((u) => { msg += `❌ @${getName(u.userId)} _(Current fine: ₹${u.fine || 0})_\n`; });
+        }
+
+        msg += `\n━━━━━━━━━━━━━━━\n⚠️ _This is a TEST — no fines applied, no status reset._`;
+
+        return safeSend(sock, chatId, {
+          text: msg,
+          mentions: users.map((u) => u.userId).filter(Boolean),
+        });
+      }
+
       // 🔄 RESET STATUS
       if (cmd.startsWith("/resetstatus")) {
         if (!isAdmin) return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
