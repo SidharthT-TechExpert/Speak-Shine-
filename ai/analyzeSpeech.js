@@ -111,7 +111,7 @@ AUDIO STATS (measured objectively from the recording):
 - ${topicLine}
 
 TRANSCRIPT:
-"${transcript}"
+${transcript.replace(/"/g, "'").replace(/\\/g, "")}
 
 TASK: Analyze this spoken English and return ONLY a valid JSON object with this exact structure. No extra text, no markdown, no explanation — just the JSON:
 
@@ -145,7 +145,8 @@ RULES:
 - strongPoints: find at least 1-2 genuine positives
 - If filler words were detected, address them in suggestions
 - If pace is too fast or slow, mention it
-- Keep overallComment encouraging but honest`;
+- Keep overallComment encouraging but honest
+- IMPORTANT: All string values in the JSON must use only single quotes inside text, never double quotes`;
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -157,7 +158,7 @@ RULES:
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
-      max_tokens: 800,
+      max_tokens: 1200,
     }),
   });
 
@@ -169,10 +170,37 @@ RULES:
   const data = await res.json();
   const raw = data.choices[0].message.content.trim();
 
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON found in Llama response");
+  // Extract JSON — handle markdown code blocks and stray text
+  let jsonStr = raw;
 
-  const scores = JSON.parse(jsonMatch[0]);
+  // Strip markdown code fences if present
+  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    jsonStr = fenceMatch[1].trim();
+  } else {
+    // Find the outermost { ... }
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      jsonStr = raw.slice(start, end + 1);
+    }
+  }
+
+  // Fix common Llama JSON issues:
+  // 1. Unescaped double quotes inside string values → replace with single quotes
+  // 2. Trailing commas before } or ]
+  jsonStr = jsonStr
+    .replace(/,\s*([}\]])/g, "$1")  // remove trailing commas
+    .replace(/[\u0000-\u001F]/g, " "); // remove control characters
+
+  let scores;
+  try {
+    scores = JSON.parse(jsonStr);
+  } catch (parseErr) {
+    // Last resort: try to extract just the numeric scores with regex
+    console.error("JSON parse failed, raw response:", raw.slice(0, 500));
+    throw new Error(`Failed to parse Llama response as JSON: ${parseErr.message}`);
+  }
 
   return {
     ...scores,
