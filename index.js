@@ -191,6 +191,8 @@ async function startBot() {
         await Question.findByIdAndDelete(question._id);
 
         status.questionSentToday = true;
+        // Save today's topic so AI feedback can check relevance
+        status.todayTopic = question.topic || question.question || null;
         await status.save();
 
         console.log("✅ Poster question sent");
@@ -434,7 +436,8 @@ async function startBot() {
       processedMsgIds.add(msgId);
       setTimeout(() => processedMsgIds.delete(msgId), 60000);
       if (isOwnerDM && dmVideo) {
-        generateFeedback(msg, OWNER, dmVideo.seconds || 60)
+        const ownerStatus = await getStatus();
+        generateFeedback(msg, OWNER, dmVideo.seconds || 60, ownerStatus?.todayTopic || null)
           .then((feedbackText) => {
             safeSend(sock, OWNER, { text: feedbackText });
           })
@@ -934,8 +937,11 @@ async function startBot() {
           mentions: [dbUser],
         });
 
+        // Fetch today's topic for AI relevance check
+        const todayStatus = await getStatus();
+
         // 🤖 AI Feedback (runs async, won't block submission)
-        generateFeedback(msg, dbUser, video.seconds || 60)
+        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null)
           .then((feedbackText) => {
             safeSend(sock, chatId, { text: feedbackText, mentions: [dbUser] });
           })
