@@ -237,8 +237,9 @@ async function startBot() {
       let msg = `${title}\n━━━━━━━━━━━━━━━\n\n`;
       msg += `📌 *${pending.length} member(s) yet to submit:*\n\n`;
       pending.forEach((u) => {
-        const displayName = u.name || getName(u.userId);
-        msg += `▪️ @${displayName}\n`;
+        const phone = getName(u.userId); // phone number without @domain
+        const displayName = u.name ? ` (${u.name})` : "";
+        msg += `▪️ @${phone}${displayName}\n`;
       });
       msg += `\n📹 _Send your 1-min+ speaking video now!_`;
 
@@ -318,7 +319,7 @@ async function startBot() {
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
-        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${u.name || getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
+        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${getName(u.userId)}${u.name ? ` (${u.name})` : ""}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
         mentions: pending.map((u) => u.userId),
       });
 
@@ -384,16 +385,18 @@ async function startBot() {
       if (completed.length) {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
-          const displayName = u.name || getName(u.userId);
-          msg += `✅ @${displayName}\n`;
+          const phone = getName(u.userId);
+          const displayName = u.name ? ` (${u.name})` : "";
+          msg += `✅ @${phone}${displayName}\n`;
         });
       }
 
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
-          const displayName = u.name || getName(u.userId);
-          msg += `❌ @${displayName} _(Total fine: ₹${u.fine})_\n`;
+          const phone = getName(u.userId);
+          const displayName = u.name ? ` (${u.name})` : "";
+          msg += `❌ @${phone}${displayName} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -557,8 +560,9 @@ async function startBot() {
         uniqueUsers.forEach((u) => {
           const fine = u.fine || 0;
           totalFine += fine;
-          const displayName = u.name || getName(u.userId);
-          msgText += `▪️ @${displayName} → ₹${fine}\n`;
+          const phone = getName(u.userId);
+          const displayName = u.name ? ` (${u.name})` : "";
+          msgText += `▪️ @${phone}${displayName} → ₹${fine}\n`;
         });
 
         msgText += `\n━━━━━━━━━━━━━━━\n💵 *Total Fine Pool:* ₹${totalFine}\n\n⚠️ _Missed daily submissions result in fines._\n🔥 _Stay consistent. Avoid penalties._\n`;
@@ -832,6 +836,40 @@ async function startBot() {
         return safeSend(sock, chatId, {
           text: `💰 *All Fines Cleared!*\n\n━━━━━━━━━━━━━━━\n✅ All member fines have been reset to ₹0.\n\n💡 _Daily status unchanged. Use /resetday to reset status._`,
         });
+      }
+
+      // 👥 SYNC USERS — add all current group members to DB (for members who joined before bot)
+      if (cmd.startsWith("/syncusers")) {
+        if (!isAdmin)
+          return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
+
+        try {
+          const meta = await sock.groupMetadata(TARGET_GROUP);
+          let added = 0;
+
+          for (const p of meta.participants) {
+            const normalizedId = p.id.includes("@lid")
+              ? p.id.replace("@lid", "@s.whatsapp.net")
+              : p.id;
+            const pName = p.notify || p.name || null;
+
+            const result = await User.updateOne(
+              { userId: normalizedId },
+              {
+                $setOnInsert: { userId: normalizedId, completed: false, fine: 0 },
+                ...(pName ? { $set: { name: pName } } : {}),
+              },
+              { upsert: true }
+            );
+            if (result.upsertedCount > 0) added++;
+          }
+
+          return safeSend(sock, chatId, {
+            text: `✅ *Users Synced!*\n\n━━━━━━━━━━━━━━━\n➕ Added *${added}* new member(s) to DB.\n📦 Total tracked: *${meta.participants.length}*`,
+          });
+        } catch (err) {
+          return safeSend(sock, chatId, { text: `❌ Sync failed: ${err.message}` });
+        }
       }
 
       // 🔄 SYNC NAMES — bulk fetch push names from group metadata
