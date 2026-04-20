@@ -414,13 +414,21 @@ async function startBot() {
 
       const chatId = msg.key.remoteJid;
 
-      // Extract video from all possible message types including view-once
+      // Helper: check if a documentMessage is a video file
+      const docMsg = msg.message?.documentMessage;
+      const docIsVideo = docMsg && (
+        docMsg.mimetype?.startsWith("video/") ||
+        docMsg.fileName?.match(/\.(mp4|mov|mkv|avi|3gp|webm)$/i)
+      );
+
+      // Extract video from all possible message types including view-once and document
       const dmVideo =
         msg.message?.videoMessage ||
         msg.message?.ephemeralMessage?.message?.videoMessage ||
         msg.message?.viewOnceMessage?.message?.videoMessage ||
         msg.message?.viewOnceMessageV2?.message?.videoMessage ||
-        msg.message?.viewOnceMessageV2Extension?.message?.videoMessage;
+        msg.message?.viewOnceMessageV2Extension?.message?.videoMessage ||
+        (docIsVideo ? docMsg : null);
 
       // Get message text early
       const text =
@@ -912,10 +920,13 @@ async function startBot() {
         msg.message?.ephemeralMessage?.message?.videoMessage ||
         msg.message?.viewOnceMessage?.message?.videoMessage ||
         msg.message?.viewOnceMessageV2?.message?.videoMessage ||
-        msg.message?.viewOnceMessageV2Extension?.message?.videoMessage;
+        msg.message?.viewOnceMessageV2Extension?.message?.videoMessage ||
+        (docIsVideo ? docMsg : null);
 
       if (video) {
-        if ((video.seconds || 0) < 60) {
+        // Documents don't have a seconds field — skip duration check, Whisper will measure it
+        const isDocument = video === docMsg;
+        if (!isDocument && (video.seconds || 0) < 60) {
           return safeSend(sock, chatId, {
             text: `❌ *Video Too Short!*\n\n━━━━━━━━━━━━━━━\n⏱️ Minimum duration is *1 minute*.\n\n🔁 _Please re-record and send again._`,
           });
