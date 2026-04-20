@@ -12,7 +12,7 @@ import fs from "fs";
  * @param {number} durationSeconds - Video duration in seconds
  * @param {string|null} questionTopic - Today's speaking topic (optional, for relevance check)
  */
-export async function generateFeedback(msg, user, durationSeconds, questionTopic = null) {
+export async function generateFeedback(msg, user, durationSeconds, questionTopic = null, questionText = null) {
   const id = Date.now();
   let videoPath, audioPath;
 
@@ -40,7 +40,8 @@ export async function generateFeedback(msg, user, durationSeconds, questionTopic
       transcription.text,
       actualDuration,
       transcription.words,
-      questionTopic
+      questionTopic,
+      questionText
     );
 
     // 5. Format the feedback message

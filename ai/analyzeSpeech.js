@@ -65,7 +65,7 @@ function detectPauses(words, pauseThreshold = 1.5) {
  * @param {object[]} words - Word-level timestamps from Whisper
  * @param {string|null} questionTopic - Today's daily question topic (optional)
  */
-export async function analyzeSpeech(transcript, durationSeconds, words = [], questionTopic = null) {
+export async function analyzeSpeech(transcript, durationSeconds, words = [], questionTopic = null, questionText = null) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY is not set in .env");
 
@@ -93,8 +93,11 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     ? `${wpm} words per minute (${wpm < 100 ? "slow" : wpm <= 150 ? "good" : "fast"})`
     : "unknown";
 
-  const topicLine = questionTopic
-    ? `Today's speaking topic: "${questionTopic}"`
+  const topicLine = questionTopic || questionText
+    ? [
+        questionTopic  ? `Topic: "${questionTopic}"` : null,
+        questionText   ? `Question asked: "${questionText}"` : null,
+      ].filter(Boolean).join("\n- ")
     : "No specific topic provided.";
 
   const prompt = `You are an expert English speaking coach analyzing a student's spoken English video submission.

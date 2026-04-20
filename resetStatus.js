@@ -9,6 +9,7 @@ export async function resetStatus() {
     notifiedLast: false,
     fineAppliedToday: false,
     todayTopic: null,
+    todayQuestion: null,
   });
 }
 
