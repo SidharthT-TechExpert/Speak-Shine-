@@ -50,6 +50,12 @@ const getName = (userId) => {
   return userId.split("@")[0];
 };
 
+// Returns saved name from DB record, falls back to phone number
+const getDisplayName = (userRecord) => {
+  if (!userRecord) return "Unknown";
+  return userRecord.name || getName(userRecord.userId);
+};
+
 const safeSend = async (sock, jid, msg) => {
   try {
     if (!sock?.user) return false;
@@ -88,14 +94,21 @@ async function startBot() {
             ? id.replace("@lid", "@s.whatsapp.net")
             : id;
 
+          // Try to get push name from group metadata
+          let pushName = null;
+          try {
+            const meta = await sock.groupMetadata(TARGET_GROUP);
+            const participant = meta.participants.find(p =>
+              p.id === normalizedId || p.id === id
+            );
+            pushName = participant?.notify || participant?.name || null;
+          } catch (_) {}
+
           await User.updateOne(
             { userId: normalizedId },
             {
-              $setOnInsert: {
-                userId: normalizedId,
-                completed: false,
-                fine: 0,
-              },
+              $setOnInsert: { userId: normalizedId, completed: false, fine: 0 },
+              ...(pushName ? { $set: { name: pushName } } : {}),
             },
             { upsert: true }
           );
@@ -224,7 +237,8 @@ async function startBot() {
       let msg = `${title}\n━━━━━━━━━━━━━━━\n\n`;
       msg += `📌 *${pending.length} member(s) yet to submit:*\n\n`;
       pending.forEach((u) => {
-        msg += `▪️ @${getName(u.userId)}\n`;
+        const displayName = u.name || getName(u.userId);
+        msg += `▪️ ${displayName}\n`;
       });
       msg += `\n📹 _Send your 1-min+ speaking video now!_`;
 
@@ -304,7 +318,7 @@ async function startBot() {
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
-        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
+        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ ${u.name || getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
         mentions: pending.map((u) => u.userId),
       });
 
@@ -370,14 +384,16 @@ async function startBot() {
       if (completed.length) {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
-          msg += `✅ @${getName(u.userId)}\n`;
+          const displayName = u.name || getName(u.userId);
+          msg += `✅ ${displayName}\n`;
         });
       }
 
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
-          msg += `❌ @${getName(u.userId)} _(Total fine: ₹${u.fine})_\n`;
+          const displayName = u.name || getName(u.userId);
+          msg += `❌ ${displayName} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -495,6 +511,16 @@ async function startBot() {
       // Use normalizedUser for all DB operations
       const dbUser = normalizedUser;
 
+      // Save push name whenever we see a message — most reliable way to capture names
+      const pushName = msg.pushName || null;
+      if (pushName) {
+        await User.updateOne(
+          { userId: dbUser },
+          { $set: { name: pushName } },
+          { upsert: false } // only update existing records, don't create
+        );
+      }
+
       // 📋 REMAINING
       if (cmd.startsWith("/remaining")) {
         return sendReminder(
@@ -517,22 +543,22 @@ async function startBot() {
           if (merged.has(phone)) {
             const existing = merged.get(phone);
             existing.fine = (existing.fine || 0) + (u.fine || 0);
-            // Prefer @s.whatsapp.net userId for mentions
             if (u.userId?.includes("@s.whatsapp.net")) existing.userId = u.userId;
+            if (u.name) existing.name = u.name;
           } else {
-            merged.set(phone, { userId: u.userId, fine: u.fine || 0 });
+            merged.set(phone, { userId: u.userId, name: u.name || null, fine: u.fine || 0 });
           }
         }
         const uniqueUsers = [...merged.values()];
 
         let totalFine = 0;
-
         let msgText = `╔══════════════════╗\n💰 *FINE REPORT*\n╚══════════════════╝\n\n📋 *Individual Fines:*\n━━━━━━━━━━━━━━━\n`;
 
         uniqueUsers.forEach((u) => {
           const fine = u.fine || 0;
           totalFine += fine;
-          msgText += `▪️ @${getName(u.userId)} → ₹${fine}\n`;
+          const displayName = u.name || getName(u.userId);
+          msgText += `▪️ ${displayName} → ₹${fine}\n`;
         });
 
         msgText += `\n━━━━━━━━━━━━━━━\n💵 *Total Fine Pool:* ₹${totalFine}\n\n⚠️ _Missed daily submissions result in fines._\n🔥 _Stay consistent. Avoid penalties._\n`;
@@ -806,6 +832,38 @@ async function startBot() {
         return safeSend(sock, chatId, {
           text: `💰 *All Fines Cleared!*\n\n━━━━━━━━━━━━━━━\n✅ All member fines have been reset to ₹0.\n\n💡 _Daily status unchanged. Use /resetday to reset status._`,
         });
+      }
+
+      // 🔄 SYNC NAMES — bulk fetch push names from group metadata
+      if (cmd.startsWith("/syncnames")) {
+        if (!isAdmin)
+          return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
+
+        try {
+          const meta = await sock.groupMetadata(TARGET_GROUP);
+          let updated = 0;
+
+          for (const p of meta.participants) {
+            const pName = p.notify || p.name || null;
+            if (!pName) continue;
+
+            const normalizedId = p.id.includes("@lid")
+              ? p.id.replace("@lid", "@s.whatsapp.net")
+              : p.id;
+
+            const result = await User.updateOne(
+              { userId: normalizedId },
+              { $set: { name: pName } }
+            );
+            if (result.modifiedCount > 0) updated++;
+          }
+
+          return safeSend(sock, chatId, {
+            text: `✅ *Names Synced!*\n\n━━━━━━━━━━━━━━━\n🔄 Updated *${updated}* member name(s) from group.`,
+          });
+        } catch (err) {
+          return safeSend(sock, chatId, { text: `❌ Sync failed: ${err.message}` });
+        }
       }
 
       // 🧹 DEDUP — remove duplicate userId records from DB
