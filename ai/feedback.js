@@ -42,6 +42,7 @@ export async function generateFeedback(msg, user, durationSeconds, questionTopic
     if (visualResult.status === "rejected") {
       console.log("⚠️ Visual analysis error (non-fatal):", visualResult.reason?.message);
     }
+    console.log("🎨 Visual analysis result:", visual ? JSON.stringify(visual).slice(0, 300) : "null/failed");
 
     // 3. Transcribe with verbose_json (word timestamps + duration)
     const transcription = await transcribe(audioPath);

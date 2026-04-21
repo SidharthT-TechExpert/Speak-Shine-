@@ -75,9 +75,12 @@ export async function analyzeVideo(videoPath) {
     return null;
   }
 
+  console.log("🎥 Starting visual analysis for:", videoPath);
+
   let frames = [];
   try {
     frames = await extractFrames(videoPath, 3);
+    console.log(`🖼️ Extracted ${frames.length} frames, sizes: ${frames.map(f => f.length)} chars`);
   } catch (err) {
     console.log("⚠️ Frame extraction failed:", err.message);
     return null;
@@ -148,8 +151,13 @@ Be specific and honest. If the image quality is low or face is not clearly visib
     }
 
     const data = await res.json();
+    console.log("🤖 Gemini raw response:", JSON.stringify(data).slice(0, 500));
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!raw) return null;
+    if (!raw) {
+      console.log("⚠️ Gemini returned empty content. Full response:", JSON.stringify(data).slice(0, 800));
+      return null;
+    }
+    console.log("📝 Gemini text output:", raw.slice(0, 300));
 
     // Strip markdown fences if present
     let jsonStr = raw;
