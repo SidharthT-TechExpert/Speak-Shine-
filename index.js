@@ -237,9 +237,9 @@ async function startBot() {
       let msg = `${title}\n━━━━━━━━━━━━━━━\n\n`;
       msg += `📌 *${pending.length} member(s) yet to submit:*\n\n`;
       pending.forEach((u) => {
-        const phone = getName(u.userId); // phone number without @domain
-        const displayName = u.name ? ` (${u.name})` : "";
-        msg += `▪️ @${phone}${displayName}\n`;
+        const phone = getName(u.userId);
+        const displayName = u.name || `...${phone.slice(-6)}`;
+        msg += `▪️ @${phone} ${displayName}\n`;
       });
       msg += `\n📹 _Send your 1-min+ speaking video now!_`;
 
@@ -319,7 +319,11 @@ async function startBot() {
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
-        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${getName(u.userId)}${u.name ? ` (${u.name})` : ""}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
+        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => {
+          const phone = getName(u.userId);
+          const displayName = u.name || `...${phone.slice(-6)}`;
+          return `▪️ @${phone} ${displayName}`;
+        }).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
         mentions: pending.map((u) => u.userId),
       });
 
@@ -386,8 +390,8 @@ async function startBot() {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
           const phone = getName(u.userId);
-          const displayName = u.name ? ` (${u.name})` : "";
-          msg += `✅ @${phone}${displayName}\n`;
+          const displayName = u.name || `...${phone.slice(-6)}`;
+          msg += `✅ @${phone} ${displayName}\n`;
         });
       }
 
@@ -395,8 +399,8 @@ async function startBot() {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
           const phone = getName(u.userId);
-          const displayName = u.name ? ` (${u.name})` : "";
-          msg += `❌ @${phone}${displayName} _(Total fine: ₹${u.fine})_\n`;
+          const displayName = u.name || `...${phone.slice(-6)}`;
+          msg += `❌ @${phone} ${displayName} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -560,9 +564,10 @@ async function startBot() {
         uniqueUsers.forEach((u) => {
           const fine = u.fine || 0;
           totalFine += fine;
+          // Show name if available, else show last 6 digits of phone
           const phone = getName(u.userId);
-          const displayName = u.name ? ` (${u.name})` : "";
-          msgText += `▪️ @${phone}${displayName} → ₹${fine}\n`;
+          const displayName = u.name || `...${phone.slice(-6)}`;
+          msgText += `▪️ ${displayName} → ₹${fine}\n`;
         });
 
         msgText += `\n━━━━━━━━━━━━━━━\n💵 *Total Fine Pool:* ₹${totalFine}\n\n⚠️ _Missed daily submissions result in fines._\n🔥 _Stay consistent. Avoid penalties._\n`;
@@ -835,6 +840,39 @@ async function startBot() {
 
         return safeSend(sock, chatId, {
           text: `💰 *All Fines Cleared!*\n\n━━━━━━━━━━━━━━━\n✅ All member fines have been reset to ₹0.\n\n💡 _Daily status unchanged. Use /resetday to reset status._`,
+        });
+      }
+
+      // ✏️ SET NAME — manually set a member's display name
+      // Usage: /setname @mention Name Here
+      if (cmd.startsWith("/setname")) {
+        if (!isAdmin)
+          return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
+
+        const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        if (!mentioned.length) {
+          return safeSend(sock, chatId, { text: `❌ Usage: /setname @mention Name\nExample: /setname @628xxx Sinan` });
+        }
+
+        // Name is everything after the command and mention
+        const rawText = text.trim();
+        const nameMatch = rawText.replace(/\/setname\s*/i, "").replace(/@\S+\s*/g, "").trim();
+        if (!nameMatch) {
+          return safeSend(sock, chatId, { text: `❌ Please provide a name. Usage: /setname @mention Name` });
+        }
+
+        const results = [];
+        for (const userId of mentioned) {
+          const normalizedId = userId.includes("@lid")
+            ? userId.replace("@lid", "@s.whatsapp.net")
+            : userId;
+          await User.updateOne({ userId: normalizedId }, { $set: { name: nameMatch } });
+          results.push(`@${getName(normalizedId)} → *${nameMatch}*`);
+        }
+
+        return safeSend(sock, chatId, {
+          text: `✅ *Name Updated!*\n\n━━━━━━━━━━━━━━━\n${results.join("\n")}`,
+          mentions: mentioned,
         });
       }
 
