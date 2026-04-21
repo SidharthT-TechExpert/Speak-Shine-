@@ -256,10 +256,18 @@ async function startBot() {
       const users = await User.find();
       const pending = users.filter((u) => !u.completed);
 
+      console.log(`📱 DM Reminder: ${pending.length} pending users at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
+
+      if (pending.length === 0) {
+        console.log("✅ No DMs sent - all users completed");
+        return;
+      }
+
       for (const u of pending) {
         await safeSend(sock, u.userId, {
           text: `⏰ *Hey! Don't forget today's task.*\n\n━━━━━━━━━━━━━━━\n📹 You haven't submitted your speaking video yet.\n\n🕐 _Time is running out — send it before midnight!_ 💪`,
         });
+        console.log(`📱 DM sent to ${u.name || getName(u.userId)}`);
       }
     } catch (err) {
       console.log("❌ DM error:", err);
@@ -555,14 +563,13 @@ async function startBot() {
           const fine = u.fine || 0;
           totalFine += fine;
           const display = u.name || getName(u.userId);
-          msgText += `▪️ @${display} → ₹${fine}\n`;
+          msgText += `▪️ ${display} → ₹${fine}\n`;
         });
 
         msgText += `\n━━━━━━━━━━━━━━━\n💵 *Total Fine Pool:* ₹${totalFine}\n\n⚠️ _Missed daily submissions result in fines._\n🔥 _Stay consistent. Avoid penalties._\n`;
 
         return safeSend(sock, chatId, {
           text: msgText,
-          mentions: uniqueUsers.map((u) => u.userId),
         });
       }
 
@@ -1155,7 +1162,7 @@ async function startBot() {
           { upsert: true },
         );
 
-        const username = dbUser.split("@")[0];
+        const username = getName(dbUser);
         await safeSend(sock, chatId, {
           text: `🔥 *Great work, @${username}!*\n\n✅ Submission received!\n\n💪 _Keep showing up every day — consistency is what separates the best from the rest. You're on the right track!_ 🚀`,
           mentions: [dbUser],
