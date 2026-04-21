@@ -237,9 +237,7 @@ async function startBot() {
       let msg = `${title}\n━━━━━━━━━━━━━━━\n\n`;
       msg += `📌 *${pending.length} member(s) yet to submit:*\n\n`;
       pending.forEach((u) => {
-        const phone = getName(u.userId);
-        const displayName = u.name || `...${phone.slice(-6)}`;
-        msg += `▪️ @${phone} ${displayName}\n`;
+        msg += `▪️ @${getName(u.userId)}\n`;
       });
       msg += `\n📹 _Send your 1-min+ speaking video now!_`;
 
@@ -319,11 +317,7 @@ async function startBot() {
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
-        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => {
-          const phone = getName(u.userId);
-          const displayName = u.name || `...${phone.slice(-6)}`;
-          return `▪️ @${phone} ${displayName}`;
-        }).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
+        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
         mentions: pending.map((u) => u.userId),
       });
 
@@ -389,18 +383,14 @@ async function startBot() {
       if (completed.length) {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
-          const phone = getName(u.userId);
-          const displayName = u.name || `...${phone.slice(-6)}`;
-          msg += `✅ @${phone} ${displayName}\n`;
+          msg += `✅ @${getName(u.userId)}\n`;
         });
       }
 
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
-          const phone = getName(u.userId);
-          const displayName = u.name || `...${phone.slice(-6)}`;
-          msg += `❌ @${phone} ${displayName} _(Total fine: ₹${u.fine})_\n`;
+          msg += `❌ @${getName(u.userId)} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -564,10 +554,7 @@ async function startBot() {
         uniqueUsers.forEach((u) => {
           const fine = u.fine || 0;
           totalFine += fine;
-          // Show name if available, else show last 6 digits of phone
-          const phone = getName(u.userId);
-          const displayName = u.name || `...${phone.slice(-6)}`;
-          msgText += `▪️ ${displayName} → ₹${fine}\n`;
+          msgText += `▪️ @${getName(u.userId)} → ₹${fine}\n`;
         });
 
         msgText += `\n━━━━━━━━━━━━━━━\n💵 *Total Fine Pool:* ₹${totalFine}\n\n⚠️ _Missed daily submissions result in fines._\n🔥 _Stay consistent. Avoid penalties._\n`;
