@@ -237,7 +237,8 @@ async function startBot() {
       let msg = `${title}\n━━━━━━━━━━━━━━━\n\n`;
       msg += `📌 *${pending.length} member(s) yet to submit:*\n\n`;
       pending.forEach((u) => {
-        msg += `▪️ @${getName(u.userId)}\n`;
+        const display = u.name || getName(u.userId);
+        msg += `▪️ @${display}\n`;
       });
       msg += `\n📹 _Send your 1-min+ speaking video now!_`;
 
@@ -317,7 +318,7 @@ async function startBot() {
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
-        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
+        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${u.name || getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
         mentions: pending.map((u) => u.userId),
       });
 
@@ -383,14 +384,16 @@ async function startBot() {
       if (completed.length) {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
-          msg += `✅ @${getName(u.userId)}\n`;
+          const display = u.name || getName(u.userId);
+          msg += `✅ @${display}\n`;
         });
       }
 
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
-          msg += `❌ @${getName(u.userId)} _(Total fine: ₹${u.fine})_\n`;
+          const display = u.name || getName(u.userId);
+          msg += `❌ @${display} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -554,7 +557,8 @@ async function startBot() {
         uniqueUsers.forEach((u) => {
           const fine = u.fine || 0;
           totalFine += fine;
-          msgText += `▪️ @${getName(u.userId)} → ₹${fine}\n`;
+          const display = u.name || getName(u.userId);
+          msgText += `▪️ @${display} → ₹${fine}\n`;
         });
 
         msgText += `\n━━━━━━━━━━━━━━━\n💵 *Total Fine Pool:* ₹${totalFine}\n\n⚠️ _Missed daily submissions result in fines._\n🔥 _Stay consistent. Avoid penalties._\n`;
@@ -775,12 +779,12 @@ async function startBot() {
 
         if (completed.length) {
           msg += `\n\n🏅 *Submitted:*\n`;
-          completed.forEach((u) => { msg += `✅ @${getName(u.userId)}\n`; });
+          completed.forEach((u) => { msg += `✅ @${u.name || getName(u.userId)}\n`; });
         }
 
         if (pending.length) {
           msg += `\n\n⚠️ *Would be fined ₹${FINE_AMOUNT}:*\n`;
-          pending.forEach((u) => { msg += `❌ @${getName(u.userId)} _(Current fine: ₹${u.fine || 0})_\n`; });
+          pending.forEach((u) => { msg += `❌ @${u.name || getName(u.userId)} _(Current fine: ₹${u.fine || 0})_\n`; });
         }
 
         msg += `\n━━━━━━━━━━━━━━━\n⚠️ _This is a TEST — no fines applied, no status reset._`;
