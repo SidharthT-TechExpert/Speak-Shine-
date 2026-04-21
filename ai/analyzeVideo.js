@@ -92,8 +92,8 @@ async function extractFrames(videoPath, frameCount = 3) {
  */
 export async function analyzeVideo(videoPath) {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === "your_gemini_api_key_here") {
-    console.log("⚠️ GEMINI_API_KEY not configured — skipping visual analysis");
+  if (!GEMINI_API_KEY) {
+    console.log("⚠️ GEMINI_API_KEY not set — skipping visual analysis");
     return null;
   }
 
@@ -114,10 +114,7 @@ export async function analyzeVideo(videoPath) {
 
   console.log(`🖼️ Sending ${frames.length} frame(s) to Gemini Vision...`);
 
-  // Build Gemini request: text prompt + image frames
-  const parts = [
-    {
-      text: `You are an expert public speaking coach analyzing video frames of a student giving a spoken English presentation.
+  const prompt = `You are an expert public speaking coach analyzing video frames of a student giving a spoken English presentation.
 
 Analyze these ${frames.length} frame(s) sampled from their video and evaluate their non-verbal communication.
 
@@ -141,13 +138,12 @@ SCORING GUIDE:
 - facialExpression: 10 = engaged, expressive, natural smile, 1 = blank or stiff
 - overallPresence: overall visual confidence and stage presence
 
-Be specific and honest. If image quality is low or face is not clearly visible, still give your best assessment and mention it in the notes.`,
-    },
+Be specific and honest. If image quality is low or face is not clearly visible, still give your best assessment and mention it in the notes.`;
+
+  const parts = [
+    { text: prompt },
     ...frames.map((b64) => ({
-      inline_data: {
-        mime_type: "image/jpeg",
-        data: b64,
-      },
+      inline_data: { mime_type: "image/jpeg", data: b64 },
     })),
   ];
 
@@ -159,10 +155,7 @@ Be specific and honest. If image quality is low or face is not clearly visible, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 700,
-          },
+          generationConfig: { temperature: 0.2, maxOutputTokens: 700 },
         }),
       }
     );
@@ -174,11 +167,11 @@ Be specific and honest. If image quality is low or face is not clearly visible, 
     }
 
     const data = await res.json();
-    console.log("🤖 Gemini response status:", data?.candidates?.[0]?.finishReason);
+    console.log("🤖 Gemini finish reason:", data?.candidates?.[0]?.finishReason);
 
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     if (!raw) {
-      console.log("⚠️ Gemini returned no text. Full response:", JSON.stringify(data).slice(0, 500));
+      console.log("⚠️ Gemini returned no text. Response:", JSON.stringify(data).slice(0, 400));
       return null;
     }
 
