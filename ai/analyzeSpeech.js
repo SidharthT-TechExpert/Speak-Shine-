@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import { checkGrammar } from "./grammarCheck.js";
 
 // ---------------------------------------------------------------------------
 // Filler word detection
@@ -270,19 +271,23 @@ RULES:
 - Keep overallComment encouraging but honest
 - IMPORTANT: All string values in the JSON must use only single quotes inside text, never double quotes`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-      max_tokens: 1400,
+  // Run Llama speech analysis and LanguageTool grammar check in parallel
+  const [res, ltErrors] = await Promise.all([
+    fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: 1400,
+      }),
     }),
-  });
+    checkGrammar(transcript),
+  ]);
 
   if (!res.ok) {
     const err = await res.text();
@@ -326,6 +331,8 @@ RULES:
 
   return {
     ...scores,
+    // Merge LanguageTool errors with AI errors (dedup by original text)
+    grammarErrors: mergeGrammarErrors(scores.grammarErrors || [], ltErrors),
     // Attach computed stats so feedback.js can use them
     _stats: {
       duration: durationStr,
@@ -336,4 +343,24 @@ RULES:
       wordCount,
     },
   };
+}
+
+/**
+ * Merges AI-detected grammar errors with LanguageTool errors.
+ * AI errors take priority; LT errors are appended if not already covered.
+ * Total capped at 6 errors.
+ */
+function mergeGrammarErrors(aiErrors, ltErrors) {
+  const seen = new Set(
+    aiErrors.map((e) => e.original?.toLowerCase().trim()).filter(Boolean)
+  );
+  const merged = [...aiErrors];
+  for (const e of ltErrors) {
+    if (!seen.has(e.original?.toLowerCase().trim())) {
+      merged.push(e);
+      seen.add(e.original?.toLowerCase().trim());
+    }
+    if (merged.length >= 6) break;
+  }
+  return merged;
 }

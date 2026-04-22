@@ -15,7 +15,7 @@ export async function transcribe(audioPath) {
     filename: "audio.mp3",
     contentType: "audio/mpeg",
   });
-  form.append("model", "whisper-large-v3-turbo");
+  form.append("model", "whisper-large-v3");
   form.append("response_format", "verbose_json");
   form.append("language", "en");
   form.append("timestamp_granularities[]", "word");
