@@ -78,7 +78,7 @@ Return ONLY valid JSON (no markdown, no extra text):
         model: "meta-llama/llama-4-scout-17b-16e-instruct",
         messages: [{ role: "user", content: userContent }],
         temperature: 0.2,
-        max_tokens: 700,
+        max_tokens: 1200,
       }),
     });
     if (!res.ok) { const e = await res.text(); console.log(`Groq Vision HTTP ${res.status}:`, e.slice(0,300)); return null; }
@@ -91,7 +91,23 @@ Return ONLY valid JSON (no markdown, no extra text):
     if (fence) { jsonStr = fence[1].trim(); }
     else { const s = raw.indexOf("{"), e = raw.lastIndexOf("}"); if (s !== -1 && e !== -1) jsonStr = raw.slice(s, e+1); }
     jsonStr = jsonStr.replace(/,\s*([}\]])/g, "$1");
-    const parsed = JSON.parse(jsonStr);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      // Response was truncated — extract numeric scores via regex as fallback
+      console.log("JSON parse failed, attempting partial extraction:", parseErr.message);
+      const extract = (key) => { const m = raw.match(new RegExp(`"${key}"\\s*:\\s*(\\d+)`)); return m ? parseInt(m[1]) : null; };
+      const eyeContact = extract("eyeContact");
+      const bodyLanguage = extract("bodyLanguage");
+      const facialExpression = extract("facialExpression");
+      const overallPresence = extract("overallPresence");
+      if (eyeContact === null && bodyLanguage === null) throw parseErr; // nothing salvageable
+      parsed = { eyeContact, bodyLanguage, facialExpression, overallPresence,
+        eyeContactNote: "Analysis partially available.", bodyLanguageNote: "Analysis partially available.",
+        expressionNote: "Analysis partially available.", visualSuggestions: [], visualStrengths: [] };
+      console.log("Partial visual data recovered:", JSON.stringify(parsed));
+    }
     console.log("Visual analysis complete:", JSON.stringify(parsed).slice(0,150));
     return parsed;
   } catch (err) { console.log("Visual analysis failed:", err.message); return null; }

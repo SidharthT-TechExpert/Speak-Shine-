@@ -119,7 +119,7 @@ async function startBot() {
               p.id === normalizedId || p.id === id
             );
             pushName = participant?.notify || participant?.name || null;
-          } catch (_) {}
+          } catch (_) { }
 
           await User.updateOne(
             { userId: normalizedId },
@@ -254,9 +254,9 @@ async function startBot() {
       let msg = `${title}\n━━━━━━━━━━━━━━━\n\n`;
       msg += `📌 *${pending.length} member(s) yet to submit:*\n\n`;
       pending.forEach((u) => {
-        msg += `▪️ @${getName(u.userId)}\n`;
+        msg += `▪ @${getDisplayName(u)}\n`;
       });
-      msg += `\n📹 _Send your 1-min+ speaking video now!_`;
+      msg += `\n🎬 _Send your 1-min+ speaking video now!_`;
 
       await safeSend(sock, TARGET_GROUP, {
         text: msg,
@@ -342,7 +342,7 @@ async function startBot() {
 
       // 📤 Send text + voice
       await safeSend(sock, TARGET_GROUP, {
-        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪️ @${getName(u.userId)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
+        text: `🚨 *FINAL WARNING!*\n\n━━━━━━━━━━━━━━━\n⏳ Deadline is almost here!\n\n${pending.map((u) => `▪ @${getDisplayName(u)}`).join("\n")}\n\n📹 _Submit your speaking video RIGHT NOW or a fine will be applied!_ 💸`,
         mentions: pending.map((u) => u.userId),
       });
 
@@ -407,14 +407,14 @@ async function startBot() {
       if (completed.length) {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
-          msg += `✅ @${getName(u.userId)}\n`;
+          msg += `✅ @${getDisplayName(u)}\n`;
         });
       }
 
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
-          msg += `❌ @${getName(u.userId)} _(Total fine: ₹${u.fine})_\n`;
+          msg += `❌ @${getDisplayName(u)} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -521,7 +521,7 @@ async function startBot() {
               text: `⏳ _${stage}_`,
               edit: ownerProgressMsgKey,
             });
-          } catch (_) {}
+          } catch (_) { }
         };
 
         generateFeedback(msg, OWNER, dmVideo.seconds || 60, ownerStatus?.todayTopic || null, ownerStatus?.todayQuestion || null, sock, { onProgress: ownerOnProgress })
@@ -640,7 +640,7 @@ async function startBot() {
           .sort((a, b) => b.completed - a.completed)
           .forEach((u, i) => {
             const medal = ["🥇", "🥈", "🥉"][i] || "🔹";
-            msgText += `${medal} @${getName(u.userId)} → ${u.completed ? "✅ Done" : "❌ Pending"}\n`;
+            msgText += `${medal} @${getDisplayName(u)} → ${u.completed ? "✅ Done" : "❌ Pending"}\n`;
           });
         msgText += `\n━━━━━━━━━━━━━━━\n🔥 _Keep grinding — consistency wins!_`;
 
@@ -674,7 +674,7 @@ async function startBot() {
         const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const parts = text.trim().split(/\s+/);
         const userAmounts = [];
-        
+
         if (mentioned.length === 0) {
           // No mentions - apply to self
           const lastPart = parts[parts.length - 1];
@@ -684,29 +684,29 @@ async function startBot() {
           // Check if last part is a number (applies to all without individual amounts)
           const lastPart = parts[parts.length - 1];
           const defaultAmount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
-          
+
           // Parse mentions and individual amounts
           let mentionIndex = 0;
-          
+
           for (let i = 1; i < parts.length && mentionIndex < mentioned.length; i++) {
             const part = parts[i];
-            
+
             // If part starts with @, it's a mention
             if (part.startsWith("@")) {
               const userId = mentioned[mentionIndex];
-              
+
               // Check if next part is a number (and not the last part which is default)
               let amount = defaultAmount;
               if (i + 1 < parts.length - 1 && !isNaN(parts[i + 1]) && parts[i + 1] !== "") {
                 amount = parseInt(parts[i + 1]);
                 i++; // Skip the number
               }
-              
+
               userAmounts.push({ userId, amount });
               mentionIndex++;
             }
           }
-          
+
           // If we didn't parse all mentions, add remaining with default amount
           while (mentionIndex < mentioned.length) {
             userAmounts.push({ userId: mentioned[mentionIndex], amount: defaultAmount });
@@ -742,7 +742,7 @@ async function startBot() {
         const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const parts = text.trim().split(/\s+/);
         const userAmounts = [];
-        
+
         if (mentioned.length === 0) {
           // No mentions - apply to self
           const lastPart = parts[parts.length - 1];
@@ -752,29 +752,29 @@ async function startBot() {
           // Check if last part is a number (applies to all without individual amounts)
           const lastPart = parts[parts.length - 1];
           const defaultAmount = !isNaN(lastPart) && lastPart !== "" ? parseInt(lastPart) : FINE_AMOUNT;
-          
+
           // Parse mentions and individual amounts
           let mentionIndex = 0;
-          
+
           for (let i = 1; i < parts.length && mentionIndex < mentioned.length; i++) {
             const part = parts[i];
-            
+
             // If part starts with @, it's a mention
             if (part.startsWith("@")) {
               const userId = mentioned[mentionIndex];
-              
+
               // Check if next part is a number (and not the last part which is default)
               let amount = defaultAmount;
               if (i + 1 < parts.length - 1 && !isNaN(parts[i + 1]) && parts[i + 1] !== "") {
                 amount = parseInt(parts[i + 1]);
                 i++; // Skip the number
               }
-              
+
               userAmounts.push({ userId, amount });
               mentionIndex++;
             }
           }
-          
+
           // If we didn't parse all mentions, add remaining with default amount
           while (mentionIndex < mentioned.length) {
             userAmounts.push({ userId: mentioned[mentionIndex], amount: defaultAmount });
@@ -827,7 +827,7 @@ async function startBot() {
         if (!isAdmin) return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
 
         await safeSend(sock, chatId, { text: `🧪 _Running test report... (fines will NOT be applied in test mode)_` });
-        
+
         const users = await User.find({ userId: { $ne: null, $exists: true } });
         const completed = users.filter((u) => u.completed);
         const pending = users.filter((u) => !u.completed);
@@ -998,7 +998,7 @@ async function startBot() {
                 await User.updateOne({ _id: u._id }, { $set: { name: contact[0].notify } });
                 fromStore++;
               }
-            } catch (_) {}
+            } catch (_) { }
           }
 
           return safeSend(sock, chatId, {
@@ -1073,13 +1073,13 @@ async function startBot() {
       // ✍️ GRAMMAR COMMANDS
       if (cmd === "/grammar on") {
         if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
-        
+
         await GrammarSettings.updateOne(
           { groupId: chatId },
           { grammarEnabled: true },
           { upsert: true }
         );
-        
+
         return safeSend(sock, chatId, {
           text: "✅ *Grammar Assistant Enabled!*\n\n📝 I'll now help members improve their English.",
         });
@@ -1087,13 +1087,13 @@ async function startBot() {
 
       if (cmd === "/grammar off") {
         if (!isAdmin) return safeSend(sock, chatId, { text: "❌ Only admins can use this command" });
-        
+
         await GrammarSettings.updateOne(
           { groupId: chatId },
           { grammarEnabled: false },
           { upsert: true }
         );
-        
+
         return safeSend(sock, chatId, {
           text: "⏸️ *Grammar Assistant Disabled*\n\n📝 I won't analyze messages anymore.",
         });
@@ -1106,13 +1106,13 @@ async function startBot() {
           vocabEnabled: true,
           cooldownMinutes: 2,
         };
-        
+
         return safeSend(sock, chatId, {
           text: `📊 *Grammar Assistant Status*\n\n` +
-                `✍️ Grammar: ${settings.grammarEnabled ? "✅ ON" : "❌ OFF"}\n` +
-                `⏰ Tense Check: ${settings.tenseEnabled ? "✅ ON" : "❌ OFF"}\n` +
-                `📚 Vocab: ${settings.vocabEnabled ? "✅ ON" : "❌ OFF"}\n` +
-                `⏱️ Cooldown: ${settings.cooldownMinutes} minutes`,
+            `✍️ Grammar: ${settings.grammarEnabled ? "✅ ON" : "❌ OFF"}\n` +
+            `⏰ Tense Check: ${settings.tenseEnabled ? "✅ ON" : "❌ OFF"}\n` +
+            `📚 Vocab: ${settings.vocabEnabled ? "✅ ON" : "❌ OFF"}\n` +
+            `⏱️ Cooldown: ${settings.cooldownMinutes} minutes`,
         });
       }
 
@@ -1142,23 +1142,23 @@ async function startBot() {
 
       if (cmd === "/mystats") {
         const stats = await UserStats.findOne({ userId: dbUser, groupId: chatId });
-        
+
         if (!stats || stats.totalCorrections === 0) {
           return safeSend(sock, chatId, {
             text: `📊 *Your English Stats*\n\n` +
-                  `@${getName(dbUser)}, you haven't received any corrections yet!\n\n` +
-                  `💬 Keep chatting in English to get feedback.`,
+              `@${getName(dbUser)}, you haven't received any corrections yet!\n\n` +
+              `💬 Keep chatting in English to get feedback.`,
             mentions: [dbUser],
           });
         }
-        
+
         return safeSend(sock, chatId, {
           text: `📊 *Your English Stats*\n\n` +
-                `👤 @${getName(dbUser)}\n` +
-                `✍️ Total Corrections: ${stats.totalCorrections}\n` +
-                `📈 Grammar Score: ${stats.grammarScore}/100\n` +
-                `🔥 Streak: ${stats.streakDays} days\n\n` +
-                `💪 Keep improving!`,
+            `👤 @${getName(dbUser)}\n` +
+            `✍️ Total Corrections: ${stats.totalCorrections}\n` +
+            `📈 Grammar Score: ${stats.grammarScore}/100\n` +
+            `🔥 Streak: ${stats.streakDays} days\n\n` +
+            `💪 Keep improving!`,
           mentions: [dbUser],
         });
       }
@@ -1167,20 +1167,20 @@ async function startBot() {
         const topUsers = await UserStats.find({ groupId: chatId })
           .sort({ totalCorrections: -1 })
           .limit(5);
-        
+
         if (!topUsers.length) {
           return safeSend(sock, chatId, {
             text: "📊 *Top Learners*\n\nNo stats yet! Start chatting in English.",
           });
         }
-        
+
         let msg = "🏆 *Top English Learners*\n\n";
         const medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
-        
+
         topUsers.forEach((u, i) => {
           msg += `${medals[i]} @${getName(u.userId)} - ${u.totalCorrections} corrections\n`;
         });
-        
+
         return safeSend(sock, chatId, {
           text: msg,
           mentions: topUsers.map(u => u.userId),
@@ -1212,7 +1212,7 @@ async function startBot() {
             text: `⚠️ *Already Submitted!*\n\n━━━━━━━━━━━━━━━\n✅ You've already sent your video for today.\n\n😎 _Sit back and relax — see you tomorrow!_`,
           });
         }
-   
+
         await User.findOneAndUpdate(
           { userId: dbUser },
           { completed: true },
@@ -1262,7 +1262,7 @@ async function startBot() {
               text: `⏳ _${stage}_`,
               edit: progressMsgKey,
             });
-          } catch (_) {}
+          } catch (_) { }
         };
 
         // 🤖 AI Feedback (runs async, won't block submission)
