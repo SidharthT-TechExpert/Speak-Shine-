@@ -78,6 +78,7 @@ async function startBot() {
     markOnlineOnConnect: false,
     defaultQueryTimeoutMs: 60000,
     retryRequestDelayMs: 1000,
+    logger: { level: "silent", log: () => {}, info: () => {}, warn: () => {}, error: () => {}, debug: () => {}, trace: () => {}, child: () => ({ level: "silent", log: () => {}, info: () => {}, warn: () => {}, error: () => {}, debug: () => {}, trace: () => {}, child: () => ({}) }) },
   });
 
   sock.ev.on("creds.update", saveCreds);
