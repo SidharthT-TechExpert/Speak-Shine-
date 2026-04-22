@@ -2,9 +2,16 @@ import fs from "fs";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
+// Segments with avg_logprob below this threshold are likely hallucinated — exclude them
+const SEGMENT_CONFIDENCE_THRESHOLD = -0.8;
+
+// Words with probability below this are likely mispronounced or unclear
+const WORD_CLARITY_THRESHOLD = 0.4;
+
 /**
  * Transcribes audio using Groq Whisper verbose_json mode.
- * Returns rich data: full text, word-level timestamps, segments, and duration.
+ * Returns rich data: filtered text, word-level timestamps, segments,
+ * duration, pronunciation issues, and rhythm stats.
  */
 export async function transcribe(audioPath) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -37,26 +44,148 @@ export async function transcribe(audioPath) {
 
   const data = await res.json();
 
-  // Extract word-level data if available
-  const words = data.words || [];
-  const segments = data.segments || [];
-  const text = (data.text || "").trim();
+  const allWords = data.words || [];
+  const allSegments = data.segments || [];
+
+  // -------------------------------------------------------------------------
+  // 1. Segment-level confidence filtering
+  //    Remove segments that Whisper is very uncertain about (hallucinations).
+  //    Keep all segments if none pass the threshold (safety fallback).
+  // -------------------------------------------------------------------------
+  const confidentSegments = allSegments.filter(
+    (seg) => (seg.avg_logprob ?? 0) >= SEGMENT_CONFIDENCE_THRESHOLD
+  );
+  const filteredSegments = confidentSegments.length > 0 ? confidentSegments : allSegments;
+
+  // Build a set of time ranges from confident segments
+  const confidentRanges = filteredSegments.map((s) => ({ start: s.start, end: s.end }));
+
+  // Filter words to only those within confident segment ranges
+  const filteredWords = allWords.filter((w) =>
+    confidentRanges.some((r) => w.start >= r.start - 0.1 && w.end <= r.end + 0.1)
+  );
+
+  const words = filteredWords.length > 0 ? filteredWords : allWords;
+
+  // Rebuild clean transcript from confident segments
+  const text = filteredSegments.length > 0
+    ? filteredSegments.map((s) => s.text.trim()).join(" ").trim()
+    : (data.text || "").trim();
+
+  // -------------------------------------------------------------------------
+  // 2. Pronunciation scoring — find words Whisper was uncertain about
+  //    These are words the model had low confidence transcribing, which
+  //    usually means they were unclear, mispronounced, or heavily accented.
+  // -------------------------------------------------------------------------
+  const unclearWords = words
+    .filter((w) => {
+      const prob = w.probability ?? w.avg_logprob ?? null;
+      return prob !== null && prob < WORD_CLARITY_THRESHOLD;
+    })
+    .map((w) => w.word.trim().toLowerCase().replace(/[^a-z']/g, ""))
+    .filter((w) => w.length > 2); // skip very short words
+
+  // Deduplicate
+  const pronunciationIssues = [...new Set(unclearWords)].slice(0, 8);
+
+  // -------------------------------------------------------------------------
+  // 6. Speaking rhythm analysis from word timestamps
+  // -------------------------------------------------------------------------
+  const rhythm = analyzeRhythm(words);
 
   // Calculate actual spoken duration from word timestamps
-  // Fall back to segment end times, then to data.duration
   let spokenDuration = data.duration || 0;
   if (words.length > 0) {
     const lastWord = words[words.length - 1];
     spokenDuration = lastWord.end || spokenDuration;
-  } else if (segments.length > 0) {
-    const lastSeg = segments[segments.length - 1];
+  } else if (filteredSegments.length > 0) {
+    const lastSeg = filteredSegments[filteredSegments.length - 1];
     spokenDuration = lastSeg.end || spokenDuration;
+  }
+
+  const droppedSegments = allSegments.length - filteredSegments.length;
+  if (droppedSegments > 0) {
+    console.log(`🔍 Whisper confidence filter: dropped ${droppedSegments}/${allSegments.length} low-confidence segments`);
+  }
+  if (pronunciationIssues.length > 0) {
+    console.log(`🗣️ Pronunciation issues detected: ${pronunciationIssues.join(", ")}`);
   }
 
   return {
     text,
-    words,      // [{ word, start, end }]
-    segments,   // [{ text, start, end, avg_logprob, ... }]
+    words,
+    segments: filteredSegments,
     duration: spokenDuration,
+    pronunciationIssues,  // words that were unclear/mispronounced
+    rhythm,               // speaking rhythm stats
+  };
+}
+
+/**
+ * Analyzes speaking rhythm from word-level timestamps.
+ * Returns structured stats about pace consistency, rush patterns, and silence ratio.
+ *
+ * @param {Array<{word: string, start: number, end: number}>} words
+ * @returns {object}
+ */
+function analyzeRhythm(words) {
+  if (!words || words.length < 3) {
+    return { speechRatio: null, longestPause: null, rushesAtStart: false, rushesAtEnd: false, paceConsistency: null };
+  }
+
+  const totalDuration = words[words.length - 1].end - words[0].start;
+  if (totalDuration <= 0) return { speechRatio: null, longestPause: null, rushesAtStart: false, rushesAtEnd: false, paceConsistency: null };
+
+  // Total time actually speaking (sum of word durations)
+  const speakingTime = words.reduce((sum, w) => sum + (w.end - w.start), 0);
+  const speechRatio = Math.round((speakingTime / totalDuration) * 100); // % of time speaking
+
+  // Find the longest pause
+  let longestPause = 0;
+  let longestPauseAfter = "";
+  for (let i = 1; i < words.length; i++) {
+    const gap = words[i].start - words[i - 1].end;
+    if (gap > longestPause) {
+      longestPause = gap;
+      longestPauseAfter = words[i - 1].word.trim();
+    }
+  }
+
+  // Detect rushing: compare WPM in first 20% vs last 20% of speech
+  const cutoff = Math.floor(words.length * 0.2);
+  const startWords = words.slice(0, Math.max(cutoff, 3));
+  const endWords = words.slice(Math.max(words.length - cutoff, words.length - 3));
+
+  const startDuration = startWords[startWords.length - 1].end - startWords[0].start;
+  const endDuration = endWords[endWords.length - 1].end - endWords[0].start;
+
+  const startWpm = startDuration > 0 ? (startWords.length / startDuration) * 60 : 0;
+  const endWpm = endDuration > 0 ? (endWords.length / endDuration) * 60 : 0;
+
+  const rushesAtStart = startWpm > 180 && startWpm > endWpm * 1.3;
+  const rushesAtEnd = endWpm > 180 && endWpm > startWpm * 1.3;
+
+  // Pace consistency: std deviation of inter-word gaps
+  const gaps = [];
+  for (let i = 1; i < words.length; i++) {
+    const gap = words[i].start - words[i - 1].end;
+    if (gap < 2) gaps.push(gap); // ignore long pauses for this calc
+  }
+  let paceConsistency = null;
+  if (gaps.length > 3) {
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const variance = gaps.reduce((sum, g) => sum + Math.pow(g - mean, 2), 0) / gaps.length;
+    const stdDev = Math.sqrt(variance);
+    // Lower stdDev = more consistent pace. Score 1-10: 10 = very consistent
+    paceConsistency = Math.max(1, Math.min(10, Math.round(10 - stdDev * 10)));
+  }
+
+  return {
+    speechRatio,                                          // % of time actually speaking
+    longestPause: Math.round(longestPause * 10) / 10,    // seconds
+    longestPauseAfter,                                    // word before the longest pause
+    rushesAtStart,                                        // speaks too fast at beginning
+    rushesAtEnd,                                          // speeds up toward the end
+    paceConsistency,                                      // 1-10 score
   };
 }

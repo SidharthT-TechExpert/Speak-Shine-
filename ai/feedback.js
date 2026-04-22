@@ -46,7 +46,7 @@ export async function generateFeedback(
 
   const pipelineStart = Date.now();
   const id = Date.now();
-  let videoPath, audioPath;
+  let videoPath, audioPath, qualityWarning;
 
   try {
     // -----------------------------------------------------------------------
@@ -67,8 +67,11 @@ export async function generateFeedback(
     // Stage 2: Extract audio
     // -----------------------------------------------------------------------
     const extractStage = startStage("extractAudio");
+    let audioPath, qualityWarning;
     try {
-      audioPath = await extractAudio(videoPath, id);
+      const extracted = await extractAudio(videoPath, id);
+      audioPath = extracted.audioPath;
+      qualityWarning = extracted.qualityWarning;
       extractStage.end();
     } catch (err) {
       extractStage.end(err);
@@ -147,7 +150,9 @@ export async function generateFeedback(
           actualDuration,
           transcription.words,
           questionTopic,
-          questionText
+          questionText,
+          transcription.pronunciationIssues || [],
+          transcription.rhythm || null
         ),
         speechTimeout,
         "speech"
@@ -164,7 +169,7 @@ export async function generateFeedback(
     // -----------------------------------------------------------------------
     // Stage 5: Format combined feedback
     // -----------------------------------------------------------------------
-    const formatted = formatFeedback(result, visual, user);
+    const formatted = formatFeedback(result, visual, user, qualityWarning);
 
     console.log(
       "[PIPELINE] total DONE elapsed=" + (Date.now() - pipelineStart)
@@ -185,7 +190,7 @@ export async function generateFeedback(
  * @param {string}      user    - User JID
  * @returns {string}
  */
-export function formatFeedback(result, visual, user) {
+export function formatFeedback(result, visual, user, qualityWarning = null) {
   const username = user.split("@")[0];
   const s = result._stats;
 
@@ -213,6 +218,25 @@ export function formatFeedback(result, visual, user) {
     msg += `🔇 *Long pauses:* ${s.pauses} detected\n`;
   }
 
+  // Rhythm stats
+  if (s.rhythm) {
+    const r = s.rhythm;
+    if (r.speechRatio !== null) {
+      const ratioLabel = r.speechRatio >= 75 ? "✅ Good" : r.speechRatio >= 55 ? "⚠️ Many pauses" : "❌ Too many silences";
+      msg += `🎵 *Speech ratio:* ${r.speechRatio}% ${ratioLabel}\n`;
+    }
+    if (r.rushesAtStart) msg += `⚡ _Tends to rush at the start — slow down your opening._\n`;
+    if (r.rushesAtEnd) msg += `⚡ _Speeds up toward the end — maintain steady pace throughout._\n`;
+    if (r.paceConsistency !== null && r.paceConsistency <= 5) {
+      msg += `📈 *Pace consistency:* ${scoreBar(r.paceConsistency)} ${r.paceConsistency}/10\n`;
+    }
+  }
+
+  // Audio quality warning
+  if (qualityWarning) {
+    msg += `🔈 _${qualityWarning}_\n`;
+  }
+
   // --- Speech Scores ---
   msg += `━━━━━━━━━━━━━━━\n`;
   msg += `🗣️ *Fluency:*    ${scoreBar(result.fluency)} ${result.fluency}/10\n`;
@@ -220,11 +244,27 @@ export function formatFeedback(result, visual, user) {
   msg += `🔥 *Confidence:* ${scoreBar(result.confidence)} ${result.confidence}/10\n`;
   msg += `🧠 *Vocabulary:* ${scoreBar(result.vocabulary)} ${result.vocabulary}/10\n`;
 
+  // CEFR level
+  if (s.cefrLevel) {
+    msg += `🎓 *Level:* ${s.cefrLevel.level} — _${s.cefrLevel.description}_\n`;
+  }
+
   if (result.topicRelevance != null) {
     msg += `🎯 *On-topic:*   ${scoreBar(result.topicRelevance)} ${result.topicRelevance}/10\n`;
     if (result.topicFeedback) {
       msg += `   💬 _${result.topicFeedback}_\n`;
     }
+  }
+
+  // Pronunciation note
+  if (result.pronunciationNote) {
+    msg += `━━━━━━━━━━━━━━━\n`;
+    msg += `🗣️ *Pronunciation:* _${result.pronunciationNote}_\n`;
+  }
+
+  // Rhythm note
+  if (result.rhythmNote) {
+    msg += `🎵 *Rhythm:* _${result.rhythmNote}_\n`;
   }
 
   // --- Visual Scores (only if analysis succeeded) ---
