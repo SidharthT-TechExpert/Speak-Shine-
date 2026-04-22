@@ -222,6 +222,9 @@ export function formatFeedback(result, visual, user) {
 
   if (result.topicRelevance != null) {
     msg += `🎯 *On-topic:*   ${scoreBar(result.topicRelevance)} ${result.topicRelevance}/10\n`;
+    if (result.topicFeedback) {
+      msg += `   💬 _${result.topicFeedback}_\n`;
+    }
   }
 
   // --- Visual Scores (only if analysis succeeded) ---

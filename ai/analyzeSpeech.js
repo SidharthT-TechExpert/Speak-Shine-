@@ -211,8 +211,10 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     4-5 = loosely related, mentions the topic briefly but mostly talks about something else
     2-3 = barely related, only 1-2 sentences touch the topic
     1 = completely off-topic, does not address the question at all
-    IMPORTANT: Read the transcript carefully against the question. Give credit for any relevant content.`
-    : `- topicRelevance: null (no topic was provided)`;
+    IMPORTANT: Read the transcript carefully against the question. Give credit for any relevant content.
+- topicFeedback: 1-2 sentences explaining specifically what the student covered from the topic and what key points were missing. Be specific — mention actual content from their speech.`
+    : `- topicRelevance: null (no topic was provided)
+- topicFeedback: null`;
 
   const prompt = `You are an expert English speaking coach analyzing a student's spoken English video submission.
 
@@ -244,6 +246,7 @@ TASK: Analyze this spoken English and return ONLY a valid JSON object with this 
   "strongPoints": ["<specific positive observation>"],
   "suggestions": ["<specific, actionable improvement tip>", "<tip 2>", "<tip 3>"],
   "topicRelevance": <integer 1-10 or null>,
+  "topicFeedback": "<1-2 sentences explaining what they covered well and what was missing from the topic, or null if no topic>",
   "vocabularyHighlights": {
     "strong": ["<good word/phrase they used>"],
     "weak": ["<basic word they could upgrade>"]
@@ -277,7 +280,7 @@ RULES:
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
-      max_tokens: 1200,
+      max_tokens: 1400,
     }),
   });
 
