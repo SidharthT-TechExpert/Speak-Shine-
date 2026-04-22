@@ -1,26 +1,128 @@
 import fetch from "node-fetch";
 
-// Common filler words to detect
-const FILLER_WORDS = [
-  "um", "uh", "like", "you know", "basically", "literally",
-  "actually", "so", "right", "okay", "well", "i mean",
-  "kind of", "sort of", "you see",
+// ---------------------------------------------------------------------------
+// Filler word detection
+//
+// Two categories:
+//   PURE_FILLERS  — words that are ALWAYS fillers (um, uh, er, etc.)
+//   CONTEXT_FILLERS — words that are only fillers in specific positions
+//                     (e.g. "like" as a discourse particle, not as a verb/preposition)
+// ---------------------------------------------------------------------------
+
+const PURE_FILLERS = [
+  "um", "uh", "er", "uhh", "umm", "hmm",
+];
+
+// Context-sensitive fillers: only counted when they appear in filler positions.
+// Each entry has a pattern that matches the filler usage but not the legitimate usage.
+const CONTEXT_FILLER_PATTERNS = [
+  // "like" as filler: preceded by comma/pause marker or followed by a clause
+  // Matches: "it was, like, really" / "like I said" at sentence start / "and like he"
+  // Does NOT match: "I like it" / "something like that" / "looks like"
+  {
+    name: "like",
+    // filler "like" appears:
+    // 1. after comma/and/but/so: ", like," or "and like " or "but like "
+    // 2. at start of utterance: "like, " or "like I" (discourse opener)
+    // 3. between words as hedge: "was like really" "is like so"
+    regex: /(?:,\s*like\s*,|(?:^|[,.])\s*like\s*,|\band\s+like\b|\bbut\s+like\b|\bso\s+like\b|\bwas\s+like\b|\bis\s+like\b|\bwere\s+like\b|\bam\s+like\b|\bare\s+like\b|\bit'?s\s+like\b)/gi,
+  },
+  // "you know" — almost always a filler
+  {
+    name: "you know",
+    regex: /\byou\s+know\b/gi,
+  },
+  // "i mean" — filler when used as a hedge/restart
+  {
+    name: "i mean",
+    regex: /\bi\s+mean\b/gi,
+  },
+  // "basically" — filler when overused; count all occurrences
+  {
+    name: "basically",
+    regex: /\bbasically\b/gi,
+  },
+  // "literally" — filler when used for emphasis (not literal meaning)
+  // Hard to distinguish perfectly; count all as potential filler
+  {
+    name: "literally",
+    regex: /\bliterally\b/gi,
+  },
+  // "kind of" / "sort of" — hedging fillers
+  {
+    name: "kind of",
+    regex: /\bkind\s+of\b/gi,
+  },
+  {
+    name: "sort of",
+    regex: /\bsort\s+of\b/gi,
+  },
+  // "you see" — discourse filler
+  {
+    name: "you see",
+    regex: /\byou\s+see\b/gi,
+  },
+  // "right" as filler: at end of clause or between clauses, not as adjective/direction
+  // Matches: "right?" / ", right," / "right so" / "right okay"
+  {
+    name: "right",
+    regex: /(?:\bright\s*\?|\bright\s*,|\bright\s+so\b|\bright\s+okay\b|\bright\s+and\b|,\s*right\b)/gi,
+  },
+  // "okay" as filler: sentence-initial or between clauses
+  // Does NOT match "that's okay" / "I'm okay"
+  {
+    name: "okay",
+    regex: /(?:^okay\b|,\s*okay\b|\bokay\s+so\b|\bokay\s+now\b|\bokay\s+let\b)/gim,
+  },
+  // "well" as filler: sentence-initial hedge
+  // Does NOT match "well done" / "do well" / "as well"
+  {
+    name: "well",
+    regex: /(?:^well\b|,\s*well\b|\bwell\s+I\b|\bwell\s+it\b|\bwell\s+the\b|\bwell\s+actually\b)/gim,
+  },
+  // "so" as filler: sentence-initial or after pause, not as conjunction meaning "therefore"
+  // Only flag when repeated or at very start of utterance
+  {
+    name: "so",
+    regex: /(?:^so\b|,\s*so\s*,)/gim,
+  },
+  // "actually" as filler: overused hedge
+  {
+    name: "actually",
+    regex: /\bactually\b/gi,
+  },
 ];
 
 /**
- * Counts filler word occurrences in a transcript.
+ * Counts filler word occurrences in a transcript with context-awareness.
+ * Pure fillers (um, uh) are always counted.
+ * Context-sensitive fillers use position-aware patterns to avoid false positives.
+ *
  * Returns an object like { um: 3, like: 2 }
+ * Only includes fillers that appear 2+ times (single use may be legitimate).
  */
 function detectFillerWords(text) {
   const lower = text.toLowerCase();
   const found = {};
 
-  for (const filler of FILLER_WORDS) {
-    // Match whole word/phrase occurrences
-    const regex = new RegExp(`\\b${filler.replace(" ", "\\s+")}\\b`, "gi");
+  // Pure fillers — always count
+  for (const filler of PURE_FILLERS) {
+    const regex = new RegExp(`\\b${filler}\\b`, "gi");
     const matches = lower.match(regex);
     if (matches && matches.length > 0) {
       found[filler] = matches.length;
+    }
+  }
+
+  // Context-sensitive fillers — use position-aware patterns
+  for (const { name, regex } of CONTEXT_FILLER_PATTERNS) {
+    // Reset lastIndex for global regexes
+    regex.lastIndex = 0;
+    const matches = lower.match(regex);
+    const count = matches ? matches.length : 0;
+    // Only flag if used 2+ times (once may be legitimate)
+    if (count >= 2) {
+      found[name] = count;
     }
   }
 
@@ -83,7 +185,7 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
   // Format stats for the prompt
   const fillerSummary = Object.keys(fillerWords).length > 0
     ? Object.entries(fillerWords).map(([w, c]) => `"${w}" (${c}x)`).join(", ")
-    : "none detected";
+    : "none detected (speech was clean)";
 
   const pauseSummary = pauses.length > 0
     ? `${pauses.length} long pause(s) detected (>${1.5}s gaps)`
