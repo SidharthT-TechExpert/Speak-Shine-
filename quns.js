@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import Question from "./models/questionSchema.js";
+import statusSchema from "./models/statusSchema.js";
 
 dotenv.config();
 
@@ -39,14 +40,29 @@ const pushQuestions = async () => {
 //pushQuestions();
 
 const getCount = async () => {
+  const count = await Question.find();
+  console.log("Total Questions:", count);
+};
+
+const questionStatusUpdate = async () => {
+  const status = await statusSchema.findOne();
+  if (!status) {
+    console.log("No status document found");
+    return;
+  }
+  // status.questionSentToday = false;
+  // await status.save();
+  console.log("✅ Status updated:", status);
+};
+
+// Run both, then close connection once
+(async () => {
   try {
-    const count = await Question.countDocuments();
-    console.log("Total Questions:", count);
+    await questionStatusUpdate();
+    await getCount();
   } catch (err) {
     console.log("❌ Error:", err);
   } finally {
     mongoose.connection.close();
   }
-};
-
-getCount();
+})();
