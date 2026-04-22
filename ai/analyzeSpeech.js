@@ -93,12 +93,24 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     ? `${wpm} words per minute (${wpm < 100 ? "slow" : wpm <= 150 ? "good" : "fast"})`
     : "unknown";
 
-  const topicLine = questionTopic || questionText
+  const hasTopic = !!(questionTopic || questionText);
+  const topicLine = hasTopic
     ? [
-        questionTopic  ? `Topic: "${questionTopic}"` : null,
-        questionText   ? `Question asked: "${questionText}"` : null,
+        questionTopic ? `Topic: "${questionTopic}"` : null,
+        questionText  ? `Question asked: "${questionText}"` : null,
       ].filter(Boolean).join("\n- ")
     : "No specific topic provided.";
+
+  const topicRelevanceGuide = hasTopic
+    ? `- topicRelevance: how directly and thoroughly the speaker addressed the topic/question
+    10 = entire speech is focused on the topic with specific details and examples
+    8-9 = mostly on-topic with good coverage, minor tangents
+    6-7 = partially on-topic, addresses the question but lacks depth or goes off-track
+    4-5 = loosely related, mentions the topic briefly but mostly talks about something else
+    2-3 = barely related, only 1-2 sentences touch the topic
+    1 = completely off-topic, does not address the question at all
+    IMPORTANT: Read the transcript carefully against the question. Give credit for any relevant content.`
+    : `- topicRelevance: null (no topic was provided)`;
 
   const prompt = `You are an expert English speaking coach analyzing a student's spoken English video submission.
 
@@ -108,7 +120,11 @@ AUDIO STATS (measured objectively from the recording):
 - Speaking pace: ${paceSummary}
 - Filler words: ${fillerSummary}
 - Pauses: ${pauseSummary}
+
+${hasTopic ? `TODAY'S SPEAKING TASK:
 - ${topicLine}
+
+IMPORTANT: The student was asked to speak about this specific topic. You MUST evaluate how well their transcript addresses it.` : "No specific topic was assigned."}
 
 TRANSCRIPT:
 ${transcript.replace(/"/g, "'").replace(/\\/g, "")}
@@ -125,7 +141,7 @@ TASK: Analyze this spoken English and return ONLY a valid JSON object with this 
   ],
   "strongPoints": ["<specific positive observation>"],
   "suggestions": ["<specific, actionable improvement tip>", "<tip 2>", "<tip 3>"],
-  "topicRelevance": <integer 1-10 — how well they addressed the topic, or null if no topic>,
+  "topicRelevance": <integer 1-10 or null>,
   "vocabularyHighlights": {
     "strong": ["<good word/phrase they used>"],
     "weak": ["<basic word they could upgrade>"]
@@ -138,6 +154,7 @@ SCORING GUIDE:
 - grammar: correctness of tenses, articles, prepositions, sentence structure
 - confidence: assertiveness, clarity, not trailing off
 - vocabulary: range and appropriateness of words used
+${topicRelevanceGuide}
 
 RULES:
 - grammarErrors: list up to 4 real mistakes found in the transcript with exact quotes
