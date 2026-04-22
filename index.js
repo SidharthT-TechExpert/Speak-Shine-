@@ -54,14 +54,12 @@ const getName = (userId) => {
   return userId.split("@")[0].split(":")[0];
 };
 
-// Returns the display name for use in @mention text.
-// Put the saved name in text + JID in mentions[] for the notification ping.
-// This shows "@shabeer" instead of "@+92 883 046 645 835"
+// Returns the phone number for use in @mention text.
+// Text must contain @<phone_number>, mentions[] must contain the JID.
+// WhatsApp then shows it as a blue tappable mention with the contact's name.
 const getMentionName = (userRecord) => {
   if (!userRecord) return "Unknown";
-  // Always use saved name if available — WhatsApp shows it as a proper mention
-  // Fall back to phone number only if no name saved
-  return userRecord.name || getName(userRecord.userId);
+  return getName(userRecord.userId);
 };
 
 // Returns saved name from DB record, falls back to phone number
@@ -1268,7 +1266,7 @@ async function startBot() {
         };
 
         // 🤖 AI Feedback (runs async, won't block submission)
-        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null, todayStatus?.todayQuestion || null, sock, { onProgress, username })
+        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null, todayStatus?.todayQuestion || null, sock, { onProgress })
           .then((feedbackText) => {
             storeResult(hash, feedbackText);
             const chunks = chunkMessage(feedbackText);

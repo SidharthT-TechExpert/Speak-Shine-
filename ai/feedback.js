@@ -168,7 +168,7 @@ export async function generateFeedback(
     // -----------------------------------------------------------------------
     // Stage 5: Format combined feedback
     // -----------------------------------------------------------------------
-    const formatted = formatFeedback(result, visual, user, qualityWarning, opts.username || null);
+    const formatted = formatFeedback(result, visual, user, qualityWarning);
 
     console.log(
       "[PIPELINE] total DONE elapsed=" + (Date.now() - pipelineStart)
@@ -189,12 +189,12 @@ export async function generateFeedback(
  * @param {string}      user    - User JID
  * @returns {string}
  */
-export function formatFeedback(result, visual, user, qualityWarning = null, username = null) {
-  const displayName = username || user.split("@")[0];
+export function formatFeedback(result, visual, user, qualityWarning = null) {
+  const username = user.split("@")[0];
   const s = result._stats;
 
   // --- Header ---
-  let msg = `🎤 *Video Feedback for @${displayName}*\n\n`;
+  let msg = `🎤 *Video Feedback for @${username}*\n\n`;
 
   // --- Audio Stats ---
   msg += `━━━━━━━━━━━━━━━\n`;
