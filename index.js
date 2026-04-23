@@ -1340,9 +1340,7 @@ async function startBot() {
       const now = new Date();
       const minutes = now.getMinutes();
 
-      if (minutes > 30) return; // stop after 8:20
-
-      console.log(`📢 Sending question at 8:${minutes}`);
+      if (minutes < 2 || minutes > 30) return; // only run 8:02 to 8:30
 
       await sendQuestion();
     },
