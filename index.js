@@ -1375,7 +1375,7 @@ async function startBot() {
 
   cron.schedule("35 23 * * *", finalWarning, { timezone: TIMEZONE });
 
-  cron.schedule("50 20 * * *", dailyReport, { timezone: TIMEZONE });
+  cron.schedule("55 20 * * *", dailyReport, { timezone: TIMEZONE });
 
   cron.schedule("0 0 * * *", dailyReport, { timezone: TIMEZONE });
 
