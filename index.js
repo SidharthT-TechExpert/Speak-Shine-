@@ -785,11 +785,12 @@ async function startBot() {
         // Remove fines
         const results = [];
         for (const { userId, amount } of userAmounts) {
-          const u = await User.findOne({ userId });
+          const normalizedId = normalizeUserId(userId);
+          const u = await User.findOne({ userId: normalizedId });
           if (!u) continue;
           const newFine = Math.max(0, (u.fine || 0) - amount);
-          await User.updateOne({ userId }, { fine: newFine });
-          results.push(`@${getName(userId)} → -₹${amount} (₹${newFine} remaining)`);
+          await User.updateOne({ userId: normalizedId }, { fine: newFine });
+          results.push(`@${getName(normalizedId)} → -₹${amount} (₹${newFine} remaining)`);
         }
 
         if (!results.length) {
@@ -798,7 +799,7 @@ async function startBot() {
 
         return safeSend(sock, chatId, {
           text: `💰 *Fine Removed!*\n\n━━━━━━━━━━━━━━━\n${results.join("\n")}\n\n✅ Fines updated successfully.`,
-          mentions: userAmounts.map(ua => ua.userId),
+          mentions: userAmounts.map(ua => normalizeUserId(ua.userId)),
         });
       }
 
@@ -1417,10 +1418,13 @@ async function startBot() {
   }
 
   // ================= CONNECTION =================
+  let reconnecting = false;
+
   sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
     if (qr) qrcode.generate(qr, { small: true });
 
     if (connection === "open") {
+      reconnecting = false;
       console.log("✅ Connected");
     }
 
@@ -1442,6 +1446,8 @@ async function startBot() {
         process.exit(0);
       }
 
+      if (reconnecting) return; // prevent stacking multiple reconnect timers
+      reconnecting = true;
       console.log(`⚠️ Disconnected (code: ${code}), reconnecting in 5s...`);
       setTimeout(startBot, 5000);
     }

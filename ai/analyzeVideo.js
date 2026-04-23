@@ -22,13 +22,12 @@ function extractFrame(videoPath, timestamp) {
     exec(
       `ffmpeg -ss ${timestamp} -i "${videoPath}" -frames:v 1 -q:v 3 -vf "scale=640:-1" "${framePath}" -y`,
       (err) => {
-        if (err) { console.log(`Frame extraction failed at ${timestamp}s:`, err.message); return resolve(null); }
-        if (!fs.existsSync(framePath)) { console.log(`Frame file not found at ${timestamp}s`); return resolve(null); }
+        if (err) { return resolve(null); }
+        if (!fs.existsSync(framePath)) { return resolve(null); }
         try {
           const buffer = fs.readFileSync(framePath);
           fs.unlinkSync(framePath);
-          if (buffer.length < 1000) { console.log(`Frame too small at ${timestamp}s`); return resolve(null); }
-          console.log(`Frame at ${timestamp}s: ${buffer.length} bytes`);
+          if (buffer.length < 1000) { return resolve(null); }
           resolve(buffer.toString("base64"));
         } catch (e) { console.log(`Frame read error:`, e.message); resolve(null); }
       }
@@ -43,7 +42,6 @@ async function extractFrames(videoPath, frameCount = 3) {
   for (let i = 1; i <= frameCount; i++) {
     timestamps.push(Math.max(1, Math.floor((duration * i) / (frameCount + 1))));
   }
-  console.log(`Extracting frames at: ${timestamps.join(", ")}s`);
   const results = await Promise.all(timestamps.map((ts) => extractFrame(videoPath, ts)));
   return results.filter(Boolean);
 }
@@ -52,13 +50,10 @@ export async function analyzeVideo(videoPath) {
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
   if (!GROQ_API_KEY) { console.log("GROQ_API_KEY not set"); return null; }
 
-  console.log("Starting visual analysis for:", videoPath);
   let frames = [];
   try { frames = await extractFrames(videoPath, 3); }
-  catch (err) { console.log("Frame extraction error:", err.message); return null; }
+  catch (err) { console.log("Visual frame extraction error:", err.message); return null; }
   if (frames.length === 0) { console.log("No frames extracted"); return null; }
-
-  console.log(`Sending ${frames.length} frame(s) to Groq Vision...`);
 
   const prompt = `You are an expert public speaking coach analyzing video frames of a student giving a spoken English presentation.
 Analyze these ${frames.length} frame(s) and evaluate non-verbal communication.
