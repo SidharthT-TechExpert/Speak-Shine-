@@ -1602,25 +1602,6 @@ async function startBot() {
 
   cron.schedule("0 0 * * *", dailyReset, { timezone: TIMEZONE });
 
-  cron.schedule(
-    "0 10,13,18,20 * * *",
-    async () => {
-      const count = await Question.countDocuments();
-
-      if (count === 1) {
-        await safeSend(sock, OWNER, {
-          text: `⚠️ *Low Stock Warning!*\n\n━━━━━━━━━━━━━━━\n📦 Only *1 question* left in the database.\n\n🛠️ _Add more questions soon to avoid interruption._`,
-        });
-      }
-      if (count === 0) {
-        await safeSend(sock, OWNER, {
-          text: `🚨 *Alert: Question Bank Empty!*\n\n━━━━━━━━━━━━━━━\n📭 No questions remaining in the database.\n\n🛠️ _Please add new questions to keep the daily challenge going._`,
-        });
-      }
-    },
-    { timezone: TIMEZONE },
-  );
-
   // ================= TEST CRON (sends question to owner every min, no delete) =================
   if (false) {
     cron.schedule("* * * * *", async () => {
