@@ -994,6 +994,7 @@ async function startBot() {
             `${streakBadge} *Current Streak:* ${streak} day${streak !== 1 ? "s" : ""}\n` +
             `💸 *Total Fine:* ₹${totalFine}\n` +
             `📅 *Submitted This Month:* ${monthSubs} day${monthSubs !== 1 ? "s" : ""}\n` +
+            `📆 *Submitted This Week:* ${dbUser.weeklySubmissions || 0}/7 days\n` +
             `━━━━━━━━━━━━━━━\n` +
             `📈 *Avg Feedback Scores:*\n` +
             `${avgLine}\n` +
@@ -1774,6 +1775,7 @@ async function startBot() {
           `${streakBadge} *Current Streak:* ${streak} day${streak !== 1 ? "s" : ""}\n` +
           `💸 *Total Fine:* ₹${totalFine}\n` +
           `📅 *Submitted This Month:* ${monthSubs} day${monthSubs !== 1 ? "s" : ""}\n` +
+          `📆 *Submitted This Week:* ${userRecord.weeklySubmissions || 0}/7 days\n` +
           `━━━━━━━━━━━━━━━\n` +
           `📈 *Avg Feedback Scores:*\n` +
           `${avgLine}\n` +
