@@ -330,27 +330,39 @@ RULES:
 - IMPORTANT: All string values in the JSON must use only single quotes inside text, never double quotes`;
 
   // Run Llama speech analysis and LanguageTool grammar check in parallel
-  const [res, ltErrors] = await Promise.all([
-    fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1400,
-      }),
-    }),
-    checkGrammar(transcript),
-  ]);
+  // Llama call uses key rotation with retry on 429
+  const llamaFetch = async () => {
+    while (true) {
+      const apiKey = getTextKey();
+      if (!apiKey) throw new Error("All Groq API keys exhausted — speech analysis unavailable");
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Groq analysis failed: ${err}`);
-  }
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+          max_tokens: 1400,
+        }),
+      });
+
+      if (res.status === 429) {
+        const errText = await res.text();
+        markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+        continue;
+      }
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Groq analysis failed: ${err}`);
+      }
+
+      return res;
+    }
+  };
+
+  const [res, ltErrors] = await Promise.all([llamaFetch(), checkGrammar(transcript)]);
 
   const data = await res.json();
   const raw = data.choices[0].message.content.trim();
