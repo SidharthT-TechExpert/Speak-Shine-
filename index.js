@@ -837,9 +837,9 @@ async function startBot() {
       // Normalize userId - always use @s.whatsapp.net format
       const normalizeUserId = (id) => {
         if (!id) return id;
-        // Convert @lid to @s.whatsapp.net by stripping the lid suffix
-        if (id.includes("@lid")) {
-          return id.replace("@lid", "@s.whatsapp.net");
+        if (id.includes("@lid") || id.includes("@c.us")) {
+          const phone = id.split("@")[0].split(":")[0];
+          return `${phone}@s.whatsapp.net`;
         }
         return id;
       };
