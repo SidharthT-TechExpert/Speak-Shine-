@@ -165,19 +165,37 @@ function analyzeRhythm(words) {
   const rushesAtStart = startWpm > 180 && startWpm > endWpm * 1.3;
   const rushesAtEnd = endWpm > 180 && endWpm > startWpm * 1.3;
 
-  // Pace consistency: std deviation of inter-word gaps
-  const gaps = [];
-  for (let i = 1; i < words.length; i++) {
-    const gap = words[i].start - words[i - 1].end;
-    if (gap < 2) gaps.push(gap); // ignore long pauses for this calc
-  }
+  // Pace consistency: measure WPM variance across 5-second sliding windows.
+  // More meaningful than inter-word gap stdDev — captures speed changes a listener notices.
   let paceConsistency = null;
-  if (gaps.length > 3) {
-    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
-    const variance = gaps.reduce((sum, g) => sum + Math.pow(g - mean, 2), 0) / gaps.length;
-    const stdDev = Math.sqrt(variance);
-    // Lower stdDev = more consistent pace. Score 1-10: 10 = very consistent
-    paceConsistency = Math.max(1, Math.min(10, Math.round(10 - stdDev * 10)));
+  if (words.length >= 10) {
+    const windowSec = 5;
+    const windowWpms = [];
+    let winStart = words[0].start;
+    const totalEnd = words[words.length - 1].end;
+
+    while (winStart + windowSec <= totalEnd + 0.5) {
+      const winEnd = winStart + windowSec;
+      const winWords = words.filter(w => w.start >= winStart && w.end <= winEnd);
+      if (winWords.length >= 2) {
+        const actualDur = winWords[winWords.length - 1].end - winWords[0].start;
+        if (actualDur > 0) windowWpms.push((winWords.length / actualDur) * 60);
+      }
+      winStart += 2.5; // 50% overlap for smoother measurement
+    }
+
+    if (windowWpms.length >= 3) {
+      const mean = windowWpms.reduce((a, b) => a + b, 0) / windowWpms.length;
+      const variance = windowWpms.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / windowWpms.length;
+      const stdDev = Math.sqrt(variance);
+      // Calibrated scale based on WPM stdDev across windows:
+      //   < 15 wpm variation  → 9-10 (very consistent, professional)
+      //   15-30 wpm variation → 7-8  (good, natural variation)
+      //   30-50 wpm variation → 5-6  (noticeable inconsistency)
+      //   50-70 wpm variation → 3-4  (significant speed changes)
+      //   > 70 wpm variation  → 1-2  (very erratic)
+      paceConsistency = Math.max(1, Math.min(10, Math.round(10 - stdDev / 8)));
+    }
   }
 
   return {

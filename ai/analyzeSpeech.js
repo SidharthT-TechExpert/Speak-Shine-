@@ -196,6 +196,28 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     ? `${wpm} words per minute (${wpm < 100 ? "slow" : wpm <= 150 ? "good" : "fast"})`
     : "unknown";
 
+  // Stat-based score anchors — give the LLM concrete starting points
+  // so scores are grounded in measured data, not just impression.
+  const fluencyAnchor = (() => {
+    let score = 7; // baseline
+    if (fillerTotal > 10) score -= 2;
+    else if (fillerTotal > 5) score -= 1;
+    if (pauses.length > 5) score -= 1;
+    else if (pauses.length === 0) score += 1;
+    if (wpm && (wpm < 80 || wpm > 180)) score -= 1;
+    if (rhythm?.paceConsistency !== null && rhythm?.paceConsistency < 5) score -= 1;
+    return Math.max(1, Math.min(10, score));
+  })();
+
+  const confidenceAnchor = (() => {
+    let score = 7;
+    if (fillerTotal > 8) score -= 1;
+    if (pauses.length > 4) score -= 1;
+    if (wpm && wpm < 90) score -= 1; // very slow = hesitant
+    if (rhythm?.speechRatio !== null && rhythm.speechRatio < 55) score -= 1; // too much silence
+    return Math.max(1, Math.min(10, score));
+  })();
+
   const hasTopic = !!(questionTopic || questionText);
 
   // CEFR vocabulary level classification
@@ -282,8 +304,10 @@ TASK: Analyze this spoken English and return ONLY a valid JSON object with this 
 
 SCORING GUIDE:
 - fluency: flow of speech, natural rhythm, absence of excessive pauses/fillers
+  → Stat-based anchor: ${fluencyAnchor}/10 (adjust ±1-2 based on transcript quality)
 - grammar: correctness of tenses, articles, prepositions, sentence structure
 - confidence: assertiveness, clarity, not trailing off
+  → Stat-based anchor: ${confidenceAnchor}/10 (adjust ±1-2 based on transcript tone)
 - vocabulary: range and appropriateness of words used
 - cefrLevel: estimate the overall CEFR level based on vocabulary, grammar complexity, and sentence structure
 - pronunciationNote: comment on the unclear words listed above if any; otherwise note clean pronunciation
