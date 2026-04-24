@@ -1724,12 +1724,24 @@ async function startBot() {
       if (cmd === "/mystats") {
         const userRecord = await User.findOne({ userId: dbUser });
         const senderPhone = dbUser.split("@")[0].split(":")[0];
-        const senderDmJid = `${senderPhone}@s.whatsapp.net`;
+
+        // Resolve exact participant JID from group metadata (needed for tappable mention + DM)
+        let actualUserJid = dbUser;
+        try {
+          const meta = await sock.groupMetadata(chatId);
+          const participant = meta.participants.find(
+            p => p.id.split("@")[0].split(":")[0] === senderPhone
+          );
+          if (participant) actualUserJid = participant.id;
+        } catch (_) { }
+
+        // DM JID: strip device suffix, use @s.whatsapp.net
+        const dmJid = `${actualUserJid.split("@")[0].split(":")[0]}@s.whatsapp.net`;
 
         if (!userRecord) {
           return safeSend(sock, chatId, {
             text: `❌ @${senderPhone} _You're not registered yet._`,
-            mentions: [dbUser],
+            mentions: [actualUserJid],
           });
         }
 
@@ -1771,12 +1783,12 @@ async function startBot() {
           `💪 _Keep submitting daily to improve your scores!_`;
 
         // Send full stats privately to the user's DM
-        await safeSend(sock, senderDmJid, { text: statsMsg });
+        await safeSend(sock, dmJid, { text: statsMsg });
 
-        // Acknowledge in group so others know the command was received
+        // Acknowledge in group with proper tappable mention
         return safeSend(sock, chatId, {
           text: `📊 @${senderPhone} _Your stats have been sent to your DM!_ 👆`,
-          mentions: [dbUser],
+          mentions: [actualUserJid],
         });
       }
 
