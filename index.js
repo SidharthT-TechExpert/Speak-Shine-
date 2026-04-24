@@ -449,8 +449,14 @@ async function startBot() {
         userId: { $exists: true, $nin: [null, ""] }
       }));
 
-      const completed = users.filter((u) => u.completed);
-      const pending = users.filter((u) => !u.completed);
+      // Filter out the bot's own account from all reports
+      const botPhone = sock.user?.id?.split(":")[0].split("@")[0] ?? "";
+      const filteredUsers = botPhone
+        ? users.filter(u => !u.userId.includes(botPhone))
+        : users;
+
+      const completed = filteredUsers.filter((u) => u.completed);
+      const pending = filteredUsers.filter((u) => !u.completed);
 
       console.log(`📊 Report: ${completed.length} submitted, ${pending.length} pending`);
 
@@ -545,7 +551,7 @@ async function startBot() {
       msg += `\n━━━━━━━━━━━━━━━
 🔥 _Consistency builds champions._`;
 
-      const allMentions = users.map((u) => u.userId).filter(Boolean);
+      const allMentions = filteredUsers.map((u) => u.userId).filter(Boolean);
 
       await safeSend(sock, TARGET_GROUP, {
         text: msg,
@@ -770,6 +776,13 @@ async function startBot() {
       const user = msg.key.participant || msg.key.remoteJid;
       if (!user) return;
 
+      // For group messages, participant must be set — remoteJid is the group, not the sender
+      if (chatId.includes("@g.us") && !msg.key.participant) return;
+
+      // Skip if the apparent sender is the bot itself (can happen with forwarded messages)
+      const botPhone = sock.user?.id?.split(":")[0].split("@")[0] ?? "";
+      if (botPhone && user.includes(botPhone)) return;
+
       // Normalize userId - always use @s.whatsapp.net format
       const normalizeUserId = (id) => {
         if (!id) return id;
@@ -872,10 +885,14 @@ async function startBot() {
 
       // 📊 STREAK REPORT
       if (cmd.startsWith("/report")) {
+        const botJid = sock.user?.id?.replace(/:.*@/, "@") ?? "";
         const users = await User.find({ userId: { $exists: true, $nin: [null, ""] } });
 
+        // Filter out the bot itself
+        const members = users.filter(u => u.userId && !u.userId.includes(botJid.split("@")[0]));
+
         // Sort by streak descending, then by fine ascending
-        const sorted = [...users].sort((a, b) => {
+        const sorted = [...members].sort((a, b) => {
           if ((b.streak || 0) !== (a.streak || 0)) return (b.streak || 0) - (a.streak || 0);
           return (a.fine || 0) - (b.fine || 0);
         });
