@@ -21,6 +21,7 @@ import { chunkMessage, sendChunks as _sendChunks } from "./helpers.js";
 import { hashBuffer, markProcessing, storeResult, getCacheEntry, evict } from "./ai/dedupCache.js";
 import { processMessage, formatResponse } from "./grammar/processor.js";
 import { isOnCooldown, setCooldown, getRemainingCooldown } from "./grammar/cooldown.js";
+import { generateAndInsertQuestions } from "./ai/questionGenerator.js";
 import fs from "fs";
 import { exec } from "child_process";
 import pino from "pino";
@@ -226,25 +227,44 @@ async function startBot() {
 
       const count = await Question.countDocuments();
 
-      // 🚨 No Questions
+      // 🚨 No Questions — auto-generate immediately
       if (count === 0) {
-        if (!claimed.notifiedEmpty) {
+        await safeSend(sock, OWNER, {
+          text: `🚨 *Question Bank Empty!*\n\n⏳ _Auto-generating 14 new questions…_`,
+        });
+        try {
+          const { inserted, totalInDb } = await generateAndInsertQuestions(14);
           await safeSend(sock, OWNER, {
-            text: `🚨 *Alert: Question Bank Empty!*\n\n━━━━━━━━━━━━━━━\n📭 No questions remaining in the database.\n\n🛠️ Please add new questions.`,
+            text: `✅ *Auto-generated ${inserted.length} questions!*\n📊 Total in DB: ${totalInDb}`,
           });
-
+          await Status.updateOne({}, { $set: { notifiedEmpty: false, questionSentToday: false } });
+        } catch (genErr) {
+          console.log("❌ Auto-generate failed:", genErr.message);
+          await safeSend(sock, OWNER, {
+            text: `❌ *Auto-generation failed:* _${genErr.message}_\n\nUse /genq to add questions manually.`,
+          });
           await Status.updateOne({}, { $set: { notifiedEmpty: true, questionSentToday: false } });
         }
         return;
       }
 
-      // ⚠️ Last Question Warning
-      if (count === 1 && !claimed.notifiedLast) {
-        await safeSend(sock, OWNER, {
-          text: `⚠️ *Low Stock Warning!*\n\n━━━━━━━━━━━━━━━\n📦 Only *1 question* left in database.\n\n🛠️ Add more soon.`,
-        });
-
-        await Status.updateOne({}, { $set: { notifiedLast: true } });
+      // ⚠️ Low Stock (≤7) — auto-generate in background, don't block today's question
+      if (count <= 7) {
+        console.log(`[Questions] Low stock (${count} left) — auto-generating 14 more in background`);
+        generateAndInsertQuestions(14)
+          .then(({ inserted, totalInDb }) => {
+            console.log(`[Questions] Auto-generated ${inserted.length} questions. Total: ${totalInDb}`);
+            safeSend(sock, OWNER, {
+              text: `🔄 *Auto-refill:* Added ${inserted.length} new questions _(${count} were left)_\n📊 Total in DB: ${totalInDb}`,
+            });
+          })
+          .catch(err => {
+            console.log("❌ Background auto-generate failed:", err.message);
+            safeSend(sock, OWNER, {
+              text: `⚠️ *Low stock (${count} left)* — auto-refill failed: _${err.message}_\n\nUse /genq to add questions manually.`,
+            });
+          });
+        // Don't return — continue sending today's question normally
       }
 
       // 🎯 Random Question
@@ -624,7 +644,81 @@ async function startBot() {
         return;
       }
 
-      if (chatId !== TARGET_GROUP) return;
+      if (chatId !== TARGET_GROUP) {
+        // ── Owner DM text commands ──────────────────────────────────────────
+        if (isOwnerDM && !dmVideo) {
+          const ownerCmd = text.trim().toLowerCase();
+
+          // /genq [count] — generate AI questions
+          // Examples: /genq  /genq 14  /genq 21
+          if (ownerCmd.startsWith("/genq")) {
+            const parts = ownerCmd.split(/\s+/);
+            const count = parseInt(parts[1] ?? "7");
+            const total = isNaN(count) || count <= 0 ? 7 : count;
+
+            await safeSend(sock, OWNER, {
+              text: `🤖 _Generating ${total} new questions… this may take 10-15 seconds._`,
+            });
+
+            try {
+              const { inserted, skipped, totalInDb } = await generateAndInsertQuestions(total);
+
+              let reply = `✅ *Questions Generated!*\n\n━━━━━━━━━━━━━━━\n`;
+              reply += `📥 *Added:* ${inserted.length} new questions\n`;
+              if (skipped.length > 0) reply += `⚠️ *Skipped:* ${skipped.length} (duplicates/invalid)\n`;
+              reply += `📊 *Total in DB:* ${totalInDb}\n\n`;
+
+              if (inserted.length > 0) {
+                reply += `📋 *Preview:*\n`;
+                inserted.slice(0, 5).forEach((q, i) => {
+                  reply += `\n${i + 1}. [${q.category}]\n`;
+                  reply += `   📌 ${q.topic}\n`;
+                  reply += `   ❓ ${q.question}\n`;
+                });
+                if (inserted.length > 5) {
+                  reply += `\n_...and ${inserted.length - 5} more_`;
+                }
+              }
+
+              await safeSend(sock, OWNER, { text: reply });
+            } catch (err) {
+              console.log("❌ /genq error:", err.message);
+              await safeSend(sock, OWNER, {
+                text: `❌ *Question generation failed:*\n_${err.message}_`,
+              });
+            }
+            return;
+          }
+
+          // /qcount — show how many questions are left in DB
+          if (ownerCmd === "/qcount") {
+            const count = await Question.countDocuments();
+            await safeSend(sock, OWNER, {
+              text: `📊 *Questions in DB:* ${count}\n\n💡 _Use /genq to add more._`,
+            });
+            return;
+          }
+
+          // /qlist — show all pending questions
+          if (ownerCmd === "/qlist") {
+            const qs = await Question.find().lean();
+            if (qs.length === 0) {
+              await safeSend(sock, OWNER, { text: `📭 No questions in DB. Use /genq to generate some.` });
+              return;
+            }
+            let msg = `📋 *All Questions (${qs.length}):*\n━━━━━━━━━━━━━━━\n`;
+            qs.forEach((q, i) => {
+              msg += `\n${i + 1}. [${q.category}]\n📌 ${q.topic}\n❓ ${q.question}\n`;
+            });
+            const chunks = chunkMessage(msg);
+            for (const chunk of chunks) {
+              await safeSend(sock, OWNER, { text: chunk });
+            }
+            return;
+          }
+        }
+        return;
+      }
 
       const user = msg.key.participant || msg.key.remoteJid;
       if (!user) return;
