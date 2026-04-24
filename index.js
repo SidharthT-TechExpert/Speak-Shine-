@@ -1034,6 +1034,41 @@ async function startBot() {
         });
       }
 
+      // 🤖 GENERATE QUESTIONS (Admin only)
+      if (cmd.startsWith("/genq")) {
+        if (!isAdmin) return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
+
+        const parts = cmd.split(/\s+/);
+        const count = parseInt(parts[1] ?? "7");
+        const total = isNaN(count) || count <= 0 ? 7 : count;
+
+        await safeSend(sock, chatId, { text: `🤖 _Generating ${total} new questions… please wait._` });
+
+        try {
+          const { inserted, skipped, totalInDb } = await generateAndInsertQuestions(total);
+
+          let reply = `✅ *Questions Generated!*\n\n━━━━━━━━━━━━━━━\n`;
+          reply += `📥 *Added:* ${inserted.length} new questions\n`;
+          if (skipped.length > 0) reply += `⚠️ *Skipped:* ${skipped.length} (duplicates)\n`;
+          reply += `📊 *Total in DB:* ${totalInDb}\n`;
+
+          return safeSend(sock, chatId, { text: reply });
+        } catch (err) {
+          console.log("❌ /genq error:", err.message);
+          return safeSend(sock, chatId, { text: `❌ *Generation failed:* _${err.message}_` });
+        }
+      }
+
+      // 📊 QUESTION COUNT (Admin only)
+      if (cmd === "/qcount") {
+        if (!isAdmin) return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
+
+        const qCount = await Question.countDocuments();
+        return safeSend(sock, chatId, {
+          text: `📊 *Questions in DB:* ${qCount}\n\n💡 _Use /genq [count] to add more._`,
+        });
+      }
+
       // 🔄 RESET STATUS
       if (cmd.startsWith("/resetstatus")) {
         if (!isAdmin) return safeSend(sock, chatId, { text: `❌ *Access Denied*\n_Only admins can use this command._` });
