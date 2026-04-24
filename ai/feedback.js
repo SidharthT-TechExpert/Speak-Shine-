@@ -161,7 +161,8 @@ export async function generateFeedback(
     } catch (err) {
       speechStage.end(err);
       console.log(
-        "[PIPELINE] total failure elapsed=" + (Date.now() - pipelineStart)
+        "[PIPELINE] analyzeSpeech FAIL elapsed=" + (Date.now() - pipelineStart),
+        "error=" + (err?.message ?? String(err))
       );
       return "⚠️ _The scoring service is currently unavailable. Please try resubmitting your video._";
     }

@@ -15,22 +15,23 @@ const WORD_CLARITY_THRESHOLD = 0.4;
  * duration, pronunciation issues, and rhythm stats.
  */
 export async function transcribe(audioPath) {
-  const form = new FormData();
-  form.append("file", fs.createReadStream(audioPath), {
-    filename: "audio.mp3",
-    contentType: "audio/mpeg",
-  });
-  form.append("model", "whisper-large-v3");
-  form.append("response_format", "verbose_json");
-  form.append("language", "en");
-  form.append("timestamp_granularities[]", "word");
-  form.append("timestamp_granularities[]", "segment");
-
-  // Retry with next key on 429
+  // Retry with next key on 429 — rebuild FormData fresh each attempt
+  // (ReadStream can only be consumed once, so we can't reuse the same form)
   let res;
   while (true) {
     const apiKey = getTextKey();
     if (!apiKey) throw new Error("All Groq API keys exhausted — transcription unavailable");
+
+    const form = new FormData();
+    form.append("file", fs.createReadStream(audioPath), {
+      filename: "audio.mp3",
+      contentType: "audio/mpeg",
+    });
+    form.append("model", "whisper-large-v3");
+    form.append("response_format", "verbose_json");
+    form.append("language", "en");
+    form.append("timestamp_granularities[]", "word");
+    form.append("timestamp_granularities[]", "segment");
 
     res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
@@ -41,15 +42,7 @@ export async function transcribe(audioPath) {
     if (res.status === 429) {
       const errText = await res.text();
       markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
-      // Rebuild form — stream can only be read once
-      form._streams = [];
-      form.append("file", fs.createReadStream(audioPath), { filename: "audio.mp3", contentType: "audio/mpeg" });
-      form.append("model", "whisper-large-v3");
-      form.append("response_format", "verbose_json");
-      form.append("language", "en");
-      form.append("timestamp_granularities[]", "word");
-      form.append("timestamp_granularities[]", "segment");
-      continue;
+      continue; // try next key with a fresh form
     }
 
     break;
