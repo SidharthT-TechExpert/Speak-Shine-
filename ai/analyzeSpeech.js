@@ -169,6 +169,49 @@ function detectPauses(words, pauseThreshold = 1.5) {
  * @param {object[]} words - Word-level timestamps from Whisper
  * @param {string|null} questionTopic - Today's daily question topic (optional)
  */
+/**
+ * Fixes unescaped double quotes inside JSON string values.
+ * Walks the string char-by-char tracking structural vs content quotes.
+ * e.g. "correction": "foo" or "bar"  →  "correction": "foo' or 'bar"
+ */
+function fixUnescapedQuotes(str) {
+  let result = "";
+  let inString = false;
+  let i = 0;
+  while (i < str.length) {
+    const ch = str[i];
+    if (ch === "\\") {
+      // escaped character — pass through as-is
+      result += ch + (str[i + 1] || "");
+      i += 2;
+      continue;
+    }
+    if (ch === '"') {
+      if (!inString) {
+        // Opening quote of a JSON string
+        inString = true;
+        result += ch;
+      } else {
+        // Could be closing quote or an unescaped quote inside the value.
+        // Peek ahead: if followed by structural chars (:,}]) with optional whitespace → it's closing
+        const rest = str.slice(i + 1).trimStart();
+        if (rest === "" || /^[,\}\]:]/.test(rest)) {
+          inString = false;
+          result += ch;
+        } else {
+          // Unescaped quote inside a string value — replace with single quote
+          result += "'";
+        }
+      }
+      i++;
+      continue;
+    }
+    result += ch;
+    i++;
+  }
+  return result;
+}
+
 export async function analyzeSpeech(transcript, durationSeconds, words = [], questionTopic = null, questionText = null, pronunciationIssues = [], rhythm = null) {
 
   // --- Compute real stats from Whisper data ---
@@ -327,7 +370,7 @@ RULES:
 - If filler words were detected, address them in suggestions
 - If pace is too fast or slow, mention it
 - Keep overallComment encouraging but honest
-- IMPORTANT: All string values in the JSON must use only single quotes inside text, never double quotes`;
+- IMPORTANT: All string values in the JSON must use only single quotes inside text, never double quotes. For grammar corrections with alternatives, use "X or Y" format without inner quotes.`;
 
   // Run Llama speech analysis and LanguageTool grammar check in parallel
   // Llama call uses key rotation with retry on 429
@@ -384,11 +427,17 @@ RULES:
   }
 
   // Fix common Llama JSON issues:
-  // 1. Unescaped double quotes inside string values → replace with single quotes
-  // 2. Trailing commas before } or ]
+  // 1. Trailing commas before } or ]
+  // 2. Control characters
+  // 3. Unescaped double quotes inside string values (e.g. "correction": "foo" or "bar")
   jsonStr = jsonStr
-    .replace(/,\s*([}\]])/g, "$1")  // remove trailing commas
-    .replace(/[\u0000-\u001F]/g, " "); // remove control characters
+    .replace(/,\s*([}\]])/g, "$1")       // remove trailing commas
+    .replace(/[\u0000-\u001F]/g, " ");   // remove control characters
+
+  // Fix unescaped double quotes inside JSON string values.
+  // Strategy: walk char by char tracking whether we're inside a string,
+  // and escape any " that isn't a structural delimiter.
+  jsonStr = fixUnescapedQuotes(jsonStr);
 
   let scores;
   try {
