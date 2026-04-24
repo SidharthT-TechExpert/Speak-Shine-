@@ -3,7 +3,7 @@ import fs from "fs";
 import fetch from "node-fetch";
 import FrameCache from "../models/frameCacheSchema.js";
 
-const FRAME_COUNT = 8;
+const FRAME_COUNT = 5; // Groq Vision API limit: max 5 images per request
 
 function getVideoDuration(videoPath) {
   return new Promise((resolve) => {

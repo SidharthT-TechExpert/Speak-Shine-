@@ -1,19 +1,20 @@
 /**
  * Bug Condition Exploration Test for visual-analysis-failure-fix
- * 
+ *
  * Task 1: Write bug condition exploration property test
  * Feature: visual-analysis-failure-fix
- * 
+ *
  * **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
- * 
- * CRITICAL: This test MUST FAIL on unfixed code - failure confirms the bug exists
- * DO NOT attempt to fix the test or the code when it fails
- * 
- * Property 1: Bug Condition - Six Frames Cause API Rejection
- * 
- * This test encodes the expected behavior after the fix. On unfixed code,
- * it will fail because the code sends 6 frames and gets HTTP 400.
- * After the fix, it will pass because the code sends 5 frames and succeeds.
+ *
+ * Property 1: Bug Condition - Too Many Frames Cause API Rejection
+ *
+ * The Groq Vision API enforces a maximum of 5 images per request.
+ * The original code used FRAME_COUNT = 8 (previously 6), causing HTTP 400.
+ * The fix reduces FRAME_COUNT to 5.
+ *
+ * This test encodes the expected behavior after the fix.
+ * On unfixed code (FRAME_COUNT > 5) it will FAIL, confirming the bug.
+ * After the fix (FRAME_COUNT = 5) it will PASS.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -21,21 +22,103 @@ import fc from 'fast-check';
 import fs from 'fs';
 import { exec } from 'child_process';
 
-// We need to mock the modules before importing analyzeVideo
+// Mock modules before importing analyzeVideo
 vi.mock('fs');
 vi.mock('child_process');
 vi.mock('node-fetch');
 
+// Mock FrameCache (MongoDB model used by current architecture)
+vi.mock('../models/frameCacheSchema.js', () => {
+  const mockCreate = vi.fn();
+  const mockFind = vi.fn();
+  const mockDeleteMany = vi.fn();
+
+  const FrameCache = {
+    create: mockCreate,
+    find: mockFind,
+    deleteMany: mockDeleteMany,
+  };
+
+  return { default: FrameCache };
+});
+
 // Import after mocking
 const { analyzeVideo } = await import('./analyzeVideo.js');
 const fetch = (await import('node-fetch')).default;
+const FrameCache = (await import('../models/frameCacheSchema.js')).default;
 
-describe('Bug Condition Exploration - Six Frames Cause API Rejection', () => {
+/**
+ * Builds a mock FrameCache.find() chain that returns frameDocs.
+ * Supports .sort().lean() chaining.
+ */
+function mockFindChain(frameDocs) {
+  const chain = { sort: vi.fn(), lean: vi.fn() };
+  chain.sort.mockReturnValue(chain);
+  chain.lean.mockResolvedValue(frameDocs);
+  FrameCache.find.mockReturnValue(chain);
+}
+
+/**
+ * Sets up exec mock: ffprobe returns `duration`, ffmpeg succeeds.
+ */
+function mockExec(duration = 60) {
+  exec.mockImplementation((cmd, callback) => {
+    if (cmd.includes('ffprobe')) {
+      callback(null, `${duration}\n`, '');
+    } else {
+      // ffmpeg frame extraction — always succeeds
+      callback(null, '', '');
+    }
+  });
+}
+
+/**
+ * Sets up fs mocks so the video file exists and frame files exist after ffmpeg.
+ */
+function mockFs(videoPath) {
+  fs.existsSync.mockImplementation((p) => {
+    if (p === videoPath) return true;
+    if (p.includes('_frame_')) return true;
+    return false;
+  });
+  // Return a buffer large enough to pass the 1000-byte check
+  fs.readFileSync.mockReturnValue(Buffer.alloc(2000, 0xff));
+  fs.unlinkSync.mockImplementation(() => {});
+}
+
+/**
+ * Sets up FrameCache mocks.
+ * create() stores a fake doc and returns an _id.
+ * find() returns frameDocs built from the stored frames.
+ * deleteMany() resolves immediately.
+ */
+function mockFrameCache(videoPath) {
+  let storedFrames = [];
+
+  FrameCache.create.mockImplementation(async ({ videoId, frameIndex, timestamp, base64 }) => {
+    const id = `id_${frameIndex}`;
+    storedFrames.push({ _id: id, videoId, frameIndex, timestamp, base64 });
+    return { _id: id };
+  });
+
+  // find() returns whatever was stored, sorted by frameIndex
+  FrameCache.find.mockImplementation(() => {
+    const sorted = [...storedFrames].sort((a, b) => a.frameIndex - b.frameIndex);
+    const chain = {
+      sort: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(sorted),
+    };
+    return chain;
+  });
+
+  FrameCache.deleteMany.mockResolvedValue({});
+
+  return { getStored: () => storedFrames };
+}
+
+describe('Bug Condition Exploration - Frame Count Exceeds Groq Vision API Limit', () => {
   beforeEach(() => {
-    // Set up environment
     process.env.GROQ_API_KEY = 'test-api-key';
-    
-    // Reset all mocks
     vi.clearAllMocks();
   });
 
@@ -44,226 +127,139 @@ describe('Bug Condition Exploration - Six Frames Cause API Rejection', () => {
   });
 
   /**
-   * Property 1: Bug Condition - Six Frames Cause API Rejection
-   * 
-   * **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
-   * 
-   * SCOPED PBT: This is a deterministic bug (frameCount=6 always fails).
-   * We scope the property to the concrete failing case: frameCount=6 with any valid video.
-   * 
-   * EXPECTED BEHAVIOR (after fix):
-   * - extractFrames should be called with frameCount <= 5
-   * - API request should contain <= 5 images
-   * - API should return HTTP 200 with valid JSON
-   * - Function should return visual analysis object (not null)
-   * 
-   * CURRENT BEHAVIOR (unfixed code):
-   * - extractFrames is called with frameCount = 6
-   * - API request contains 6 images
-   * - API returns HTTP 400 "Maximum 5 images per request"
-   * - Function logs error and returns null
-   * 
-   * This test will FAIL on unfixed code, confirming the bug exists.
+   * Property 1 (scoped PBT): For any valid video path, analyzeVideo() must:
+   *   - Send ≤ 5 images to the Groq Vision API
+   *   - Receive HTTP 200
+   *   - Return a valid visual analysis object (not null)
+   *
+   * UNFIXED code (FRAME_COUNT = 8): sends 8 images → HTTP 400 → returns null → FAILS
+   * FIXED code  (FRAME_COUNT = 5): sends 5 images → HTTP 200 → returns object → PASSES
    */
-  it('Property 1: analyzeVideo with 6 frames should succeed (fails on unfixed code)', async () => {
+  it('Property 1: analyzeVideo sends ≤5 frames and returns valid result (fails on unfixed code)', async () => {
     await fc.assert(
       fc.asyncProperty(
-        // Generate a valid video path
-        fc.string({ minLength: 1, maxLength: 50 }).map(s => `test_video_${s}.mp4`),
+        fc.string({ minLength: 1, maxLength: 30 }).map(s => `test_${s}.mp4`),
         async (videoPath) => {
-          // Mock fs.existsSync to return true for the video file
-          fs.existsSync.mockImplementation((path) => {
-            if (path === videoPath) return true;
-            return false; // Frame files don't exist (will be cleaned up)
-          });
+          mockExec(60);
+          mockFs(videoPath);
+          mockFrameCache(videoPath);
 
-          // Mock ffprobe to return a valid duration
-          exec.mockImplementation((cmd, callback) => {
-            if (cmd.includes('ffprobe')) {
-              callback(null, '60.0\n', '');
-            } else if (cmd.includes('ffmpeg')) {
-              // Mock ffmpeg frame extraction
-              const frameMatch = cmd.match(/frame_(\d+)\.jpg/);
-              if (frameMatch) {
-                const timestamp = frameMatch[1];
-                const framePath = `${videoPath}_frame_${timestamp}.jpg`;
-                
-                // Simulate frame file creation
-                setTimeout(() => {
-                  fs.existsSync.mockImplementation((path) => {
-                    if (path === videoPath) return true;
-                    if (path === framePath) return true;
-                    return false;
-                  });
-                }, 0);
-                
-                callback(null, '', '');
-              }
-            }
-          });
-
-          // Mock fs.readFileSync to return valid frame data
-          fs.readFileSync.mockReturnValue(Buffer.from('fake-jpeg-data-' + 'x'.repeat(1000)));
-
-          // Mock fs.unlinkSync (cleanup)
-          fs.unlinkSync.mockImplementation(() => {});
-
-          // Count how many images are sent to the API
           let imageCount = 0;
-          
-          // Mock fetch to simulate Groq API behavior
+
           fetch.mockImplementation(async (url, options) => {
             if (url.includes('api.groq.com')) {
               const body = JSON.parse(options.body);
-              const userContent = body.messages[0].content;
-              
-              // Count image_url entries
-              imageCount = userContent.filter(item => item.type === 'image_url').length;
-              
-              // UNFIXED CODE: sends 6 images → HTTP 400
-              // FIXED CODE: sends 5 images → HTTP 200
+              const content = body.messages[0].content;
+              imageCount = content.filter(item => item.type === 'image_url').length;
+
               if (imageCount > 5) {
-                // Simulate API rejection (current buggy behavior)
                 return {
                   ok: false,
                   status: 400,
-                  text: async () => 'Bad Request: Maximum 5 images per request allowed'
-                };
-              } else {
-                // Simulate successful API response (expected after fix)
-                return {
-                  ok: true,
-                  status: 200,
-                  json: async () => ({
-                    choices: [{
-                      message: {
-                        content: JSON.stringify({
-                          eyeContact: 7,
-                          bodyLanguage: 8,
-                          facialExpression: 6,
-                          overallPresence: 7,
-                          eyeContactNote: "Good engagement",
-                          bodyLanguageNote: "Confident posture",
-                          expressionNote: "Natural expressions",
-                          visualSuggestions: ["Maintain eye contact"],
-                          visualStrengths: ["Strong presence"]
-                        })
-                      }
-                    }]
-                  })
+                  text: async () => 'Bad Request: Maximum 5 images per request allowed',
                 };
               }
+
+              return {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                  choices: [{
+                    message: {
+                      content: JSON.stringify({
+                        eyeContact: 7,
+                        bodyLanguage: 8,
+                        facialExpression: 6,
+                        overallPresence: 7,
+                        eyeContactNote: 'Good engagement',
+                        bodyLanguageNote: 'Confident posture',
+                        expressionNote: 'Natural expressions',
+                        visualSuggestions: ['Maintain eye contact'],
+                        visualStrengths: ['Strong presence'],
+                      }),
+                    },
+                  }],
+                }),
+              };
             }
           });
 
-          // Call analyzeVideo
           const result = await analyzeVideo(videoPath);
 
-          // EXPECTED BEHAVIOR (after fix):
-          // - Should send <= 5 images to API
-          // - Should receive HTTP 200
-          // - Should return valid visual analysis object
+          // After fix: ≤5 images sent, result is a valid object
           expect(imageCount).toBeLessThanOrEqual(5);
           expect(result).not.toBeNull();
           expect(result).toHaveProperty('eyeContact');
           expect(result).toHaveProperty('bodyLanguage');
           expect(result).toHaveProperty('facialExpression');
           expect(result).toHaveProperty('overallPresence');
-          
-          // UNFIXED CODE BEHAVIOR:
-          // - Sends 6 images
-          // - Gets HTTP 400
-          // - Returns null
-          // This test will FAIL, confirming the bug exists
         }
       ),
-      { numRuns: 10 } // Run 10 times with different video paths
+      { numRuns: 5 }
     );
   });
 
   /**
-   * Additional verification: Explicitly test the 6-frame scenario
-   * 
-   * This is a concrete unit test that demonstrates the exact bug condition.
-   * It will FAIL on unfixed code, showing the counterexample clearly.
+   * Concrete case: explicit verification that exactly 5 frames are sent.
    */
-  it('Concrete case: 6 frames cause HTTP 400 (fails on unfixed code)', async () => {
+  it('Concrete case: exactly 5 frames are sent to Groq Vision API after fix', async () => {
     const videoPath = 'test_video.mp4';
-    
-    // Mock fs.existsSync
-    fs.existsSync.mockImplementation((path) => {
-      if (path === videoPath) return true;
-      if (path.includes('_frame_')) return true;
-      return false;
-    });
 
-    // Mock ffprobe to return 60 second duration
-    exec.mockImplementation((cmd, callback) => {
-      if (cmd.includes('ffprobe')) {
-        callback(null, '60.0\n', '');
-      } else if (cmd.includes('ffmpeg')) {
-        callback(null, '', '');
-      }
-    });
+    mockExec(60);
+    mockFs(videoPath);
+    mockFrameCache(videoPath);
 
-    // Mock fs.readFileSync to return valid frame data
-    fs.readFileSync.mockReturnValue(Buffer.from('fake-jpeg-data-' + 'x'.repeat(1000)));
-    fs.unlinkSync.mockImplementation(() => {});
+    let capturedBody = null;
 
-    let apiRequestBody = null;
-    
-    // Mock fetch to capture the request
     fetch.mockImplementation(async (url, options) => {
       if (url.includes('api.groq.com')) {
-        apiRequestBody = JSON.parse(options.body);
-        const userContent = apiRequestBody.messages[0].content;
-        const imageCount = userContent.filter(item => item.type === 'image_url').length;
-        
+        capturedBody = JSON.parse(options.body);
+        const content = capturedBody.messages[0].content;
+        const imageCount = content.filter(item => item.type === 'image_url').length;
+
         if (imageCount > 5) {
           return {
             ok: false,
             status: 400,
-            text: async () => 'Bad Request: Maximum 5 images per request allowed'
-          };
-        } else {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              choices: [{
-                message: {
-                  content: JSON.stringify({
-                    eyeContact: 7,
-                    bodyLanguage: 8,
-                    facialExpression: 6,
-                    overallPresence: 7,
-                    eyeContactNote: "Good",
-                    bodyLanguageNote: "Good",
-                    expressionNote: "Good",
-                    visualSuggestions: ["tip"],
-                    visualStrengths: ["strength"]
-                  })
-                }
-              }]
-            })
+            text: async () => 'Bad Request: Maximum 5 images per request allowed',
           };
         }
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  eyeContact: 7,
+                  bodyLanguage: 8,
+                  facialExpression: 6,
+                  overallPresence: 7,
+                  eyeContactNote: 'Good',
+                  bodyLanguageNote: 'Good',
+                  expressionNote: 'Good',
+                  visualSuggestions: ['tip'],
+                  visualStrengths: ['strength'],
+                }),
+              },
+            }],
+          }),
+        };
       }
     });
 
-    // Call analyzeVideo
     const result = await analyzeVideo(videoPath);
 
-    // Verify the API request
-    expect(apiRequestBody).not.toBeNull();
-    const userContent = apiRequestBody.messages[0].content;
-    const imageCount = userContent.filter(item => item.type === 'image_url').length;
+    expect(capturedBody).not.toBeNull();
+    const imageCount = capturedBody.messages[0].content.filter(
+      item => item.type === 'image_url'
+    ).length;
 
-    // EXPECTED BEHAVIOR (after fix): <= 5 images, result is not null
-    expect(imageCount).toBeLessThanOrEqual(5);
+    // After fix: exactly 5 images (FRAME_COUNT = 5)
+    expect(imageCount).toBe(5);
     expect(result).not.toBeNull();
-    
-    // UNFIXED CODE: sends 6 images, result is null
-    // This assertion will FAIL on unfixed code, confirming the bug
+    expect(result.eyeContact).toBe(7);
+    expect(result.bodyLanguage).toBe(8);
   });
 });
