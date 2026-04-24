@@ -101,6 +101,13 @@ const getMentionName = (userRecord) => {
   return getName(userRecord.userId);
 };
 
+// Returns just the phone number for a proper tappable @mention in WhatsApp.
+// Use this in message text — WhatsApp renders it as the contact's saved name.
+const getMentionPhone = (userRecord) => {
+  if (!userRecord?.userId) return "unknown";
+  return userRecord.userId.split("@")[0].split(":")[0];
+};
+
 // Returns saved name from DB record, falls back to phone number
 const getDisplayName = (userRecord) => {
   if (!userRecord) return "Unknown";
@@ -524,7 +531,7 @@ async function startBot() {
         completed.forEach((u) => {
           const streak = u.streak || 0;
           const streakBadge = streak >= 7 ? `🔥` : streak >= 3 ? `⚡` : `📅`;
-          msg += `✅ @${getDisplayName(u)} ${streakBadge} ${streak} day streak\n`;
+          msg += `✅ @${getMentionPhone(u)} ${streakBadge} ${streak} day streak\n`;
         });
       }
 
@@ -533,14 +540,14 @@ async function startBot() {
         msg += `\n🎁 *7-Day Streak Reward!*\n`;
         streakRewardUsers.forEach((u) => {
           const deducted = Math.min((u.fine || 0) + STREAK_REWARD_AMOUNT, STREAK_REWARD_AMOUNT);
-          msg += `🏆 @${getDisplayName(u)} — ${u.streak} day streak! ₹${deducted} fine removed 🎉\n`;
+          msg += `🏆 @${getMentionPhone(u)} — ${u.streak} day streak! ₹${deducted} fine removed 🎉\n`;
         });
       }
 
       if (pending.length) {
         msg += `\n⚠️ *Missed & Fined ₹${FINE_AMOUNT}:*\n`;
         pending.forEach((u) => {
-          msg += `❌ @${getDisplayName(u)} _(Total fine: ₹${u.fine})_\n`;
+          msg += `❌ @${getMentionPhone(u)} _(Total fine: ₹${u.fine})_\n`;
         });
       }
 
@@ -873,7 +880,7 @@ async function startBot() {
           .sort((a, b) => b.completed - a.completed)
           .forEach((u, i) => {
             const medal = ["🥇", "🥈", "🥉"][i] || "🔹";
-            msgText += `${medal} @${getDisplayName(u)} → ${u.completed ? "✅ Done" : "❌ Pending"}\n`;
+            msgText += `${medal} @${getMentionPhone(u)} → ${u.completed ? "✅ Done" : "❌ Pending"}\n`;
           });
         msgText += `\n━━━━━━━━━━━━━━━\n🔥 _Keep grinding — consistency wins!_`;
 
@@ -904,7 +911,7 @@ async function startBot() {
           const streakBadge = streak >= 7 ? `🔥` : streak >= 3 ? `⚡` : `📅`;
           const fine = u.fine || 0;
           const status = u.completed ? `✅` : `❌`;
-          msgText += `${status} @${getDisplayName(u)}\n`;
+          msgText += `${status} @${getMentionPhone(u)}\n`;
           msgText += `   ${streakBadge} *${streak} day streak*  |  💸 Fine: ₹${fine}\n\n`;
         });
 
