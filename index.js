@@ -472,6 +472,38 @@ async function startBot() {
         await status.save();
       }
 
+      // ── Streak tracking ──────────────────────────────────────────────────
+      // Increment streak for completed users, reset for pending
+      if (completed.length) {
+        await User.updateMany(
+          { userId: { $in: completed.map((u) => u.userId) } },
+          { $inc: { streak: 1 } }
+        );
+        completed.forEach((u) => { u.streak = (u.streak || 0) + 1; });
+      }
+      if (pending.length) {
+        await User.updateMany(
+          { userId: { $in: pending.map((u) => u.userId) } },
+          { $set: { streak: 0 } }
+        );
+        pending.forEach((u) => { u.streak = 0; });
+      }
+
+      // ── 7-day streak reward: deduct ₹5 from fine ─────────────────────────
+      const STREAK_REWARD_DAYS = 7;
+      const STREAK_REWARD_AMOUNT = 5;
+      const streakRewardUsers = completed.filter(u => u.streak > 0 && u.streak % STREAK_REWARD_DAYS === 0);
+
+      if (streakRewardUsers.length > 0) {
+        for (const u of streakRewardUsers) {
+          const deduct = Math.min(u.fine || 0, STREAK_REWARD_AMOUNT);
+          if (deduct > 0) {
+            await User.updateOne({ userId: u.userId }, { $inc: { fine: -deduct } });
+            u.fine = Math.max(0, (u.fine || 0) - deduct);
+          }
+        }
+      }
+
       let msg = `╔══════════════════╗
 📊 *DAILY REPORT*
 ╚══════════════════╝
@@ -484,7 +516,18 @@ async function startBot() {
       if (completed.length) {
         msg += `\n\n🏅 *Today's Submissions:*\n`;
         completed.forEach((u) => {
-          msg += `✅ @${getDisplayName(u)}\n`;
+          const streak = u.streak || 0;
+          const streakBadge = streak >= 7 ? `🔥` : streak >= 3 ? `⚡` : `📅`;
+          msg += `✅ @${getDisplayName(u)} ${streakBadge} ${streak} day streak\n`;
+        });
+      }
+
+      // Streak reward announcement
+      if (streakRewardUsers.length > 0) {
+        msg += `\n🎁 *7-Day Streak Reward!*\n`;
+        streakRewardUsers.forEach((u) => {
+          const deducted = Math.min((u.fine || 0) + STREAK_REWARD_AMOUNT, STREAK_REWARD_AMOUNT);
+          msg += `🏆 @${getDisplayName(u)} — ${u.streak} day streak! ₹${deducted} fine removed 🎉\n`;
         });
       }
 
@@ -825,6 +868,41 @@ async function startBot() {
           text: msgText,
           mentions: users.map((u) => u.userId),
         });
+      }
+
+      // 📊 STREAK REPORT
+      if (cmd.startsWith("/report")) {
+        const users = await User.find({ userId: { $exists: true, $nin: [null, ""] } });
+
+        // Sort by streak descending, then by fine ascending
+        const sorted = [...users].sort((a, b) => {
+          if ((b.streak || 0) !== (a.streak || 0)) return (b.streak || 0) - (a.streak || 0);
+          return (a.fine || 0) - (b.fine || 0);
+        });
+
+        let msgText = `╔══════════════════╗\n📊 *STREAK REPORT*\n╚══════════════════╝\n\n`;
+
+        sorted.filter(u => u.userId).forEach((u, i) => {
+          const streak = u.streak || 0;
+          const streakBadge = streak >= 7 ? `🔥` : streak >= 3 ? `⚡` : `📅`;
+          const fine = u.fine || 0;
+          const status = u.completed ? `✅` : `❌`;
+          msgText += `${status} @${getDisplayName(u)}\n`;
+          msgText += `   ${streakBadge} *${streak} day streak*  |  💸 Fine: ₹${fine}\n\n`;
+        });
+
+        msgText += `━━━━━━━━━━━━━━━\n`;
+        msgText += `📅 1-2 days  ⚡ 3-6 days  🔥 7+ days\n`;
+        msgText += `🎁 _Every 7-day streak = ₹5 fine removed!_`;
+
+        const chunks = chunkMessage(msgText);
+        for (const chunk of chunks) {
+          await safeSend(sock, chatId, {
+            text: chunk,
+            mentions: users.map(u => u.userId),
+          });
+        }
+        return;
       }
 
       // 🔄 RESET (FULL RESET)
