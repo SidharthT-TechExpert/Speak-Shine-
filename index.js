@@ -448,14 +448,25 @@ async function startBot() {
         mentions: allMentions,
       });
 
+      // NOTE: reset is done separately at 12:00 AM by dailyReset()
+
+    } catch (err) {
+      console.log("❌ Report error:", err);
+    }
+  };
+
+  // ================= DAILY RESET (12:00 AM) =================
+  const dailyReset = async () => {
+    try {
       // Reset all users for next day
       await User.updateMany({}, { completed: false });
 
       // Reset daily flags
       await resetStatus();
 
+      console.log("🔄 Daily reset done");
     } catch (err) {
-      console.log("❌ Report error:", err);
+      console.log("❌ Reset error:", err);
     }
   };
 
@@ -1384,26 +1395,15 @@ async function startBot() {
       timezone: TIMEZONE,
     },
   );
-
-  cron.schedule(
-    "27 21 * * *",
-    () =>
-      sendReminder(
-        `🌙 *Night Reminder*\n\n😴 _It's getting late — submit your video before midnight!_`,
-      ),
-    {
-      timezone: TIMEZONE,
-    },
-  );
-
-
   
 
   cron.schedule("30 22 * * *", sendDMReminder, { timezone: TIMEZONE });
 
-  cron.schedule("35 23 * * *", finalWarning, { timezone: TIMEZONE });
+  cron.schedule("30 23 * * *", finalWarning, { timezone: TIMEZONE });
 
-  cron.schedule("0 0 * * *", dailyReport, { timezone: TIMEZONE });
+  cron.schedule("55 23 * * *", dailyReport, { timezone: TIMEZONE });
+
+  cron.schedule("0 0 * * *", dailyReset, { timezone: TIMEZONE });
 
   cron.schedule(
     "0 10,13,18,20 * * *",
