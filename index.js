@@ -174,9 +174,14 @@ async function startBot() {
   // ================= DAILY QUESTION =================
   const sendQuestion = async () => {
     try {
-      const status = await safeDB(() => getStatus());
+      // Atomic claim — only one instance can set questionSentToday from false→true
+      const claimed = await Status.findOneAndUpdate(
+        { questionSentToday: { $ne: true } },
+        { $set: { questionSentToday: true } },
+        { new: false }
+      );
 
-      if (status.questionSentToday) {
+      if (!claimed) {
         console.log("🚫 Blocked: already sent today");
         return;
       }
@@ -185,25 +190,23 @@ async function startBot() {
 
       // 🚨 No Questions
       if (count === 0) {
-        if (!status.notifiedEmpty) {
+        if (!claimed.notifiedEmpty) {
           await safeSend(sock, OWNER, {
             text: `🚨 *Alert: Question Bank Empty!*\n\n━━━━━━━━━━━━━━━\n📭 No questions remaining in the database.\n\n🛠️ Please add new questions.`,
           });
 
-          status.notifiedEmpty = true;
-          await status.save();
+          await Status.updateOne({}, { $set: { notifiedEmpty: true, questionSentToday: false } });
         }
         return;
       }
 
       // ⚠️ Last Question Warning
-      if (count === 1 && !status.notifiedLast) {
+      if (count === 1 && !claimed.notifiedLast) {
         await safeSend(sock, OWNER, {
           text: `⚠️ *Low Stock Warning!*\n\n━━━━━━━━━━━━━━━\n📦 Only *1 question* left in database.\n\n🛠️ Add more soon.`,
         });
 
-        status.notifiedLast = true;
-        await status.save();
+        await Status.updateOne({}, { $set: { notifiedLast: true } });
       }
 
       // 🎯 Random Question
@@ -225,13 +228,13 @@ async function startBot() {
       if (sent) {
         await Question.findByIdAndDelete(question._id);
 
-        status.questionSentToday = true;
         // Save today's topic so AI feedback can check relevance
-        status.todayTopic = question.topic || null;
-        status.todayQuestion = question.question || null;
-        await status.save();
+        await Status.updateOne({}, { $set: { todayTopic: question.topic || null, todayQuestion: question.question || null } });
 
         console.log("✅ Poster question sent");
+      } else {
+        // Send failed — release the lock so it can retry
+        await Status.updateOne({}, { $set: { questionSentToday: false } });
       }
     } catch (err) {
       console.log("❌ Question error:", err);
