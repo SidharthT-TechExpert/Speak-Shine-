@@ -41,7 +41,7 @@ const pushQuestions = async () => {
 
 const getCount = async () => {
   const count = await Question.find();
-  console.log("Total Questions:", count);
+  console.log("Total Questions:", count.length);
 };
 
 const questionStatusUpdate = async () => {

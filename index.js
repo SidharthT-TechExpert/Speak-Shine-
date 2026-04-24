@@ -543,7 +543,7 @@ async function startBot() {
       if (pending.length && !status.fineAppliedToday) {
         await User.updateMany(
           { userId: { $in: pending.map((u) => u.userId) } },
-          { $inc: { fine: FINE_AMOUNT } }
+          { $inc: { fine: FINE_AMOUNT, weeklyFine: FINE_AMOUNT } }
         );
 
         pending.forEach((u) => {
@@ -653,12 +653,86 @@ async function startBot() {
       // Reset all users for next day
       await User.updateMany({}, { completed: false });
 
+      // On Sunday (day 0) reset weekly submissions
+      const dayOfWeek = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata", weekday: "short" });
+      if (dayOfWeek === "Sun") {
+        await User.updateMany({}, { weeklySubmissions: 0, weeklyFine: 0 });
+        console.log("🔄 Weekly submissions + fines reset (Sunday)");
+      }
+
       // Reset daily flags
       await resetStatus();
 
       console.log("🔄 Daily reset done");
     } catch (err) {
       console.log("❌ Reset error:", err);
+    }
+  };
+
+  // ================= WEEKLY SUMMARY =================
+  const weeklySummary = async () => {
+    try {
+      const users = await safeDB(() => User.find({
+        userId: { $exists: true, $nin: [null, ""] }
+      }));
+
+      const botPhone = sock.user?.id?.split(":")[0].split("@")[0] ?? "";
+      const filtered = botPhone ? users.filter(u => !u.userId.includes(botPhone)) : users;
+
+      if (!filtered.length) return;
+
+      const pMap = await getParticipantMap(sock, TARGET_GROUP);
+
+      // Sort by weeklySubmissions desc, then streak desc
+      const sorted = [...filtered].sort((a, b) =>
+        (b.weeklySubmissions || 0) - (a.weeklySubmissions || 0) ||
+        (b.streak || 0) - (a.streak || 0)
+      );
+
+      const topStreaks = [...filtered]
+        .filter(u => (u.streak || 0) > 0)
+        .sort((a, b) => (b.streak || 0) - (a.streak || 0))
+        .slice(0, 3);
+
+      const totalFines = filtered.reduce((sum, u) => sum + (u.weeklyFine || 0), 0);
+
+      // Week date range
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 6);
+      const fmt = (d) => d.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" });
+
+      let msg = `╔══════════════════╗\n🏆 *WEEKLY SUMMARY*\n╚══════════════════╝\n\n`;
+      msg += `📅 _Week of ${fmt(weekStart)} – ${fmt(now)}_\n`;
+      msg += `━━━━━━━━━━━━━━━\n\n`;
+
+      // Most consistent
+      msg += `🥇 *Most Consistent:*\n`;
+      const medals = ["🥇", "🥈", "🥉"];
+      sorted.slice(0, 5).forEach((u, i) => {
+        const days = u.weeklySubmissions || 0;
+        const badge = days === 7 ? "🔥" : days >= 5 ? "⚡" : days >= 3 ? "💪" : "📅";
+        msg += `${medals[i] || `${i + 1}.`} @${getMentionPhone(u)} — *${days}/7 days* ${badge}\n`;
+      });
+
+      // Top streaks
+      if (topStreaks.length) {
+        msg += `\n🔥 *Top Streaks:*\n`;
+        topStreaks.forEach((u) => {
+          msg += `@${getMentionPhone(u)} — ${u.streak} day streak\n`;
+        });
+      }
+
+      msg += `\n💸 *Total Fines This Week:* ₹${totalFines}\n`;
+      msg += `━━━━━━━━━━━━━━━\n`;
+      msg += `🎯 _New week starts tomorrow. Stay consistent!_`;
+
+      const allMentions = filtered.map((u) => resolveJid(u.userId, pMap)).filter(Boolean);
+
+      await safeSend(sock, TARGET_GROUP, { text: msg, mentions: allMentions });
+      console.log("📊 Weekly summary sent");
+    } catch (err) {
+      console.log("❌ Weekly summary error:", err);
     }
   };
 
@@ -1645,7 +1719,7 @@ async function startBot() {
 
         await User.findOneAndUpdate(
           { userId: dbUser },
-          { completed: true },
+          { completed: true, $inc: { weeklySubmissions: 1 } },
           { upsert: true },
         );
 
@@ -1839,6 +1913,8 @@ async function startBot() {
 
     cron.schedule("5 0 * * *", dailyReset, { timezone: TIMEZONE });
 
+    cron.schedule("0 21 * * 0", weeklySummary, { timezone: TIMEZONE });
+
     // ================= TEST CRON (sends question to owner every min, no delete) =================
     if (false) {
       cron.schedule("* * * * *", async () => {
@@ -1860,7 +1936,7 @@ async function startBot() {
       }, { timezone: TIMEZONE });
     }
 
-    console.log("✅ All cron jobs registered (7:30, 8:00, 8:02-8:30, 15:00, 21:00, 22:30, 23:30, 00:00, 00:05)");
+    console.log("✅ All cron jobs registered (7:30, 8:00, 8:02-8:30, 15:00, 21:00, 22:30, 23:30, 00:00, 00:05, Sun 21:00)");
   } // end cronsRegistered guard
 
   // ================= CONNECTION =================
