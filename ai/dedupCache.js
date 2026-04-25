@@ -13,65 +13,34 @@
  */
 
 import { createHash } from 'node:crypto';
-import Redis from 'ioredis';
+import { getRedisClient, isRedisAvailable } from '../redis.js';
 
 // ---------------------------------------------------------------------------
-// TTL constants
+// TTL helpers — expire at midnight IST (Asia/Kolkata)
 // ---------------------------------------------------------------------------
 
-/** How long (ms) a completed result is retained. Default: 50 400 000 (14 hrs) */
+/** CACHE_TTL_MS kept for in-memory fallback and tests. */
 export const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS) || 50_400_000;
 
-/** How long (s) a "processing" entry lives in Redis before auto-expiry (safety net). */
-const PROCESSING_TTL_S = 50_400; // 14 hrs
-
-/** How long (s) a completed result lives in Redis. */
-const RESULT_TTL_S = Math.ceil(CACHE_TTL_MS / 1000); // 14 hrs
+/**
+ * Returns seconds remaining until the next midnight in IST (Asia/Kolkata).
+ * Minimum 60s so we never set a near-zero TTL right at midnight.
+ */
+function secondsUntilMidnightIST() {
+  const now = new Date();
+  // Midnight IST = next day 00:00:00 in Asia/Kolkata
+  const midnight = new Date(
+    new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  );
+  midnight.setHours(24, 0, 0, 0); // next midnight in local IST wall-clock
+  // Convert back: get IST offset in ms
+  const istOffset = 5.5 * 60 * 60 * 1000; // UTC+5:30
+  const midnightUTC = midnight.getTime() - istOffset;
+  const diff = Math.floor((midnightUTC - now.getTime()) / 1000);
+  return Math.max(diff, 60);
+}
 
 const KEY_PREFIX = 'dedup:';
-
-// ---------------------------------------------------------------------------
-// Redis client — lazy singleton
-// ---------------------------------------------------------------------------
-
-let redis = null;
-let redisAvailable = false;
-
-function getRedis() {
-  if (redis) return redis;
-
-  const url = process.env.REDIS_URL;
-  if (!url) return null;
-
-  redis = new Redis(url, {
-    lazyConnect: true,
-    maxRetriesPerRequest: 1,
-    connectTimeout: 3000,
-    enableOfflineQueue: false,
-  });
-
-  redis.on('ready', () => {
-    redisAvailable = true;
-    console.log('[DedupCache] Redis connected');
-  });
-
-  redis.on('error', (err) => {
-    if (redisAvailable) {
-      console.log('[DedupCache] Redis error — falling back to in-memory:', err.message);
-    }
-    redisAvailable = false;
-  });
-
-  redis.on('close', () => {
-    redisAvailable = false;
-  });
-
-  redis.connect().catch(() => {
-    // connection failure handled by 'error' event
-  });
-
-  return redis;
-}
 
 // ---------------------------------------------------------------------------
 // In-memory fallback Map
@@ -104,15 +73,15 @@ export function hashBuffer(buffer) {
 
 /**
  * Marks a hash as currently being processed.
- * Redis: SET dedup:<hash> "processing" EX 600
+ * Expires at midnight IST so the lock auto-clears with the daily reset.
  *
  * @param {string} hash
  */
 export async function markProcessing(hash) {
-  const client = getRedis();
-  if (client && redisAvailable) {
+  const client = getRedisClient();
+  if (client && isRedisAvailable()) {
     try {
-      await client.set(`${KEY_PREFIX}${hash}`, 'processing', 'EX', PROCESSING_TTL_S);
+      await client.set(`${KEY_PREFIX}${hash}`, 'processing', 'EX', secondsUntilMidnightIST());
       return;
     } catch (err) {
       console.log('[DedupCache] markProcessing Redis error, using fallback:', err.message);
@@ -122,17 +91,17 @@ export async function markProcessing(hash) {
 }
 
 /**
- * Stores a completed feedback result and schedules eviction.
- * Redis: SET dedup:<hash> <result> EX <RESULT_TTL_S>
+ * Stores a completed feedback result.
+ * Expires at midnight IST — aligns with the daily reset at 12:00 AM.
  *
  * @param {string} hash
  * @param {string} result  — formatted feedback text
  */
 export async function storeResult(hash, result) {
-  const client = getRedis();
-  if (client && redisAvailable) {
+  const client = getRedisClient();
+  if (client && isRedisAvailable()) {
     try {
-      await client.set(`${KEY_PREFIX}${hash}`, result, 'EX', RESULT_TTL_S);
+      await client.set(`${KEY_PREFIX}${hash}`, result, 'EX', secondsUntilMidnightIST());
       return;
     } catch (err) {
       console.log('[DedupCache] storeResult Redis error, using fallback:', err.message);
@@ -144,17 +113,16 @@ export async function storeResult(hash, result) {
 
 /**
  * Returns the current cache state for a hash.
- * Returns 'processing', a result string, or undefined/null if not found.
+ * Returns 'processing', a result string, or null if not found.
  *
  * @param {string} hash
  * @returns {Promise<'processing' | string | null>}
  */
 export async function getCacheEntry(hash) {
-  const client = getRedis();
-  if (client && redisAvailable) {
+  const client = getRedisClient();
+  if (client && isRedisAvailable()) {
     try {
-      const val = await client.get(`${KEY_PREFIX}${hash}`);
-      return val; // null if not found
+      return await client.get(`${KEY_PREFIX}${hash}`);
     } catch (err) {
       console.log('[DedupCache] getCacheEntry Redis error, using fallback:', err.message);
     }
@@ -168,8 +136,8 @@ export async function getCacheEntry(hash) {
  * @param {string} hash
  */
 export async function evict(hash) {
-  const client = getRedis();
-  if (client && redisAvailable) {
+  const client = getRedisClient();
+  if (client && isRedisAvailable()) {
     try {
       await client.del(`${KEY_PREFIX}${hash}`);
       return;

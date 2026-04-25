@@ -22,6 +22,8 @@
  *   }
  */
 
+import { getRedisClient, isRedisAvailable } from '../redis.js';
+
 // ---------------------------------------------------------------------------
 // Load keys from environment
 // ---------------------------------------------------------------------------
@@ -122,9 +124,16 @@ export function getTextKey() {
  * @param {number} [resetAfterMs]
  */
 export function markKeyExhausted(key, resetAfterMs) {
-  const ms = resetAfterMs ?? 24 * 60 * 60 * 1000; // default: 24h
+  const ms = resetAfterMs ?? 24 * 60 * 60 * 1000;
   const resetAt = Date.now() + ms;
   exhaustedUntil.set(key, resetAt);
+
+  // Persist to Redis so restarts don't forget exhausted keys
+  const client = getRedisClient();
+  if (client && isRedisAvailable()) {
+    const ttlS = Math.ceil(ms / 1000);
+    client.set(`groq:exhausted:${key.slice(-8)}`, String(resetAt), 'EX', ttlS).catch(() => {});
+  }
 
   const resetIn = Math.ceil(ms / 60000);
   const keyHint = key.slice(-6);
