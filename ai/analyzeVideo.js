@@ -226,6 +226,18 @@ function mergeBatchResults(a, b) {
   };
 }
 
+const SCORE_KEYS = ['eyeContact', 'bodyLanguage', 'facialExpression', 'overallPresence'];
+const RECONCILE_THRESHOLD = 2;
+
+function scoresAreClose(results) {
+  for (const key of SCORE_KEYS) {
+    const vals = results.map(r => r[key]).filter(v => v != null);
+    if (vals.length < 2) continue;
+    if (Math.max(...vals) - Math.min(...vals) > RECONCILE_THRESHOLD) return false;
+  }
+  return true;
+}
+
 async function validateAndReconcile(batchResults, merged) {
   const batchSummaries = batchResults.map((r, i) => {
     return `Assessment ${i + 1} (${i === 0 ? "first half" : i === batchResults.length - 1 ? "second half" : `part ${i + 1}`} of video):
@@ -346,11 +358,16 @@ export async function analyzeVideo(videoPath) {
       return null;
     }
 
-    // Validation pass
+    // Validation pass — skip reconciliation if all scores are within threshold
     const validBatchResults = batchResults.filter(Boolean);
-    const validated = validBatchResults.length >= 2
-      ? await validateAndReconcile(validBatchResults, merged)
-      : merged;
+    let validated;
+    if (validBatchResults.length >= 2 && !scoresAreClose(validBatchResults)) {
+      console.log("[Visual] scores diverge — running reconciliation");
+      validated = await validateAndReconcile(validBatchResults, merged);
+    } else {
+      if (validBatchResults.length >= 2) console.log("[Visual] scores are close — skipping reconciliation");
+      validated = merged;
+    }
 
     const final = validated ?? merged;
     console.log("Visual analysis complete:", JSON.stringify(final).slice(0, 150));
