@@ -969,6 +969,31 @@ async function startBot() {
             }
             return;
           }
+
+          // /clearscore <phone> — clear all feedback scores for a user
+          // Example: /clearscore 918848096746
+          if (ownerCmd.startsWith("/clearscore")) {
+            const parts = ownerCmd.split(/\s+/);
+            const phone = parts[1]?.replace(/\D/g, "");
+            if (!phone) {
+              await safeSend(sock, OWNER, { text: `❌ Usage: /clearscore <phone>\nExample: /clearscore 918848096746` });
+              return;
+            }
+            const target = await User.findOne({ userId: { $regex: phone } });
+            if (!target) {
+              await safeSend(sock, OWNER, { text: `❌ No user found with phone: ${phone}` });
+              return;
+            }
+            await User.updateOne(
+              { _id: target._id },
+              { $set: { feedbackScores: [] } }
+            );
+            const name = target.name || phone;
+            await safeSend(sock, OWNER, {
+              text: `✅ *Scores cleared for ${name}*\n\n_Fluency, Grammar, Confidence, Vocabulary reset to —_`,
+            });
+            return;
+          }
         }
 
         // ── Member DM commands (any user) ──────────────────────────────────
