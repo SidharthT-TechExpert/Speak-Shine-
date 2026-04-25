@@ -361,16 +361,22 @@ export async function analyzeVideo(videoPath) {
         const idx = w + i;
         const startSec = batch[0]?.timestamp ?? null;
         const endSec = batch[batch.length - 1]?.timestamp ?? null;
-        return analyzeFrameBatch(
-          batch,
-          `batch${idx + 1}/${batches.length}`,
-          { index: idx, total: batches.length, startSec, endSec }
+        // Stagger each batch within the wave by 500ms to avoid simultaneous key contention
+        return new Promise(resolve => setTimeout(resolve, i * 500)).then(() =>
+          analyzeFrameBatch(
+            batch,
+            `batch${idx + 1}/${batches.length}`,
+            { index: idx, total: batches.length, startSec, endSec }
+          )
         );
       })
     );
     batchResults.push(...waveResults);
-    // Small gap between waves to let rate limits breathe
-    if (w + WAVE_SIZE < batches.length) await new Promise(r => setTimeout(r, 1000));
+    // 3s gap between waves — gives rate-limited keys time to recover
+    if (w + WAVE_SIZE < batches.length) {
+      console.log(`[Visual] wave ${Math.floor(w / WAVE_SIZE) + 1} done — waiting 3s before next wave`);
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
 
   // Merge all batch results with 60/40 second-half weighting
