@@ -2118,6 +2118,7 @@ async function startBot() {
     if (qr) qrcode.generate(qr, { small: true });
 
     if (connection === "open") {
+      const wasReconnecting = reconnecting;
       reconnecting = false;
       console.log("✅ Connected");
 
@@ -2126,6 +2127,13 @@ async function startBot() {
         global._dbHealthStarted = true;
         startDBHealthCheck((text) => safeSend(sock, OWNER, { text }));
         console.log("💚 DB health check started (every 5 min)");
+      }
+
+      // On reconnect, notify owner that any videos sent during downtime were missed
+      if (wasReconnecting) {
+        safeSend(sock, OWNER, {
+          text: `🔄 *Bot reconnected!*\n\n⚠️ _Any videos sent while the bot was offline were NOT processed._\n\n📹 _Ask members who sent videos during downtime to resend them._`,
+        });
       }
     }
 
