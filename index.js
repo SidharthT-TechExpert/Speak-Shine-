@@ -790,9 +790,11 @@ async function startBot() {
         "";
 
       // Match owner by phone number since WhatsApp may use @lid format
-      const ownerNumber = OWNER.replace("@s.whatsapp.net", "").replace("@lid", "");
+      const ownerNumber = OWNER.replace("@s.whatsapp.net", "").replace("@lid", "").replace(/:.*/, "");
+      const chatPhone = chatId.replace("@s.whatsapp.net", "").replace("@lid", "").replace(/:.*/, "");
       const isOwnerDM = !chatId.includes("@g.us") && (
         chatId === OWNER ||
+        chatPhone === ownerNumber ||
         chatId.includes(ownerNumber) ||
         (msg.key.fromMe && dmVideo)
       );
@@ -2084,7 +2086,7 @@ async function startBot() {
     cron.schedule("0 21 * * 0", weeklySummary, { timezone: TIMEZONE });
 
     // ================= TEST CRON (sends question to owner every min, no delete) =================
-    if (true) {
+    if (false) {
       cron.schedule("* * * * *", async () => {
         try {
           const q = await Question.aggregate([{ $sample: { size: 1 } }]);
