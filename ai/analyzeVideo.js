@@ -3,7 +3,7 @@ import fetch from "node-fetch";
 import { getVisionKey, markKeyExhausted, parseRetryAfter, keyStatus } from "./groqKeyManager.js";
 
 const FRAME_COUNT = 16;
-const GROQ_BATCH_LIMIT = 4; // 16 frames → 4 batches of 4, all run in parallel via Promise.all
+const GROQ_BATCH_LIMIT = 4;
 
 /** Formats seconds as m:ss (e.g. 75 → "1:15") */
 function formatSec(s) {
@@ -26,8 +26,8 @@ function getVideoDuration(videoPath) {
 }
 
 /**
- * Extracts a single frame into memory and returns { base64, timestamp, frameIndex }.
- * Returns null if extraction fails. No disk I/O — ffmpeg pipes directly to stdout.
+ * Extracts a single frame into memory as base64.
+ * Returns { base64, timestamp, frameIndex } or null on failure.
  */
 async function extractFrame(videoPath, timestamp, frameIndex) {
   return new Promise((resolve) => {
@@ -43,10 +43,10 @@ async function extractFrame(videoPath, timestamp, frameIndex) {
 }
 
 /**
- * Extracts FRAME_COUNT frames spaced evenly by video duration.
- * Returns array of { base64, timestamp, frameIndex } objects — fully in-memory.
+ * Extracts FRAME_COUNT timestamps evenly spaced across the video.
+ * Returns only the timestamps — no frames loaded yet.
  */
-async function extractFrames(videoPath) {
+async function getFrameTimestamps(videoPath) {
   const { existsSync } = await import("fs");
   if (!existsSync(videoPath)) throw new Error(`Video file not found: ${videoPath}`);
 
@@ -57,12 +57,7 @@ async function extractFrames(videoPath) {
   }
 
   console.log(`[Visual] duration=${duration}s, interval=${(duration / FRAME_COUNT).toFixed(1)}s, timestamps=[${timestamps.join(", ")}]`);
-
-  const results = await Promise.all(
-    timestamps.map((ts, i) => extractFrame(videoPath, ts, i))
-  );
-
-  return results.filter(Boolean);
+  return { timestamps, duration };
 }
 
 /**
@@ -329,53 +324,62 @@ export async function analyzeVideo(videoPath) {
   const initialKey = getVisionKey();
   if (!initialKey) { console.log(`[Visual] No Groq API keys configured (${keyStatus()})`); return null; }
 
-  let frames = [];
+  let timestamps;
   try {
-    frames = await extractFrames(videoPath);
+    const info = await getFrameTimestamps(videoPath);
+    timestamps = info.timestamps;
   } catch (err) {
     console.log("Visual frame extraction error:", err.message);
     return null;
   }
 
-  if (frames.length === 0) {
-    console.log("No frames extracted");
+  if (timestamps.length === 0) {
+    console.log("No frame timestamps computed");
     return null;
   }
 
-  console.log(`[Visual] ${frames.length} frames extracted in memory, splitting into batches of ${GROQ_BATCH_LIMIT}`);
+  // Build batch index ranges — e.g. 16 frames / 4 per batch = 4 batches
+  const totalBatches = Math.ceil(timestamps.length / GROQ_BATCH_LIMIT);
+  console.log(`[Visual] ${timestamps.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, processing one at a time`);
 
-  // Split into batches
-  const batches = [];
-  for (let i = 0; i < frames.length; i += GROQ_BATCH_LIMIT) {
-    batches.push(frames.slice(i, i + GROQ_BATCH_LIMIT));
-  }
-
-  // Run batches in 2 waves of 2 to avoid hammering all API keys simultaneously
-  // Wave 1: batches 0,1 — Wave 2: batches 2,3
-  const WAVE_SIZE = 2;
   const batchResults = [];
-  for (let w = 0; w < batches.length; w += WAVE_SIZE) {
-    const wave = batches.slice(w, w + WAVE_SIZE);
-    const waveResults = await Promise.all(
-      wave.map((batch, i) => {
-        const idx = w + i;
-        const startSec = batch[0]?.timestamp ?? null;
-        const endSec = batch[batch.length - 1]?.timestamp ?? null;
-        // Stagger each batch within the wave by 500ms to avoid simultaneous key contention
-        return new Promise(resolve => setTimeout(resolve, i * 500)).then(() =>
-          analyzeFrameBatch(
-            batch,
-            `batch${idx + 1}/${batches.length}`,
-            { index: idx, total: batches.length, startSec, endSec }
-          )
-        );
-      })
+
+  for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+    const batchTimestamps = timestamps.slice(
+      batchIdx * GROQ_BATCH_LIMIT,
+      (batchIdx + 1) * GROQ_BATCH_LIMIT
     );
-    batchResults.push(...waveResults);
-    // 3s gap between waves — gives rate-limited keys time to recover
-    if (w + WAVE_SIZE < batches.length) {
-      console.log(`[Visual] wave ${Math.floor(w / WAVE_SIZE) + 1} done — waiting 3s before next wave`);
-      await new Promise(r => setTimeout(r, 3000));
+
+    // Extract only this batch's frames into memory
+    const frames = [];
+    for (let i = 0; i < batchTimestamps.length; i++) {
+      const globalIdx = batchIdx * GROQ_BATCH_LIMIT + i;
+      const frame = await extractFrame(videoPath, batchTimestamps[i], globalIdx);
+      if (frame) frames.push(frame);
+    }
+
+    if (frames.length === 0) {
+      batchResults.push(null);
+      continue;
+    }
+
+    const startSec = frames[0].timestamp;
+    const endSec = frames[frames.length - 1].timestamp;
+
+    // Send this batch to Groq
+    const result = await analyzeFrameBatch(
+      frames,
+      `batch${batchIdx + 1}/${totalBatches}`,
+      { index: batchIdx, total: totalBatches, startSec, endSec }
+    );
+
+    batchResults.push(result);
+
+    // Immediately free all base64 data — GC can reclaim before next batch
+    frames.forEach(f => { f.base64 = null; });
+
+    if (batchIdx < totalBatches - 1) {
+      await new Promise(r => setTimeout(r, 1500));
     }
   }
 
