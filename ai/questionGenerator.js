@@ -136,30 +136,31 @@ Return ONLY the rewritten question text, nothing else.`;
 // Humanize a batch — detect + rewrite flagged questions
 // ---------------------------------------------------------------------------
 async function humanizeBatch(questions, apiKey) {
-  const results = [];
   const openerCounts = getOpenerCounts(questions);
 
-  for (const q of questions) {
+  // Identify which questions need rewriting up-front
+  const needsRewrite = questions.map((q) => {
     const lower = q.question.toLowerCase().trim();
     const opener = lower.split(" ").slice(0, 3).join(" ");
     const repeatedOpener = (openerCounts[opener] || 0) > 2;
-    const needsRewrite = hasAIPatterns(q.question) || repeatedOpener;
+    return hasAIPatterns(q.question) || repeatedOpener;
+  });
 
-    if (needsRewrite) {
-      console.log(`[Humanize] Rewriting: "${q.question.slice(0, 60)}..."`);
-      const rewritten = await rewriteAsHuman(q, apiKey);
-      if (rewritten) {
-        console.log(`[Humanize] → "${rewritten.slice(0, 60)}"`);
-        results.push({ ...q, question: rewritten });
-        // Update opener counts after rewrite
-        const newOpener = rewritten.toLowerCase().split(" ").slice(0, 3).join(" ");
-        openerCounts[newOpener] = (openerCounts[newOpener] || 0) + 1;
-        if (openerCounts[opener] > 0) openerCounts[opener]--;
-        continue;
-      }
-    }
-    results.push(q);
-  }
+  // Fire all rewrites in parallel
+  const rewritePromises = questions.map((q, i) => {
+    if (!needsRewrite[i]) return Promise.resolve(null);
+    console.log(`[Humanize] Rewriting: "${q.question.slice(0, 60)}..."`);
+    return rewriteAsHuman(q, apiKey);
+  });
+
+  const rewritten = await Promise.all(rewritePromises);
+
+  // Build results and log outcomes
+  const results = questions.map((q, i) => {
+    if (!needsRewrite[i] || !rewritten[i]) return q;
+    console.log(`[Humanize] → "${rewritten[i].slice(0, 60)}"`);
+    return { ...q, question: rewritten[i] };
+  });
 
   return results;
 }
