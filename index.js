@@ -165,8 +165,8 @@ const parseFeedbackScores = (text) => {
     const m = text.match(new RegExp(`${label}:[^\\d]*(\\d+)/10`));
     return m ? parseInt(m[1]) : null;
   };
-  const fluency    = extract("Fluency");
-  const grammar    = extract("Grammar");
+  const fluency = extract("Fluency");
+  const grammar = extract("Grammar");
   const confidence = extract("Confidence");
   const vocabulary = extract("Vocabulary");
   if (fluency == null && grammar == null) return null;
@@ -277,31 +277,31 @@ async function startBot() {
         return;
       }
 
-      const count = await Question.countDocuments();
+      // ── Ensure there are questions — generate if needed (blocking) ──────
+      let count = await Question.countDocuments();
 
-      // 🚨 No Questions — auto-generate immediately
       if (count === 0) {
+        console.log("[Questions] Bank empty — generating 14 before sending...");
         await safeSend(sock, OWNER, {
           text: `🚨 *Question Bank Empty!*\n\n⏳ _Auto-generating 14 new questions…_`,
         });
         try {
           const { inserted, totalInDb } = await generateAndInsertQuestions(14);
+          count = totalInDb;
           await safeSend(sock, OWNER, {
             text: `✅ *Auto-generated ${inserted.length} questions!*\n📊 Total in DB: ${totalInDb}`,
           });
-          await Status.updateOne({}, { $set: { notifiedEmpty: false, questionSentToday: false } });
         } catch (genErr) {
           console.log("❌ Auto-generate failed:", genErr.message);
           await safeSend(sock, OWNER, {
-            text: `❌ *Auto-generation failed:* _${genErr.message}_\n\nUse /genq to add questions manually.`,
+            text: `❌ *Auto-generation failed:* _${genErr.message}_`,
           });
-          await Status.updateOne({}, { $set: { notifiedEmpty: true, questionSentToday: false } });
+          // Release lock so it can retry next cron tick
+          await Status.updateOne({}, { $set: { questionSentToday: false } });
+          return;
         }
-        return;
-      }
-
-      // ⚠️ Low Stock (≤7) — auto-generate in background, don't block today's question
-      if (count <= 7) {
+      } else if (count <= 7) {
+        // Low stock — refill in background, don't block today's question
         console.log(`[Questions] Low stock (${count} left) — auto-generating 14 more in background`);
         generateAndInsertQuestions(14)
           .then(({ inserted, totalInDb }) => {
@@ -313,65 +313,71 @@ async function startBot() {
           .catch(err => {
             console.log("❌ Background auto-generate failed:", err.message);
             safeSend(sock, OWNER, {
-              text: `⚠️ *Low stock (${count} left)* — auto-refill failed: _${err.message}_\n\nUse /genq to add questions manually.`,
+              text: `⚠️ *Low stock (${count} left)* — auto-refill failed: _${err.message}_`,
             });
           });
-        // Don't return — continue sending today's question normally
       }
 
-      // 🎯 Random Question — avoid repeating categories from last 7 days
-      const recentCategories = status?.recentCategories || [];
+      // ── Pick a question ──────────────────────────────────────────────────
+      const statusDoc = await Status.findOne();
+      const recentCategories = statusDoc?.recentCategories || [];
+
       let q = null;
 
-      // Try to find a question whose category wasn't used recently
+      // Prefer a category not used in last 7 days
       if (recentCategories.length > 0) {
-        const freshQuestions = await Question.aggregate([
+        const fresh = await Question.aggregate([
           { $match: { category: { $nin: recentCategories } } },
           { $sample: { size: 1 } },
         ]);
-        if (freshQuestions?.length) q = freshQuestions;
+        if (fresh?.length) q = fresh;
       }
 
-      // Fallback: all categories exhausted or no category field — just pick any random
+      // Fallback: any random question
       if (!q || !q.length) {
         q = await Question.aggregate([{ $sample: { size: 1 } }]);
       }
 
-      if (!q || !q.length) return;
+      if (!q || !q.length) {
+        console.log("❌ No question available after generation — releasing lock");
+        await Status.updateOne({}, { $set: { questionSentToday: false } });
+        return;
+      }
 
       const question = q[0];
 
-      // 🖼 Generate Poster
+      // ── Generate & send poster ───────────────────────────────────────────
       await generatePoster(question);
 
-      // 📤 Send Image Poster
       const sent = await safeSend(sock, TARGET_GROUP, {
         image: { url: "./daily.png" },
       });
 
-      // ✅ Success
       if (sent) {
         await Question.findByIdAndDelete(question._id);
 
-        // Update recentCategories — keep last 7, push today's category
         const updatedRecent = question.category
-          ? [...new Set([...(status?.recentCategories || []), question.category])].slice(-7)
-          : (status?.recentCategories || []);
+          ? [...new Set([...recentCategories, question.category])].slice(-7)
+          : recentCategories;
 
-        // Save today's topic so AI feedback can check relevance
-        await Status.updateOne({}, { $set: {
-          todayTopic: question.topic || null,
-          todayQuestion: question.question || null,
-          recentCategories: updatedRecent,
-        }});
+        await Status.updateOne({}, {
+          $set: {
+            todayTopic: question.topic || null,
+            todayQuestion: question.question || null,
+            recentCategories: updatedRecent,
+          }
+        });
 
-        console.log(`✅ Poster question sent | Category: ${question.category || "N/A"} | Recent: [${updatedRecent.join(", ")}]`);
+        console.log(`✅ Question sent | Category: ${question.category || "N/A"} | Recent: [${updatedRecent.join(", ")}]`);
       } else {
-        // Send failed — release the lock so it can retry
+        // Send failed — release lock so cron retries
         await Status.updateOne({}, { $set: { questionSentToday: false } });
+        console.log("❌ Poster send failed — lock released for retry");
       }
     } catch (err) {
       console.log("❌ Question error:", err);
+      // Release lock on unexpected error so it retries next cron tick
+      await Status.updateOne({}, { $set: { questionSentToday: false } }).catch(() => { });
     }
   };
 
@@ -1937,7 +1943,7 @@ async function startBot() {
                   $push: { feedbackScores: { $each: [{ ...scores, date: new Date() }], $slice: -30 } },
                   $inc: { monthlySubmissions: 1 },
                 }
-              ).catch(() => {});
+              ).catch(() => { });
             }
 
             const chunks = chunkMessage(feedbackText);
@@ -2020,7 +2026,7 @@ async function startBot() {
     cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
 
     cron.schedule(
-      "*/2 8 * * *",
+      "*/2 9 * * *",
       async () => {
         const now = new Date();
         const minutes = now.getMinutes();
