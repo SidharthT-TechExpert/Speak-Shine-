@@ -265,14 +265,9 @@ async function startBot() {
   // ================= DAILY QUESTION =================
   const sendQuestion = async () => {
     try {
-      // Atomic claim — only one instance can set questionSentToday from false→true
-      const claimed = await Status.findOneAndUpdate(
-        { questionSentToday: { $ne: true } },
-        { $set: { questionSentToday: true } },
-        { new: false }
-      );
-
-      if (!claimed) {
+      // Check if already sent today — only block if truly sent, not on failure
+      const statusCheck = await Status.findOne();
+      if (statusCheck?.questionSentToday) {
         console.log("🚫 Blocked: already sent today");
         return;
       }
@@ -296,8 +291,6 @@ async function startBot() {
           await safeSend(sock, OWNER, {
             text: `❌ *Auto-generation failed:* _${genErr.message}_`,
           });
-          // Release lock so it can retry next cron tick
-          await Status.updateOne({}, { $set: { questionSentToday: false } });
           return;
         }
       } else if (count <= 7) {
@@ -339,8 +332,7 @@ async function startBot() {
       }
 
       if (!q || !q.length) {
-        console.log("❌ No question available after generation — releasing lock");
-        await Status.updateOne({}, { $set: { questionSentToday: false } });
+        console.log("❌ No question available after generation");
         return;
       }
 
@@ -360,8 +352,10 @@ async function startBot() {
           ? [...new Set([...recentCategories, question.category])].slice(-7)
           : recentCategories;
 
+        // ✅ Mark as sent ONLY after successful delivery
         await Status.updateOne({}, {
           $set: {
+            questionSentToday: true,
             todayTopic: question.topic || null,
             todayQuestion: question.question || null,
             recentCategories: updatedRecent,
@@ -370,14 +364,10 @@ async function startBot() {
 
         console.log(`✅ Question sent | Category: ${question.category || "N/A"} | Recent: [${updatedRecent.join(", ")}]`);
       } else {
-        // Send failed — release lock so cron retries
-        await Status.updateOne({}, { $set: { questionSentToday: false } });
-        console.log("❌ Poster send failed — lock released for retry");
+        console.log("❌ Poster send failed — will retry next cron tick");
       }
     } catch (err) {
       console.log("❌ Question error:", err);
-      // Release lock on unexpected error so it retries next cron tick
-      await Status.updateOne({}, { $set: { questionSentToday: false } }).catch(() => { });
     }
   };
 
@@ -2072,7 +2062,7 @@ async function startBot() {
     cron.schedule("0 21 * * 0", weeklySummary, { timezone: TIMEZONE });
 
     // ================= TEST CRON (sends question to owner every min, no delete) =================
-    if (false) {
+    if (true) {
       cron.schedule("* * * * *", async () => {
         try {
           const q = await Question.aggregate([{ $sample: { size: 1 } }]);

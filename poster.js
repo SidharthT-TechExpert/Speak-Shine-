@@ -1,89 +1,77 @@
 import { createCanvas } from "canvas";
 import fs from "fs";
 
-export default async function generatePoster(question) {
-  const canvas = createCanvas(1080, 1080);
-  const ctx = canvas.getContext("2d");
+// ── Category → theme mapping ──────────────────────────────────────────────
+const THEMES = {
+  "Daily Life":       { primary: "#4ade80", secondary: "#22c55e", accent: "#bbf7d0", bg1: "#020617", bg2: "#0f172a", glow1: "rgba(34,197,94,0.15)",  glow2: "rgba(16,185,129,0.08)",  cardBg: "rgba(20,83,45,0.35)",   cardBorder: "#22c55e" },
+  "Travel":           { primary: "#38bdf8", secondary: "#0ea5e9", accent: "#bae6fd", bg1: "#020c1b", bg2: "#0c1a2e", glow1: "rgba(56,189,248,0.15)", glow2: "rgba(14,165,233,0.08)",  cardBg: "rgba(7,89,133,0.35)",   cardBorder: "#0ea5e9" },
+  "Technology":       { primary: "#a78bfa", secondary: "#7c3aed", accent: "#ddd6fe", bg1: "#0d0117", bg2: "#1a0533", glow1: "rgba(167,139,250,0.15)",glow2: "rgba(124,58,237,0.08)",  cardBg: "rgba(76,29,149,0.35)",  cardBorder: "#7c3aed" },
+  "Food":             { primary: "#fb923c", secondary: "#ea580c", accent: "#fed7aa", bg1: "#150800", bg2: "#1c0f00", glow1: "rgba(251,146,60,0.15)", glow2: "rgba(234,88,12,0.08)",   cardBg: "rgba(124,45,18,0.35)",  cardBorder: "#ea580c" },
+  "Health":           { primary: "#34d399", secondary: "#059669", accent: "#a7f3d0", bg1: "#011208", bg2: "#022c16", glow1: "rgba(52,211,153,0.15)", glow2: "rgba(5,150,105,0.08)",   cardBg: "rgba(6,78,59,0.35)",    cardBorder: "#059669" },
+  "Education":        { primary: "#fbbf24", secondary: "#d97706", accent: "#fde68a", bg1: "#120c00", bg2: "#1c1200", glow1: "rgba(251,191,36,0.15)", glow2: "rgba(217,119,6,0.08)",   cardBg: "rgba(120,53,15,0.35)",  cardBorder: "#d97706" },
+  "Work":             { primary: "#60a5fa", secondary: "#2563eb", accent: "#bfdbfe", bg1: "#020b1a", bg2: "#0a1628", glow1: "rgba(96,165,250,0.15)", glow2: "rgba(37,99,235,0.08)",   cardBg: "rgba(30,58,138,0.35)",  cardBorder: "#2563eb" },
+  "Environment":      { primary: "#86efac", secondary: "#16a34a", accent: "#dcfce7", bg1: "#011005", bg2: "#02200a", glow1: "rgba(134,239,172,0.15)",glow2: "rgba(22,163,74,0.08)",   cardBg: "rgba(20,83,45,0.35)",   cardBorder: "#16a34a" },
+  "Culture":          { primary: "#f472b6", secondary: "#db2777", accent: "#fce7f3", bg1: "#150010", bg2: "#200018", glow1: "rgba(244,114,182,0.15)",glow2: "rgba(219,39,119,0.08)",  cardBg: "rgba(131,24,67,0.35)",  cardBorder: "#db2777" },
+  "Sports":           { primary: "#f87171", secondary: "#dc2626", accent: "#fecaca", bg1: "#150000", bg2: "#200000", glow1: "rgba(248,113,113,0.15)",glow2: "rgba(220,38,38,0.08)",   cardBg: "rgba(127,29,29,0.35)",  cardBorder: "#dc2626" },
+  "Business":         { primary: "#94a3b8", secondary: "#475569", accent: "#e2e8f0", bg1: "#050810", bg2: "#0f1520", glow1: "rgba(148,163,184,0.15)",glow2: "rgba(71,85,105,0.08)",   cardBg: "rgba(30,41,59,0.45)",   cardBorder: "#475569" },
+  "Relationships":    { primary: "#fb7185", secondary: "#e11d48", accent: "#ffe4e6", bg1: "#150008", bg2: "#200010", glow1: "rgba(251,113,133,0.15)",glow2: "rgba(225,29,72,0.08)",   cardBg: "rgba(136,19,55,0.35)",  cardBorder: "#e11d48" },
+  "default":          { primary: "#4ade80", secondary: "#22c55e", accent: "#bbf7d0", bg1: "#020617", bg2: "#0f172a", glow1: "rgba(34,197,94,0.15)",  glow2: "rgba(59,130,246,0.08)",  cardBg: "rgba(20,83,45,0.35)",   cardBorder: "#22c55e" },
+};
 
-  // ===== Background =====
-  const bg = ctx.createLinearGradient(0, 0, 0, 1080);
-  bg.addColorStop(0, "#020617");
-  bg.addColorStop(1, "#0f172a");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, 1080, 1080);
-
-  // ===== Ambient Glow =====
-  drawGlow(ctx, 800, 100, 600, "rgba(34, 197, 94, 0.12)");
-  drawGlow(ctx, 100, 900, 500, "rgba(59, 130, 246, 0.08)");
-
-  // ===== Title =====
-  ctx.textAlign = "center";
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = "rgba(34, 197, 94, 0.4)";
-
-  const titleGrad = ctx.createLinearGradient(400, 0, 680, 0);
-  titleGrad.addColorStop(0, "#ffffff");
-  titleGrad.addColorStop(1, "#4ade80");
-  ctx.fillStyle = titleGrad;
-  ctx.font = "bold 78px Arial";
-  ctx.fillText("Speak & Shine", 540, 130);
-  ctx.shadowBlur = 0;
-
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "500 30px Arial";
-  ctx.fillText("DAILY SPEAKING CHALLENGE", 540, 185);
-
-  // ===== Category Badge =====
-  drawRoundedRect(ctx, 390, 215, 300, 52, 26, "rgba(34,197,94,0.2)");
-  ctx.strokeStyle = "#22c55e";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(390, 215, 300, 52, 26);
-  ctx.stroke();
-  ctx.fillStyle = "#4ade80";
-  ctx.font = "bold 24px Arial";
-  ctx.fillText(`📂 ${question.category || "General"}`, 540, 249);
-
-  // ===== Topic Card =====
-  drawCard(ctx, 80, 295, 920, 200, 28, "rgba(30,41,59,0.6)", "rgba(255,255,255,0.08)");
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "bold 24px Arial";
-  ctx.fillText("TOPIC", 130, 345);
-  ctx.fillStyle = "#e2e8f0";
-  ctx.font = "italic 38px Arial";
-  wrapText(ctx, `"${question.topic}"`, 130, 400, 820, 50);
-
-  // ===== Question Card =====
-  drawCard(ctx, 80, 530, 920, 320, 28, "rgba(20,83,45,0.3)", "#22c55e");
-  ctx.fillStyle = "#4ade80";
-  ctx.font = "bold 26px Arial";
-  ctx.fillText("❓ QUESTION", 130, 590);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 46px Arial";
-  wrapText(ctx, question.question, 130, 660, 820, 60);
-
-  // ===== Footer =====
-  drawRoundedRect(ctx, 220, 910, 640, 76, 38, "#22c55e");
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#052e16";
-  ctx.font = "bold 30px Arial";
-  ctx.fillText("🎥 Send your 1-min speaking video!", 540, 956);
-
-  fs.writeFileSync("./daily.png", canvas.toBuffer("image/png"));
+function getTheme(category) {
+  if (!category) return THEMES.default;
+  const key = Object.keys(THEMES).find(k =>
+    k.toLowerCase() === category.toLowerCase() ||
+    category.toLowerCase().includes(k.toLowerCase())
+  );
+  return THEMES[key] || THEMES.default;
 }
 
-function drawCard(ctx, x, y, w, h, r, bg, border) {
+// ── Text measurement helpers ──────────────────────────────────────────────
+function measureWrappedLines(ctx, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? line + " " + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(" ");
+  let line = "";
+  let cy = y;
+  for (const word of words) {
+    const test = line ? line + " " + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, cy);
+      line = word;
+      cy += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  ctx.fillText(line, x, cy);
+  return cy; // return last y position
+}
+
+// ── Drawing primitives ────────────────────────────────────────────────────
+function roundRect(ctx, x, y, w, h, r, fillStyle, strokeStyle = null, lineWidth = 2) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
-  ctx.fillStyle = bg;
-  ctx.fill();
-  ctx.strokeStyle = border;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  if (fillStyle) { ctx.fillStyle = fillStyle; ctx.fill(); }
+  if (strokeStyle) { ctx.strokeStyle = strokeStyle; ctx.lineWidth = lineWidth; ctx.stroke(); }
 }
 
-function drawGlow(ctx, x, y, radius, color) {
+function glow(ctx, x, y, radius, color) {
   const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
   g.addColorStop(0, color);
   g.addColorStop(1, "transparent");
@@ -91,25 +79,209 @@ function drawGlow(ctx, x, y, radius, color) {
   ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 }
 
-function drawRoundedRect(ctx, x, y, w, h, r, color) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+function decorativeDots(ctx, color, count, seed) {
   ctx.fillStyle = color;
-  ctx.fill();
+  for (let i = 0; i < count; i++) {
+    // deterministic pseudo-random positions
+    const x = ((seed * 137 + i * 293) % 1080);
+    const y = ((seed * 251 + i * 179) % 1080);
+    const r = 1.5 + (i % 3);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-  const words = text.split(" ");
-  let line = "";
-  for (let i = 0; i < words.length; i++) {
-    const test = line + words[i] + " ";
-    if (ctx.measureText(test).width > maxWidth && i > 0) {
-      ctx.fillText(line, x, y);
-      line = words[i] + " ";
-      y += lineHeight;
-    } else {
-      line = test;
-    }
+function cornerAccent(ctx, x, y, size, color, flip = false) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  const sx = flip ? x + size : x;
+  const ex = flip ? x : x + size;
+  ctx.beginPath();
+  ctx.moveTo(sx, y);
+  ctx.lineTo(x + (flip ? size : 0), y);
+  ctx.lineTo(x + (flip ? size : 0), y + size);
+  ctx.stroke();
+}
+
+// ── Main export ───────────────────────────────────────────────────────────
+export default async function generatePoster(question) {
+  const theme = getTheme(question.category);
+
+  const PAD = 80;       // horizontal padding
+  const W = 1080;
+  const INNER_W = W - PAD * 2;
+
+  // ── Measure question text to determine canvas height ──────────────────
+  // Use a temp canvas to measure
+  const tmpCanvas = createCanvas(W, 100);
+  const tmpCtx = tmpCanvas.getContext("2d");
+
+  // Topic lines
+  tmpCtx.font = "italic 38px Arial";
+  const topicLines = measureWrappedLines(tmpCtx, `"${question.topic}"`, INNER_W - 100);
+
+  // Question lines — font size adapts to length
+  const qLen = (question.question || "").length;
+  const qFontSize = qLen > 160 ? 36 : qLen > 100 ? 42 : qLen > 60 ? 48 : 54;
+  const qLineH = qFontSize + 14;
+  tmpCtx.font = `bold ${qFontSize}px Arial`;
+  const qLines = measureWrappedLines(tmpCtx, question.question, INNER_W - 100);
+
+  // Layout constants
+  const HEADER_H   = 260;                          // title + subtitle + badge
+  const TOPIC_H    = 80 + topicLines.length * 52 + 40;  // label + lines + padding
+  const Q_H        = 80 + qLines.length * qLineH + 50;  // label + lines + padding
+  const GAP        = 28;
+  const FOOTER_H   = 120;
+  const CANVAS_H   = HEADER_H + GAP + TOPIC_H + GAP + Q_H + GAP + FOOTER_H + 40;
+
+  const canvas = createCanvas(W, CANVAS_H);
+  const ctx = canvas.getContext("2d");
+
+  // ── Background ────────────────────────────────────────────────────────
+  const bg = ctx.createLinearGradient(0, 0, W, CANVAS_H);
+  bg.addColorStop(0, theme.bg1);
+  bg.addColorStop(0.5, theme.bg2);
+  bg.addColorStop(1, theme.bg1);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, CANVAS_H);
+
+  // Subtle grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.03)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 60) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); ctx.stroke();
   }
-  ctx.fillText(line, x, y);
+  for (let y = 0; y < CANVAS_H; y += 60) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Ambient glows
+  glow(ctx, W * 0.75, CANVAS_H * 0.15, 500, theme.glow1);
+  glow(ctx, W * 0.2,  CANVAS_H * 0.8,  400, theme.glow2);
+  glow(ctx, W * 0.5,  CANVAS_H * 0.5,  300, "rgba(255,255,255,0.02)");
+
+  // Decorative dots
+  decorativeDots(ctx, `${theme.primary}22`, 18, 42);
+
+  // ── Header ────────────────────────────────────────────────────────────
+  // Top accent line
+  const accentLine = ctx.createLinearGradient(0, 0, W, 0);
+  accentLine.addColorStop(0, "transparent");
+  accentLine.addColorStop(0.3, theme.primary);
+  accentLine.addColorStop(0.7, theme.secondary);
+  accentLine.addColorStop(1, "transparent");
+  ctx.fillStyle = accentLine;
+  ctx.fillRect(0, 0, W, 4);
+
+  ctx.textAlign = "center";
+
+  // Title "Speak & Shine"
+  ctx.shadowBlur = 30;
+  ctx.shadowColor = `${theme.primary}88`;
+  const titleGrad = ctx.createLinearGradient(300, 0, 780, 0);
+  titleGrad.addColorStop(0, "#ffffff");
+  titleGrad.addColorStop(0.6, theme.accent);
+  titleGrad.addColorStop(1, theme.primary);
+  ctx.fillStyle = titleGrad;
+  ctx.font = "bold 82px Arial";
+  ctx.fillText("Speak & Shine", W / 2, 110);
+  ctx.shadowBlur = 0;
+
+  // Subtitle
+  ctx.fillStyle = "#64748b";
+  ctx.font = "600 28px Arial";
+  ctx.fillText("DAILY SPEAKING CHALLENGE", W / 2, 158);
+
+  // Divider line under subtitle
+  const divGrad = ctx.createLinearGradient(200, 0, 880, 0);
+  divGrad.addColorStop(0, "transparent");
+  divGrad.addColorStop(0.5, `${theme.primary}66`);
+  divGrad.addColorStop(1, "transparent");
+  ctx.fillStyle = divGrad;
+  ctx.fillRect(200, 172, 680, 1);
+
+  // Category badge
+  const badgeW = 280, badgeH = 48, badgeX = (W - badgeW) / 2, badgeY = 190;
+  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 24, `${theme.primary}22`, theme.primary, 1.5);
+  ctx.fillStyle = theme.primary;
+  ctx.font = "bold 22px Arial";
+  ctx.fillText(`✦ ${question.category || "General"}`, W / 2, badgeY + 31);
+
+  // ── Topic Card ────────────────────────────────────────────────────────
+  const topicY = HEADER_H + GAP;
+  roundRect(ctx, PAD, topicY, INNER_W, TOPIC_H, 24, "rgba(15,23,42,0.7)", "rgba(255,255,255,0.1)", 1.5);
+
+  // Corner accents on topic card
+  cornerAccent(ctx, PAD + 16, topicY + 16, 20, `${theme.primary}88`);
+  cornerAccent(ctx, PAD + INNER_W - 36, topicY + 16, 20, `${theme.primary}88`, true);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#64748b";
+  ctx.font = "bold 20px Arial";
+  ctx.letterSpacing = "3px";
+  ctx.fillText("TOPIC", PAD + 40, topicY + 44);
+  ctx.letterSpacing = "0px";
+
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = `italic 38px Arial`;
+  drawWrappedText(ctx, `"${question.topic}"`, PAD + 40, topicY + 88, INNER_W - 80, 52);
+
+  // ── Question Card ─────────────────────────────────────────────────────
+  const qCardY = topicY + TOPIC_H + GAP;
+
+  // Outer glow effect for question card
+  glow(ctx, W / 2, qCardY + Q_H / 2, 350, `${theme.primary}18`);
+
+  roundRect(ctx, PAD, qCardY, INNER_W, Q_H, 24, theme.cardBg, theme.cardBorder, 2);
+
+  // Left accent bar
+  roundRect(ctx, PAD, qCardY + 20, 5, Q_H - 40, 3, theme.primary);
+
+  // Question label
+  ctx.fillStyle = theme.primary;
+  ctx.font = "bold 22px Arial";
+  ctx.fillText("❓  QUESTION", PAD + 40, qCardY + 48);
+
+  // Question text
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `bold ${qFontSize}px Arial`;
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  drawWrappedText(ctx, question.question, PAD + 40, qCardY + 48 + qLineH + 10, INNER_W - 80, qLineH);
+  ctx.shadowBlur = 0;
+
+  // ── Footer ────────────────────────────────────────────────────────────
+  const footerY = qCardY + Q_H + GAP;
+
+  // Footer pill button
+  const pillW = 580, pillH = 64, pillX = (W - pillW) / 2, pillY = footerY + 16;
+  const pillGrad = ctx.createLinearGradient(pillX, 0, pillX + pillW, 0);
+  pillGrad.addColorStop(0, theme.secondary);
+  pillGrad.addColorStop(1, theme.primary);
+  roundRect(ctx, pillX, pillY, pillW, pillH, 32, pillGrad);
+
+  // Pill shine
+  const shine = ctx.createLinearGradient(pillX, pillY, pillX, pillY + pillH);
+  shine.addColorStop(0, "rgba(255,255,255,0.2)");
+  shine.addColorStop(1, "rgba(255,255,255,0)");
+  roundRect(ctx, pillX, pillY, pillW, pillH / 2, 32, shine);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#052e16";
+  ctx.font = "bold 28px Arial";
+  ctx.fillText("🎥  Send your 1-min speaking video!", W / 2, pillY + 41);
+
+  // Bottom accent line
+  const bottomLine = ctx.createLinearGradient(0, 0, W, 0);
+  bottomLine.addColorStop(0, "transparent");
+  bottomLine.addColorStop(0.3, theme.secondary);
+  bottomLine.addColorStop(0.7, theme.primary);
+  bottomLine.addColorStop(1, "transparent");
+  ctx.fillStyle = bottomLine;
+  ctx.fillRect(0, CANVAS_H - 4, W, 4);
+
+  fs.writeFileSync("./daily.png", canvas.toBuffer("image/png"));
 }
