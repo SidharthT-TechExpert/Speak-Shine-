@@ -10,6 +10,7 @@ import {
   SPEECH_TIMEOUT_MS,
   VISUAL_TIMEOUT_MS,
 } from "./pipeline.js";
+import { getTextKey, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 import fs from "fs";
 
 /**
@@ -81,96 +82,114 @@ export async function generateFeedback(
     await onProgress("Analysing your video…");
 
     // -----------------------------------------------------------------------
-    // Stage 3: Parallel — transcription + visual analysis (with timeouts)
+    // Stage 3: Overlapped pipeline
+    //
+    // Visual analysis and transcription run in parallel (as before).
+    // But now: as soon as transcription finishes, analyzeSpeech starts
+    // immediately — it no longer waits for visual to complete.
+    //
+    // Timeline:
+    //   extractAudio ──┬── transcribe ──── analyzeSpeech ──┐
+    //                  └── analyzeVideo ───────────────────┴── format
     // -----------------------------------------------------------------------
     const parallelStage = startStage("parallel");
 
-    const [transcriptionResult, visualResult] = await Promise.allSettled([
-      withTimeout(transcribe(audioPath, { meanVolume }), transcribeTimeout, "transcription"),
-      withTimeout(analyzeVideo(videoPath), visualTimeout, "visual"),
+    // Visual runs fully in the background — result collected at the end
+    const visualPromise = withTimeout(
+      analyzeVideo(videoPath),
+      visualTimeout,
+      "visual"
+    );
+
+    // Transcription → speech analysis chained: speech starts the moment
+    // transcription resolves, without waiting for visual
+    let transcription = null;
+    let speechResult = null;
+    let transcriptionError = null;
+
+    const speechChainPromise = withTimeout(
+      transcribe(audioPath, { meanVolume }),
+      transcribeTimeout,
+      "transcription"
+    ).then(async (t) => {
+      transcription = t;
+
+      if (!t.text || t.text.length < 10) return; // caught below
+
+      const actualDuration = t.duration > 0 ? t.duration : durationSeconds;
+      await onProgress("Scoring your speech…");
+
+      const speechStage = startStage("analyzeSpeech");
+      try {
+        speechResult = await withTimeout(
+          analyzeSpeech(
+            t.text,
+            actualDuration,
+            t.words,
+            questionTopic,
+            questionText,
+            t.pronunciationIssues || [],
+            t.rhythm || null
+          ),
+          speechTimeout,
+          "speech"
+        );
+        speechStage.end();
+      } catch (err) {
+        speechStage.end(err);
+        throw err;
+      }
+    }).catch((err) => {
+      transcriptionError = err;
+    });
+
+    // Wait for both chains to finish
+    const [, visualSettled] = await Promise.all([
+      speechChainPromise,
+      visualPromise.then(v => ({ status: "fulfilled", value: v }))
+                   .catch(e => ({ status: "rejected", reason: e })),
     ]);
 
     parallelStage.end();
 
-    // Visual result is optional — gracefully degrade if it failed or timed out
+    // Resolve visual result
     let visual = null;
-    if (visualResult.status === "fulfilled") {
-      visual = visualResult.value;
+    if (visualSettled.status === "fulfilled") {
+      visual = visualSettled.value;
     } else {
-      const reason = visualResult.reason;
-      console.log(
-        "⚠️ Visual analysis error (non-fatal):",
-        reason?.message ?? String(reason)
-      );
+      console.log("⚠️ Visual analysis error (non-fatal):", visualSettled.reason?.message ?? String(visualSettled.reason));
     }
-    console.log(
-      "🎨 Visual analysis result:",
-      visual ? JSON.stringify(visual).slice(0, 200) : "null/failed"
-    );
+    console.log("🎨 Visual analysis result:", visual ? JSON.stringify(visual).slice(0, 200) : "null/failed");
 
-    // Transcription must succeed — if it timed out or failed, abort
-    if (transcriptionResult.status === "rejected") {
-      const reason = transcriptionResult.reason;
-      console.log(
-        "[PIPELINE] transcription FAIL elapsed=" + (Date.now() - pipelineStart),
-        "error=" + (reason?.message ?? String(reason))
-      );
-      // Both transcription AND visual failed → total failure
+    // Handle transcription/speech failures
+    if (transcriptionError) {
+      console.log("[PIPELINE] transcription/speech FAIL elapsed=" + (Date.now() - pipelineStart), "error=" + (transcriptionError?.message ?? String(transcriptionError)));
       if (visual === null) {
-        console.log(
-          "[PIPELINE] total failure elapsed=" + (Date.now() - pipelineStart)
-        );
+        console.log("[PIPELINE] total failure elapsed=" + (Date.now() - pipelineStart));
         return "⚠️ _Sorry, we could not analyse your video. Please try resubmitting — if the problem persists, the service may be temporarily unavailable._";
       }
-      // Transcription failed but visual succeeded — still can't produce feedback
       return "⚠️ _The transcription service is currently unavailable. Please try resubmitting your video._";
     }
 
-    const transcription = transcriptionResult.value;
-
-    if (!transcription.text || transcription.text.length < 10) {
+    if (!transcription || !transcription.text || transcription.text.length < 10) {
       return "⚠️ _Could not detect speech in the video._";
     }
 
-    // Use Whisper's actual spoken duration if available, fall back to video duration
-    const actualDuration =
-      transcription.duration > 0 ? transcription.duration : durationSeconds;
-
-    await onProgress("Scoring your speech…");
-
-    // -----------------------------------------------------------------------
-    // Stage 4: Speech analysis (with timeout — abort on timeout)
-    // -----------------------------------------------------------------------
-    const speechStage = startStage("analyzeSpeech");
-    let result;
-    try {
-      result = await withTimeout(
-        analyzeSpeech(
-          transcription.text,
-          actualDuration,
-          transcription.words,
-          questionTopic,
-          questionText,
-          transcription.pronunciationIssues || [],
-          transcription.rhythm || null
-        ),
-        speechTimeout,
-        "speech"
-      );
-      speechStage.end();
-    } catch (err) {
-      speechStage.end(err);
-      console.log(
-        "[PIPELINE] analyzeSpeech FAIL elapsed=" + (Date.now() - pipelineStart),
-        "error=" + (err?.message ?? String(err))
-      );
+    if (!speechResult) {
       return "⚠️ _The scoring service is currently unavailable. Please try resubmitting your video._";
     }
 
     // -----------------------------------------------------------------------
+    // Stage 4: Synthesize overallComment from speech + visual
+    // Now that both halves are done, generate one unified comment that
+    // covers speech quality AND visual presence together.
+    // -----------------------------------------------------------------------
+    speechResult.overallComment = await synthesizeOverallComment(speechResult, visual);
+
+    // -----------------------------------------------------------------------
     // Stage 5: Format combined feedback
     // -----------------------------------------------------------------------
-    const formatted = formatFeedback(result, visual, user, qualityWarning);
+    const formatted = formatFeedback(speechResult, visual, user, qualityWarning);
 
     console.log(
       "[PIPELINE] total DONE elapsed=" + (Date.now() - pipelineStart)
@@ -180,6 +199,101 @@ export async function generateFeedback(
   } finally {
     if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
     if (audioPath && fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+  }
+}
+
+/**
+ * Synthesizes a single overallComment from speech scores + visual scores.
+ * Called after both pipelines complete so it can reference both halves.
+ * Falls back to the existing speech-only comment if the API call fails.
+ *
+ * @param {object}      speechResult  - analyzeSpeech result
+ * @param {object|null} visual        - analyzeVideo result, or null
+ * @returns {Promise<string>}
+ */
+async function synthesizeOverallComment(speechResult, visual) {
+  const existing = speechResult.overallComment || "";
+
+  // Build a compact summary of all scores for the prompt
+  const speechSummary = [
+    `Fluency: ${speechResult.fluency}/10`,
+    `Grammar: ${speechResult.grammar}/10`,
+    `Confidence: ${speechResult.confidence}/10`,
+    `Vocabulary: ${speechResult.vocabulary}/10`,
+    speechResult._stats?.wpm ? `Pace: ${speechResult._stats.wpm} wpm` : null,
+    speechResult._stats?.fillerTotal > 0 ? `Filler words: ${speechResult._stats.fillerTotal} total` : null,
+    speechResult.topicRelevance != null ? `Topic relevance: ${speechResult.topicRelevance}/10` : null,
+    speechResult._stats?.cefrLevel ? `CEFR level: ${speechResult._stats.cefrLevel.level}` : null,
+  ].filter(Boolean).join(", ");
+
+  const visualSummary = visual ? [
+    `Eye contact: ${visual.eyeContact}/10`,
+    `Body language: ${visual.bodyLanguage}/10`,
+    `Facial expression: ${visual.facialExpression}/10`,
+    `Overall presence: ${visual.overallPresence}/10`,
+    visual.eyeContactNote ? `Eye contact note: ${visual.eyeContactNote}` : null,
+    visual.bodyLanguageNote ? `Body language note: ${visual.bodyLanguageNote}` : null,
+  ].filter(Boolean).join(", ") : null;
+
+  const strongPoints = (speechResult.strongPoints || []).slice(0, 2).join("; ");
+  const topSuggestion = (speechResult.suggestions || [])[0] || "";
+
+  const prompt = `You are an encouraging English speaking coach. Write a 2-3 sentence overall comment for a student's video submission.
+
+Speech analysis: ${speechSummary}
+${visualSummary ? `Visual presence: ${visualSummary}` : "Visual analysis: not available"}
+${strongPoints ? `Key strengths: ${strongPoints}` : ""}
+${topSuggestion ? `Top improvement area: ${topSuggestion}` : ""}
+${existing ? `Draft comment (improve this): ${existing}` : ""}
+
+Rules:
+- Mention BOTH speech quality AND visual presence if visual data is available
+- Be specific — reference actual scores or observations, not generic praise
+- End with one concrete actionable encouragement
+- 2-3 sentences max, warm and motivating tone
+- Return ONLY the comment text, no quotes, no labels`;
+
+  try {
+    while (true) {
+      const apiKey = getTextKey();
+      if (!apiKey) {
+        console.log("[OverallComment] No API keys — using existing comment");
+        return existing;
+      }
+
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.4,
+          max_tokens: 150,
+        }),
+      });
+
+      if (res.status === 429) {
+        const errText = await res.text();
+        markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+        continue;
+      }
+
+      if (!res.ok) {
+        console.log("[OverallComment] API error — using existing comment");
+        return existing;
+      }
+
+      const data = await res.json();
+      const comment = data?.choices?.[0]?.message?.content?.trim();
+      if (comment && comment.length > 10) {
+        console.log("[OverallComment] synthesized:", comment.slice(0, 100));
+        return comment;
+      }
+      return existing;
+    }
+  } catch (err) {
+    console.log("[OverallComment] failed (using existing):", err.message);
+    return existing;
   }
 }
 
