@@ -96,8 +96,9 @@ Return ONLY valid JSON (no markdown, no extra text):
 
   const userContent = [{ type: "text", text: prompt }, ...imageContent];
 
-  // Try each available key — rotate on 429
-  while (true) {
+  // Try each available key — rotate on 429, max 6 retries before giving up
+  let retries = 0;
+  while (retries < 6) {
     const apiKey = getVisionKey();
     if (!apiKey) {
       console.log(`[Visual] ${batchLabel} no available keys — skipping batch`);
@@ -117,7 +118,11 @@ Return ONLY valid JSON (no markdown, no extra text):
 
     if (res.status === 429) {
       const errText = await res.text();
-      markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+      const waitMs = parseRetryAfter(errText) || 5000;
+      markKeyExhausted(apiKey, waitMs);
+      retries++;
+      // Brief pause before retrying with next key
+      await new Promise(r => setTimeout(r, Math.min(waitMs, 8000)));
       continue;
     }
 
@@ -163,6 +168,8 @@ Return ONLY valid JSON (no markdown, no extra text):
       };
     }
   }
+  console.log(`[Visual] ${batchLabel} max retries reached — skipping`);
+  return null;
 }
 
 /**
@@ -343,17 +350,28 @@ export async function analyzeVideo(videoPath) {
     batches.push(frames.slice(i, i + GROQ_BATCH_LIMIT));
   }
 
-  const batchResults = await Promise.all(
-    batches.map((batch, idx) => {
-      const startSec = batch[0]?.timestamp ?? null;
-      const endSec = batch[batch.length - 1]?.timestamp ?? null;
-      return analyzeFrameBatch(
-        batch,
-        `batch${idx + 1}/${batches.length}`,
-        { index: idx, total: batches.length, startSec, endSec }
-      );
-    })
-  );
+  // Run batches in 2 waves of 2 to avoid hammering all API keys simultaneously
+  // Wave 1: batches 0,1 — Wave 2: batches 2,3
+  const WAVE_SIZE = 2;
+  const batchResults = [];
+  for (let w = 0; w < batches.length; w += WAVE_SIZE) {
+    const wave = batches.slice(w, w + WAVE_SIZE);
+    const waveResults = await Promise.all(
+      wave.map((batch, i) => {
+        const idx = w + i;
+        const startSec = batch[0]?.timestamp ?? null;
+        const endSec = batch[batch.length - 1]?.timestamp ?? null;
+        return analyzeFrameBatch(
+          batch,
+          `batch${idx + 1}/${batches.length}`,
+          { index: idx, total: batches.length, startSec, endSec }
+        );
+      })
+    );
+    batchResults.push(...waveResults);
+    // Small gap between waves to let rate limits breathe
+    if (w + WAVE_SIZE < batches.length) await new Promise(r => setTimeout(r, 1000));
+  }
 
   // Merge all batch results with 60/40 second-half weighting
   const merged = mergeWeightedBatchResults(batchResults);
