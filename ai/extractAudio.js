@@ -52,8 +52,11 @@ export async function extractAudio(videoPath, id) {
             console.log(`🔊 Audio quality: mean=${quality.meanVolume}dB max=${quality.maxVolume}dB`);
             if (quality.meanVolume < MIN_VOLUME_DB) {
               console.log(`⚠️ Audio too quiet (${quality.meanVolume}dB) — transcription may be inaccurate`);
-              // Attach warning to the resolved path via a wrapper object
-              resolve({ audioPath, qualityWarning: `Audio is very quiet (${quality.meanVolume}dB). For better feedback, record in a quieter environment and speak closer to the microphone.` });
+              resolve({
+                audioPath,
+                qualityWarning: `Audio is very quiet (${quality.meanVolume}dB). For better feedback, record in a quieter environment and speak closer to the microphone.`,
+                meanVolume: quality.meanVolume,
+              });
               return;
             }
           }
@@ -61,7 +64,7 @@ export async function extractAudio(videoPath, id) {
           // Quality check is non-fatal
         }
 
-        resolve({ audioPath, qualityWarning: null });
+        resolve({ audioPath, qualityWarning: null, meanVolume: quality?.meanVolume ?? null });
       }
     );
   });

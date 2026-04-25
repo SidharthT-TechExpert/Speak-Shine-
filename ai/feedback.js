@@ -72,6 +72,7 @@ export async function generateFeedback(
       const extracted = await extractAudio(videoPath, id);
       audioPath = extracted.audioPath;
       qualityWarning = extracted.qualityWarning;
+      const meanVolume = extracted.meanVolume ?? null;
       extractStage.end();
     } catch (err) {
       extractStage.end(err);
@@ -86,7 +87,7 @@ export async function generateFeedback(
     const parallelStage = startStage("parallel");
 
     const [transcriptionResult, visualResult] = await Promise.allSettled([
-      withTimeout(transcribe(audioPath), transcribeTimeout, "transcription"),
+      withTimeout(transcribe(audioPath, { meanVolume }), transcribeTimeout, "transcription"),
       withTimeout(analyzeVideo(videoPath), visualTimeout, "visual"),
     ]);
 

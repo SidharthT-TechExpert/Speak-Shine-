@@ -3,18 +3,109 @@ import FormData from "form-data";
 import fetch from "node-fetch";
 import { getTextKey, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 
-// Segments with avg_logprob below this threshold are likely hallucinated — exclude them
-const SEGMENT_CONFIDENCE_THRESHOLD = -0.8;
+// ---------------------------------------------------------------------------
+// Dynamic confidence threshold helpers
+// ---------------------------------------------------------------------------
 
-// Words with probability below this are likely mispronounced or unclear
-const WORD_CLARITY_THRESHOLD = 0.4;
+/**
+ * Computes the median of an array of numbers.
+ */
+function median(values) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Computes a dynamic segment confidence threshold based on:
+ * - The median avg_logprob of all segments (adapts to overall audio quality)
+ * - The measured volume of the audio (lenient for quiet recordings)
+ *
+ * Logic:
+ *   - Start from the median segment confidence
+ *   - Allow segments up to 0.5 logprob below the median (catches outliers, not all)
+ *   - If audio is quiet (meanVolume < -35dB), be extra lenient (−0.3 more)
+ *   - Hard floor at −1.5 so we never keep near-random hallucinations
+ *   - Hard ceiling at −0.3 so we never keep low-quality segments on good audio
+ *
+ * @param {Array<{avg_logprob?: number}>} segments
+ * @param {number|null} meanVolume  — dB from ffmpeg volumedetect, or null
+ * @returns {number}  threshold (segments below this are dropped)
+ */
+function computeSegmentThreshold(segments, meanVolume) {
+  if (!segments.length) return -0.8; // safe default
+
+  const logprobs = segments
+    .map(s => s.avg_logprob)
+    .filter(v => typeof v === 'number' && isFinite(v));
+
+  if (logprobs.length === 0) return -0.8;
+
+  const med = median(logprobs);
+
+  // Base threshold: 0.5 below median — keeps most segments, drops clear outliers
+  let threshold = med - 0.5;
+
+  // Quiet audio → Whisper scores everything lower → be more lenient
+  if (meanVolume !== null && meanVolume < -35) {
+    threshold -= 0.3;
+    console.log(`🔊 Quiet audio (${meanVolume}dB) — relaxing segment threshold by 0.3`);
+  }
+
+  // Clamp: never too strict, never too loose
+  threshold = Math.max(-1.5, Math.min(-0.3, threshold));
+
+  console.log(`📊 Dynamic segment threshold: ${threshold.toFixed(2)} (median logprob: ${med.toFixed(2)})`);
+  return threshold;
+}
+
+/**
+ * Computes a dynamic word clarity threshold based on the median word probability.
+ * On noisy/quiet audio, Whisper assigns lower probabilities across the board —
+ * so we adapt rather than flagging every word as unclear.
+ *
+ * @param {Array<{probability?: number}>} words
+ * @param {number|null} meanVolume
+ * @returns {number}  threshold (words below this are flagged as unclear)
+ */
+function computeWordThreshold(words, meanVolume) {
+  if (!words.length) return 0.4;
+
+  const probs = words
+    .map(w => w.probability ?? w.avg_logprob ?? null)
+    .filter(v => v !== null && isFinite(v));
+
+  if (probs.length === 0) return 0.4;
+
+  const med = median(probs);
+
+  // Flag words in the bottom 30% relative to this audio's median
+  let threshold = med * 0.6;
+
+  // Quiet audio — shift threshold down further so we don't over-flag
+  if (meanVolume !== null && meanVolume < -35) {
+    threshold *= 0.8;
+  }
+
+  // Clamp between 0.15 and 0.55
+  threshold = Math.max(0.15, Math.min(0.55, threshold));
+
+  console.log(`📊 Dynamic word threshold: ${threshold.toFixed(2)} (median prob: ${med.toFixed(2)})`);
+  return threshold;
+}
 
 /**
  * Transcribes audio using Groq Whisper verbose_json mode.
  * Returns rich data: filtered text, word-level timestamps, segments,
  * duration, pronunciation issues, and rhythm stats.
+ *
+ * @param {string} audioPath
+ * @param {object} [opts]
+ * @param {number|null} [opts.meanVolume]  — dB from ffmpeg volumedetect (used for dynamic thresholds)
  */
-export async function transcribe(audioPath) {
+export async function transcribe(audioPath, opts = {}) {
+  const { meanVolume = null } = opts;
   // Retry with next key on 429 — rebuild FormData fresh each attempt
   // (ReadStream can only be consumed once, so we can't reuse the same form)
   let res;
@@ -59,12 +150,14 @@ export async function transcribe(audioPath) {
   const allSegments = data.segments || [];
 
   // -------------------------------------------------------------------------
-  // 1. Segment-level confidence filtering
-  //    Remove segments that Whisper is very uncertain about (hallucinations).
-  //    Keep all segments if none pass the threshold (safety fallback).
+  // 1. Segment-level confidence filtering — dynamic threshold
+  //    Adapts to the actual quality of this audio instead of a fixed cutoff.
+  //    Drops segments well below the median confidence (likely hallucinations).
+  //    Falls back to all segments if none pass (safety net).
   // -------------------------------------------------------------------------
+  const segmentThreshold = computeSegmentThreshold(allSegments, meanVolume);
   const confidentSegments = allSegments.filter(
-    (seg) => (seg.avg_logprob ?? 0) >= SEGMENT_CONFIDENCE_THRESHOLD
+    (seg) => (seg.avg_logprob ?? 0) >= segmentThreshold
   );
   const filteredSegments = confidentSegments.length > 0 ? confidentSegments : allSegments;
 
@@ -84,14 +177,14 @@ export async function transcribe(audioPath) {
     : (data.text || "").trim();
 
   // -------------------------------------------------------------------------
-  // 2. Pronunciation scoring — find words Whisper was uncertain about
-  //    These are words the model had low confidence transcribing, which
-  //    usually means they were unclear, mispronounced, or heavily accented.
+  // 2. Pronunciation scoring — dynamic word clarity threshold
+  //    Adapts to the overall word probability distribution of this audio.
   // -------------------------------------------------------------------------
+  const wordThreshold = computeWordThreshold(words, meanVolume);
   const unclearWords = words
     .filter((w) => {
       const prob = w.probability ?? w.avg_logprob ?? null;
-      return prob !== null && prob < WORD_CLARITY_THRESHOLD;
+      return prob !== null && prob < wordThreshold;
     })
     .map((w) => w.word.trim().toLowerCase().replace(/[^a-z']/g, ""))
     .filter((w) => w.length > 2); // skip very short words
