@@ -761,13 +761,25 @@ async function startBot() {
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     try {
-      if (type !== "notify") return;
       if (!messages || !messages.length) return;
 
       const msg = messages[0];
       if (!msg || !msg.message) return;
 
       const chatId = msg.key.remoteJid;
+
+      // Allow "append" type only for owner self-DM commands (messages sent to yourself)
+      // All other non-notify events (history sync, etc.) are ignored
+      if (type !== "notify") {
+        const selfText =
+          msg.message?.conversation ||
+          msg.message?.extendedTextMessage?.text ||
+          "";
+        const ownerNum = (process.env.OWNER_NUMBER || "").replace("@s.whatsapp.net", "").replace(/:.*/, "");
+        const chatNum = chatId.replace("@s.whatsapp.net", "").replace(/:.*/, "");
+        const isSelfOwnerCmd = msg.key.fromMe && chatNum === ownerNum && selfText.startsWith("/");
+        if (!isSelfOwnerCmd) return;
+      }
 
       // Helper: check if a documentMessage is a video file
       const docMsg = msg.message?.documentMessage;
@@ -1390,6 +1402,39 @@ async function startBot() {
         return safeSend(sock, chatId, {
           text: `💰 *Fine Removed!*\n\n━━━━━━━━━━━━━━━\n${results.join("\n")}\n\n✅ Fines updated successfully.`,
           mentions: userAmounts.map(ua => ua.userId), // mentionedJid from WhatsApp = already correct JID
+        });
+      }
+
+      // 🧹 CLEAR SCORE (Admin only) — /clearscore @user or /clearscore @user1 @user2
+      if (cmd.startsWith("/clearscore")) {
+        if (!isAdmin) {
+          return safeSend(sock, chatId, {
+            text: `❌ *Access Denied*\n_Only admins can use this command._`,
+          });
+        }
+
+        const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+        // No mention = clear own scores
+        const targets = mentioned.length > 0 ? mentioned : [normalizedUser];
+
+        const results = [];
+        for (const userId of targets) {
+          const normalizedId = normalizeUserId(userId);
+          const u = await User.findOne({ userId: { $regex: normalizedId.split("@")[0].split(":")[0] } });
+          if (!u) {
+            const phone = normalizedId.split("@")[0].split(":")[0];
+            results.push(`@${phone} → ❌ not found`);
+            continue;
+          }
+          await User.updateOne({ _id: u._id }, { $set: { feedbackScores: [] } });
+          const phone = normalizedId.split("@")[0].split(":")[0];
+          results.push(`@${phone} → ✅ scores cleared`);
+        }
+
+        return safeSend(sock, chatId, {
+          text: `🧹 *Score Reset*\n\n━━━━━━━━━━━━━━━\n${results.join("\n")}\n\n_Fluency, Grammar, Confidence & Vocabulary history removed._`,
+          mentions: targets,
         });
       }
 
