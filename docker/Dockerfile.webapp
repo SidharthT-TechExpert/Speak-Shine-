@@ -1,38 +1,47 @@
-FROM node:20-slim AS base
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM node:20-slim AS builder
 
-# ── System deps (cached unless this layer changes) ───────────────────────────
+WORKDIR /app
+
+# Copy only package files first for better caching
+COPY package.json package-lock.json ./
+COPY api/package.json api/package-lock.json* ./api/
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+
+# Install all dependencies in parallel
+RUN npm ci --omit=dev --no-audit --no-fund && \
+    cd api && npm install --omit=dev --no-audit --no-fund && \
+    cd ../frontend && npm ci --no-audit --no-fund
+
+# Copy frontend source and build
+COPY frontend/ ./frontend/
+RUN cd frontend && NODE_ENV=production npm run build
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM node:20-slim
+
+# Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    python3 \
-    make \
-    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# ── Root deps (cached unless package*.json changes) ──────────────────────────
+# Copy only production dependencies
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
-
-# ── API deps ──────────────────────────────────────────────────────────────────
 COPY api/package.json api/package-lock.json* ./api/
-RUN cd api && npm install --omit=dev --no-audit --no-fund
+RUN npm ci --omit=dev --no-audit --no-fund && \
+    cd api && npm install --omit=dev --no-audit --no-fund
 
-# ── Frontend deps (separate layer — changes most often) ──────────────────────
-COPY frontend/package.json frontend/package-lock.json ./frontend/
-RUN cd frontend && npm ci --no-audit --no-fund
+# Copy built frontend from builder
+COPY --from=builder /app/frontend/dist ./frontend/dist
 
-# ── Frontend build ────────────────────────────────────────────────────────────
-COPY frontend/ ./frontend/
-RUN cd frontend && NODE_ENV=production npm run build
-
-# ── Copy rest of source ───────────────────────────────────────────────────────
+# Copy application source
 COPY . .
 
-# Remove frontend node_modules after build — not needed at runtime
-RUN rm -rf frontend/node_modules
+# Remove unnecessary files
+RUN rm -rf frontend/src frontend/node_modules frontend/public
 
-# ── Runtime ───────────────────────────────────────────────────────────────────
 ENV NODE_ENV=production
 EXPOSE 3001
 

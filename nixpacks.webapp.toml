@@ -1,20 +1,17 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg", "pkg-config", "python3", "cairo", "pango", "libjpeg", "giflib", "librsvg", "pixman"]
+nixPkgs = ["nodejs_20", "ffmpeg"]
 
 [phases.install]
 cmds = [
-  # Root dependencies
-  "npm ci --prefer-offline --no-audit --no-fund --omit=dev || npm ci --prefer-offline --no-audit --no-fund --omit=dev --omit=optional",
-  # API has no package-lock.json, use npm install
+  "npm ci --prefer-offline --no-audit --no-fund --omit=dev",
   "cd api && npm install --prefer-offline --no-audit --no-fund --omit=dev",
-  # Frontend has package-lock.json, use npm ci
   "cd frontend && npm ci --prefer-offline --no-audit --no-fund"
 ]
 
 [phases.build]
 cmds = [
   "cd frontend && NODE_ENV=production npm run build",
-  "rm -rf frontend/node_modules"
+  "rm -rf frontend/node_modules frontend/src"
 ]
 
 [start]
