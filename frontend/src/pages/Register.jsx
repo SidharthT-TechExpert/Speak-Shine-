@@ -1,29 +1,51 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
 
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ phone: "", password: "", name: "" });
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [modal, setModal] = useState(null);
 
   const submit = async (e) => {
     e.preventDefault();
-    setError(""); setLoading(true);
+    setLoading(true);
     try {
       const { data } = await api.post("/auth/register", form);
       login(data.token, { phone: data.phone, role: data.role, name: data.name });
-      navigate("/");
+      setModal({
+        type: "alert",
+        title: "Welcome! 🎉",
+        message: `Account created successfully. Welcome to Speak & Shine, ${data.name || ""}!`,
+        confirmText: "Let's Go",
+        onConfirm: () => {
+          setModal(null);
+          navigate("/dashboard", { replace: true });
+        },
+      });
     } catch (err) {
-      setError(err.response?.data?.error || "Registration failed");
-    } finally { setLoading(false); }
+      const msg = err.response?.data?.error || "Registration failed. Please try again.";
+      setModal({ type: "danger", title: "Registration Failed", message: msg, confirmText: "OK", onConfirm: () => setModal(null) });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="auth-page">
+      {modal && (
+        <Modal
+          type={modal.type}
+          title={modal.title}
+          message={modal.message}
+          confirmText={modal.confirmText}
+          onConfirm={modal.onConfirm}
+        />
+      )}
       <div className="auth-card">
         <div className="auth-logo">🗣️</div>
         <h1 className="auth-title">Create Account</h1>
@@ -42,9 +64,7 @@ export default function Register() {
             </div>
           ))}
 
-          {error && <div className="auth-error">{error}</div>}
-
-          <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: "0.25rem" }} disabled={loading}>
+          <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: "0.5rem" }} disabled={loading}>
             {loading ? "Creating account…" : "Create Account"}
           </button>
         </form>

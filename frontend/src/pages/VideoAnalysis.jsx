@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Layout from "../components/Layout.jsx";
+import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
 
 export default function VideoAnalysis() {
@@ -11,6 +12,7 @@ export default function VideoAnalysis() {
   const [error, setError] = useState(null);
   const [myReports, setMyReports] = useState([]);
   const [progressStage, setProgressStage] = useState("");
+  const [modal, setModal] = useState(null); // { type, title, message, onConfirm }
 
   useEffect(() => { loadMyReports(); }, []);
 
@@ -117,12 +119,22 @@ export default function VideoAnalysis() {
   };
 
   const deleteReport = async (id) => {
-    if (!confirm("Delete this report?")) return;
-    try {
-      await api.delete(`/video/report/${id}`);
-      loadMyReports();
-      if (reportId === id) { setReportId(null); setReport(null); }
-    } catch { alert("Failed to delete report"); }
+    setModal({
+      type: "danger",
+      title: "Delete Report",
+      message: "This report will be permanently deleted. Are you sure?",
+      confirmText: "Delete",
+      onConfirm: async () => {
+        setModal(null);
+        try {
+          await api.delete(`/video/report/${id}`);
+          loadMyReports();
+          if (reportId === id) { setReportId(null); setReport(null); }
+        } catch {
+          setModal({ type: "alert", title: "Error", message: "Failed to delete report.", confirmText: "OK", onConfirm: () => setModal(null) });
+        }
+      },
+    });
   };
 
   const formatTimeRemaining = (expiresAt) => {
@@ -137,6 +149,16 @@ export default function VideoAnalysis() {
 
   return (
     <Layout title="Video Analysis">
+      {modal && (
+        <Modal
+          type={modal.type}
+          title={modal.title}
+          message={modal.message}
+          confirmText={modal.confirmText}
+          onConfirm={modal.onConfirm}
+          onCancel={modal.type !== "alert" ? () => setModal(null) : undefined}
+        />
+      )}
       <div className="video-analysis-page">
 
         {/* Upload Card */}

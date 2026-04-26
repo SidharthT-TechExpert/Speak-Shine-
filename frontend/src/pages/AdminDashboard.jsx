@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
+import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 
@@ -23,6 +24,9 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [qSearch, setQSearch] = useState("");
   const [qCat, setQCat] = useState("");
+  const [modal, setModal] = useState(null);
+  const [fineInput, setFineInput] = useState("");
+  const [qCat, setQCat] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -36,11 +40,47 @@ export default function AdminDashboard() {
   const msg = (text, type="success") => { setFlash({text,type}); setTimeout(()=>setFlash(null),3000); };
   const changeRole = async (phone,role) => { await api.patch(`/users/${phone}/role`,{role}); msg(`Role → ${role}`); load(); };
   const toggleUser = async (phone) => { await api.patch(`/users/${phone}/toggle`); msg("Status toggled"); load(); };
-  const deleteUser = async (phone) => { if(!confirm("Remove user?"))return; await api.delete(`/users/${phone}`); msg("Removed","danger"); load(); };
-  const adjustFine = async (phone,cur) => { const v=prompt(`Adjust fine (neg=deduct). Current: ₹${cur}`,"0"); if(v===null||isNaN(+v))return; await api.patch(`/users/${phone}/fine`,{amount:+v}); msg(`Fine adjusted ₹${v}`); load(); };
-  const resetFine = async (phone) => { if(!confirm("Reset fine to ₹0?"))return; const u=users.find(x=>x.phone===phone); if(!u)return; await api.patch(`/users/${phone}/fine`,{amount:-(u.fine||0)}); msg("Fine reset"); load(); };
+  const deleteUser = async (phone) => {
+    setModal({
+      type: "danger", title: "Remove User",
+      message: "This user will be permanently removed. Are you sure?",
+      confirmText: "Remove",
+      onConfirm: async () => { setModal(null); await api.delete(`/users/${phone}`); msg("Removed","danger"); load(); },
+    });
+  };
+  const adjustFine = (phone, cur) => {
+    setFineInput("0");
+    setModal({
+      type: "confirm", title: "Adjust Fine",
+      message: `Current fine: ₹${cur}. Enter amount to add (negative to deduct):`,
+      confirmText: "Apply",
+      isFineInput: true,
+      phone,
+    });
+  };
+  const resetFine = async (phone) => {
+    setModal({
+      type: "danger", title: "Reset Fine",
+      message: "Reset this user's fine to ₹0?",
+      confirmText: "Reset",
+      onConfirm: async () => {
+        setModal(null);
+        const u = users.find(x=>x.phone===phone);
+        if (!u) return;
+        await api.patch(`/users/${phone}/fine`,{amount:-(u.fine||0)});
+        msg("Fine reset"); load();
+      },
+    });
+  };
   const saveQ = async (e) => { e.preventDefault(); if(editQ){await api.patch(`/questions/${editQ._id}`,qForm);setEditQ(null);msg("Updated!");}else{await api.post("/questions",qForm);msg("Added!");} setQForm({category:"",topic:"",question:""}); load(); };
-  const deleteQ = async (id) => { if(!confirm("Delete?"))return; await api.delete(`/questions/${id}`); msg("Deleted","danger"); load(); };
+  const deleteQ = async (id) => {
+    setModal({
+      type: "danger", title: "Delete Question",
+      message: "This question will be permanently deleted.",
+      confirmText: "Delete",
+      onConfirm: async () => { setModal(null); await api.delete(`/questions/${id}`); msg("Deleted","danger"); load(); },
+    });
+  };
   const startEdit = (q) => { setEditQ(q); setQForm({category:q.category,topic:q.topic,question:q.question}); window.scrollTo({top:0,behavior:"smooth"}); };
 
   const filteredUsers = useMemo(()=>users.filter(u=>{const s=search.toLowerCase();return(u.registeredName||u.name||"").toLowerCase().includes(s)||(u.phone||"").includes(s)}),[users,search]);
@@ -55,6 +95,35 @@ export default function AdminDashboard() {
 
   return (
     <Layout title="Admin Dashboard">
+      {modal && (
+        <Modal
+          type={modal.type}
+          title={modal.title}
+          message={
+            modal.isFineInput ? (
+              <div>
+                <p style={{ marginBottom: "0.75rem", color: "var(--muted)", fontSize: "0.9rem" }}>{modal.message}</p>
+                <input
+                  className="form-input"
+                  type="number"
+                  value={fineInput}
+                  onChange={e => setFineInput(e.target.value)}
+                  style={{ textAlign: "center", fontSize: "1.1rem" }}
+                  autoFocus
+                />
+              </div>
+            ) : modal.message
+          }
+          confirmText={modal.confirmText}
+          onConfirm={modal.isFineInput ? async () => {
+            if (isNaN(+fineInput)) return;
+            setModal(null);
+            await api.patch(`/users/${modal.phone}/fine`, { amount: +fineInput });
+            msg(`Fine adjusted ₹${fineInput}`); load();
+          } : modal.onConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
       {flash && <div className={`flash ${flash.type}`}>{flash.text}</div>}
 
       <div className="stat-grid">

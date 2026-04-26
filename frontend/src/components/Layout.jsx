@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation, Link } from "react-router-dom";
+import Modal from "./Modal.jsx";
 
 export default function Layout({ children, title }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const doLogout = () => {
+    setShowLogoutModal(false);
     setMenuOpen(false);
+    logout();
     if (user?.role === "admin") navigate("/admin/login");
     else if (user?.role === "trainer") navigate("/trainer/login");
     else navigate("/login");
   };
+
+  const handleLogout = () => setShowLogoutModal(true);
 
   const navLinks = () => {
     if (user?.role === "admin") return [
@@ -38,6 +43,17 @@ export default function Layout({ children, title }) {
 
   return (
     <div className="app-shell">
+      {showLogoutModal && (
+        <Modal
+          type="danger"
+          title="Log Out"
+          message="Are you sure you want to log out?"
+          confirmText="Log Out"
+          cancelText="Stay"
+          onConfirm={doLogout}
+          onCancel={() => setShowLogoutModal(false)}
+        />
+      )}
       <header className="app-header">
         {/* Brand */}
         <div className="brand">
