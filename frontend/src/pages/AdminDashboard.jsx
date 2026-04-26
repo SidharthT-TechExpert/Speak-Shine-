@@ -2,21 +2,26 @@ import { useEffect, useState, useMemo } from "react";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import api from "../api/client.js";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Cell, PieChart, Pie, Legend,
-} from "recharts";
-import styles from "./Dashboard.module.css";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 
 const CATEGORIES = ["Daily Life","Opinion","Personal Experience","English Growth","Future Goals","Fun Topic","Free Talk"];
 const TABS = [
-  { id: "overview",   label: "📊 Overview" },
-  { id: "today",      label: "📅 Today" },
-  { id: "users",      label: "👥 Users" },
-  { id: "reports",    label: "📈 Reports" },
-  { id: "fines",      label: "💸 Fines" },
-  { id: "questions",  label: "❓ Questions" },
+  { id:"overview", label:"📊 Overview" },
+  { id:"today",    label:"📅 Today" },
+  { id:"users",    label:"👥 Users" },
+  { id:"reports",  label:"📈 Reports" },
+  { id:"fines",    label:"💸 Fines" },
+  { id:"questions",label:"❓ Questions" },
 ];
+const PIE_COLORS = ["#7c6fff","#4ade80","#fbbf24","#ff6b9d","#38bdf8","#fb923c","#a78bfa"];
+const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, fontSize:12 };
+
+const Card = ({ children, className="" }) => (
+  <div className={`bg-[#16162a] border border-[#252545] rounded-2xl p-5 ${className}`}>{children}</div>
+);
+const SectionTitle = ({ children }) => <h3 className="text-base font-semibold text-[#e8e8f4] mb-4">{children}</h3>;
+const Th = ({ children }) => <th className="text-left py-2.5 px-3 text-xs text-[#8888aa] font-medium border-b border-[#252545]">{children}</th>;
+const Td = ({ children, className="" }) => <td className={`py-2.5 px-3 text-sm border-b border-[#252545]/50 ${className}`}>{children}</td>;
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -25,507 +30,348 @@ export default function AdminDashboard() {
   const [questions, setQuestions] = useState([]);
   const [weekly, setWeekly] = useState([]);
   const [monthly, setMonthly] = useState([]);
-  const [qForm, setQForm] = useState({ category: "", topic: "", question: "" });
+  const [qForm, setQForm] = useState({ category:"", topic:"", question:"" });
   const [editQ, setEditQ] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState({ text: "", type: "success" });
+  const [flash, setFlash] = useState({ text:"", type:"success" });
   const [search, setSearch] = useState("");
   const [qSearch, setQSearch] = useState("");
-  const [qCatFilter, setQCatFilter] = useState("");
+  const [qCat, setQCat] = useState("");
 
   const load = async () => {
     setLoading(true);
     try {
-      const [d, u, q, w, m] = await Promise.all([
-        api.get("/dashboard"),
-        api.get("/users"),
+      const [d,u,q,w,m] = await Promise.all([
+        api.get("/dashboard"), api.get("/users"),
         api.get("/questions?limit=200"),
         api.get("/dashboard/report/weekly"),
         api.get("/dashboard/report/monthly"),
       ]);
-      setDashboard(d.data);
-      setUsers(u.data);
-      setQuestions(q.data.questions);
-      setWeekly(w.data);
-      setMonthly(m.data);
-    } finally {
-      setLoading(false);
-    }
+      setDashboard(d.data); setUsers(u.data);
+      setQuestions(q.data.questions); setWeekly(w.data); setMonthly(m.data);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
-  const flash = (text, type = "success") => {
-    setMsg({ text, type });
-    setTimeout(() => setMsg({ text: "", type: "success" }), 3000);
-  };
+  const msg = (text, type="success") => { setFlash({text,type}); setTimeout(()=>setFlash({text:"",type:"success"}),3000); };
 
-  const changeRole = async (phone, role) => {
-    await api.patch(`/users/${phone}/role`, { role });
-    flash(`Role updated to ${role}`);
-    load();
-  };
+  const changeRole = async (phone, role) => { await api.patch(`/users/${phone}/role`,{role}); msg(`Role → ${role}`); load(); };
+  const toggleUser = async (phone) => { await api.patch(`/users/${phone}/toggle`); msg("Status toggled"); load(); };
+  const deleteUser = async (phone) => { if(!confirm("Remove user?"))return; await api.delete(`/users/${phone}`); msg("Removed","danger"); load(); };
+  const adjustFine = async (phone, cur) => { const v=prompt(`Adjust fine (neg=deduct). Current: ₹${cur}`,"0"); if(v===null||isNaN(+v))return; await api.patch(`/users/${phone}/fine`,{amount:+v}); msg(`Fine adjusted ₹${v}`); load(); };
+  const resetFine = async (phone) => { if(!confirm("Reset fine to ₹0?"))return; const u=users.find(x=>x.phone===phone); if(!u)return; await api.patch(`/users/${phone}/fine`,{amount:-(u.fine||0)}); msg("Fine reset"); load(); };
+  const saveQ = async (e) => { e.preventDefault(); if(editQ){await api.patch(`/questions/${editQ._id}`,qForm);setEditQ(null);msg("Updated!");}else{await api.post("/questions",qForm);msg("Added!");} setQForm({category:"",topic:"",question:""}); load(); };
+  const deleteQ = async (id) => { if(!confirm("Delete?"))return; await api.delete(`/questions/${id}`); msg("Deleted","danger"); load(); };
+  const startEdit = (q) => { setEditQ(q); setQForm({category:q.category,topic:q.topic,question:q.question}); window.scrollTo({top:0,behavior:"smooth"}); };
 
-  const toggleUser = async (phone) => {
-    await api.patch(`/users/${phone}/toggle`);
-    flash("User status toggled");
-    load();
-  };
+  const filteredUsers = useMemo(()=>users.filter(u=>{const s=search.toLowerCase();return(u.registeredName||u.name||"").toLowerCase().includes(s)||(u.phone||"").includes(s)}),[users,search]);
+  const filteredQ = useMemo(()=>questions.filter(q=>(qCat?q.category===qCat:true)&&(q.question.toLowerCase().includes(qSearch.toLowerCase())||q.topic.toLowerCase().includes(qSearch.toLowerCase()))),[questions,qSearch,qCat]);
 
-  const deleteUser = async (phone) => {
-    if (!confirm("Remove this user from the webapp?")) return;
-    await api.delete(`/users/${phone}`);
-    flash("User removed");
-    load();
-  };
+  const pieSub = [{name:"Submitted",value:dashboard?.stats?.completed||0,color:"#4ade80"},{name:"Pending",value:dashboard?.stats?.pending||0,color:"#f87171"}];
+  const catCount = questions.reduce((a,q)=>{a[q.category]=(a[q.category]||0)+1;return a},{});
+  const catPie = Object.entries(catCount).map(([name,value])=>({name,value}));
+  const fineBar = [...users].filter(u=>(u.fine||0)>0).sort((a,b)=>(b.fine||0)-(a.fine||0)).slice(0,10).map(u=>({name:(u.registeredName||u.name||u.phone||"?").slice(0,8),fine:u.fine||0}));
 
-  const adjustFine = async (phone, current) => {
-    const val = prompt(`Enter fine adjustment (negative to deduct). Current: ₹${current}`, "0");
-    if (val === null || isNaN(Number(val))) return;
-    await api.patch(`/users/${phone}/fine`, { amount: Number(val) });
-    flash(`Fine adjusted by ₹${val}`);
-    load();
-  };
+  if (loading) return <Layout title="Admin Dashboard"><div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-[#252545] border-t-[#7c6fff] rounded-full animate-spin"/></div></Layout>;
 
-  const resetFine = async (phone) => {
-    if (!confirm("Reset this user's fine to ₹0?")) return;
-    const user = users.find(u => u.phone === phone);
-    if (!user) return;
-    await api.patch(`/users/${phone}/fine`, { amount: -(user.fine || 0) });
-    flash("Fine reset to ₹0");
-    load();
-  };
-
-  const addQuestion = async (e) => {
-    e.preventDefault();
-    if (editQ) {
-      await api.patch(`/questions/${editQ._id}`, qForm);
-      setEditQ(null);
-      flash("Question updated!");
-    } else {
-      await api.post("/questions", qForm);
-      flash("Question added!");
-    }
-    setQForm({ category: "", topic: "", question: "" });
-    load();
-  };
-
-  const deleteQuestion = async (id) => {
-    if (!confirm("Delete this question?")) return;
-    await api.delete(`/questions/${id}`);
-    flash("Question deleted", "danger");
-    load();
-  };
-
-  const startEdit = (q) => {
-    setEditQ(q);
-    setQForm({ category: q.category, topic: q.topic, question: q.question });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const filteredUsers = useMemo(() =>
-    users.filter(u => {
-      const name = (u.registeredName || u.name || "").toLowerCase();
-      const phone = (u.phone || "").toLowerCase();
-      return name.includes(search.toLowerCase()) || phone.includes(search.toLowerCase());
-    }), [users, search]);
-
-  const filteredQuestions = useMemo(() =>
-    questions.filter(q => {
-      const matchCat = qCatFilter ? q.category === qCatFilter : true;
-      const matchSearch = q.question.toLowerCase().includes(qSearch.toLowerCase()) ||
-        q.topic.toLowerCase().includes(qSearch.toLowerCase());
-      return matchCat && matchSearch;
-    }), [questions, qSearch, qCatFilter]);
-
-  // Chart data
-  const submissionPieData = [
-    { name: "Submitted", value: dashboard?.stats?.completed || 0, color: "#4ade80" },
-    { name: "Pending", value: dashboard?.stats?.pending || 0, color: "#f87171" },
-  ];
-
-  const weeklyBarData = weekly.slice(0, 10).map(u => ({
-    name: (u.name || u.userId?.split("@")[0] || "?").slice(0, 8),
-    days: u.weeklySubmissions || 0,
-    streak: u.streak || 0,
-  }));
-
-  const fineBarData = [...users]
-    .filter(u => (u.fine || 0) > 0)
-    .sort((a, b) => (b.fine || 0) - (a.fine || 0))
-    .slice(0, 10)
-    .map(u => ({
-      name: (u.registeredName || u.name || u.phone || "?").slice(0, 8),
-      fine: u.fine || 0,
-    }));
-
-  const catCount = questions.reduce((acc, q) => {
-    acc[q.category] = (acc[q.category] || 0) + 1;
-    return acc;
-  }, {});
-  const catPieData = Object.entries(catCount).map(([name, value]) => ({ name, value }));
-  const PIE_COLORS = ["#6c63ff","#4ade80","#facc15","#ff6584","#38bdf8","#fb923c","#a78bfa"];
-
-  if (loading) return <Layout title="Admin Dashboard"><p className={styles.loading}>Loading…</p></Layout>;
+  const Input = ({value,onChange,placeholder,className=""}) => (
+    <input value={value} onChange={onChange} placeholder={placeholder}
+      className={`bg-[#111122] border border-[#252545] rounded-xl px-3 py-2 text-[#e8e8f4] text-sm placeholder-[#444466] focus:border-[#7c6fff] transition-colors ${className}`}/>
+  );
 
   return (
     <Layout title="Admin Dashboard">
-      {msg.text && (
-        <div className={styles.flashMsg} data-type={msg.type}>{msg.text}</div>
+      {flash.text && (
+        <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm font-medium ${flash.type==="danger"?"bg-[#f87171]/10 text-[#f87171] border border-[#f87171]/30":"bg-[#4ade80]/10 text-[#4ade80] border border-[#4ade80]/30"}`}>
+          {flash.text}
+        </div>
       )}
 
-      <div className={styles.grid4}>
-        <StatCard icon="👥" label="Total Users" value={dashboard?.stats?.total || 0} color="#6c63ff" />
-        <StatCard icon="✅" label="Submitted Today" value={dashboard?.stats?.completed || 0} color="#4ade80" />
-        <StatCard icon="❌" label="Pending Today" value={dashboard?.stats?.pending || 0} color="#f87171" />
-        <StatCard icon="💸" label="Total Fines" value={`₹${dashboard?.stats?.totalFines || 0}`} color="#facc15" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard icon="👥" label="Total Users"     value={dashboard?.stats?.total||0}     color="#7c6fff"/>
+        <StatCard icon="✅" label="Submitted Today" value={dashboard?.stats?.completed||0} color="#4ade80"/>
+        <StatCard icon="❌" label="Pending Today"   value={dashboard?.stats?.pending||0}   color="#f87171"/>
+        <StatCard icon="💸" label="Total Fines"     value={`₹${dashboard?.stats?.totalFines||0}`} color="#fbbf24"/>
       </div>
 
-      <div className={styles.tabs}>
-        {TABS.map(t => (
-          <button key={t.id} className={`${styles.tab} ${tab === t.id ? styles.active : ""}`} onClick={() => setTab(t.id)}>
+      {/* Tabs */}
+      <div className="flex gap-1.5 flex-wrap mb-6">
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab===t.id?"bg-[#7c6fff] text-white":"bg-[#16162a] border border-[#252545] text-[#8888aa] hover:text-[#e8e8f4] hover:border-[#353560]"}`}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── OVERVIEW ── */}
-      {tab === "overview" && (
-        <div className={styles.grid2}>
-          <div className={styles.chartCard} style={{ margin: 0 }}>
-            <h3 className={styles.sectionTitle}>Today's Submission Rate</h3>
+      {/* OVERVIEW */}
+      {tab==="overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <SectionTitle>Today's Submission Rate</SectionTitle>
             <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={submissionPieData} dataKey="value" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${name}: ${value}`}>
-                  {submissionPieData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-              </PieChart>
+              <PieChart><Pie data={pieSub} dataKey="value" cx="50%" cy="50%" outerRadius={70} label={({name,value})=>`${name}: ${value}`}>
+                {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
+              </Pie><Tooltip contentStyle={tt}/></PieChart>
             </ResponsiveContainer>
-          </div>
-
-          <div className={styles.chartCard} style={{ margin: 0 }}>
-            <h3 className={styles.sectionTitle}>🏆 Top Streaks</h3>
-            <div className={styles.streakList}>
-              {(dashboard?.topStreak || []).map((u, i) => (
-                <div key={i} className={styles.streakRow}>
-                  <span className={styles.rank}>{["🥇","🥈","🥉"][i] || `${i+1}.`}</span>
-                  <span className={styles.streakName}>{u.name || u.userId?.split("@")[0]}</span>
-                  <span className={styles.streakVal}>🔥 {u.streak} days</span>
-                  <span style={{ fontSize: "0.78rem", color: "var(--text2)" }}>{u.weeklySubmissions}/7</span>
+          </Card>
+          <Card>
+            <SectionTitle>🏆 Top Streaks</SectionTitle>
+            <div className="space-y-2">
+              {(dashboard?.topStreak||[]).map((u,i)=>(
+                <div key={i} className="flex items-center gap-3 bg-[#111122] rounded-xl px-4 py-2.5">
+                  <span className="text-lg w-7">{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
+                  <span className="flex-1 text-sm text-[#e8e8f4]">{u.name||u.userId?.split("@")[0]}</span>
+                  <span className="text-sm text-[#fbbf24] font-semibold">🔥 {u.streak}</span>
+                  <span className="text-xs text-[#8888aa]">{u.weeklySubmissions}/7</span>
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className={styles.chartCard} style={{ margin: 0 }}>
-            <h3 className={styles.sectionTitle}>Weekly Submissions (Top 10)</h3>
+          </Card>
+          <Card>
+            <SectionTitle>Weekly Submissions</SectionTitle>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={weeklyBarData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" />
-                <XAxis dataKey="name" stroke="#9090b0" fontSize={11} />
-                <YAxis domain={[0, 7]} stroke="#9090b0" fontSize={11} />
-                <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                <Bar dataKey="days" fill="#6c63ff" radius={[4,4,0,0]} />
+              <BarChart data={weekly.slice(0,10).map(u=>({name:(u.name||"?").slice(0,8),days:u.weeklySubmissions||0}))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
+                <XAxis dataKey="name" stroke="#8888aa" fontSize={11}/>
+                <YAxis domain={[0,7]} stroke="#8888aa" fontSize={11}/>
+                <Tooltip contentStyle={tt}/>
+                <Bar dataKey="days" fill="#7c6fff" radius={[4,4,0,0]}/>
               </BarChart>
             </ResponsiveContainer>
-          </div>
-
-          <div className={styles.chartCard} style={{ margin: 0 }}>
-            <h3 className={styles.sectionTitle}>Question Bank by Category</h3>
+          </Card>
+          <Card>
+            <SectionTitle>Questions by Category</SectionTitle>
             <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={catPieData} dataKey="value" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${value}`}>
-                  {catPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                <Legend iconSize={10} wrapperStyle={{ fontSize: "0.75rem" }} />
-              </PieChart>
+              <PieChart><Pie data={catPie} dataKey="value" cx="50%" cy="50%" outerRadius={70} label={({value})=>value}>
+                {catPie.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+              </Pie><Tooltip contentStyle={tt}/><Legend iconSize={10} wrapperStyle={{fontSize:"0.75rem"}}/></PieChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
         </div>
       )}
 
-      {/* ── TODAY ── */}
-      {tab === "today" && (
+      {/* TODAY */}
+      {tab==="today" && (
         <>
           {dashboard?.today?.question ? (
-            <div className={styles.todayCard} style={{ marginBottom: "1.5rem" }}>
-              <p className={styles.todayLabel}>📌 Today's Question</p>
-              <p className={styles.todayQ}>{dashboard.today.question}</p>
-              {dashboard.today.topic && <span className={styles.topic}>{dashboard.today.topic}</span>}
+            <div className="mb-6 rounded-2xl p-5 border border-[#7c6fff]/30" style={{background:"linear-gradient(135deg,rgba(124,111,255,0.1),rgba(255,107,157,0.05))"}}>
+              <p className="text-xs text-[#8888aa] mb-2">📌 TODAY'S QUESTION</p>
+              <p className="text-[#e8e8f4] font-semibold">{dashboard.today.question}</p>
             </div>
-          ) : (
-            <div className={styles.emptyChart} style={{ marginBottom: "1.5rem" }}>
-              <p>⏳ No question sent today yet.</p>
-            </div>
-          )}
-
-          <div className={styles.chartCard}>
-            <h3 className={styles.sectionTitle}>Today's Submission Status</h3>
-            <div style={{ overflowX: "auto" }}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>Name</th><th>Phone</th><th>Streak</th><th>Status</th><th>Fine</th></tr>
-                </thead>
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.userId}>
-                      <td>{u.registeredName || u.name || "—"}</td>
-                      <td style={{ color: "var(--text2)", fontSize: "0.8rem" }}>{u.phone}</td>
-                      <td>🔥 {u.streak || 0}</td>
-                      <td>
-                        <span style={{ color: u.completed ? "var(--success)" : "var(--danger)", fontWeight: 600, fontSize: "0.85rem" }}>
-                          {u.completed ? "✅ Submitted" : "⏳ Pending"}
-                        </span>
-                      </td>
-                      <td style={{ color: u.fine > 0 ? "var(--danger)" : "var(--text2)" }}>₹{u.fine || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
+          ) : <div className="mb-6 bg-[#fbbf24]/8 border border-[#fbbf24]/20 rounded-2xl p-4 text-[#fbbf24] text-sm">⏳ No question sent today yet.</div>}
+          <Card>
+            <SectionTitle>Submission Status</SectionTitle>
+            <div className="overflow-x-auto">
+              <table className="w-full"><thead><tr>{["Name","Phone","Streak","Status","Fine"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                <tbody>{users.map(u=>(
+                  <tr key={u.userId} className="hover:bg-[#7c6fff]/5 transition-colors">
+                    <Td className="text-[#e8e8f4] font-medium">{u.registeredName||u.name||"—"}</Td>
+                    <Td className="text-[#8888aa] text-xs">{u.phone}</Td>
+                    <Td>🔥 {u.streak||0}</Td>
+                    <Td><span className={`text-xs font-semibold ${u.completed?"text-[#4ade80]":"text-[#f87171]"}`}>{u.completed?"✅ Submitted":"⏳ Pending"}</span></Td>
+                    <Td className={u.fine>0?"text-[#f87171]":"text-[#8888aa]"}>₹{u.fine||0}</Td>
+                  </tr>
+                ))}</tbody>
               </table>
             </div>
-          </div>
+          </Card>
         </>
       )}
 
-      {/* ── USERS ── */}
-      {tab === "users" && (
-        <div className={styles.chartCard}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-            <h3 className={styles.sectionTitle} style={{ margin: 0 }}>All Users ({filteredUsers.length})</h3>
-            <input
-              className={styles.searchInput}
-              placeholder="Search by name or phone…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+      {/* USERS */}
+      {tab==="users" && (
+        <Card>
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+            <SectionTitle>All Users ({filteredUsers.length})</SectionTitle>
+            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or phone…" className="w-56"/>
           </div>
-          <div style={{ overflowX: "auto" }}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Name</th><th>Phone</th><th>Role</th><th>Streak</th>
-                  <th>Weekly</th><th>Monthly</th><th>Fine</th><th>Status</th><th>Actions</th>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr>{["Name","Phone","Role","Streak","Weekly","Monthly","Fine","Status","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+              <tbody>{filteredUsers.map(u=>(
+                <tr key={u.userId} className="hover:bg-[#7c6fff]/5 transition-colors">
+                  <Td className="text-[#e8e8f4] font-medium whitespace-nowrap">{u.registeredName||u.name||"—"}</Td>
+                  <Td className="text-[#8888aa] text-xs">{u.phone}</Td>
+                  <Td>
+                    <select value={u.role||"user"} onChange={e=>changeRole(u.phone,e.target.value)}
+                      className="bg-[#111122] border border-[#252545] text-[#8888aa] rounded-lg px-2 py-1 text-xs">
+                      {["user","trainer","admin"].map(r=><option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </Td>
+                  <Td>🔥 {u.streak||0}</Td>
+                  <Td>{u.weeklySubmissions||0}/7</Td>
+                  <Td>{u.monthlySubmissions||0}</Td>
+                  <Td className={u.fine>0?"text-[#f87171] font-semibold":"text-[#8888aa]"}>₹{u.fine||0}</Td>
+                  <Td><span className={`text-xs font-medium ${u.isActive?"text-[#4ade80]":"text-[#f87171]"}`}>{u.isActive?"Active":"Disabled"}</span></Td>
+                  <Td>
+                    <div className="flex gap-1 flex-wrap">
+                      {[["±Fine",()=>adjustFine(u.phone,u.fine),""],["Reset",()=>resetFine(u.phone),""],
+                        [u.isActive?"Disable":"Enable",()=>toggleUser(u.phone),""],
+                        ["Remove",()=>deleteUser(u.phone),"text-[#f87171]"]].map(([l,fn,cls])=>(
+                        <button key={l} onClick={fn} className={`text-xs border border-[#252545] px-2 py-1 rounded-lg text-[#8888aa] hover:border-[#7c6fff] hover:text-[#7c6fff] transition-all ${cls}`}>{l}</button>
+                      ))}
+                    </div>
+                  </Td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map(u => (
-                  <tr key={u.userId}>
-                    <td style={{ fontWeight: 500 }}>{u.registeredName || u.name || "—"}</td>
-                    <td style={{ color: "var(--text2)", fontSize: "0.8rem" }}>{u.phone}</td>
-                    <td>
-                      <select
-                        className={styles.roleSelect}
-                        value={u.role || "user"}
-                        onChange={e => changeRole(u.phone, e.target.value)}
-                      >
-                        <option value="user">user</option>
-                        <option value="trainer">trainer</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    </td>
-                    <td>🔥 {u.streak || 0}</td>
-                    <td>{u.weeklySubmissions || 0}/7</td>
-                    <td>{u.monthlySubmissions || 0}</td>
-                    <td style={{ color: u.fine > 0 ? "var(--danger)" : "var(--text2)" }}>₹{u.fine || 0}</td>
-                    <td>
-                      <span style={{ color: u.isActive ? "var(--success)" : "var(--danger)", fontSize: "0.8rem" }}>
-                        {u.isActive ? "Active" : "Disabled"}
-                      </span>
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      <button className={styles.actionBtn} onClick={() => adjustFine(u.phone, u.fine)}>±Fine</button>
-                      <button className={styles.actionBtn} onClick={() => resetFine(u.phone)}>Reset Fine</button>
-                      <button className={styles.actionBtn} onClick={() => toggleUser(u.phone)}>
-                        {u.isActive ? "Disable" : "Enable"}
-                      </button>
-                      <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => deleteUser(u.phone)}>Remove</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              ))}</tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* ── REPORTS ── */}
-      {tab === "reports" && (
+      {/* REPORTS */}
+      {tab==="reports" && (
         <>
-          <div className={styles.chartCard}>
-            <h3 className={styles.sectionTitle}>📅 Weekly Report</h3>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={weekly.slice(0, 15).map(u => ({
-                name: (u.name || u.userId?.split("@")[0] || "?").slice(0, 8),
-                days: u.weeklySubmissions || 0,
-                streak: u.streak || 0,
-              }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" />
-                <XAxis dataKey="name" stroke="#9090b0" fontSize={11} />
-                <YAxis domain={[0, 7]} stroke="#9090b0" fontSize={11} />
-                <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                <Legend />
-                <Bar dataKey="days" name="Days Submitted" fill="#6c63ff" radius={[4,4,0,0]} />
-                <Bar dataKey="streak" name="Streak" fill="#facc15" radius={[4,4,0,0]} />
+          <Card className="mb-4">
+            <SectionTitle>📅 Weekly Report</SectionTitle>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={weekly.slice(0,15).map(u=>({name:(u.name||"?").slice(0,8),days:u.weeklySubmissions||0,streak:u.streak||0}))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
+                <XAxis dataKey="name" stroke="#8888aa" fontSize={11}/>
+                <YAxis domain={[0,7]} stroke="#8888aa" fontSize={11}/>
+                <Tooltip contentStyle={tt}/><Legend/>
+                <Bar dataKey="days" name="Days" fill="#7c6fff" radius={[4,4,0,0]}/>
+                <Bar dataKey="streak" name="Streak" fill="#fbbf24" radius={[4,4,0,0]}/>
               </BarChart>
             </ResponsiveContainer>
-            <div style={{ overflowX: "auto", marginTop: "1rem" }}>
-              <table className={styles.table}>
-                <thead><tr><th>#</th><th>Name</th><th>Days</th><th>Streak</th><th>Weekly Fine</th></tr></thead>
-                <tbody>
-                  {weekly.map((u, i) => (
-                    <tr key={i}>
-                      <td style={{ color: "var(--text2)" }}>{i + 1}</td>
-                      <td>{u.name || u.userId?.split("@")[0]}</td>
-                      <td><span style={{ color: u.weeklySubmissions >= 7 ? "var(--success)" : u.weeklySubmissions >= 4 ? "var(--warning)" : "var(--danger)" }}>{u.weeklySubmissions || 0}/7</span></td>
-                      <td>🔥 {u.streak || 0}</td>
-                      <td style={{ color: "var(--danger)" }}>₹{u.weeklyFine || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
+            <div className="overflow-x-auto mt-4">
+              <table className="w-full"><thead><tr>{["#","Name","Days","Streak","Weekly Fine"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                <tbody>{weekly.map((u,i)=>(
+                  <tr key={i} className="hover:bg-[#7c6fff]/5 transition-colors">
+                    <Td className="text-[#8888aa]">{i+1}</Td>
+                    <Td className="text-[#e8e8f4] font-medium">{u.name||u.userId?.split("@")[0]}</Td>
+                    <Td><span className={(u.weeklySubmissions||0)>=7?"text-[#4ade80] font-semibold":(u.weeklySubmissions||0)>=4?"text-[#fbbf24]":"text-[#f87171]"}>{u.weeklySubmissions||0}/7</span></Td>
+                    <Td>🔥 {u.streak||0}</Td>
+                    <Td className="text-[#f87171]">₹{u.weeklyFine||0}</Td>
+                  </tr>
+                ))}</tbody>
               </table>
             </div>
-          </div>
-
-          <div className={styles.chartCard}>
-            <h3 className={styles.sectionTitle}>📆 Monthly Report</h3>
-            <div style={{ overflowX: "auto" }}>
-              <table className={styles.table}>
-                <thead><tr><th>#</th><th>Name</th><th>Monthly Submissions</th><th>Streak</th><th>Total Fine</th></tr></thead>
-                <tbody>
-                  {monthly.map((u, i) => (
-                    <tr key={i}>
-                      <td style={{ color: "var(--text2)" }}>{i + 1}</td>
-                      <td>{u.name || u.userId?.split("@")[0]}</td>
-                      <td>{u.monthlySubmissions || 0}</td>
-                      <td>🔥 {u.streak || 0}</td>
-                      <td style={{ color: u.fine > 0 ? "var(--danger)" : "var(--text2)" }}>₹{u.fine || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
+          </Card>
+          <Card>
+            <SectionTitle>📆 Monthly Report</SectionTitle>
+            <div className="overflow-x-auto">
+              <table className="w-full"><thead><tr>{["#","Name","Monthly","Streak","Total Fine"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                <tbody>{monthly.map((u,i)=>(
+                  <tr key={i} className="hover:bg-[#7c6fff]/5 transition-colors">
+                    <Td className="text-[#8888aa]">{i+1}</Td>
+                    <Td className="text-[#e8e8f4] font-medium">{u.name||u.userId?.split("@")[0]}</Td>
+                    <Td>{u.monthlySubmissions||0}</Td>
+                    <Td>🔥 {u.streak||0}</Td>
+                    <Td className={u.fine>0?"text-[#f87171]":"text-[#8888aa]"}>₹{u.fine||0}</Td>
+                  </tr>
+                ))}</tbody>
               </table>
             </div>
-          </div>
+          </Card>
         </>
       )}
 
-      {/* ── FINES ── */}
-      {tab === "fines" && (
+      {/* FINES */}
+      {tab==="fines" && (
         <>
-          <div className={styles.grid4} style={{ marginBottom: "1.5rem" }}>
-            <StatCard icon="💸" label="Total Outstanding" value={`₹${users.reduce((s, u) => s + (u.fine || 0), 0)}`} color="#f87171" />
-            <StatCard icon="⚠️" label="Users with Fines" value={users.filter(u => (u.fine || 0) > 0).length} color="#facc15" />
-            <StatCard icon="✅" label="Fine-Free Users" value={users.filter(u => (u.fine || 0) === 0).length} color="#4ade80" />
-            <StatCard icon="📊" label="Avg Fine" value={`₹${users.length ? Math.round(users.reduce((s, u) => s + (u.fine || 0), 0) / users.length) : 0}`} color="#6c63ff" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <StatCard icon="💸" label="Total Outstanding" value={`₹${users.reduce((s,u)=>s+(u.fine||0),0)}`} color="#f87171"/>
+            <StatCard icon="⚠️" label="Users with Fines"  value={users.filter(u=>(u.fine||0)>0).length}      color="#fbbf24"/>
+            <StatCard icon="✅" label="Fine-Free Users"   value={users.filter(u=>(u.fine||0)===0).length}    color="#4ade80"/>
+            <StatCard icon="📊" label="Avg Fine"          value={`₹${users.length?Math.round(users.reduce((s,u)=>s+(u.fine||0),0)/users.length):0}`} color="#7c6fff"/>
           </div>
-
-          {fineBarData.length > 0 && (
-            <div className={styles.chartCard}>
-              <h3 className={styles.sectionTitle}>Top Fine Holders</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={fineBarData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" />
-                  <XAxis dataKey="name" stroke="#9090b0" fontSize={11} />
-                  <YAxis stroke="#9090b0" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                  <Bar dataKey="fine" fill="#f87171" radius={[4,4,0,0]} />
+          {fineBar.length>0 && (
+            <Card className="mb-4">
+              <SectionTitle>Top Fine Holders</SectionTitle>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={fineBar}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
+                  <XAxis dataKey="name" stroke="#8888aa" fontSize={11}/>
+                  <YAxis stroke="#8888aa" fontSize={11}/>
+                  <Tooltip contentStyle={tt}/>
+                  <Bar dataKey="fine" fill="#f87171" radius={[4,4,0,0]}/>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </Card>
           )}
-
-          <div className={styles.chartCard}>
-            <h3 className={styles.sectionTitle}>Fine Management</h3>
-            <div style={{ overflowX: "auto" }}>
-              <table className={styles.table}>
-                <thead><tr><th>Name</th><th>Phone</th><th>Total Fine</th><th>Weekly Fine</th><th>Actions</th></tr></thead>
-                <tbody>
-                  {[...users].sort((a, b) => (b.fine || 0) - (a.fine || 0)).map(u => (
-                    <tr key={u.userId}>
-                      <td>{u.registeredName || u.name || "—"}</td>
-                      <td style={{ color: "var(--text2)", fontSize: "0.8rem" }}>{u.phone}</td>
-                      <td style={{ color: u.fine > 0 ? "var(--danger)" : "var(--success)", fontWeight: 600 }}>₹{u.fine || 0}</td>
-                      <td style={{ color: "var(--text2)" }}>₹{u.weeklyFine || 0}</td>
-                      <td>
-                        <button className={styles.actionBtn} onClick={() => adjustFine(u.phone, u.fine)}>±Adjust</button>
-                        <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => resetFine(u.phone)}>Reset</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+          <Card>
+            <SectionTitle>Fine Management</SectionTitle>
+            <div className="overflow-x-auto">
+              <table className="w-full"><thead><tr>{["Name","Phone","Total Fine","Weekly Fine","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                <tbody>{[...users].sort((a,b)=>(b.fine||0)-(a.fine||0)).map(u=>(
+                  <tr key={u.userId} className="hover:bg-[#7c6fff]/5 transition-colors">
+                    <Td className="text-[#e8e8f4] font-medium">{u.registeredName||u.name||"—"}</Td>
+                    <Td className="text-[#8888aa] text-xs">{u.phone}</Td>
+                    <Td className={u.fine>0?"text-[#f87171] font-bold":"text-[#4ade80]"}>₹{u.fine||0}</Td>
+                    <Td className="text-[#8888aa]">₹{u.weeklyFine||0}</Td>
+                    <Td>
+                      <button onClick={()=>adjustFine(u.phone,u.fine)} className="text-xs border border-[#252545] px-2 py-1 rounded-lg text-[#8888aa] hover:border-[#7c6fff] hover:text-[#7c6fff] transition-all mr-1">±Adjust</button>
+                      <button onClick={()=>resetFine(u.phone)} className="text-xs border border-[#252545] px-2 py-1 rounded-lg text-[#8888aa] hover:border-[#f87171] hover:text-[#f87171] transition-all">Reset</button>
+                    </Td>
+                  </tr>
+                ))}</tbody>
               </table>
             </div>
-          </div>
+          </Card>
         </>
       )}
 
-      {/* ── QUESTIONS ── */}
-      {tab === "questions" && (
+      {/* QUESTIONS */}
+      {tab==="questions" && (
         <>
-          <div className={styles.chartCard}>
-            <h3 className={styles.sectionTitle}>{editQ ? "✏️ Edit Question" : "➕ Add New Question"}</h3>
-            <form onSubmit={addQuestion} className={styles.form}>
-              <div className={styles.formRow}>
-                <div className={styles.field}>
-                  <label>Category</label>
-                  <select value={qForm.category} onChange={e => setQForm({ ...qForm, category: e.target.value })} required>
+          <Card className="mb-4">
+            <SectionTitle>{editQ?"✏️ Edit Question":"➕ Add Question"}</SectionTitle>
+            <form onSubmit={saveQ} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-[#8888aa] mb-1.5">Category</label>
+                  <select value={qForm.category} onChange={e=>setQForm({...qForm,category:e.target.value})} required
+                    className="w-full bg-[#111122] border border-[#252545] rounded-xl px-3 py-2.5 text-[#e8e8f4] text-sm focus:border-[#7c6fff] transition-colors">
                     <option value="">Select category</option>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className={styles.field}>
-                  <label>Topic</label>
-                  <input placeholder="e.g. Morning routines" value={qForm.topic} onChange={e => setQForm({ ...qForm, topic: e.target.value })} required />
+                <div>
+                  <label className="block text-xs text-[#8888aa] mb-1.5">Topic</label>
+                  <Input value={qForm.topic} onChange={e=>setQForm({...qForm,topic:e.target.value})} placeholder="e.g. Morning routines" className="w-full"/>
                 </div>
               </div>
-              <div className={styles.field}>
-                <label>Question</label>
-                <textarea placeholder="Write the question…" value={qForm.question} onChange={e => setQForm({ ...qForm, question: e.target.value })} required />
+              <div>
+                <label className="block text-xs text-[#8888aa] mb-1.5">Question</label>
+                <textarea value={qForm.question} onChange={e=>setQForm({...qForm,question:e.target.value})} required placeholder="Write the question…"
+                  className="w-full bg-[#111122] border border-[#252545] rounded-xl px-3 py-2.5 text-[#e8e8f4] text-sm focus:border-[#7c6fff] transition-colors resize-none h-20"/>
               </div>
-              <div style={{ display: "flex", gap: "0.75rem" }}>
-                <button type="submit" className={styles.submitBtn}>{editQ ? "Update" : "Add Question"}</button>
-                {editQ && (
-                  <button type="button" className={styles.actionBtn} style={{ padding: "0.7rem 1.2rem" }} onClick={() => { setEditQ(null); setQForm({ category: "", topic: "", question: "" }); }}>
-                    Cancel
-                  </button>
-                )}
+              <div className="flex gap-2">
+                <button type="submit" className="bg-[#7c6fff] text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-[#6055e0] transition-colors">{editQ?"Update":"Add Question"}</button>
+                {editQ && <button type="button" onClick={()=>{setEditQ(null);setQForm({category:"",topic:"",question:""});}} className="border border-[#252545] text-[#8888aa] px-4 py-2 rounded-xl text-sm hover:border-[#7c6fff] transition-colors">Cancel</button>}
               </div>
             </form>
-          </div>
-
-          <div className={styles.chartCard}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-              <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Question Bank ({filteredQuestions.length} / {questions.length})</h3>
-              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                <select className={styles.searchInput} style={{ width: "auto" }} value={qCatFilter} onChange={e => setQCatFilter(e.target.value)}>
+          </Card>
+          <Card>
+            <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+              <SectionTitle>Question Bank ({filteredQ.length}/{questions.length})</SectionTitle>
+              <div className="flex gap-2 flex-wrap">
+                <select value={qCat} onChange={e=>setQCat(e.target.value)} className="bg-[#111122] border border-[#252545] rounded-xl px-3 py-2 text-[#8888aa] text-xs focus:border-[#7c6fff] transition-colors">
                   <option value="">All Categories</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
                 </select>
-                <input className={styles.searchInput} placeholder="Search questions…" value={qSearch} onChange={e => setQSearch(e.target.value)} />
+                <Input value={qSearch} onChange={e=>setQSearch(e.target.value)} placeholder="Search…" className="w-44"/>
               </div>
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>Category</th><th>Topic</th><th>Question</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {filteredQuestions.map(q => (
-                    <tr key={q._id}>
-                      <td><span className={`${styles.roleBadge} ${styles.user}`} style={{ whiteSpace: "nowrap" }}>{q.category}</span></td>
-                      <td style={{ color: "var(--text2)", fontSize: "0.8rem", whiteSpace: "nowrap" }}>{q.topic}</td>
-                      <td style={{ maxWidth: 320 }}>{q.question}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        <button className={styles.actionBtn} onClick={() => startEdit(q)}>Edit</button>
-                        <button className={`${styles.actionBtn} ${styles.danger}`} onClick={() => deleteQuestion(q._id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+            <div className="overflow-x-auto">
+              <table className="w-full"><thead><tr>{["Category","Topic","Question","Actions"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                <tbody>{filteredQ.map(q=>(
+                  <tr key={q._id} className="hover:bg-[#7c6fff]/5 transition-colors">
+                    <Td><span className="text-xs bg-[#7c6fff]/15 text-[#7c6fff] px-2 py-0.5 rounded-full whitespace-nowrap">{q.category}</span></Td>
+                    <Td className="text-[#8888aa] text-xs whitespace-nowrap">{q.topic}</Td>
+                    <Td className="max-w-xs text-[#e8e8f4]">{q.question}</Td>
+                    <Td>
+                      <button onClick={()=>startEdit(q)} className="text-xs border border-[#252545] px-2 py-1 rounded-lg text-[#8888aa] hover:border-[#7c6fff] hover:text-[#7c6fff] transition-all mr-1">Edit</button>
+                      <button onClick={()=>deleteQ(q._id)} className="text-xs border border-[#252545] px-2 py-1 rounded-lg text-[#8888aa] hover:border-[#f87171] hover:text-[#f87171] transition-all">Delete</button>
+                    </Td>
+                  </tr>
+                ))}</tbody>
               </table>
             </div>
-          </div>
+          </Card>
         </>
       )}
     </Layout>

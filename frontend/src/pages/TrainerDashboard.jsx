@@ -7,34 +7,28 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   BarChart, Bar, Cell,
 } from "recharts";
-import styles from "./Dashboard.module.css";
+
+const SCORE_COLORS = { Fluency:"#7c6fff", Grammar:"#4ade80", Confidence:"#fbbf24", Vocabulary:"#ff6b9d" };
+const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, fontSize:12 };
+const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
+const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
+
+const Card = ({children,className=""}) => <div className={`bg-[#16162a] border border-[#252545] rounded-2xl p-5 ${className}`}>{children}</div>;
+const SectionTitle = ({children}) => <h3 className="text-base font-semibold text-[#e8e8f4] mb-4">{children}</h3>;
+const Th = ({children}) => <th className="text-left py-2.5 px-3 text-xs text-[#8888aa] font-medium border-b border-[#252545]">{children}</th>;
+const Td = ({children,className=""}) => <td className={`py-2.5 px-3 text-sm border-b border-[#252545]/50 ${className}`}>{children}</td>;
 
 const TABS = [
-  { id: "overview",    label: "📊 Overview" },
-  { id: "students",    label: "👥 Students" },
-  { id: "compare",     label: "⚖️ Compare" },
-  { id: "improvement", label: "📈 Improvement" },
+  {id:"overview",    label:"📊 Overview"},
+  {id:"students",    label:"👥 Students"},
+  {id:"compare",     label:"⚖️ Compare"},
+  {id:"improvement", label:"📈 Improvement"},
 ];
-
-const SCORE_COLORS = { Fluency: "#6c63ff", Grammar: "#4ade80", Confidence: "#facc15", Vocabulary: "#ff6584" };
-
-function avg(arr, key) {
-  const vals = arr.filter(s => s[key] != null).map(s => s[key]);
-  return vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null;
-}
-
-function delta(arr, key) {
-  if (arr.length < 2) return null;
-  const first = arr[0][key];
-  const last = arr[arr.length - 1][key];
-  if (first == null || last == null) return null;
-  return +(last - first).toFixed(1);
-}
 
 export default function TrainerDashboard() {
   const [dashboard, setDashboard] = useState(null);
   const [users, setUsers] = useState([]);
-  const [allScores, setAllScores] = useState({});   // phone → feedbackScores[]
+  const [allScores, setAllScores] = useState({});
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -44,204 +38,157 @@ export default function TrainerDashboard() {
 
   useEffect(() => {
     Promise.all([api.get("/dashboard"), api.get("/users")])
-      .then(([d, u]) => { setDashboard(d.data); setUsers(u.data); })
+      .then(([d,u]) => { setDashboard(d.data); setUsers(u.data); })
       .finally(() => setLoading(false));
   }, []);
 
-  // Load all scores when switching to compare/improvement tabs
   const loadAllScores = async () => {
     if (Object.keys(allScores).length > 0) return;
     setScoresLoading(true);
-    const results = {};
-    await Promise.all(
-      users.map(async u => {
-        try {
-          const { data } = await api.get(`/dashboard/scores/${u.phone}`);
-          results[u.phone] = data.feedbackScores || [];
-        } catch { results[u.phone] = []; }
-      })
-    );
-    setAllScores(results);
-    setScoresLoading(false);
+    const res = {};
+    await Promise.all(users.map(async u => {
+      try { const {data} = await api.get(`/dashboard/scores/${u.phone}`); res[u.phone] = data.feedbackScores||[]; }
+      catch { res[u.phone] = []; }
+    }));
+    setAllScores(res); setScoresLoading(false);
   };
 
-  const handleTabChange = (t) => {
-    setTab(t);
-    if (t === "compare" || t === "improvement") loadAllScores();
-  };
+  const handleTab = (t) => { setTab(t); if(t==="compare"||t==="improvement") loadAllScores(); };
 
   const selectUser = async (user) => {
-    setSelected(user);
-    setTab("student-detail");
+    setSelected(user); setTab("detail");
     if (!allScores[user.phone]) {
-      const { data } = await api.get(`/dashboard/scores/${user.phone}`);
-      setAllScores(prev => ({ ...prev, [user.phone]: data.feedbackScores || [] }));
+      const {data} = await api.get(`/dashboard/scores/${user.phone}`);
+      setAllScores(p => ({...p, [user.phone]: data.feedbackScores||[]}));
     }
   };
 
   const filteredUsers = useMemo(() => {
     let list = [...users];
-    if (search) {
-      const s = search.toLowerCase();
-      list = list.filter(u => (u.registeredName || u.name || "").toLowerCase().includes(s) || (u.phone || "").includes(s));
-    }
-    if (sortBy === "streak") list.sort((a, b) => (b.streak || 0) - (a.streak || 0));
-    else if (sortBy === "weekly") list.sort((a, b) => (b.weeklySubmissions || 0) - (a.weeklySubmissions || 0));
-    else if (sortBy === "fine") list.sort((a, b) => (b.fine || 0) - (a.fine || 0));
-    else if (sortBy === "name") list.sort((a, b) => (a.registeredName || a.name || "").localeCompare(b.registeredName || b.name || ""));
+    if (search) { const s=search.toLowerCase(); list=list.filter(u=>(u.registeredName||u.name||"").toLowerCase().includes(s)||(u.phone||"").includes(s)); }
+    if (sortBy==="streak") list.sort((a,b)=>(b.streak||0)-(a.streak||0));
+    else if (sortBy==="weekly") list.sort((a,b)=>(b.weeklySubmissions||0)-(a.weeklySubmissions||0));
+    else if (sortBy==="fine") list.sort((a,b)=>(b.fine||0)-(a.fine||0));
+    else list.sort((a,b)=>(a.registeredName||a.name||"").localeCompare(b.registeredName||b.name||""));
     return list;
   }, [users, search, sortBy]);
 
-  // Improvement data: first vs latest score per user
-  const improvementData = useMemo(() => {
-    return users.map(u => {
-      const scores = allScores[u.phone] || [];
-      return {
-        name: (u.registeredName || u.name || u.phone || "?").slice(0, 10),
-        phone: u.phone,
-        sessions: scores.length,
-        fluencyDelta: delta(scores, "fluency"),
-        grammarDelta: delta(scores, "grammar"),
-        confidenceDelta: delta(scores, "confidence"),
-        vocabularyDelta: delta(scores, "vocabulary"),
-        avgFluency: avg(scores, "fluency"),
-        avgGrammar: avg(scores, "grammar"),
-        avgConfidence: avg(scores, "confidence"),
-        avgVocabulary: avg(scores, "vocabulary"),
-      };
-    }).filter(u => u.sessions > 0).sort((a, b) => {
-      const aTotal = [a.fluencyDelta, a.grammarDelta, a.confidenceDelta, a.vocabularyDelta].filter(Boolean).reduce((s, v) => s + v, 0);
-      const bTotal = [b.fluencyDelta, b.grammarDelta, b.confidenceDelta, b.vocabularyDelta].filter(Boolean).reduce((s, v) => s + v, 0);
-      return bTotal - aTotal;
-    });
-  }, [users, allScores]);
+  const improvementData = useMemo(() => users.map(u => {
+    const s = allScores[u.phone]||[];
+    return { name:(u.registeredName||u.name||u.phone||"?").slice(0,10), phone:u.phone, sessions:s.length,
+      fd:delta(s,"fluency"), gd:delta(s,"grammar"), cd:delta(s,"confidence"), vd:delta(s,"vocabulary"),
+      af:avg(s,"fluency"), ag:avg(s,"grammar") };
+  }).filter(u=>u.sessions>0).sort((a,b)=>{
+    const ta=[a.fd,a.gd,a.cd,a.vd].filter(Boolean).reduce((s,v)=>s+v,0);
+    const tb=[b.fd,b.gd,b.cd,b.vd].filter(Boolean).reduce((s,v)=>s+v,0);
+    return tb-ta;
+  }), [users, allScores]);
 
-  // Compare bar data: avg scores per user
-  const compareData = useMemo(() => {
-    return users.map(u => {
-      const scores = allScores[u.phone] || [];
-      return {
-        name: (u.registeredName || u.name || u.phone || "?").slice(0, 8),
-        Fluency: avg(scores, "fluency"),
-        Grammar: avg(scores, "grammar"),
-        Confidence: avg(scores, "confidence"),
-        Vocabulary: avg(scores, "vocabulary"),
-        sessions: scores.length,
-      };
-    }).filter(u => u.sessions > 0);
-  }, [users, allScores]);
+  const compareData = useMemo(() => users.map(u => {
+    const s=allScores[u.phone]||[];
+    return { name:(u.registeredName||u.name||"?").slice(0,8), Fluency:avg(s,"fluency"), Grammar:avg(s,"grammar"), Confidence:avg(s,"confidence"), Vocabulary:avg(s,"vocabulary"), sessions:s.length };
+  }).filter(u=>u.sessions>0), [users, allScores]);
 
-  if (loading) return <Layout title="Trainer Dashboard"><p className={styles.loading}>Loading…</p></Layout>;
+  if (loading) return <Layout title="Trainer Dashboard"><div className="flex justify-center py-24"><div className="w-10 h-10 border-2 border-[#252545] border-t-[#7c6fff] rounded-full animate-spin"/></div></Layout>;
 
-  const selectedScores = selected ? (allScores[selected.phone] || []) : [];
-  const chartData = selectedScores.map((s, i) => ({
-    session: `#${i + 1}`,
-    Fluency: s.fluency,
-    Grammar: s.grammar,
-    Confidence: s.confidence,
-    Vocabulary: s.vocabulary,
-  }));
-  const latest = selectedScores.slice(-1)[0];
-  const radarData = latest ? [
-    { subject: "Fluency", score: latest.fluency || 0 },
-    { subject: "Grammar", score: latest.grammar || 0 },
-    { subject: "Confidence", score: latest.confidence || 0 },
-    { subject: "Vocabulary", score: latest.vocabulary || 0 },
-  ] : [];
+  const selScores = selected ? (allScores[selected.phone]||[]) : [];
+  const latest = selScores.slice(-1)[0];
+  const radarData = latest ? Object.entries(SCORE_COLORS).map(([k])=>({subject:k, score:latest[k.toLowerCase()]||0})) : [];
+  const chartData = selScores.map((s,i)=>({session:`#${i+1}`, Fluency:s.fluency, Grammar:s.grammar, Confidence:s.confidence, Vocabulary:s.vocabulary}));
+
+  const DeltaBadge = ({v}) => v==null ? <span className="text-[#8888aa]">—</span>
+    : <span className={`font-bold ${v>0?"text-[#4ade80]":v<0?"text-[#f87171]":"text-[#8888aa]"}`}>{v>0?`+${v}`:v}</span>;
 
   return (
     <Layout title="Trainer Dashboard">
-      <div className={styles.grid4}>
-        <StatCard icon="👥" label="Total Students" value={dashboard?.stats?.total || 0} color="#6c63ff" />
-        <StatCard icon="✅" label="Submitted Today" value={dashboard?.stats?.completed || 0} color="#4ade80" />
-        <StatCard icon="❌" label="Pending Today" value={dashboard?.stats?.pending || 0} color="#f87171" />
-        <StatCard icon="💸" label="Total Fines" value={`₹${dashboard?.stats?.totalFines || 0}`} color="#facc15" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard icon="👥" label="Total Students"  value={dashboard?.stats?.total||0}     color="#7c6fff"/>
+        <StatCard icon="✅" label="Submitted Today" value={dashboard?.stats?.completed||0} color="#4ade80"/>
+        <StatCard icon="❌" label="Pending Today"   value={dashboard?.stats?.pending||0}   color="#f87171"/>
+        <StatCard icon="💸" label="Total Fines"     value={`₹${dashboard?.stats?.totalFines||0}`} color="#fbbf24"/>
       </div>
 
-      <div className={styles.tabs}>
-        {TABS.map(t => (
-          <button key={t.id} className={`${styles.tab} ${tab === t.id ? styles.active : ""}`} onClick={() => handleTabChange(t.id)}>
+      <div className="flex gap-1.5 flex-wrap mb-6">
+        {TABS.map(t=>(
+          <button key={t.id} onClick={()=>handleTab(t.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab===t.id?"bg-[#7c6fff] text-white":"bg-[#16162a] border border-[#252545] text-[#8888aa] hover:text-[#e8e8f4] hover:border-[#353560]"}`}>
             {t.label}
           </button>
         ))}
         {selected && (
-          <button className={`${styles.tab} ${tab === "student-detail" ? styles.active : ""}`} onClick={() => setTab("student-detail")}>
-            📈 {(selected.registeredName || selected.name || selected.phone || "").slice(0, 12)}
+          <button onClick={()=>setTab("detail")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==="detail"?"bg-[#7c6fff] text-white":"bg-[#16162a] border border-[#252545] text-[#8888aa] hover:text-[#e8e8f4]"}`}>
+            📈 {(selected.registeredName||selected.name||selected.phone||"").slice(0,12)}
           </button>
         )}
       </div>
 
-      {/* ── OVERVIEW ── */}
-      {tab === "overview" && (
+      {/* OVERVIEW */}
+      {tab==="overview" && (
         <>
           {dashboard?.today?.question && (
-            <div className={styles.todayCard} style={{ marginBottom: "1.5rem" }}>
-              <p className={styles.todayLabel}>📌 Today's Question</p>
-              <p className={styles.todayQ}>{dashboard.today.question}</p>
-              {dashboard.today.topic && <span className={styles.topic}>{dashboard.today.topic}</span>}
+            <div className="mb-6 rounded-2xl p-5 border border-[#7c6fff]/30" style={{background:"linear-gradient(135deg,rgba(124,111,255,0.1),rgba(255,107,157,0.05))"}}>
+              <p className="text-xs text-[#8888aa] mb-2">📌 TODAY'S QUESTION</p>
+              <p className="text-[#e8e8f4] font-semibold">{dashboard.today.question}</p>
             </div>
           )}
-          <div className={styles.grid2}>
-            <div className={styles.chartCard} style={{ margin: 0 }}>
-              <h3 className={styles.sectionTitle}>🏆 Top Streaks</h3>
-              <div className={styles.streakList}>
-                {(dashboard?.topStreak || []).map((u, i) => (
-                  <div key={i} className={styles.streakRow}>
-                    <span className={styles.rank}>{["🥇","🥈","🥉"][i] || `${i+1}.`}</span>
-                    <span className={styles.streakName}>{u.name || u.userId?.split("@")[0]}</span>
-                    <span className={styles.streakVal}>🔥 {u.streak} days</span>
-                    <span style={{ fontSize: "0.78rem", color: "var(--text2)" }}>{u.weeklySubmissions}/7</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <SectionTitle>🏆 Top Streaks</SectionTitle>
+              <div className="space-y-2">
+                {(dashboard?.topStreak||[]).map((u,i)=>(
+                  <div key={i} className="flex items-center gap-3 bg-[#111122] rounded-xl px-4 py-2.5">
+                    <span className="text-lg w-7">{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
+                    <span className="flex-1 text-sm text-[#e8e8f4]">{u.name||u.userId?.split("@")[0]}</span>
+                    <span className="text-sm text-[#fbbf24] font-semibold">🔥 {u.streak}</span>
+                    <span className="text-xs text-[#8888aa]">{u.weeklySubmissions}/7</span>
                   </div>
                 ))}
               </div>
-            </div>
-            <div className={styles.chartCard} style={{ margin: 0 }}>
-              <h3 className={styles.sectionTitle}>Today's Status</h3>
-              <div className={styles.streakList}>
-                {users.map((u, i) => (
-                  <div key={i} className={styles.streakRow}>
-                    <div className={styles.avatar} style={{ width: 28, height: 28, fontSize: "0.75rem" }}>
-                      {(u.registeredName || u.name || "?")[0].toUpperCase()}
+            </Card>
+            <Card>
+              <SectionTitle>Today's Status</SectionTitle>
+              <div className="space-y-2">
+                {users.map((u,i)=>(
+                  <div key={i} className="flex items-center gap-3 bg-[#111122] rounded-xl px-4 py-2.5">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#7c6fff] to-[#ff6b9d] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      {(u.registeredName||u.name||"?")[0].toUpperCase()}
                     </div>
-                    <span className={styles.streakName}>{u.registeredName || u.name || u.phone}</span>
-                    <span style={{ color: u.completed ? "var(--success)" : "var(--danger)", fontSize: "0.85rem", fontWeight: 600 }}>
-                      {u.completed ? "✅" : "⏳"}
-                    </span>
+                    <span className="flex-1 text-sm text-[#e8e8f4]">{u.registeredName||u.name||u.phone}</span>
+                    <span className={`text-sm font-semibold ${u.completed?"text-[#4ade80]":"text-[#f87171]"}`}>{u.completed?"✅":"⏳"}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           </div>
         </>
       )}
 
-      {/* ── STUDENTS ── */}
-      {tab === "students" && (
+      {/* STUDENTS */}
+      {tab==="students" && (
         <>
-          <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-            <input className={styles.searchInput} placeholder="Search students…" value={search} onChange={e => setSearch(e.target.value)} />
-            <select className={styles.searchInput} style={{ width: "auto" }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
-              <option value="streak">Sort: Streak</option>
-              <option value="weekly">Sort: Weekly</option>
-              <option value="fine">Sort: Fine</option>
-              <option value="name">Sort: Name</option>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search students…"
+              className="bg-[#111122] border border-[#252545] rounded-xl px-3 py-2 text-[#e8e8f4] text-sm placeholder-[#444466] focus:border-[#7c6fff] transition-colors w-52"/>
+            <select value={sortBy} onChange={e=>setSortBy(e.target.value)}
+              className="bg-[#111122] border border-[#252545] rounded-xl px-3 py-2 text-[#8888aa] text-sm focus:border-[#7c6fff] transition-colors">
+              {[["streak","Streak"],["weekly","Weekly"],["fine","Fine"],["name","Name"]].map(([v,l])=><option key={v} value={v}>Sort: {l}</option>)}
             </select>
           </div>
-          <div className={styles.grid2}>
-            {filteredUsers.map(u => (
-              <div key={u.userId} className={styles.userCard} onClick={() => selectUser(u)}>
-                <div className={styles.avatar}>{(u.registeredName || u.name || "?")[0].toUpperCase()}</div>
-                <div className={styles.userInfo}>
-                  <p className={styles.userName}>{u.registeredName || u.name || u.phone}</p>
-                  <p className={styles.userMeta}>
-                    🔥 {u.streak || 0} streak &nbsp;·&nbsp; {u.weeklySubmissions || 0}/7 this week &nbsp;·&nbsp; ₹{u.fine || 0} fine
-                  </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {filteredUsers.map(u=>(
+              <div key={u.userId} onClick={()=>selectUser(u)}
+                className="bg-[#16162a] border border-[#252545] rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:border-[#7c6fff] transition-all group">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#7c6fff] to-[#ff6b9d] flex items-center justify-center text-white font-bold text-base shrink-0">
+                  {(u.registeredName||u.name||"?")[0].toUpperCase()}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.25rem" }}>
-                  <span style={{ color: u.completed ? "var(--success)" : "var(--danger)", fontSize: "1.1rem" }}>
-                    {u.completed ? "✅" : "⏳"}
-                  </span>
-                  <span style={{ fontSize: "0.7rem", color: "var(--primary)" }}>View →</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#e8e8f4] truncate">{u.registeredName||u.name||u.phone}</p>
+                  <p className="text-xs text-[#8888aa] mt-0.5">🔥 {u.streak||0} · {u.weeklySubmissions||0}/7 · ₹{u.fine||0}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`text-lg ${u.completed?"text-[#4ade80]":"text-[#f87171]"}`}>{u.completed?"✅":"⏳"}</span>
+                  <span className="text-xs text-[#7c6fff] opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
                 </div>
               </div>
             ))}
@@ -249,218 +196,165 @@ export default function TrainerDashboard() {
         </>
       )}
 
-      {/* ── COMPARE ── */}
-      {tab === "compare" && (
-        <>
-          {scoresLoading ? (
-            <p className={styles.loading}>Loading all scores…</p>
-          ) : compareData.length === 0 ? (
-            <div className={styles.emptyChart}><p>No feedback scores available yet.</p></div>
-          ) : (
-            <>
-              {["Fluency","Grammar","Confidence","Vocabulary"].map(metric => (
-                <div key={metric} className={styles.chartCard}>
-                  <h3 className={styles.sectionTitle}>{metric} — All Students (avg)</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={compareData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" />
-                      <XAxis dataKey="name" stroke="#9090b0" fontSize={11} />
-                      <YAxis domain={[0, 10]} stroke="#9090b0" fontSize={11} />
-                      <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                      <Bar dataKey={metric} fill={SCORE_COLORS[metric]} radius={[4,4,0,0]}>
-                        {compareData.map((_, i) => <Cell key={i} fill={SCORE_COLORS[metric]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ))}
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── IMPROVEMENT ── */}
-      {tab === "improvement" && (
-        <>
-          {scoresLoading ? (
-            <p className={styles.loading}>Loading scores…</p>
-          ) : improvementData.length === 0 ? (
-            <div className={styles.emptyChart}><p>No feedback scores available yet.</p></div>
-          ) : (
-            <>
-              <div className={styles.chartCard}>
-                <h3 className={styles.sectionTitle}>Score Improvement (First → Latest session)</h3>
-                <p style={{ fontSize: "0.8rem", color: "var(--text2)", marginBottom: "1rem" }}>
-                  Green = improved · Red = declined · — = only 1 session
-                </p>
-                <div style={{ overflowX: "auto" }}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>Student</th><th>Sessions</th>
-                        <th>Fluency Δ</th><th>Grammar Δ</th><th>Confidence Δ</th><th>Vocabulary Δ</th>
-                        <th>Avg Fluency</th><th>Avg Grammar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {improvementData.map((u, i) => (
-                        <tr key={i} style={{ cursor: "pointer" }} onClick={() => selectUser(users.find(x => x.phone === u.phone) || {})}>
-                          <td style={{ fontWeight: 500 }}>{u.name}</td>
-                          <td style={{ color: "var(--text2)" }}>{u.sessions}</td>
-                          {["fluencyDelta","grammarDelta","confidenceDelta","vocabularyDelta"].map(k => (
-                            <td key={k} style={{ color: u[k] == null ? "var(--text2)" : u[k] > 0 ? "var(--success)" : u[k] < 0 ? "var(--danger)" : "var(--text2)", fontWeight: 600 }}>
-                              {u[k] == null ? "—" : u[k] > 0 ? `+${u[k]}` : u[k]}
-                            </td>
-                          ))}
-                          <td>{u.avgFluency ?? "—"}</td>
-                          <td>{u.avgGrammar ?? "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className={styles.chartCard}>
-                <h3 className={styles.sectionTitle}>Most Improved Students</h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={improvementData.slice(0, 10).map(u => ({
-                    name: u.name,
-                    total: [u.fluencyDelta, u.grammarDelta, u.confidenceDelta, u.vocabularyDelta]
-                      .filter(Boolean).reduce((s, v) => s + v, 0).toFixed(1),
-                  }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" />
-                    <XAxis dataKey="name" stroke="#9090b0" fontSize={11} />
-                    <YAxis stroke="#9090b0" fontSize={11} />
-                    <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                    <Bar dataKey="total" name="Total Improvement" radius={[4,4,0,0]}>
-                      {improvementData.slice(0, 10).map((u, i) => {
-                        const total = [u.fluencyDelta, u.grammarDelta, u.confidenceDelta, u.vocabularyDelta].filter(Boolean).reduce((s, v) => s + v, 0);
-                        return <Cell key={i} fill={total >= 0 ? "#4ade80" : "#f87171"} />;
-                      })}
+      {/* COMPARE */}
+      {tab==="compare" && (
+        scoresLoading ? <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-[#252545] border-t-[#7c6fff] rounded-full animate-spin"/></div>
+        : compareData.length===0 ? <Card className="text-center py-12 text-[#8888aa]">No feedback scores available yet.</Card>
+        : <div className="space-y-4">
+            {Object.entries(SCORE_COLORS).map(([metric,color])=>(
+              <Card key={metric}>
+                <SectionTitle>{metric} — All Students (avg)</SectionTitle>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={compareData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
+                    <XAxis dataKey="name" stroke="#8888aa" fontSize={11}/>
+                    <YAxis domain={[0,10]} stroke="#8888aa" fontSize={11}/>
+                    <Tooltip contentStyle={tt}/>
+                    <Bar dataKey={metric} fill={color} radius={[4,4,0,0]}>
+                      {compareData.map((_,i)=><Cell key={i} fill={color}/>)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
-            </>
-          )}
-        </>
+              </Card>
+            ))}
+          </div>
       )}
 
-      {/* ── STUDENT DETAIL ── */}
-      {tab === "student-detail" && selected && (
-        <>
-          <div className={styles.grid4}>
-            <StatCard icon="🔥" label="Streak" value={`${selected.streak || 0} days`} color="#f97316" />
-            <StatCard icon="💸" label="Fine" value={`₹${selected.fine || 0}`} color="#f87171" />
-            <StatCard icon="📹" label="Total Sessions" value={selectedScores.length} color="#6c63ff" />
-            <StatCard icon="📅" label="This Week" value={`${selected.weeklySubmissions || 0}/7`} color="#4ade80" />
-          </div>
+      {/* IMPROVEMENT */}
+      {tab==="improvement" && (
+        scoresLoading ? <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-[#252545] border-t-[#7c6fff] rounded-full animate-spin"/></div>
+        : improvementData.length===0 ? <Card className="text-center py-12 text-[#8888aa]">No feedback scores available yet.</Card>
+        : <>
+            <Card className="mb-4">
+              <SectionTitle>Score Improvement (First → Latest)</SectionTitle>
+              <p className="text-xs text-[#8888aa] mb-4">Green = improved · Red = declined · — = only 1 session</p>
+              <div className="overflow-x-auto">
+                <table className="w-full"><thead><tr>{["Student","Sessions","Fluency Δ","Grammar Δ","Confidence Δ","Vocabulary Δ","Avg Fluency","Avg Grammar"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                  <tbody>{improvementData.map((u,i)=>(
+                    <tr key={i} className="hover:bg-[#7c6fff]/5 transition-colors cursor-pointer" onClick={()=>selectUser(users.find(x=>x.phone===u.phone)||{})}>
+                      <Td className="text-[#e8e8f4] font-medium">{u.name}</Td>
+                      <Td className="text-[#8888aa]">{u.sessions}</Td>
+                      {[u.fd,u.gd,u.cd,u.vd].map((v,j)=><Td key={j}><DeltaBadge v={v}/></Td>)}
+                      <Td className="text-[#8888aa]">{u.af??"-"}</Td>
+                      <Td className="text-[#8888aa]">{u.ag??"-"}</Td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </Card>
+            <Card>
+              <SectionTitle>Most Improved</SectionTitle>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={improvementData.slice(0,10).map(u=>({name:u.name,total:+[u.fd,u.gd,u.cd,u.vd].filter(Boolean).reduce((s,v)=>s+v,0).toFixed(1)}))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
+                  <XAxis dataKey="name" stroke="#8888aa" fontSize={11}/>
+                  <YAxis stroke="#8888aa" fontSize={11}/>
+                  <Tooltip contentStyle={tt}/>
+                  <Bar dataKey="total" name="Total Improvement" radius={[4,4,0,0]}>
+                    {improvementData.slice(0,10).map((u,i)=>{
+                      const t=[u.fd,u.gd,u.cd,u.vd].filter(Boolean).reduce((s,v)=>s+v,0);
+                      return <Cell key={i} fill={t>=0?"#4ade80":"#f87171"}/>;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </>
+      )}
 
-          <div className={styles.grid4} style={{ marginBottom: "1.5rem" }}>
-            {["fluency","grammar","confidence","vocabulary"].map(k => (
-              <StatCard
-                key={k}
-                icon={k === "fluency" ? "🗣️" : k === "grammar" ? "📝" : k === "confidence" ? "💪" : "📚"}
-                label={`Avg ${k.charAt(0).toUpperCase() + k.slice(1)}`}
-                value={avg(selectedScores, k) ?? "—"}
-                color={Object.values(SCORE_COLORS)[["fluency","grammar","confidence","vocabulary"].indexOf(k)]}
-              />
+      {/* STUDENT DETAIL */}
+      {tab==="detail" && selected && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <StatCard icon="🔥" label="Streak"       value={`${selected.streak||0} days`}          color="#f97316"/>
+            <StatCard icon="💸" label="Fine"          value={`₹${selected.fine||0}`}               color="#f87171"/>
+            <StatCard icon="📹" label="Sessions"      value={selScores.length}                      color="#7c6fff"/>
+            <StatCard icon="📅" label="This Week"     value={`${selected.weeklySubmissions||0}/7`}  color="#4ade80"/>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            {Object.entries(SCORE_COLORS).map(([k,c])=>(
+              <StatCard key={k} icon={k==="Fluency"?"🗣️":k==="Grammar"?"📝":k==="Confidence"?"💪":"📚"}
+                label={`Avg ${k}`} value={avg(selScores,k.toLowerCase())??"-"} color={c}/>
             ))}
           </div>
 
-          {radarData.length > 0 && (
-            <div className={styles.grid2} style={{ marginBottom: "1.5rem" }}>
-              <div className={styles.chartCard} style={{ margin: 0 }}>
-                <h3 className={styles.sectionTitle}>Latest Session Radar</h3>
+          {radarData.length>0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <Card>
+                <SectionTitle>Latest Session Radar</SectionTitle>
                 <ResponsiveContainer width="100%" height={220}>
                   <RadarChart data={radarData}>
-                    <PolarGrid stroke="#2a2a4a" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: "#9090b0", fontSize: 12 }} />
-                    <Radar dataKey="score" stroke="#6c63ff" fill="#6c63ff" fillOpacity={0.3} />
+                    <PolarGrid stroke="#252545"/>
+                    <PolarAngleAxis dataKey="subject" tick={{fill:"#8888aa",fontSize:12}}/>
+                    <Radar dataKey="score" stroke="#7c6fff" fill="#7c6fff" fillOpacity={0.25}/>
                   </RadarChart>
                 </ResponsiveContainer>
-              </div>
-              <div className={styles.chartCard} style={{ margin: 0 }}>
-                <h3 className={styles.sectionTitle}>Latest Scores</h3>
-                {radarData.map(r => (
-                  <div key={r.subject} style={{ marginBottom: "0.75rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                      <span style={{ fontSize: "0.85rem", color: "var(--text2)" }}>{r.subject}</span>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: r.score >= 7 ? "var(--success)" : r.score >= 5 ? "var(--warning)" : "var(--danger)" }}>
-                        {r.score}/10
-                      </span>
+              </Card>
+              <Card>
+                <SectionTitle>Latest Scores</SectionTitle>
+                {radarData.map(r=>(
+                  <div key={r.subject} className="mb-4">
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-sm text-[#8888aa]">{r.subject}</span>
+                      <span className="text-sm font-bold" style={{color:r.score>=7?"#4ade80":r.score>=5?"#fbbf24":"#f87171"}}>{r.score}/10</span>
                     </div>
-                    <div className={styles.barTrack}>
-                      <div className={styles.barFill} style={{ width: `${r.score * 10}%`, background: SCORE_COLORS[r.subject] }} />
+                    <div className="h-2 bg-[#111122] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{width:`${r.score*10}%`,background:SCORE_COLORS[r.subject]}}/>
                     </div>
                   </div>
                 ))}
-
-                {selectedScores.length >= 2 && (
-                  <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--border)" }}>
-                    <p style={{ fontSize: "0.8rem", color: "var(--text2)", marginBottom: "0.5rem" }}>Improvement (first → latest)</p>
-                    {["fluency","grammar","confidence","vocabulary"].map(k => {
-                      const d = delta(selectedScores, k);
-                      return (
-                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", marginBottom: "0.25rem" }}>
-                          <span style={{ color: "var(--text2)", textTransform: "capitalize" }}>{k}</span>
-                          <span style={{ fontWeight: 600, color: d == null ? "var(--text2)" : d > 0 ? "var(--success)" : d < 0 ? "var(--danger)" : "var(--text2)" }}>
-                            {d == null ? "—" : d > 0 ? `+${d}` : d}
-                          </span>
-                        </div>
-                      );
+                {selScores.length>=2 && (
+                  <div className="mt-4 pt-4 border-t border-[#252545]">
+                    <p className="text-xs text-[#8888aa] mb-2">Improvement (first → latest)</p>
+                    {Object.keys(SCORE_COLORS).map(k=>{
+                      const d=delta(selScores,k.toLowerCase());
+                      return <div key={k} className="flex justify-between text-xs mb-1">
+                        <span className="text-[#8888aa]">{k}</span>
+                        <span className={`font-bold ${d==null?"text-[#8888aa]":d>0?"text-[#4ade80]":d<0?"text-[#f87171]":"text-[#8888aa]"}`}>
+                          {d==null?"—":d>0?`+${d}`:d}
+                        </span>
+                      </div>;
                     })}
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           )}
 
-          {chartData.length > 0 ? (
-            <div className={styles.chartCard}>
-              <h3 className={styles.sectionTitle}>Full Score History — {selected.registeredName || selected.name}</h3>
+          {chartData.length>0 && (
+            <Card className="mb-6">
+              <SectionTitle>Score History — {selected.registeredName||selected.name}</SectionTitle>
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a4a" />
-                  <XAxis dataKey="session" stroke="#9090b0" fontSize={12} />
-                  <YAxis domain={[0, 10]} stroke="#9090b0" fontSize={12} />
-                  <Tooltip contentStyle={{ background: "#1e1e35", border: "1px solid #2a2a4a", borderRadius: 8 }} />
-                  <Legend />
-                  {Object.entries(SCORE_COLORS).map(([key, color]) => (
-                    <Line key={key} type="monotone" dataKey={key} stroke={color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
+                  <XAxis dataKey="session" stroke="#8888aa" fontSize={11}/>
+                  <YAxis domain={[0,10]} stroke="#8888aa" fontSize={11}/>
+                  <Tooltip contentStyle={tt}/><Legend/>
+                  {Object.entries(SCORE_COLORS).map(([k,c])=>(
+                    <Line key={k} type="monotone" dataKey={k} stroke={c} strokeWidth={2} dot={{r:3}} activeDot={{r:5}}/>
                   ))}
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className={styles.emptyChart}>
-              <p>No feedback scores yet for this student.</p>
-            </div>
+            </Card>
           )}
 
-          {selectedScores.length > 0 && (
-            <div className={styles.chartCard}>
-              <h3 className={styles.sectionTitle}>Session History</h3>
-              <div style={{ overflowX: "auto" }}>
-                <table className={styles.table}>
-                  <thead><tr><th>#</th><th>Date</th><th>Fluency</th><th>Grammar</th><th>Confidence</th><th>Vocabulary</th></tr></thead>
-                  <tbody>
-                    {[...selectedScores].reverse().map((s, i) => (
-                      <tr key={i}>
-                        <td style={{ color: "var(--text2)" }}>{selectedScores.length - i}</td>
-                        <td style={{ color: "var(--text2)", fontSize: "0.8rem" }}>{s.date ? new Date(s.date).toLocaleDateString("en-IN") : "—"}</td>
-                        {["fluency","grammar","confidence","vocabulary"].map(k => (
-                          <td key={k} style={{ fontWeight: 600, color: (s[k] || 0) >= 7 ? "var(--success)" : (s[k] || 0) >= 5 ? "var(--warning)" : "var(--danger)" }}>
-                            {s[k] ?? "—"}/10
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
+          {selScores.length>0 && (
+            <Card>
+              <SectionTitle>Session History</SectionTitle>
+              <div className="overflow-x-auto">
+                <table className="w-full"><thead><tr>{["#","Date","Fluency","Grammar","Confidence","Vocabulary"].map(h=><Th key={h}>{h}</Th>)}</tr></thead>
+                  <tbody>{[...selScores].reverse().map((s,i)=>(
+                    <tr key={i} className="hover:bg-[#7c6fff]/5 transition-colors">
+                      <Td className="text-[#8888aa]">{selScores.length-i}</Td>
+                      <Td className="text-[#8888aa] text-xs">{s.date?new Date(s.date).toLocaleDateString("en-IN"):"—"}</Td>
+                      {["fluency","grammar","confidence","vocabulary"].map(k=>(
+                        <Td key={k} className="font-semibold" style={{color:(s[k]||0)>=7?"#4ade80":(s[k]||0)>=5?"#fbbf24":"#f87171"}}>{s[k]??"-"}/10</Td>
+                      ))}
+                    </tr>
+                  ))}</tbody>
                 </table>
               </div>
-            </div>
+            </Card>
           )}
         </>
       )}
