@@ -12,6 +12,7 @@ import { getRedisClient, isRedisAvailable } from "../../redis.js";
 const router = express.Router();
 const TTL = 86400; // 24 hours in seconds
 const MAX_MESSAGES = 200; // keep last 200 messages per room
+const GROUP_ROOM = "chat:group"; // single shared group room
 
 /** Canonical room key — sorted so both sides resolve the same key */
 function roomKey(phoneA, phoneB) {
@@ -29,6 +30,20 @@ async function getMessages(redis, key) {
 async function saveMessages(redis, key, messages) {
   await redis.set(key, JSON.stringify(messages), "EX", TTL);
 }
+
+// GET /api/chat/group — load group chat history
+router.get("/group", authMiddleware, async (req, res) => {
+  try {
+    if (!isRedisAvailable()) {
+      return res.status(503).json({ error: "Chat unavailable — Redis not connected" });
+    }
+    const redis = getRedisClient();
+    const messages = await getMessages(redis, GROUP_ROOM);
+    res.json({ messages, room: GROUP_ROOM });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/chat/trainers — user: list available trainers to DM
 router.get("/trainers", authMiddleware, async (req, res) => {
@@ -75,5 +90,5 @@ router.get("/:peerPhone", authMiddleware, async (req, res) => {
   }
 });
 
-export { roomKey, getMessages, saveMessages, MAX_MESSAGES, TTL };
+export { roomKey, getMessages, saveMessages, MAX_MESSAGES, TTL, GROUP_ROOM };
 export default router;

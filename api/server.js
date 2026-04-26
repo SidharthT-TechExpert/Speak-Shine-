@@ -9,7 +9,7 @@ import { Server as SocketIO } from "socket.io";
 import jwt from "jsonwebtoken";
 import { connectDB } from "../db.js";
 import { getRedisClient, isRedisAvailable } from "../redis.js";
-import { roomKey, getMessages, saveMessages, MAX_MESSAGES } from "./routes/chat.js";
+import { roomKey, getMessages, saveMessages, MAX_MESSAGES, GROUP_ROOM } from "./routes/chat.js";
 
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
@@ -64,6 +64,48 @@ io.on("connection", (socket) => {
   const { phone, name, role } = socket.user;
   onlineUsers.set(phone, socket.id);
   console.log(`[Chat] Connected: ${name} (${role})`);
+
+  // ── Auto-join group room ────────────────────────────────────────────────
+  socket.join(GROUP_ROOM);
+
+  // ── Join group chat (load history) ─────────────────────────────────────
+  socket.on("group:join", async () => {
+    if (isRedisAvailable()) {
+      const redis = getRedisClient();
+      const messages = await getMessages(redis, GROUP_ROOM);
+      socket.emit("group:history", { messages });
+    }
+  });
+
+  // ── Send group message ──────────────────────────────────────────────────
+  socket.on("group:send", async ({ text, replyTo }) => {
+    if (!text?.trim()) return;
+
+    const message = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      from: phone,
+      fromName: name,
+      role,
+      text: text.trim(),
+      ts: Date.now(),
+      replyTo: replyTo || null, // { id, fromName, text }
+    };
+
+    if (isRedisAvailable()) {
+      const redis = getRedisClient();
+      const messages = await getMessages(redis, GROUP_ROOM);
+      messages.push(message);
+      if (messages.length > MAX_MESSAGES) messages.splice(0, messages.length - MAX_MESSAGES);
+      await saveMessages(redis, GROUP_ROOM, messages);
+    }
+
+    io.to(GROUP_ROOM).emit("group:message", { message });
+  });
+
+  // ── Group typing indicator ──────────────────────────────────────────────
+  socket.on("group:typing", ({ isTyping }) => {
+    socket.to(GROUP_ROOM).emit("group:typing", { from: phone, fromName: name, isTyping });
+  });
 
   // ── Join a DM room with a peer ──────────────────────────────────────────
   socket.on("chat:join", async ({ peerPhone }) => {

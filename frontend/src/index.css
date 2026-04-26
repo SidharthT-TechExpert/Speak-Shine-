@@ -691,3 +691,106 @@ input, select, textarea { font-family: inherit; outline: none; -webkit-appearanc
   color: rgba(255,255,255,0.25);
   padding: 4px 0 6px;
 }
+
+/* ── Group Chat extras ──────────────────────────────────────────────────── */
+
+.group-chat-window {
+  width: 360px;
+  height: 500px;
+}
+
+.group-avatar {
+  background: linear-gradient(135deg, #6c63ff, #f59e0b);
+  font-size: 18px;
+}
+
+.group-sender-name {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 3px;
+  letter-spacing: 0.02em;
+}
+
+/* Reply preview inside bubble */
+.group-reply-preview {
+  background: rgba(0,0,0,0.25);
+  border-left: 3px solid rgba(255,255,255,0.3);
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-bottom: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.group-reply-name { font-size: 10px; font-weight: 700; color: #a78bfa; }
+.group-reply-text { font-size: 11px; color: rgba(255,255,255,0.6); }
+
+/* Reply button on bubble */
+.group-reply-btn {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.08);
+  border: none;
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.chat-bubble:hover .group-reply-btn { display: flex; }
+.chat-bubble { position: relative; }
+
+/* Reply bar above input */
+.group-reply-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(108,99,255,0.12);
+  border-top: 1px solid rgba(108,99,255,0.2);
+}
+.group-reply-bar-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+.group-reply-bar .group-reply-name { font-size: 11px; font-weight: 700; color: #a78bfa; }
+.group-reply-bar .group-reply-text {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group-reply-cancel {
+  background: none; border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer; font-size: 14px; padding: 2px 4px;
+}
+.group-reply-cancel:hover { color: #fff; }
+
+/* Divider in peer list */
+.chat-peer-divider {
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  margin-top: 2px;
+}
+
+/* Group entry highlight */
+.group-entry {
+  background: rgba(108,99,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.group-entry:hover { background: rgba(108,99,255,0.15) !important; }
