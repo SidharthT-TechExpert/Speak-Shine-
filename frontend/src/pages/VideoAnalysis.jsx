@@ -291,14 +291,14 @@ function RecordCard({ onAnalysisStarted }) {
   const chunksRef       = useRef([]);
   const timerRef        = useRef(null);
   const countdownRef    = useRef(null);
+  const pendingBlobRef  = useRef(null); // holds blob until preview video mounts
 
   const MAX_SECONDS = 300; // 5 min hard cap
 
-  // Enumerate devices on mount (need permission first — request then enumerate)
+  // Enumerate devices on mount
   useEffect(() => {
     (async () => {
       try {
-        // Brief permission request so labels are populated
         const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         tmp.getTracks().forEach(t => t.stop());
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -316,6 +316,24 @@ function RecordCard({ onAnalysisStarted }) {
     api.get("/questions/random").then(r => setQuestion(r.data)).catch(() => {});
   }, []);
 
+  // Attach stream to live video once countdown/recording step renders the element
+  useEffect(() => {
+    if ((step === "countdown" || step === "recording") && liveVideoRef.current && streamRef.current) {
+      liveVideoRef.current.srcObject = streamRef.current;
+      liveVideoRef.current.play().catch(() => {});
+    }
+  }, [step]);
+
+  // Attach blob URL to preview video once preview step renders the element
+  useEffect(() => {
+    if (step === "preview" && previewVideoRef.current && pendingBlobRef.current) {
+      const url = URL.createObjectURL(pendingBlobRef.current);
+      previewVideoRef.current.src = url;
+      previewVideoRef.current.load();
+      pendingBlobRef.current = null;
+    }
+  }, [step]);
+
   const cleanup = useCallback(() => {
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
@@ -331,7 +349,8 @@ function RecordCard({ onAnalysisStarted }) {
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      if (liveVideoRef.current) { liveVideoRef.current.srcObject = stream; }
+      // Don't touch liveVideoRef here — it doesn't exist yet.
+      // The useEffect above will attach it once the step re-renders.
       setStep("countdown");
       setCountdown(3);
       let c = 3;
@@ -358,8 +377,8 @@ function RecordCard({ onAnalysisStarted }) {
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType });
+      pendingBlobRef.current = blob; // store for useEffect to pick up after render
       setRecordedBlob(blob);
-      if (previewVideoRef.current) previewVideoRef.current.src = URL.createObjectURL(blob);
       setStep("preview");
       cleanup();
     };
