@@ -5,6 +5,7 @@
 
 import fs from "fs";
 import path from "path";
+import { exec } from "child_process";
 import { generateFeedback } from "./feedback.js";
 
 /**
@@ -90,8 +91,6 @@ export async function processWebVideo(videoPath, userId, phone, displayName, onP
  */
 function getVideoDuration(videoPath) {
   return new Promise((resolve, reject) => {
-    const { exec } = require("child_process");
-    
     exec(
       `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`,
       (err, stdout) => {

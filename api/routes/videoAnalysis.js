@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { authenticateToken } from "../middleware/auth.js";
+import { authMiddleware } from "../middleware/auth.js";
 import VideoReport from "../../models/videoReportSchema.js";
 import User from "../../models/userSchema.js";
 import { processWebVideo } from "../../ai/webVideoProcessor.js";
@@ -29,7 +29,7 @@ const upload = multer({
  * Upload a video for analysis (web-based submission)
  * Returns a report ID that can be used to check status
  */
-router.post("/upload", authenticateToken, upload.single("video"), async (req, res) => {
+router.post("/upload", authMiddleware, upload.single("video"), async (req, res) => {
   let videoPath = null;
   
   try {
@@ -38,7 +38,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     }
 
     videoPath = req.file.path;
-    const userId = req.user.userId; // from JWT token
+    const userId = req.user.id; // from JWT token
     const phone = req.user.phone;
 
     // Get video duration
@@ -86,7 +86,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
  * GET /api/video/report/:reportId
  * Get the analysis report for a specific video submission
  */
-router.get("/report/:reportId", authenticateToken, async (req, res) => {
+router.get("/report/:reportId", authMiddleware, async (req, res) => {
   try {
     const report = await VideoReport.findById(req.params.reportId);
     
@@ -95,7 +95,7 @@ router.get("/report/:reportId", authenticateToken, async (req, res) => {
     }
 
     // Verify ownership
-    if (report.userId.toString() !== req.user.userId) {
+    if (report.userId.toString() !== req.user.id) {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -120,10 +120,10 @@ router.get("/report/:reportId", authenticateToken, async (req, res) => {
  * GET /api/video/my-reports
  * Get all active reports for the current user (not expired)
  */
-router.get("/my-reports", authenticateToken, async (req, res) => {
+router.get("/my-reports", authMiddleware, async (req, res) => {
   try {
     const reports = await VideoReport.find({
-      userId: req.user.userId,
+      userId: req.user.id,
       expiresAt: { $gt: new Date() }, // Only non-expired reports
     })
       .sort({ submittedAt: -1 })
@@ -142,7 +142,7 @@ router.get("/my-reports", authenticateToken, async (req, res) => {
  * DELETE /api/video/report/:reportId
  * Delete a report before it expires (optional — reports auto-delete after 12h)
  */
-router.delete("/report/:reportId", authenticateToken, async (req, res) => {
+router.delete("/report/:reportId", authMiddleware, async (req, res) => {
   try {
     const report = await VideoReport.findById(req.params.reportId);
     
@@ -151,7 +151,7 @@ router.delete("/report/:reportId", authenticateToken, async (req, res) => {
     }
 
     // Verify ownership
-    if (report.userId.toString() !== req.user.userId) {
+    if (report.userId.toString() !== req.user.id) {
       return res.status(403).json({ error: "Access denied" });
     }
 
