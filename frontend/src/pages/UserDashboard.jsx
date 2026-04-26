@@ -52,7 +52,7 @@ export default function UserDashboard() {
 
       {profile && (
         <div className={`status-banner ${profile.completed ? "done" : "pending"}`}>
-          {profile.completed ? "✅ You've submitted today — great work!" : "⏳ Haven't submitted today yet. Send your video on WhatsApp!"}
+          {profile.completed ? "✅ You've submitted today — great work!" : "⏳ Haven't submitted today yet. Send your video on WhatsApp or upload here!"}
         </div>
       )}
 
