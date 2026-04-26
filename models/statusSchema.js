@@ -5,9 +5,10 @@ const statusSchema = new mongoose.Schema({
   notifiedEmpty: { type: Boolean, default: false },
   notifiedLast: { type: Boolean, default: false },
   fineAppliedToday: { type: Boolean, default: false },
-  todayTopic: { type: String, default: null },    // topic (broad subject)
-  todayQuestion: { type: String, default: null }, // actual question asked to members
-  recentCategories: { type: [String], default: [] },  // last 7 used categories (dedup window)
+  todayTopic: { type: String, default: null },
+  todayQuestion: { type: String, default: null },
+  todayPosterImage: { type: String, default: null }, // base64 PNG of today's question poster
+  recentCategories: { type: [String], default: [] },
 }, { timestamps: true });
 
 export default mongoose.model("Status", statusSchema);
