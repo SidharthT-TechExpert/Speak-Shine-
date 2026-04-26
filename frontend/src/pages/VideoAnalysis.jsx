@@ -515,26 +515,18 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           </div>
 
-          {/* Today's question + poster */}
-          {question && (
-            <div style={{ display: "grid", gridTemplateColumns: question.posterImage ? "1fr 200px" : "1fr", gap: "1rem", marginBottom: "1.25rem", alignItems: "start" }}>
-              <div className="today-card" style={{ margin: 0 }}>
-                <div className="today-label">📅 Today's Question</div>
-                {question.topic && (
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginBottom: "0.4rem", fontWeight: 500 }}>
-                    Topic: <span style={{ color: "var(--text2)" }}>{question.topic}</span>
-                  </div>
-                )}
-                <div className="today-q">{question.question}</div>
-                {question.category && <span className="today-topic">{question.category}</span>}
+          {/* Today's poster only — poster already contains topic + question */}
+          {question?.posterImage && (
+            <div style={{ marginBottom: "1.25rem" }}>
+              <div style={{ fontSize: "0.65rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+                📅 Today's Question
               </div>
-              {question.posterImage && (
-                <img src={question.posterImage} alt="Today's poster"
-                  onClick={() => setLightbox(true)}
-                  onMouseOver={e => e.currentTarget.style.transform = "scale(1.04)"}
-                  onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                  style={{ width: "100%", borderRadius: "10px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s" }} />
-              )}
+              <img src={question.posterImage} alt="Today's poster"
+                onClick={() => setLightbox(true)}
+                onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
+              <p style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "center" }}>Click to enlarge</p>
             </div>
           )}
 
@@ -580,36 +572,15 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           </div>
 
-          {/* Question panel */}
+          {/* Side panel — poster only */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {question && (
-              <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
-                <div style={{ fontSize: "0.65rem", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.4rem" }}>
-                  📅 Today's Question
-                </div>
-                {question.topic && (
-                  <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginBottom: "0.5rem" }}>
-                    Topic: <span style={{ color: "var(--text2)", fontWeight: 600 }}>{question.topic}</span>
-                  </div>
-                )}
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.5, marginBottom: "0.6rem" }}>
-                  {question.question}
-                </div>
-                {question.category && (
-                  <span style={{ fontSize: "0.65rem", background: "rgba(124,111,255,0.18)", color: "var(--primary)", padding: "0.2rem 0.55rem", borderRadius: "99px", border: "1px solid rgba(124,111,255,0.25)" }}>
-                    {question.category}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Poster thumbnail during recording */}
+            {/* Poster — click to enlarge */}
             {question?.posterImage && (
               <img src={question.posterImage} alt="Today's poster"
                 onClick={() => setLightbox(true)}
                 onMouseOver={e => e.currentTarget.style.transform = "scale(1.03)"}
                 onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                style={{ width: "100%", borderRadius: "10px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s" }} />
+                style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border2)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
             )}
 
             <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
