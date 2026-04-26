@@ -126,6 +126,8 @@ router.post("/upload", authMiddleware, (req, res, next) => {
     const user = await User.findOne({ phone });
 
     // ── Mark submitted (same as WhatsApp bot) ───────────────────────────
+    // completed=true + weeklySubmissions+1 at submission time (matches WhatsApp)
+    // monthlySubmissions is incremented after analysis (matches WhatsApp)
     await User.findOneAndUpdate(
       { phone },
       {
@@ -232,8 +234,8 @@ async function processInBackground(reportId, videoPath, displayName) {
       analysis: result.analysis,
     });
 
-    // ── Same actions as WhatsApp submission ──────────────────────────────
-    // Save scores to user profile (feedbackScores + monthlySubmissions)
+    // ── Save feedback scores + monthlySubmissions after analysis ────────
+    // (matches WhatsApp bot behavior exactly)
     const { fluency, grammar, confidence, vocabulary } = result.analysis;
     if (fluency != null || grammar != null) {
       await User.findOneAndUpdate(
