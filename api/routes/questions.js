@@ -4,6 +4,21 @@ import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// GET /api/questions/random — any authenticated user: get a random question for practice
+router.get("/random", authMiddleware, async (req, res) => {
+  try {
+    const { category } = req.query;
+    const filter = category ? { category } : {};
+    const count = await Question.countDocuments(filter);
+    if (count === 0) return res.status(404).json({ error: "No questions available" });
+    const skip = Math.floor(Math.random() * count);
+    const q = await Question.findOne(filter).skip(skip).lean();
+    res.json(q);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/questions — admin/trainer: list all questions
 router.get("/", authMiddleware, requireRole("admin", "trainer"), async (req, res) => {
   try {

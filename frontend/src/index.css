@@ -390,9 +390,12 @@ input, select, textarea { font-family: inherit; outline: none; -webkit-appearanc
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
   .feedback-section {
     padding: 0.75rem;
+  }
+  /* Recording layout stacks on mobile */
+  .rec-layout {
+    grid-template-columns: 1fr !important;
   }
 }
 
