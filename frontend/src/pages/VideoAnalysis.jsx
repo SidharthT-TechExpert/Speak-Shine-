@@ -51,9 +51,9 @@ export default function VideoAnalysis() {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      // Validate file size (max 100MB)
-      if (selectedFile.size > 100 * 1024 * 1024) {
-        setError("File size must be less than 100MB");
+      // Validate file size (max 350MB)
+      if (selectedFile.size > 350 * 1024 * 1024) {
+        setError("File size must be less than 350MB");
         return;
       }
       setFile(selectedFile);
@@ -136,14 +136,14 @@ export default function VideoAnalysis() {
           <div className="section-title">📹 Upload Video for Analysis</div>
           <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
             Upload a video (30 seconds - 5 minutes) to get instant AI feedback on your speaking skills.
-            Reports are stored for 12 hours only.
+            Supported formats: MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV. Max file size: 350MB. Reports are stored for 12 hours only.
           </p>
 
           <div className="upload-area">
             <input
               id="video-input"
               type="file"
-              accept="video/mp4,video/quicktime,video/x-msvideo,video/webm"
+              accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,video/mpeg,video/3gpp,video/x-flv,video/x-ms-wmv"
               onChange={handleFileChange}
               disabled={uploading}
               style={{ marginBottom: "1rem" }}
