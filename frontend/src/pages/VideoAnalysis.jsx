@@ -311,9 +311,14 @@ function RecordCard({ onAnalysisStarted }) {
     return () => cleanup();
   }, []);
 
-  // Fetch a random question for the panel
+  // Fetch today's question from dashboard (same one sent to WhatsApp group)
   useEffect(() => {
-    api.get("/questions/random").then(r => setQuestion(r.data)).catch(() => {});
+    api.get("/dashboard").then(r => {
+      const t = r.data?.today;
+      if (t?.question) {
+        setQuestion({ question: t.question, topic: t.topic, category: t.topic, posterImage: t.posterImage });
+      }
+    }).catch(() => {});
   }, []);
 
   // Attach stream to live video once countdown/recording step renders the element
@@ -344,8 +349,21 @@ function RecordCard({ onAnalysisStarted }) {
     setError(null);
     try {
       const constraints = {
-        video: camId ? { deviceId: { exact: camId } } : true,
-        audio: micId ? { deviceId: { exact: micId } } : true,
+        video: {
+          ...(camId ? { deviceId: { exact: camId } } : {}),
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 360 },
+          aspectRatio: { ideal: 16 / 9 },
+          frameRate: { ideal: 30, min: 15 },
+          facingMode: "user",
+        },
+        audio: {
+          ...(micId ? { deviceId: { exact: micId } } : {}),
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+        },
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
@@ -483,12 +501,23 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           </div>
 
-          {/* Question preview */}
+          {/* Today's question + poster */}
           {question && (
-            <div className="today-card" style={{ marginBottom: "1.25rem" }}>
-              <div className="today-label">📝 Practice Question</div>
-              <div className="today-q">{question.question}</div>
-              <span className="today-topic">{question.category} · {question.topic}</span>
+            <div style={{ display: "grid", gridTemplateColumns: question.posterImage ? "1fr 200px" : "1fr", gap: "1rem", marginBottom: "1.25rem", alignItems: "start" }}>
+              <div className="today-card" style={{ margin: 0 }}>
+                <div className="today-label">📅 Today's Question</div>
+                {question.topic && (
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginBottom: "0.4rem", fontWeight: 500 }}>
+                    Topic: <span style={{ color: "var(--text2)" }}>{question.topic}</span>
+                  </div>
+                )}
+                <div className="today-q">{question.question}</div>
+                {question.category && <span className="today-topic">{question.category}</span>}
+              </div>
+              {question.posterImage && (
+                <img src={question.posterImage} alt="Today's poster"
+                  style={{ width: "100%", borderRadius: "10px", border: "1px solid var(--border)", objectFit: "contain" }} />
+              )}
             </div>
           )}
 
@@ -538,16 +567,29 @@ function RecordCard({ onAnalysisStarted }) {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {question && (
               <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
-                <div style={{ fontSize: "0.65rem", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
-                  📝 Your Question
+                <div style={{ fontSize: "0.65rem", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.4rem" }}>
+                  📅 Today's Question
                 </div>
-                <div style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.5, marginBottom: "0.5rem" }}>
+                {question.topic && (
+                  <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginBottom: "0.5rem" }}>
+                    Topic: <span style={{ color: "var(--text2)", fontWeight: 600 }}>{question.topic}</span>
+                  </div>
+                )}
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.5, marginBottom: "0.6rem" }}>
                   {question.question}
                 </div>
-                <span style={{ fontSize: "0.68rem", background: "rgba(124,111,255,0.18)", color: "var(--primary)", padding: "0.2rem 0.6rem", borderRadius: "99px", border: "1px solid rgba(124,111,255,0.25)" }}>
-                  {question.category}
-                </span>
+                {question.category && (
+                  <span style={{ fontSize: "0.65rem", background: "rgba(124,111,255,0.18)", color: "var(--primary)", padding: "0.2rem 0.55rem", borderRadius: "99px", border: "1px solid rgba(124,111,255,0.25)" }}>
+                    {question.category}
+                  </span>
+                )}
               </div>
+            )}
+
+            {/* Poster thumbnail during recording */}
+            {question?.posterImage && (
+              <img src={question.posterImage} alt="Today's poster"
+                style={{ width: "100%", borderRadius: "10px", border: "1px solid var(--border)", objectFit: "contain" }} />
             )}
 
             <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
