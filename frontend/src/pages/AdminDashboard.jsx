@@ -41,7 +41,6 @@ export default function AdminDashboard() {
   useEffect(()=>{load();},[]);
 
   const msg = (text, type="success") => { setFlash({text,type}); setTimeout(()=>setFlash(null),3000); };
-  const changeRole = async (phone,role) => { await api.patch(`/users/${phone}/role`,{role}); msg(`Role → ${role}`); load(); };
   const toggleUser = async (phone) => { await api.patch(`/users/${phone}/toggle`); msg("Status toggled"); load(); };
   
   const viewStudentDetail = (user) => {
