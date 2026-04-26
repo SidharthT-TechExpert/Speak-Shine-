@@ -34,23 +34,11 @@ export default defineConfig({
     minify: "esbuild",
     sourcemap: false,
     target: "es2020",
-    cssCodeSplit: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-          router: ["react-router-dom"],
-          charts: ["recharts"],
-        },
+        manualChunks: undefined, // Disable code splitting for faster builds
       },
     },
-    chunkSizeWarningLimit: 1000,
-  },
-  esbuild: {
-    logOverride: { "this-is-undefined-in-esm": "silent" },
-  },
-  optimizeDeps: {
-    include: ["react", "react-dom", "react-router-dom"],
   },
   assetsInclude: ["**/*.wasm"],
 });
