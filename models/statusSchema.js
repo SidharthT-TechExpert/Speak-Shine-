@@ -7,7 +7,8 @@ const statusSchema = new mongoose.Schema({
   fineAppliedToday: { type: Boolean, default: false },
   todayTopic: { type: String, default: null },
   todayQuestion: { type: String, default: null },
-  todayPosterImage: { type: String, default: null }, // base64 PNG of today's question poster
+  todayPosterImage: { type: String, default: null }, // base64 PNG — cleared after 15h or midnight
+  posterExpiresAt: { type: Date, default: null },    // when to auto-clear the poster
   recentCategories: { type: [String], default: [] },
 }, { timestamps: true });
 

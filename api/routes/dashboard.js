@@ -2,13 +2,54 @@ import express from "express";
 import User from "../../models/userSchema.js";
 import Status from "../../models/statusSchema.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import generatePoster from "../../poster.js";
+
+const router = express.Router();
+
+/**
+ * If today's question exists but poster image is missing or expired, generate and save it.
+ * Returns the status doc (with posterImage populated if generated).
+ */
+async function ensurePosterImage(status) {
+  if (!status) return status;
+  if (!status.todayQuestion) return status; // no question yet
+
+  // Check if poster is expired (15h TTL)
+  const isExpired = status.posterExpiresAt && new Date() > new Date(status.posterExpiresAt);
+  if (isExpired) {
+    // Clear expired poster
+    await Status.updateOne({}, { $set: { todayPosterImage: null, posterExpiresAt: null } });
+    status = { ...status, todayPosterImage: null, posterExpiresAt: null };
+  }
+
+  if (status.todayPosterImage) return status; // already exists and not expired
+
+  try {
+    console.log("[Dashboard] Poster missing — auto-generating...");
+    const posterBase64 = await generatePoster({
+      topic: status.todayTopic || "Speaking Practice",
+      question: status.todayQuestion,
+      category: null,
+    });
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 60 * 1000); // 15 hours
+    await Status.updateOne({}, { $set: { todayPosterImage: posterBase64, posterExpiresAt: expiresAt } });
+    console.log("[Dashboard] Poster auto-generated and saved (expires in 15h)");
+
+    return { ...status, todayPosterImage: posterBase64, posterExpiresAt: expiresAt };
+  } catch (err) {
+    console.error("[Dashboard] Poster auto-generate failed:", err.message);
+    return status;
+  }
+}
 
 const router = express.Router();
 
 // GET /api/dashboard — today's overview (all roles)
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    const status = await Status.findOne().lean();
+    let status = await Status.findOne().lean();
+    status = await ensurePosterImage(status);
     const users = await User.find().lean();
 
     const completed = users.filter(u => u.completed);
@@ -89,7 +130,8 @@ router.get("/me", authMiddleware, async (req, res) => {
       }).lean();
     }
 
-    const status = await Status.findOne().lean();
+    let status = await Status.findOne().lean();
+    status = await ensurePosterImage(status);
     const allUsers = await User.find().lean();
     const completed = allUsers.filter(u => u.completed).length;
     const totalFines = allUsers.reduce((s, u) => s + (u.fine || 0), 0);

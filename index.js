@@ -359,6 +359,7 @@ async function startBot() {
             todayTopic: question.topic || null,
             todayQuestion: question.question || null,
             todayPosterImage: posterBase64 || null,
+            posterExpiresAt: posterBase64 ? new Date(Date.now() + 15 * 60 * 60 * 1000) : null,
             recentCategories: updatedRecent,
           }
         });

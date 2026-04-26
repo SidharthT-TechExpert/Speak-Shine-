@@ -10,7 +10,8 @@ export async function resetStatus() {
     fineAppliedToday: false,
     todayTopic: null,
     todayQuestion: null,
-    todayPosterImage: null, // clear poster image at midnight
+    todayPosterImage: null,
+    posterExpiresAt: null,
   });
 }
 

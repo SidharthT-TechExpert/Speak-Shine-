@@ -1,9 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg"]
+nixPkgs = ["nodejs_20", "ffmpeg", "cairo", "pango", "libjpeg", "giflib", "librsvg"]
 
 [phases.install]
 cmds = [
-  "npm install --omit=dev --omit=optional --ignore-scripts",
+  "npm install --omit=dev",
   "npm install --prefix frontend --omit=dev"
 ]
 
