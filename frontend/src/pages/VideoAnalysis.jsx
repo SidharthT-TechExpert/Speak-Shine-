@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
+import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
@@ -203,6 +204,7 @@ function UploadCard({ onAnalysisStarted }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
   const [error, setError]         = useState(null);
+  const [isPublic, setIsPublic]   = useState(false);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -217,6 +219,7 @@ function UploadCard({ onAnalysisStarted }) {
     try {
       const formData = new FormData();
       formData.append("video", file);
+      formData.append("isPublic", isPublic ? "true" : "false");
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setProgress(Math.round((e.loaded / e.total) * 100)); },
@@ -258,11 +261,47 @@ function UploadCard({ onAnalysisStarted }) {
             </div>
           </div>
         )}
-        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
+
+        {/* Share toggle */}
+        <ShareToggle isPublic={isPublic} onChange={setIsPublic} />
+
+        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%", marginTop: "0.75rem" }}>
           {uploading ? `Uploading ${progress}%…` : "Upload & Analyze"}
         </button>
       </div>
       {error && <div className="error-box" style={{ marginTop: "1rem" }}><p>{error}</p></div>}
+    </div>
+  );
+}
+
+// ── Shared share toggle ──────────────────────────────────────────────────────
+function ShareToggle({ isPublic, onChange }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      background: "var(--card2)", border: "1px solid var(--border2)",
+      borderRadius: "10px", padding: "0.65rem 0.875rem", marginBottom: "0.75rem",
+    }}>
+      <div>
+        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)" }}>
+          👥 Share with group
+        </div>
+        <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.1rem" }}>
+          Others can watch your video in Community Feed
+        </div>
+      </div>
+      <button onClick={() => onChange(v => !v)} style={{
+        width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer",
+        background: isPublic ? "var(--success)" : "var(--border2)",
+        position: "relative", transition: "background 0.2s", flexShrink: 0,
+      }}>
+        <span style={{
+          position: "absolute", top: "2px",
+          left: isPublic ? "20px" : "2px",
+          width: "18px", height: "18px", borderRadius: "50%",
+          background: "#fff", transition: "left 0.2s",
+        }} />
+      </button>
     </div>
   );
 }
@@ -284,6 +323,11 @@ function RecordCard({ onAnalysisStarted }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
   const [lightbox, setLightbox]     = useState(false);
+  const [noiseCancel, setNoiseCancel] = useState(true);  // toggle for RNNoise
+  const [ncStatus, setNcStatus]     = useState("idle");  // idle|loading|active|fallback
+  const [isPublic, setIsPublic]     = useState(false);
+
+  const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
   const liveVideoRef    = useRef(null);
   const previewVideoRef = useRef(null);
@@ -344,54 +388,76 @@ function RecordCard({ onAnalysisStarted }) {
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-  }, []);
+    cleanupNC();
+    setNcStatus("idle");
+  }, [cleanupNC]);
 
   const startCountdown = async () => {
     setError(null);
     try {
+      // ── Option 1: browser-level noise suppression via getUserMedia constraints ──
       const constraints = {
         video: {
           ...(camId ? { deviceId: { exact: camId } } : {}),
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 360 },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
           aspectRatio: { ideal: 16 / 9 },
-          frameRate: { ideal: 30, min: 15 },
+          frameRate: { ideal: 30, min: 24 },
           facingMode: "user",
         },
         audio: {
           ...(micId ? { deviceId: { exact: micId } } : {}),
           echoCancellation: true,
-          noiseSuppression: true,
+          noiseSuppression: true,   // browser built-in
           autoGainControl: true,
           sampleRate: 48000,
+          channelCount: 1,
         },
       };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      // Don't touch liveVideoRef here — it doesn't exist yet.
-      // The useEffect above will attach it once the step re-renders.
+      const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      let finalStream = rawStream;
+
+      // ── Option 2: RNNoise WASM AI noise cancellation on top ──
+      if (noiseCancel) {
+        setNcStatus("loading");
+        finalStream = await applyNoiseCancellation(rawStream);
+        setNcStatus(finalStream !== rawStream ? "active" : "fallback");
+      }
+
+      streamRef.current = finalStream;
       setStep("countdown");
       setCountdown(3);
       let c = 3;
       countdownRef.current = setInterval(() => {
         c--;
         setCountdown(c);
-        if (c <= 0) { clearInterval(countdownRef.current); startRecording(stream); }
+        if (c <= 0) { clearInterval(countdownRef.current); startRecording(finalStream); }
       }, 1000);
     } catch (err) {
+      setNcStatus("idle");
       setError("Could not access camera/mic: " + err.message);
     }
   };
 
   const startRecording = (stream) => {
     chunksRef.current = [];
+
+    // Pick best codec — prefer VP9 (better quality/size), fallback to VP8, then mp4
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
       ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
       : MediaRecorder.isTypeSupported("video/webm")
       ? "video/webm"
       : "video/mp4";
 
-    const recorder = new MediaRecorder(stream, { mimeType });
+    // Higher bitrate for better quality: 2.5Mbps video + 128kbps audio
+    const recorder = new MediaRecorder(stream, {
+      mimeType,
+      videoBitsPerSecond: 2_500_000,
+      audioBitsPerSecond: 128_000,
+    });
     recorderRef.current = recorder;
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
@@ -456,6 +522,7 @@ function RecordCard({ onAnalysisStarted }) {
       const file = new File([recordedBlob], `recording.${ext}`, { type: recordedBlob.type });
       const formData = new FormData();
       formData.append("video", file);
+      formData.append("isPublic", isPublic ? "true" : "false");
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100)); },
@@ -515,28 +582,50 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           </div>
 
-          {/* Today's question + poster */}
-          {question && (
-            <div style={{ display: "grid", gridTemplateColumns: question.posterImage ? "1fr 200px" : "1fr", gap: "1rem", marginBottom: "1.25rem", alignItems: "start" }}>
-              <div className="today-card" style={{ margin: 0 }}>
-                <div className="today-label">📅 Today's Question</div>
-                {question.topic && (
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginBottom: "0.4rem", fontWeight: 500 }}>
-                    Topic: <span style={{ color: "var(--text2)" }}>{question.topic}</span>
-                  </div>
-                )}
-                <div className="today-q">{question.question}</div>
-                {question.category && <span className="today-topic">{question.category}</span>}
+          {/* Today's poster only — poster already contains topic + question */}
+          {question?.posterImage && (
+            <div style={{ marginBottom: "1.25rem" }}>
+              <div style={{ fontSize: "0.65rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+                📅 Today's Question
               </div>
-              {question.posterImage && (
-                <img src={question.posterImage} alt="Today's poster"
-                  onClick={() => setLightbox(true)}
-                  onMouseOver={e => e.currentTarget.style.transform = "scale(1.04)"}
-                  onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                  style={{ width: "100%", borderRadius: "10px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s" }} />
-              )}
+              <img src={question.posterImage} alt="Today's poster"
+                onClick={() => setLightbox(true)}
+                onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
+                onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
+              <p style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "center" }}>Click to enlarge</p>
             </div>
           )}
+
+          {/* Share toggle */}
+          <ShareToggle isPublic={isPublic} onChange={setIsPublic} />
+
+          {/* Noise cancellation toggle */}          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: "var(--card2)", border: "1px solid var(--border2)",
+            borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1.25rem",
+          }}>
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
+                🎙️ AI Noise Cancellation
+              </div>
+              <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                RNNoise WASM — removes background noise
+              </div>
+            </div>
+            <button onClick={() => setNoiseCancel(v => !v)} style={{
+              width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer",
+              background: noiseCancel ? "var(--success)" : "var(--border2)",
+              position: "relative", transition: "background 0.2s", flexShrink: 0,
+            }}>
+              <span style={{
+                position: "absolute", top: "3px",
+                left: noiseCancel ? "22px" : "3px",
+                width: "18px", height: "18px", borderRadius: "50%",
+                background: "#fff", transition: "left 0.2s",
+              }} />
+            </button>
+          </div>
 
           <button className="btn-primary" onClick={startCountdown} style={{ width: "100%" }}>
             🎬 Start Recording
@@ -551,6 +640,18 @@ function RecordCard({ onAnalysisStarted }) {
           <video ref={liveVideoRef} autoPlay muted playsInline
             style={{ width: "100%", maxWidth: "480px", borderRadius: "12px", background: "#000", aspectRatio: "16/9", objectFit: "cover" }} />
           <div style={{ fontSize: "5rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1 }}>{countdown}</div>
+          {ncStatus === "loading" && (
+            <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI noise cancellation…</p>
+          )}
+          {ncStatus === "active" && (
+            <p style={{ color: "var(--success)", fontSize: "0.82rem" }}>✅ AI noise cancellation active</p>
+          )}
+          {ncStatus === "fallback" && (
+            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
+          )}
+          {!noiseCancel && (
+            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
+          )}
           <p style={{ color: "var(--muted)" }}>Get ready…</p>
         </div>
       )}
@@ -573,6 +674,15 @@ function RecordCard({ onAnalysisStarted }) {
                 animation: isPaused ? "none" : "blink 1s infinite" }} />
               {isPaused ? "PAUSED" : "REC"} {fmtTime(elapsed)}
             </div>
+            {/* NC status badge */}
+            {ncStatus === "active" && (
+              <div style={{
+                position: "absolute", top: "12px", right: "12px",
+                background: "rgba(34,211,160,0.85)", color: "#fff",
+                padding: "0.2rem 0.55rem", borderRadius: "99px",
+                fontSize: "0.68rem", fontWeight: 700,
+              }}>🎙️ AI NC</div>
+            )}
             {/* Timer bar */}
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: "rgba(255,255,255,0.15)", borderRadius: "0 0 12px 12px" }}>
               <div style={{ height: "100%", width: `${(elapsed / MAX_SECONDS) * 100}%`,
@@ -580,36 +690,15 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           </div>
 
-          {/* Question panel */}
+          {/* Side panel — poster only */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {question && (
-              <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
-                <div style={{ fontSize: "0.65rem", color: "var(--primary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.4rem" }}>
-                  📅 Today's Question
-                </div>
-                {question.topic && (
-                  <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginBottom: "0.5rem" }}>
-                    Topic: <span style={{ color: "var(--text2)", fontWeight: 600 }}>{question.topic}</span>
-                  </div>
-                )}
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.5, marginBottom: "0.6rem" }}>
-                  {question.question}
-                </div>
-                {question.category && (
-                  <span style={{ fontSize: "0.65rem", background: "rgba(124,111,255,0.18)", color: "var(--primary)", padding: "0.2rem 0.55rem", borderRadius: "99px", border: "1px solid rgba(124,111,255,0.25)" }}>
-                    {question.category}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Poster thumbnail during recording */}
+            {/* Poster — click to enlarge */}
             {question?.posterImage && (
               <img src={question.posterImage} alt="Today's poster"
                 onClick={() => setLightbox(true)}
                 onMouseOver={e => e.currentTarget.style.transform = "scale(1.03)"}
                 onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                style={{ width: "100%", borderRadius: "10px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s" }} />
+                style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border2)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
             )}
 
             <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
