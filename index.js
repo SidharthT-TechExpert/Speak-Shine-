@@ -14,7 +14,7 @@ import Status from "./models/statusSchema.js";
 import GrammarSettings from "./models/grammarSettingsSchema.js";
 import UserStats from "./models/userStatsSchema.js";
 import generateVoice from "./generateVoice.js";
-import generatePoster from "./poster.js";
+import { ensurePoster } from "./api/posterGenerator.js";
 import { resetStatus } from "./resetStatus.js";
 import { generateFeedback } from "./ai/feedback.js";
 import { chunkMessage, sendChunks as _sendChunks } from "./helpers.js";
@@ -339,10 +339,19 @@ async function startBot() {
       const question = q[0];
 
       // ── Generate & send poster ───────────────────────────────────────────
-      const posterBase64 = await generatePoster(question);
+      // Store question info first, then use ensurePoster to generate SVG
+      const tempStatus = {
+        todayTopic: question.topic || null,
+        todayQuestion: question.question || null,
+        todayCategory: question.category || null,
+      };
+      
+      // Generate SVG poster
+      const updatedStatus = await ensurePoster(tempStatus);
+      const posterBase64 = updatedStatus.todayPosterImage;
 
       const sent = await safeSend(sock, TARGET_GROUP, {
-        image: { url: "./daily.png" },
+        image: { url: posterBase64 }, // Use the SVG data URI directly
       });
 
       if (sent) {
@@ -2173,7 +2182,13 @@ async function startBot() {
           if (!q || !q.length) return;
           const question = q[0];
 
-          await generatePoster(question);
+          // Generate poster for testing
+          const tempStatus = {
+            todayTopic: question.topic || null,
+            todayQuestion: question.question || null,
+            todayCategory: question.category || null,
+          };
+          await ensurePoster(tempStatus);
 
           await safeSend(sock, OWNER, {
             image: { url: "./daily.png" },

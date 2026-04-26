@@ -1,10 +1,10 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg", "pkg-config", "python3"]
+nixPkgs = ["nodejs_20", "ffmpeg", "pkg-config", "python3", "cairo", "pango", "libjpeg", "giflib", "librsvg", "pixman"]
 
 [phases.install]
 cmds = [
-  # Root dependencies (minimal, production only)
-  "npm ci --prefer-offline --no-audit --no-fund --omit=dev --omit=optional --ignore-scripts",
+  # Root dependencies - try with optional deps first, fallback without
+  "npm ci --prefer-offline --no-audit --no-fund --omit=dev || npm ci --prefer-offline --no-audit --no-fund --omit=dev --omit=optional",
   # API dependencies
   "cd api && npm ci --prefer-offline --no-audit --no-fund --omit=dev",
   # Frontend dependencies (build-time only)
