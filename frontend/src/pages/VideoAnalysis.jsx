@@ -272,113 +272,185 @@ export default function VideoAnalysis() {
 }
 
 // ── Report display component ─────────────────────────────────────────────────
+function ScoreBar({ score }) {
+  const filled = Math.round(score || 0);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div style={{ display: "flex", gap: "2px" }}>
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} style={{
+            width: "18px", height: "18px", borderRadius: "3px",
+            background: i < filled ? "var(--success)" : "var(--bg)",
+            border: "1px solid var(--border)",
+          }} />
+        ))}
+      </div>
+      <span style={{ fontWeight: 700, minWidth: "40px" }}>{score}/10</span>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div style={{ marginBottom: "1.25rem" }}>
+      <div style={{ borderTop: "1px solid var(--border)", margin: "1rem 0 0.75rem" }} />
+      <div style={{ fontWeight: 700, marginBottom: "0.75rem", color: "var(--text)" }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
 function ReportView({ analysis: a, expiresAt, formatTimeRemaining, scoreColor }) {
-  const scores = [
-    { icon: "🗣️", label: "Fluency",    value: a.fluency },
-    { icon: "📚", label: "Grammar",    value: a.grammar },
-    { icon: "🔥", label: "Confidence", value: a.confidence },
-    { icon: "🧠", label: "Vocabulary", value: a.vocabulary },
-  ];
-  const visualScores = a.eyeContact ? [
-    { icon: "👁️", label: "Eye Contact",   value: a.eyeContact },
-    { icon: "🧍", label: "Body Language", value: a.bodyLanguage },
-    { icon: "😊", label: "Expression",    value: a.facialExpression },
-    { icon: "✨", label: "Presence",      value: a.overallPresence },
-  ] : [];
+  const s = a.stats || {};
 
   return (
     <div className="report-content">
-      {/* Speech scores */}
-      <div className="stat-grid" style={{ marginBottom: "1.5rem" }}>
-        {scores.map(s => (
-          <div key={s.label} className="stat-card">
-            <div className="stat-icon">{s.icon}</div>
-            <div className="stat-value" style={{ color: scoreColor(s.value) }}>{s.value}/10</div>
-            <div className="stat-label">{s.label}</div>
-          </div>
-        ))}
+
+      {/* ── Stats bar ── */}
+      <div style={{ background: "var(--bg-secondary)", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", gap: "1rem", fontSize: "0.95rem" }}>
+        {s.duration && <span>⏱️ <strong>{s.duration}</strong></span>}
+        {s.wpm && (
+          <span>📊 <strong>{s.wpm} wpm</strong> {s.wpm < 100 ? "🐢 Slow" : s.wpm <= 150 ? "✅ Good" : "⚡ Fast"}</span>
+        )}
+        {s.fillerTotal > 0 && (
+          <span>🗣️ Filler words: <strong>{Object.entries(s.fillerWords || {}).map(([w, c]) => `"${w}" ×${c}`).join(", ")}</strong></span>
+        )}
+        {s.pauses > 0 && <span>🔇 Long pauses: <strong>{s.pauses}</strong></span>}
+        {s.rhythm?.speechRatio != null && (
+          <span>🎵 Speech ratio: <strong>{s.rhythm.speechRatio}%</strong> {s.rhythm.speechRatio >= 75 ? "✅ Good" : s.rhythm.speechRatio >= 55 ? "⚠️ Many pauses" : "❌ Too many silences"}</span>
+        )}
       </div>
 
-      {/* Visual scores */}
-      {visualScores.length > 0 && (
-        <div className="stat-grid" style={{ marginBottom: "1.5rem" }}>
-          {visualScores.map(s => (
-            <div key={s.label} className="stat-card">
-              <div className="stat-icon">{s.icon}</div>
-              <div className="stat-value" style={{ color: scoreColor(s.value) }}>{s.value}/10</div>
-              <div className="stat-label">{s.label}</div>
+      {/* Rhythm warnings */}
+      {s.rhythm?.rushesAtStart && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Tends to rush at the start — slow down your opening.</p>}
+      {s.rhythm?.rushesAtEnd   && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Speeds up toward the end — maintain steady pace throughout.</p>}
+      {a.qualityWarning && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>🔈 {a.qualityWarning}</p>}
+
+      {/* ── Speech Scores ── */}
+      <Section title="🗣️ Speech Scores">
+        {[
+          { icon: "🗣️", label: "Fluency",    v: a.fluency },
+          { icon: "📚", label: "Grammar",    v: a.grammar },
+          { icon: "🔥", label: "Confidence", v: a.confidence },
+          { icon: "🧠", label: "Vocabulary", v: a.vocabulary },
+        ].map(({ icon, label, v }) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.6rem" }}>
+            <span style={{ width: "110px", color: "var(--muted)" }}>{icon} {label}</span>
+            <ScoreBar score={v} />
+          </div>
+        ))}
+        {s.cefrLevel && (
+          <p style={{ marginTop: "0.5rem", color: "var(--muted)" }}>
+            🎓 Level: <strong>{s.cefrLevel.level}</strong> — <em>{s.cefrLevel.description}</em>
+          </p>
+        )}
+        {a.topicRelevance != null && (
+          <div style={{ marginTop: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "110px", color: "var(--muted)" }}>🎯 On-topic</span>
+              <ScoreBar score={a.topicRelevance} />
+            </div>
+            {a.topicFeedback && <p style={{ color: "var(--muted)", fontSize: "0.9rem", fontStyle: "italic" }}>💬 {a.topicFeedback}</p>}
+          </div>
+        )}
+      </Section>
+
+      {/* ── Pronunciation & Rhythm notes ── */}
+      {(a.pronunciationNote || a.rhythmNote) && (
+        <Section title="🎵 Pronunciation & Rhythm">
+          {a.pronunciationNote && <p style={{ marginBottom: "0.4rem" }}>🗣️ {a.pronunciationNote}</p>}
+          {a.rhythmNote        && <p>🎵 {a.rhythmNote}</p>}
+        </Section>
+      )}
+
+      {/* ── Visual Scores ── */}
+      {a.eyeContact != null && (
+        <Section title="📹 Visual Presence">
+          {[
+            { icon: "�️", label: "Eye Contact",   v: a.eyeContact },
+            { icon: "🧍", label: "Body Language", v: a.bodyLanguage },
+            { icon: "😊", label: "Expression",    v: a.facialExpression },
+            { icon: "✨", label: "Presence",      v: a.overallPresence },
+          ].map(({ icon, label, v }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.6rem" }}>
+              <span style={{ width: "120px", color: "var(--muted)" }}>{icon} {label}</span>
+              <ScoreBar score={v} />
             </div>
           ))}
-        </div>
+        </Section>
       )}
 
-      {/* Stats bar */}
-      {(a.stats?.wpm || a.stats?.duration || a.stats?.cefrLevel) && (
-        <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginBottom: "1.5rem", padding: "1rem", background: "var(--bg-secondary)", borderRadius: "8px" }}>
-          {a.stats.duration && <span>⏱️ <strong>{a.stats.duration}</strong></span>}
-          {a.stats.wpm && <span>📊 <strong>{a.stats.wpm} wpm</strong></span>}
-          {a.stats.cefrLevel && <span>🎓 <strong>{a.stats.cefrLevel.level}</strong> — {a.stats.cefrLevel.description}</span>}
-          {a.stats.fillerTotal > 0 && <span>🗣️ <strong>{a.stats.fillerTotal}</strong> filler words</span>}
-        </div>
-      )}
-
-      {/* Overall comment */}
-      {a.overallComment && (
-        <div className="feedback-section">
-          <h3>📝 Overall Feedback</h3>
-          <p>{a.overallComment}</p>
-        </div>
-      )}
-
-      {/* Strong points */}
-      {a.strongPoints?.length > 0 && (
-        <div className="feedback-section">
-          <h3>✅ What You Did Well</h3>
-          <ul>{a.strongPoints.map((p, i) => <li key={i}>{p}</li>)}</ul>
-        </div>
-      )}
-
-      {/* Grammar errors */}
+      {/* ── Grammar Issues ── */}
       {a.grammarErrors?.length > 0 && (
-        <div className="feedback-section">
-          <h3>❌ Grammar Issues</h3>
-          <ul>
-            {a.grammarErrors.map((e, i) => (
-              <li key={i}>
-                <em>"{e.original}"</em> → <strong>"{e.correction}"</strong>
-                {e.rule && <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}> ({e.rule})</span>}
-              </li>
-            ))}
+        <Section title="❌ Grammar Issues">
+          {a.grammarErrors.map((e, i) => (
+            <div key={i} style={{ marginBottom: "0.6rem", paddingLeft: "0.5rem", borderLeft: "3px solid var(--danger)" }}>
+              <span style={{ color: "var(--muted)", fontStyle: "italic" }}>"{e.original}"</span>
+              {" → "}
+              <strong style={{ color: "var(--success)" }}>"{e.correction}"</strong>
+              {e.rule && <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}> ({e.rule})</span>}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* ── What you did well ── */}
+      {a.strongPoints?.length > 0 && (
+        <Section title="✅ What You Did Well">
+          <ul style={{ paddingLeft: "1.25rem", margin: 0 }}>
+            {a.strongPoints.map((p, i) => <li key={i} style={{ marginBottom: "0.3rem" }}>{p}</li>)}
           </ul>
-        </div>
+        </Section>
       )}
 
-      {/* Suggestions */}
-      {a.suggestions?.length > 0 && (
-        <div className="feedback-section">
-          <h3>💡 Speaking Tips</h3>
-          <ul>{a.suggestions.map((t, i) => <li key={i}>{t}</li>)}</ul>
-        </div>
+      {/* ── Visual Observations ── */}
+      {(a.eyeContactNote || a.bodyLanguageNote || a.expressionNote || a.visualStrengths?.length > 0) && (
+        <Section title="📹 Visual Observations">
+          {a.eyeContactNote   && <p style={{ marginBottom: "0.4rem" }}>👁️ {a.eyeContactNote}</p>}
+          {a.bodyLanguageNote && <p style={{ marginBottom: "0.4rem" }}>🧍 {a.bodyLanguageNote}</p>}
+          {a.expressionNote   && <p style={{ marginBottom: "0.4rem" }}>😊 {a.expressionNote}</p>}
+          {a.visualStrengths?.map((s, i) => <p key={i} style={{ marginBottom: "0.3rem" }}>✅ {s}</p>)}
+        </Section>
       )}
 
-      {/* Visual suggestions */}
-      {a.visualSuggestions?.length > 0 && (
-        <div className="feedback-section">
-          <h3>🎬 Presentation Tips</h3>
-          <ul>{a.visualSuggestions.map((t, i) => <li key={i}>{t}</li>)}</ul>
-        </div>
-      )}
-
-      {/* Vocabulary */}
+      {/* ── Vocabulary ── */}
       {(a.vocabularyHighlights?.strong?.length > 0 || a.vocabularyHighlights?.weak?.length > 0) && (
-        <div className="feedback-section">
-          <h3>📖 Vocabulary</h3>
-          {a.vocabularyHighlights.strong?.length > 0 && <p>💎 Good words: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>}
-          {a.vocabularyHighlights.weak?.length > 0 && <p>📖 Upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>}
-        </div>
+        <Section title="📖 Vocabulary">
+          {a.vocabularyHighlights.strong?.length > 0 && (
+            <p style={{ marginBottom: "0.4rem" }}>💎 Good words used: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>
+          )}
+          {a.vocabularyHighlights.weak?.length > 0 && (
+            <p>📖 Words to upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>
+          )}
+        </Section>
       )}
 
-      {/* Expiry notice */}
+      {/* ── Speaking Tips ── */}
+      {a.suggestions?.length > 0 && (
+        <Section title="💡 Speaking Tips">
+          <ul style={{ paddingLeft: "1.25rem", margin: 0 }}>
+            {a.suggestions.map((t, i) => <li key={i} style={{ marginBottom: "0.3rem" }}>{t}</li>)}
+          </ul>
+        </Section>
+      )}
+
+      {/* ── Presentation Tips ── */}
+      {a.visualSuggestions?.length > 0 && (
+        <Section title="🎬 Presentation Tips">
+          <ul style={{ paddingLeft: "1.25rem", margin: 0 }}>
+            {a.visualSuggestions.map((t, i) => <li key={i} style={{ marginBottom: "0.3rem" }}>{t}</li>)}
+          </ul>
+        </Section>
+      )}
+
+      {/* ── Overall Comment ── */}
+      {a.overallComment && (
+        <Section title="📝 Overall Feedback">
+          <p style={{ lineHeight: 1.7 }}>{a.overallComment}</p>
+        </Section>
+      )}
+
+      {/* Expiry */}
       <div style={{ marginTop: "1.5rem", padding: "0.75rem 1rem", background: "var(--bg-secondary)", borderRadius: "8px", color: "var(--muted)", fontSize: "0.85rem" }}>
         ⏰ Auto-deletes in {formatTimeRemaining(expiresAt)}
       </div>
@@ -386,413 +458,3 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, scoreColor })
   );
 }
 
-export default function VideoAnalysis() {
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [reportId, setReportId] = useState(null);
-  const [report, setReport] = useState(null);
-  const [error, setError] = useState(null);
-  const [myReports, setMyReports] = useState([]);
-  const [progressStage, setProgressStage] = useState("");
-  const navigate = useNavigate();
-
-  // Load user's recent reports on mount
-  useEffect(() => {
-    loadMyReports();
-  }, []);
-
-  // SSE subscription for real-time progress when we have a reportId
-  useEffect(() => {
-    if (!reportId || !report || report.status === "completed" || report.status === "failed") return;
-
-    const token = localStorage.getItem("token");
-    const evtSource = new EventSource(
-      `/api/video/progress/${reportId}?token=${token}`
-    );
-
-    evtSource.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.stage) setProgressStage(data.stage);
-        if (data.status === "completed" || data.status === "failed") {
-          evtSource.close();
-          // Fetch the full report now
-          api.get(`/video/report/${reportId}`).then(r => {
-            setReport(r.data);
-            loadMyReports();
-          });
-        }
-      } catch {}
-    };
-
-    evtSource.onerror = () => {
-      evtSource.close();
-      // Fallback: poll once after 5s
-      setTimeout(() => {
-        api.get(`/video/report/${reportId}`).then(r => {
-          setReport(r.data);
-          if (r.data.status === "completed" || r.data.status === "failed") loadMyReports();
-        }).catch(() => {});
-      }, 5000);
-    };
-
-    return () => evtSource.close();
-  }, [reportId, report?.status]);
-
-  const loadMyReports = async () => {
-    try {
-      const res = await api.get("/video/my-reports");
-      setMyReports(res.data.reports || []);
-    } catch (err) {
-      console.error("Failed to load reports:", err);
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      // Validate file size (max 350MB)
-      if (selectedFile.size > 350 * 1024 * 1024) {
-        setError("File size must be less than 350MB");
-        return;
-      }
-      setFile(selectedFile);
-      setError(null);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a video file");
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
-    setReport(null);
-    setReportId(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("video", file);
-
-      const res = await api.post("/video/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      setReportId(res.data.reportId);
-      setReport({ status: "processing" });
-      setFile(null);
-      
-      // Reset file input
-      document.getElementById("video-input").value = "";
-
-    } catch (err) {
-      setError(err.response?.data?.error || "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const viewReport = async (id) => {
-    setReportId(id);
-    setReport({ status: "loading" });
-    // Scroll to report section
-    setTimeout(() => document.getElementById("report-section")?.scrollIntoView({ behavior: "smooth" }), 100);
-    try {
-      const res = await api.get(`/video/report/${id}`);
-      setReport(res.data);
-    } catch (err) {
-      setReport({ status: "failed", errorMessage: "Failed to load report" });
-    }
-  };
-
-  const deleteReport = async (id) => {
-    if (!confirm("Delete this report?")) return;
-    
-    try {
-      await api.delete(`/video/report/${id}`);
-      loadMyReports();
-      if (reportId === id) {
-        setReportId(null);
-        setReport(null);
-      }
-    } catch (err) {
-      alert("Failed to delete report");
-    }
-  };
-
-  const formatTimeRemaining = (expiresAt) => {
-    const now = new Date();
-    const expires = new Date(expiresAt);
-    const diff = expires - now;
-    
-    if (diff <= 0) return "Expired";
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) return `${hours}h ${minutes}m remaining`;
-    return `${minutes}m remaining`;
-  };
-
-  return (
-    <Layout title="Video Analysis">
-      <div className="video-analysis-page">
-        {/* Upload Section */}
-        <div className="card">
-          <div className="section-title">📹 Upload Video for Analysis</div>
-          <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-            Upload a video (1 minute - 5 minutes) to get instant AI feedback on your speaking skills.
-            Supported formats: MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV. File size: Any size up to 350MB. Reports are stored for 12 hours only.
-          </p>
-
-          <div className="upload-area">
-            <input
-              id="video-input"
-              type="file"
-              accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,video/mpeg,video/3gpp,video/x-flv,video/x-ms-wmv"
-              onChange={handleFileChange}
-              disabled={uploading}
-              style={{ marginBottom: "1rem" }}
-            />
-            
-            {file && (
-              <div style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-                Selected: {file.name} ({(file.size / (1024 * 1024)).toFixed(2)} MB)
-                {file.size < 1024 * 1024 && <span style={{ color: "var(--success)" }}> ✓ Small file - faster processing!</span>}
-              </div>
-            )}
-
-            <button
-              className="btn-primary"
-              onClick={handleUpload}
-              disabled={!file || uploading}
-              style={{ width: "100%" }}
-            >
-              {uploading ? "Uploading..." : "Upload & Analyze"}
-            </button>
-          </div>
-
-          {error && (
-            <div className="error-box" style={{ marginTop: "1rem" }}>
-              <p>{error}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Current Report Status */}
-        {report && (
-          <div id="report-section" className="card" style={{ marginTop: "1rem" }}>
-            <div className="section-title">
-              {report.status === "loading" && "⏳ Loading..."}
-              {report.status === "processing" && "⏳ Processing..."}
-              {report.status === "completed" && "✅ Analysis Complete"}
-              {report.status === "failed" && "❌ Analysis Failed"}
-            </div>
-
-            {(report.status === "loading" || report.status === "processing") && (
-              <div className="spinner-wrap">
-                <div className="spinner" />
-                <p style={{ color: "var(--muted)" }}>
-                  {report.status === "loading" ? "Loading report…" : (progressStage || "Uploading and preparing video…")}
-                </p>
-                {report.status === "processing" && (
-                  <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.5rem" }}>
-                    This usually takes 2-3 minutes
-                  </p>
-                )}
-              </div>
-            )}
-
-            {report.status === "failed" && (
-              <div className="error-box">
-                <p>{report.errorMessage || "Analysis failed. Please try again."}</p>
-              </div>
-            )}
-
-            {report.status === "completed" && report.analysis && (
-              <div className="report-content">
-                {/* Scores Grid */}
-                <div className="stat-grid" style={{ marginBottom: "1.5rem" }}>
-                  <div className="stat-card">
-                    <div className="stat-icon">🗣️</div>
-                    <div className="stat-value">{report.analysis.fluency}/10</div>
-                    <div className="stat-label">Fluency</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-icon">📚</div>
-                    <div className="stat-value">{report.analysis.grammar}/10</div>
-                    <div className="stat-label">Grammar</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-icon">🔥</div>
-                    <div className="stat-value">{report.analysis.confidence}/10</div>
-                    <div className="stat-label">Confidence</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-icon">🧠</div>
-                    <div className="stat-value">{report.analysis.vocabulary}/10</div>
-                    <div className="stat-label">Vocabulary</div>
-                  </div>
-                </div>
-
-                {/* Visual Scores (if available) */}
-                {report.analysis.eyeContact && (
-                  <div className="stat-grid" style={{ marginBottom: "1.5rem" }}>
-                    <div className="stat-card">
-                      <div className="stat-icon">👁️</div>
-                      <div className="stat-value">{report.analysis.eyeContact}/10</div>
-                      <div className="stat-label">Eye Contact</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">🧍</div>
-                      <div className="stat-value">{report.analysis.bodyLanguage}/10</div>
-                      <div className="stat-label">Body Language</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">😊</div>
-                      <div className="stat-value">{report.analysis.facialExpression}/10</div>
-                      <div className="stat-label">Expression</div>
-                    </div>
-                    <div className="stat-card">
-                      <div className="stat-icon">✨</div>
-                      <div className="stat-value">{report.analysis.overallPresence}/10</div>
-                      <div className="stat-label">Presence</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Overall Comment */}
-                {report.analysis.overallComment && (
-                  <div className="feedback-section">
-                    <h3>📝 Overall Feedback</h3>
-                    <p>{report.analysis.overallComment}</p>
-                  </div>
-                )}
-
-                {/* Strong Points */}
-                {report.analysis.strongPoints?.length > 0 && (
-                  <div className="feedback-section">
-                    <h3>✅ What You Did Well</h3>
-                    <ul>
-                      {report.analysis.strongPoints.map((point, i) => (
-                        <li key={i}>{point}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Suggestions */}
-                {report.analysis.suggestions?.length > 0 && (
-                  <div className="feedback-section">
-                    <h3>💡 Speaking Tips</h3>
-                    <ul>
-                      {report.analysis.suggestions.map((tip, i) => (
-                        <li key={i}>{tip}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Visual Suggestions */}
-                {report.analysis.visualSuggestions?.length > 0 && (
-                  <div className="feedback-section">
-                    <h3>🎬 Presentation Tips</h3>
-                    <ul>
-                      {report.analysis.visualSuggestions.map((tip, i) => (
-                        <li key={i}>{tip}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Stats */}
-                {report.analysis.stats && (
-                  <div className="feedback-section">
-                    <h3>📊 Statistics</h3>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "1rem" }}>
-                      {report.analysis.stats.duration && (
-                        <div>
-                          <strong>Duration:</strong> {report.analysis.stats.duration}
-                        </div>
-                      )}
-                      {report.analysis.stats.wpm && (
-                        <div>
-                          <strong>Pace:</strong> {report.analysis.stats.wpm} wpm
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginTop: "1.5rem", padding: "1rem", background: "var(--bg-secondary)", borderRadius: "8px", color: "var(--muted)", fontSize: "0.9rem" }}>
-                  ⏰ This report will be automatically deleted {formatTimeRemaining(report.expiresAt)}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Recent Reports */}
-        {myReports.length > 0 && (
-          <div className="card" style={{ marginTop: "1rem" }}>
-            <div className="section-title">📋 Recent Reports (Last 12 Hours)</div>
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Submitted</th>
-                    <th>File</th>
-                    <th>Status</th>
-                    <th>Expires</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {myReports.map((r) => (
-                    <tr key={r._id}>
-                      <td style={{ color: "var(--muted)" }}>
-                        {new Date(r.submittedAt).toLocaleString("en-IN", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                      <td>{r.videoFileName}</td>
-                      <td>
-                        {r.status === "processing" && "⏳ Processing"}
-                        {r.status === "completed" && "✅ Ready"}
-                        {r.status === "failed" && "❌ Failed"}
-                      </td>
-                      <td style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-                        {formatTimeRemaining(r.expiresAt)}
-                      </td>
-                      <td>
-                        <button
-                          className="btn-secondary"
-                          onClick={() => viewReport(r._id)}
-                          disabled={r.status !== "completed"}
-                          style={{ marginRight: "0.5rem" }}
-                        >
-                          View
-                        </button>
-                        <button
-                          className="btn-danger"
-                          onClick={() => deleteReport(r._id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    </Layout>
-  );
-}
