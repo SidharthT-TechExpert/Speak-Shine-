@@ -70,49 +70,53 @@ export default function AdminDashboard() {
 
       {/* OVERVIEW */}
       {tab==="overview" && (
-        <div className="grid-2">
-          <div className="card">
-            <div className="section-title">Today's Submission Rate</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart><Pie data={pieSub} dataKey="value" cx="50%" cy="50%" outerRadius={80} label={({name,value})=>`${name}: ${value}`}>
-                {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
-              </Pie><Tooltip contentStyle={tt}/></PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="card">
-            <div className="section-title">🏆 Top Streaks</div>
-            <div className="streak-list">
-              {(dash?.topStreak||[]).map((u,i)=>(
-                <div className="streak-row" key={i}>
-                  <span className="streak-rank">{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
-                  <span className="streak-name">{u.name||u.userId?.split("@")[0]}</span>
-                  <span className="streak-val">🔥 {u.streak}</span>
-                  <span className="streak-sub">{u.weeklySubmissions}/7</span>
-                </div>
-              ))}
+        <>
+          <div className="grid-2" style={{marginBottom:"1rem"}}>
+            <div className="card">
+              <div className="section-title">📊 Today's Submission Rate</div>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart><Pie data={pieSub} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} label={({name,value})=>`${name}: ${value}`}>
+                  {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
+                </Pie><Tooltip contentStyle={tt}/></PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="card">
+              <div className="section-title">🏆 Top Streaks</div>
+              <div className="streak-list">
+                {(dash?.topStreak||[]).map((u,i)=>(
+                  <div className="streak-row" key={i}>
+                    <span className="streak-rank">{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
+                    <span className="streak-name">{u.name||u.userId?.split("@")[0]}</span>
+                    <span className="streak-val">🔥 {u.streak}</span>
+                    <span className="streak-sub">{u.weeklySubmissions}/7</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="card">
-            <div className="section-title">Weekly Submissions</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={weekly.slice(0,10).map(u=>({name:(u.name||"?").slice(0,8),days:u.weeklySubmissions||0}))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#252545"/>
-                <XAxis dataKey="name" stroke="#8888aa" fontSize={11}/>
-                <YAxis domain={[0,7]} stroke="#8888aa" fontSize={11}/>
-                <Tooltip contentStyle={tt}/>
-                <Bar dataKey="days" fill="#7c6fff" radius={[4,4,0,0]}/>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="grid-2">
+            <div className="card">
+              <div className="section-title">📅 Weekly Submissions</div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={weekly.slice(0,10).map(u=>({name:(u.name||"?").slice(0,8),days:u.weeklySubmissions||0}))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e1e40"/>
+                  <XAxis dataKey="name" stroke="#606080" fontSize={11}/>
+                  <YAxis domain={[0,7]} stroke="#606080" fontSize={11}/>
+                  <Tooltip contentStyle={tt}/>
+                  <Bar dataKey="days" fill="#7c6fff" radius={[6,6,0,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="card">
+              <div className="section-title">❓ Questions by Category</div>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart><Pie data={catPie} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({value})=>value}>
+                  {catPie.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+                </Pie><Tooltip contentStyle={tt}/><Legend iconSize={10} wrapperStyle={{fontSize:"0.72rem"}}/></PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="card">
-            <div className="section-title">Questions by Category</div>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart><Pie data={catPie} dataKey="value" cx="50%" cy="50%" outerRadius={80} label={({value})=>value}>
-                {catPie.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
-              </Pie><Tooltip contentStyle={tt}/><Legend iconSize={10} wrapperStyle={{fontSize:"0.72rem"}}/></PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        </>
       )}
 
       {/* TODAY */}
