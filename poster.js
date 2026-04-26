@@ -343,4 +343,7 @@ export default async function generatePoster(question) {
   ctx.fillRect(0, CANVAS_H - 4, W, 4);
 
   fs.writeFileSync("./daily.png", canvas.toBuffer("image/png"));
+
+  // Return base64 so caller can store it in DB
+  return `data:image/png;base64,${canvas.toBuffer("image/png").toString("base64")}`;
 }

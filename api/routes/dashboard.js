@@ -21,6 +21,7 @@ router.get("/", authMiddleware, async (req, res) => {
         questionSent: status?.questionSentToday || false,
         topic: status?.todayTopic || null,
         question: status?.todayQuestion || null,
+        posterImage: status?.todayPosterImage || null,
       },
       stats: {
         total: users.length,
@@ -112,6 +113,7 @@ router.get("/me", authMiddleware, async (req, res) => {
         questionSent: status?.questionSentToday || false,
         topic: status?.todayTopic || null,
         question: status?.todayQuestion || null,
+        posterImage: status?.todayPosterImage || null,
       },
       stats: {
         total: allUsers.length,

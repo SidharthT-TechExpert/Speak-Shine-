@@ -16,6 +16,7 @@ export default function UserDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lightbox, setLightbox] = useState(false);
 
   useEffect(() => {
     api.get("/dashboard/me")
@@ -36,10 +37,65 @@ export default function UserDashboard() {
   return (
     <Layout title="My Dashboard">
       {data?.today?.question && (
-        <div className="today-card">
-          <div className="today-label">📌 Today's Question</div>
-          <div className="today-q">{data.today.question}</div>
-          {data.today.topic && <span className="today-topic">{data.today.topic}</span>}
+        <div className="today-card" style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+          {/* Poster thumbnail — left side */}
+          {data.today.posterImage ? (
+            <img
+              src={data.today.posterImage}
+              alt="Today's question poster"
+              onClick={() => setLightbox(true)}
+              style={{
+                width: "120px",
+                minWidth: "120px",
+                borderRadius: "10px",
+                cursor: "pointer",
+                border: "2px solid var(--border)",
+                transition: "transform 0.2s",
+              }}
+              onMouseOver={e => e.currentTarget.style.transform = "scale(1.04)"}
+              onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+            />
+          ) : (
+            <div style={{
+              width: "120px", minWidth: "120px", height: "80px",
+              borderRadius: "10px", background: "var(--bg-secondary)",
+              border: "2px dashed var(--border)", display: "flex",
+              alignItems: "center", justifyContent: "center",
+              color: "var(--muted)", fontSize: "0.8rem", textAlign: "center",
+            }}>
+              📸<br/>Poster<br/>pending
+            </div>
+          )}
+
+          {/* Question text — right side */}
+          <div style={{ flex: 1 }}>
+            <div className="today-label">📌 Today's Question</div>
+            <div className="today-q">{data.today.question}</div>
+            {data.today.topic && <span className="today-topic">{data.today.topic}</span>}
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && data?.today?.posterImage && (
+        <div
+          onClick={() => setLightbox(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={data.today.posterImage}
+            alt="Today's question poster"
+            style={{
+              maxWidth: "90vw", maxHeight: "90vh",
+              borderRadius: "16px",
+              boxShadow: "0 0 60px rgba(0,0,0,0.8)",
+            }}
+          />
         </div>
       )}
 

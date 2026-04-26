@@ -339,7 +339,7 @@ async function startBot() {
       const question = q[0];
 
       // ── Generate & send poster ───────────────────────────────────────────
-      await generatePoster(question);
+      const posterBase64 = await generatePoster(question);
 
       const sent = await safeSend(sock, TARGET_GROUP, {
         image: { url: "./daily.png" },
@@ -358,6 +358,7 @@ async function startBot() {
             questionSentToday: true,
             todayTopic: question.topic || null,
             todayQuestion: question.question || null,
+            todayPosterImage: posterBase64 || null,
             recentCategories: updatedRecent,
           }
         });
