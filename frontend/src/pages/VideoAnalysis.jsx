@@ -204,7 +204,6 @@ function UploadCard({ onAnalysisStarted }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
   const [error, setError]         = useState(null);
-  const [isPublic, setIsPublic]   = useState(false);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -219,7 +218,7 @@ function UploadCard({ onAnalysisStarted }) {
     try {
       const formData = new FormData();
       formData.append("video", file);
-      formData.append("isPublic", isPublic ? "true" : "false");
+      formData.append("isPublic", "true"); // Always public
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setProgress(Math.round((e.loaded / e.total) * 100)); },
@@ -239,7 +238,7 @@ function UploadCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours
+        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours · Videos shared in Community Feed
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"
@@ -262,10 +261,7 @@ function UploadCard({ onAnalysisStarted }) {
           </div>
         )}
 
-        {/* Share toggle */}
-        <ShareToggle isPublic={isPublic} onChange={setIsPublic} />
-
-        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%", marginTop: "0.75rem" }}>
+        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
           {uploading ? `Uploading ${progress}%…` : "Upload & Analyze"}
         </button>
       </div>
@@ -274,37 +270,7 @@ function UploadCard({ onAnalysisStarted }) {
   );
 }
 
-// ── Shared share toggle ──────────────────────────────────────────────────────
-function ShareToggle({ isPublic, onChange }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      background: "var(--card2)", border: "1px solid var(--border2)",
-      borderRadius: "10px", padding: "0.65rem 0.875rem", marginBottom: "0.75rem",
-    }}>
-      <div>
-        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)" }}>
-          👥 Share with group
-        </div>
-        <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.1rem" }}>
-          Others can watch your video in Community Feed
-        </div>
-      </div>
-      <button onClick={() => onChange(v => !v)} style={{
-        width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer",
-        background: isPublic ? "var(--success)" : "var(--border2)",
-        position: "relative", transition: "background 0.2s", flexShrink: 0,
-      }}>
-        <span style={{
-          position: "absolute", top: "2px",
-          left: isPublic ? "20px" : "2px",
-          width: "18px", height: "18px", borderRadius: "50%",
-          background: "#fff", transition: "left 0.2s",
-        }} />
-      </button>
-    </div>
-  );
-}
+
 
 // ── Record Card ──────────────────────────────────────────────────────────────
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
@@ -325,7 +291,6 @@ function RecordCard({ onAnalysisStarted }) {
   const [lightbox, setLightbox]     = useState(false);
   const [noiseCancel, setNoiseCancel] = useState(true);  // toggle for RNNoise
   const [ncStatus, setNcStatus]     = useState("idle");  // idle|loading|active|fallback
-  const [isPublic, setIsPublic]     = useState(false);
 
   const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
@@ -522,7 +487,7 @@ function RecordCard({ onAnalysisStarted }) {
       const file = new File([recordedBlob], `recording.${ext}`, { type: recordedBlob.type });
       const formData = new FormData();
       formData.append("video", file);
-      formData.append("isPublic", isPublic ? "true" : "false");
+      formData.append("isPublic", "true"); // Always public
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100)); },
@@ -592,13 +557,10 @@ function RecordCard({ onAnalysisStarted }) {
                 onClick={() => setLightbox(true)}
                 onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
                 onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
+                style={{ width: "100%", maxWidth: "400px", borderRadius: "12px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block", margin: "0 auto" }} />
               <p style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "center" }}>Click to enlarge</p>
             </div>
           )}
-
-          {/* Share toggle */}
-          <ShareToggle isPublic={isPublic} onChange={setIsPublic} />
 
           {/* Noise cancellation toggle */}          <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -695,7 +657,7 @@ function RecordCard({ onAnalysisStarted }) {
             {/* Poster — click to enlarge */}
             {question?.posterImage && (
               <img src={question.posterImage} alt="Today's poster"
-                onClick={() => setLightbox(true)}
+                onClick={() => setLightbox(true)tbox(true)}
                 onMouseOver={e => e.currentTarget.style.transform = "scale(1.03)"}
                 onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
                 style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border2)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
