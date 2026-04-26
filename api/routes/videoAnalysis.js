@@ -17,25 +17,6 @@ const sseClients = new Map();
 const upload = multer({
   dest: "tmp/uploads/",
   limits: { fileSize: 350 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    console.log(`[VideoUpload] File MIME type: ${file.mimetype}`);
-    
-    const allowedTypes = [
-      "video/mp4", "video/quicktime", "video/x-msvideo", "video/webm",
-      "video/mpeg", "video/3gpp", "video/x-flv", "video/x-ms-wmv",
-    ];
-    
-    // Check if mimetype starts with any allowed type (handles codecs like "video/webm;codecs=vp9,opus")
-    const isAllowed = allowedTypes.some(type => file.mimetype.startsWith(type));
-    
-    if (isAllowed) {
-      console.log(`[VideoUpload] File accepted: ${file.mimetype}`);
-      cb(null, true);
-    } else {
-      console.error(`[VideoUpload] File rejected: ${file.mimetype}`);
-      cb(new Error(`File type not supported: ${file.mimetype}. Only video files are allowed (MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV).`));
-    }
-  },
 });
 
 // ── SSE progress stream ──────────────────────────────────────────────────────
