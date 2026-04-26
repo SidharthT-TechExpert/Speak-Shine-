@@ -657,7 +657,7 @@ function RecordCard({ onAnalysisStarted }) {
             {/* Poster — click to enlarge */}
             {question?.posterImage && (
               <img src={question.posterImage} alt="Today's poster"
-                onClick={() => setLightbox(true)tbox(true)}
+                onClick={() => setLightbox(true)}
                 onMouseOver={e => e.currentTarget.style.transform = "scale(1.03)"}
                 onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
                 style={{ width: "100%", borderRadius: "12px", border: "2px solid var(--border2)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block" }} />
