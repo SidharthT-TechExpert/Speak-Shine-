@@ -2174,6 +2174,24 @@ async function startBot() {
 
     cron.schedule("0 21 * * 0", weeklySummary, { timezone: TIMEZONE });
 
+    // R2 cleanup — delete expired video objects from Cloudflare R2 every hour
+    cron.schedule("0 * * * *", async () => {
+      try {
+        const { deleteFromR2 } = await import("./r2.js");
+        const VideoReport = (await import("./models/videoReportSchema.js")).default;
+        const expired = await VideoReport.find({
+          videoKey: { $ne: null },
+          expiresAt: { $lt: new Date() },
+        }).select("videoKey").lean();
+        for (const r of expired) {
+          await deleteFromR2(r.videoKey);
+        }
+        if (expired.length > 0) console.log(`[R2 Cleanup] Deleted ${expired.length} expired video(s)`);
+      } catch (err) {
+        console.log("[R2 Cleanup] Error:", err.message);
+      }
+    }, { timezone: TIMEZONE });
+
     // ================= TEST CRON (sends question to owner every min, no delete) =================
     if (false) {
       cron.schedule("* * * * *", async () => {

@@ -83,11 +83,17 @@ const videoReportSchema = new mongoose.Schema({
     default: "processing",
   },
   errorMessage: String,
-  
+
+  // R2 video storage
+  videoUrl:   { type: String, default: null },  // public CDN URL
+  videoKey:   { type: String, default: null },  // R2 object key (for deletion)
+  isPublic:   { type: Boolean, default: false }, // user opted in to community feed
+  uploaderName: { type: String, default: null }, // display name for community feed
+
   // Auto-delete after 12 hours
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours from now
+    default: () => new Date(Date.now() + 12 * 60 * 60 * 1000),
   },
 });
 

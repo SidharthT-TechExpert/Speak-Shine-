@@ -6,6 +6,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import VideoReport from "../../models/videoReportSchema.js";
 import User from "../../models/userSchema.js";
 import { processWebVideo, getVideoDuration } from "../../ai/webVideoProcessor.js";
+import { uploadToR2, deleteFromR2, getR2Key } from "../../r2.js";
 
 const router = express.Router();
 
@@ -143,6 +144,8 @@ router.post("/upload", authMiddleware, (req, res, next) => {
       videoFileName: req.file.originalname,
       videoDuration: duration,
       status: "processing",
+      isPublic: req.body.isPublic === "true" || req.body.isPublic === true,
+      uploaderName: user?.name || phone,
     });
 
     console.log(`[VideoUpload] Report created: ${report._id}`);
@@ -156,7 +159,7 @@ router.post("/upload", authMiddleware, (req, res, next) => {
     });
 
     // Process in background
-    processInBackground(report._id, videoPath, phone, user?.name || phone);
+    processInBackground(report._id, videoPath, phone, user?.name || phone, req.file.mimetype);
 
   } catch (err) {
     console.error("[VideoUpload] Error:", err);
@@ -179,11 +182,52 @@ router.get("/report/:reportId", authMiddleware, async (req, res) => {
       expiresAt:     report.expiresAt,
       videoFileName: report.videoFileName,
       videoDuration: report.videoDuration,
+      videoUrl:      report.videoUrl || null,
+      isPublic:      report.isPublic || false,
       analysis:      report.status === "completed" ? report.analysis : null,
       errorMessage:  report.errorMessage,
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch report" });
+  }
+});
+
+// ── Community feed — today's public submissions ──────────────────────────────
+// GET /api/video/community-feed
+router.get("/community-feed", authMiddleware, async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
+    const feed = await VideoReport.find({
+      status:   "completed",
+      isPublic: true,
+      videoUrl: { $ne: null },
+      submittedAt: { $gte: since },
+      expiresAt:   { $gt: new Date() },
+    })
+      .sort({ submittedAt: -1 })
+      .limit(20)
+      .select("uploaderName submittedAt videoDuration videoUrl analysis.fluency analysis.grammar analysis.confidence analysis.vocabulary analysis.overallComment expiresAt")
+      .lean();
+
+    res.json({ feed });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch community feed" });
+  }
+});
+
+// ── Toggle public/private for own report ────────────────────────────────────
+router.patch("/report/:reportId/visibility", authMiddleware, async (req, res) => {
+  try {
+    const report = await VideoReport.findById(req.params.reportId);
+    if (!report) return res.status(404).json({ error: "Report not found" });
+    if (report.userId.toString() !== req.user.id) return res.status(403).json({ error: "Access denied" });
+    if (!report.videoUrl) return res.status(400).json({ error: "No video stored for this report" });
+
+    report.isPublic = !report.isPublic;
+    await report.save();
+    res.json({ isPublic: report.isPublic });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update visibility" });
   }
 });
 
@@ -216,7 +260,7 @@ router.delete("/report/:reportId", authMiddleware, async (req, res) => {
 });
 
 // ── Background processor ─────────────────────────────────────────────────────
-async function processInBackground(reportId, videoPath, phone, displayName) {
+async function processInBackground(reportId, videoPath, phone, displayName, mimeType = "video/webm") {
   try {
     console.log(`[VideoAnalysis] Starting ${reportId}`);
 
@@ -229,13 +273,31 @@ async function processInBackground(reportId, videoPath, phone, displayName) {
       }
     );
 
+    // ── Upload to R2 after analysis ──────────────────────────────────────
+    let videoUrl = null;
+    let videoKey = null;
+    const report = await VideoReport.findById(reportId).lean();
+
+    if (report && fs.existsSync(videoPath)) {
+      try {
+        pushProgress(reportId, { status: "processing", stage: "Saving video to cloud…" });
+        videoKey = getR2Key(report.userId.toString(), report.videoFileName || `recording.webm`);
+        videoUrl = await uploadToR2(videoPath, videoKey, mimeType);
+        console.log(`[R2] Uploaded: ${videoUrl}`);
+      } catch (r2Err) {
+        console.log(`[R2] Upload failed (non-fatal): ${r2Err.message}`);
+        videoUrl = null;
+        videoKey = null;
+      }
+    }
+
     await VideoReport.findByIdAndUpdate(reportId, {
-      status: "completed",
+      status:   "completed",
       analysis: result.analysis,
+      ...(videoUrl ? { videoUrl, videoKey } : {}),
     });
 
     // ── Save feedback scores + monthlySubmissions after analysis ────────
-    // (matches WhatsApp bot behavior exactly)
     const { fluency, grammar, confidence, vocabulary } = result.analysis;
     if (fluency != null || grammar != null) {
       await User.findOneAndUpdate(
@@ -252,7 +314,6 @@ async function processInBackground(reportId, videoPath, phone, displayName) {
       );
     }
 
-    // Push completion to SSE client
     pushProgress(reportId, { status: "completed" });
     const client = sseClients.get(String(reportId));
     if (client) { client.end(); sseClients.delete(String(reportId)); }
@@ -272,6 +333,7 @@ async function processInBackground(reportId, videoPath, phone, displayName) {
     if (client) { client.end(); sseClients.delete(String(reportId)); }
 
   } finally {
+    // Always delete the local temp file
     if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
   }
 }

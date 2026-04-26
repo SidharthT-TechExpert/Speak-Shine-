@@ -204,6 +204,7 @@ function UploadCard({ onAnalysisStarted }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
   const [error, setError]         = useState(null);
+  const [isPublic, setIsPublic]   = useState(false);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -218,6 +219,7 @@ function UploadCard({ onAnalysisStarted }) {
     try {
       const formData = new FormData();
       formData.append("video", file);
+      formData.append("isPublic", isPublic ? "true" : "false");
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setProgress(Math.round((e.loaded / e.total) * 100)); },
@@ -259,11 +261,47 @@ function UploadCard({ onAnalysisStarted }) {
             </div>
           </div>
         )}
-        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
+
+        {/* Share toggle */}
+        <ShareToggle isPublic={isPublic} onChange={setIsPublic} />
+
+        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%", marginTop: "0.75rem" }}>
           {uploading ? `Uploading ${progress}%…` : "Upload & Analyze"}
         </button>
       </div>
       {error && <div className="error-box" style={{ marginTop: "1rem" }}><p>{error}</p></div>}
+    </div>
+  );
+}
+
+// ── Shared share toggle ──────────────────────────────────────────────────────
+function ShareToggle({ isPublic, onChange }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      background: "var(--card2)", border: "1px solid var(--border2)",
+      borderRadius: "10px", padding: "0.65rem 0.875rem", marginBottom: "0.75rem",
+    }}>
+      <div>
+        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)" }}>
+          👥 Share with group
+        </div>
+        <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.1rem" }}>
+          Others can watch your video in Community Feed
+        </div>
+      </div>
+      <button onClick={() => onChange(v => !v)} style={{
+        width: "40px", height: "22px", borderRadius: "11px", border: "none", cursor: "pointer",
+        background: isPublic ? "var(--success)" : "var(--border2)",
+        position: "relative", transition: "background 0.2s", flexShrink: 0,
+      }}>
+        <span style={{
+          position: "absolute", top: "2px",
+          left: isPublic ? "20px" : "2px",
+          width: "18px", height: "18px", borderRadius: "50%",
+          background: "#fff", transition: "left 0.2s",
+        }} />
+      </button>
     </div>
   );
 }
@@ -287,6 +325,7 @@ function RecordCard({ onAnalysisStarted }) {
   const [lightbox, setLightbox]     = useState(false);
   const [noiseCancel, setNoiseCancel] = useState(true);  // toggle for RNNoise
   const [ncStatus, setNcStatus]     = useState("idle");  // idle|loading|active|fallback
+  const [isPublic, setIsPublic]     = useState(false);
 
   const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
@@ -483,6 +522,7 @@ function RecordCard({ onAnalysisStarted }) {
       const file = new File([recordedBlob], `recording.${ext}`, { type: recordedBlob.type });
       const formData = new FormData();
       formData.append("video", file);
+      formData.append("isPublic", isPublic ? "true" : "false");
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100)); },
@@ -557,8 +597,10 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           )}
 
-          {/* Noise cancellation toggle */}
-          <div style={{
+          {/* Share toggle */}
+          <ShareToggle isPublic={isPublic} onChange={setIsPublic} />
+
+          {/* Noise cancellation toggle */}          <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             background: "var(--card2)", border: "1px solid var(--border2)",
             borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1.25rem",

@@ -27,15 +27,18 @@ export default function Layout({ children, title }) {
       { to: "/trainer",   label: "🎓 Trainer" },
       { to: "/dashboard", label: "👤 User View" },
       { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/community", label: "👥 Community" },
     ];
     if (user?.role === "trainer") return [
       { to: "/trainer",   label: "🎓 Dashboard" },
       { to: "/dashboard", label: "👤 User View" },
       { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/community", label: "👥 Community" },
     ];
     return [
       { to: "/dashboard", label: "📊 Dashboard" },
       { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/community", label: "👥 Community" },
     ];
   };
 
