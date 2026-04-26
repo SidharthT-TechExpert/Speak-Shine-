@@ -4,6 +4,7 @@ nixPkgs = ["nodejs_20", "ffmpeg", "pkg-config", "python3"]
 [phases.install]
 cmds = [
   "npm ci --omit=dev --omit=optional --ignore-scripts || npm install --omit=dev --omit=optional --ignore-scripts",
+  "cd api && npm ci --omit=dev || npm install --omit=dev",
   "cd frontend && npm ci --omit=dev || npm install --omit=dev"
 ]
 
