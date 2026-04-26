@@ -34,8 +34,8 @@ app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" 
 if (isProd) {
   const distPath = path.join(__dirname, "../frontend/dist");
   app.use(express.static(distPath));
-  // All non-API routes → React index.html (client-side routing)
-  app.get("*", (_, res) => res.sendFile(path.join(distPath, "index.html")));
+  // Express 5 compatible wildcard — serves React for all non-API routes
+  app.get("/{*path}", (_, res) => res.sendFile(path.join(distPath, "index.html")));
 }
 
 // ── Start ───────────────────────────────────────────────────────────────────
