@@ -2,12 +2,11 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../api/client.js";
-import styles from "./Auth.module.css";
 
 const META = {
-  admin:   { title: "Admin Portal",   icon: "🛡️", sub: "Sign in to manage Speak & Shine" },
-  trainer: { title: "Trainer Portal", icon: "🎓", sub: "Sign in to coach your students" },
-  user:    { title: "Speak & Shine",  icon: "🗣️", sub: "Sign in to your account" },
+  admin:   { title: "Admin Portal",   icon: "🛡️", sub: "Manage Speak & Shine", accent: "#7c6fff" },
+  trainer: { title: "Trainer Portal", icon: "🎓", sub: "Coach your students",   accent: "#fbbf24" },
+  user:    { title: "Speak & Shine",  icon: "🗣️", sub: "Track your progress",  accent: "#7c6fff" },
 };
 
 export default function Login({ loginFor = "user", showRegister = false }) {
@@ -16,89 +15,91 @@ export default function Login({ loginFor = "user", showRegister = false }) {
   const [form, setForm] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const meta = META[loginFor] || META.user;
 
   const submit = async (e) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
+    setError(""); setLoading(true);
     try {
       const { data } = await api.post("/auth/login", form);
-
-      // Role gate — make sure the right person is logging into the right portal
-      if (loginFor === "admin" && data.role !== "admin") {
-        setError("Access denied. Admin credentials required.");
-        setLoading(false);
-        return;
-      }
-      if (loginFor === "trainer" && !["trainer", "admin"].includes(data.role)) {
-        setError("Access denied. Trainer credentials required.");
-        setLoading(false);
-        return;
-      }
-
+      if (loginFor === "admin" && data.role !== "admin") { setError("Admin credentials required."); return; }
+      if (loginFor === "trainer" && !["trainer","admin"].includes(data.role)) { setError("Trainer credentials required."); return; }
       login(data.token, { phone: data.phone, role: data.role, name: data.name });
-
-      // Redirect to the correct page
       if (data.role === "admin") navigate("/admin");
       else if (data.role === "trainer") navigate("/trainer");
       else navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.error || "Login failed");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className={styles.page}>
-      <div className={styles.card}>
-        <div className={styles.logo}>{meta.icon}</div>
-        <h1 className={styles.title}>{meta.title}</h1>
-        <p className={styles.sub}>{meta.sub}</p>
-
-        <form onSubmit={submit} className={styles.form}>
-          <div className={styles.field}>
-            <label>Phone Number</label>
-            <input
-              type="text"
-              placeholder="e.g. 918848096746"
-              value={form.phone}
-              onChange={e => setForm({ ...form, phone: e.target.value })}
-              required
-            />
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a14] px-4"
+      style={{ background: "radial-gradient(ellipse at 50% 0%, #1a1040 0%, #0a0a14 60%)" }}>
+      <div className="w-full max-w-sm">
+        {/* Card */}
+        <div className="bg-[#16162a] border border-[#252545] rounded-3xl p-8 shadow-2xl">
+          {/* Logo */}
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-3">{meta.icon}</div>
+            <h1 className="text-2xl font-bold text-[#e8e8f4]">{meta.title}</h1>
+            <p className="text-sm text-[#8888aa] mt-1">{meta.sub}</p>
           </div>
-          <div className={styles.field}>
-            <label>Password</label>
-            <input
-              type="password"
-              placeholder="Enter password"
-              value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })}
-              required
-            />
-          </div>
-          {error && <p className={styles.error}>{error}</p>}
-          <button type="submit" className={styles.btn} disabled={loading}>
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
-        </form>
 
-        {/* Only show register link on the user login page */}
-        {showRegister && (
-          <p className={styles.link}>
-            Don't have an account? <Link to="/register">Register</Link>
-          </p>
-        )}
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-[#8888aa] mb-1.5">Phone Number</label>
+              <input
+                type="text"
+                placeholder="e.g. 918848096746"
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+                required
+                className="w-full bg-[#111122] border border-[#252545] rounded-xl px-4 py-3 text-[#e8e8f4] text-sm placeholder-[#444466] focus:border-[#7c6fff] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#8888aa] mb-1.5">Password</label>
+              <input
+                type="password"
+                placeholder="Enter password"
+                value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })}
+                required
+                className="w-full bg-[#111122] border border-[#252545] rounded-xl px-4 py-3 text-[#e8e8f4] text-sm placeholder-[#444466] focus:border-[#7c6fff] transition-colors"
+              />
+            </div>
 
-        {/* Portal switcher hints */}
-        {loginFor === "user" && (
-          <div className={styles.portalLinks}>
-            <Link to="/admin/login">Admin Portal →</Link>
-            <Link to="/trainer/login">Trainer Portal →</Link>
-          </div>
-        )}
+            {error && (
+              <div className="bg-[#f87171]/10 border border-[#f87171]/30 rounded-xl px-4 py-2.5 text-[#f87171] text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-all duration-200 disabled:opacity-50"
+              style={{ background: `linear-gradient(135deg, ${meta.accent}, #5544cc)` }}
+            >
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
+          </form>
+
+          {showRegister && (
+            <p className="text-center text-sm text-[#8888aa] mt-5">
+              No account?{" "}
+              <Link to="/register" className="text-[#7c6fff] font-medium hover:underline">Register</Link>
+            </p>
+          )}
+
+          {loginFor === "user" && (
+            <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-[#252545]">
+              <Link to="/admin/login" className="text-xs text-[#8888aa] hover:text-[#7c6fff] transition-colors">Admin Portal →</Link>
+              <Link to="/trainer/login" className="text-xs text-[#8888aa] hover:text-[#fbbf24] transition-colors">Trainer Portal →</Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
