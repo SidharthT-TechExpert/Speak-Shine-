@@ -14,6 +14,7 @@ const SCORE_LABELS = [
   { key: "vocabulary", label: "Vocabulary", icon: "📚" },
 ];
 
+// ── Reusable score bar (progress style) ─────────────────────────────────────
 function ScoreBar({ label, icon, value }) {
   if (value == null) return null;
   return (
@@ -25,95 +26,185 @@ function ScoreBar({ label, icon, value }) {
       <div style={{ height: "6px", borderRadius: "99px", background: "var(--border2)", overflow: "hidden" }}>
         <div style={{
           height: "100%", width: `${value * 10}%`,
-          background: scoreColor(value),
-          borderRadius: "99px",
-          transition: "width 0.6s ease",
+          background: scoreColor(value), borderRadius: "99px", transition: "width 0.6s ease",
         }} />
       </div>
     </div>
   );
 }
 
-function FeedbackPanel({ analysis }) {
-  if (!analysis) return null;
+// ── Block score bar (same style as VideoAnalysis page) ───────────────────────
+function BlockScoreBar({ score }) {
+  const filled = Math.round(score || 0);
   return (
-    <div style={{
-      marginTop: "1rem",
-      padding: "1rem",
-      borderRadius: "10px",
-      background: "var(--card2)",
-      border: "1px solid var(--border2)",
-    }}>
-      <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.75rem" }}>
-        📊 Feedback
+    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div style={{ display: "flex", gap: "2px" }}>
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} style={{
+            width: "16px", height: "16px", borderRadius: "3px",
+            background: i < filled ? scoreColor(score) : "var(--bg)",
+            border: "1px solid var(--border)",
+          }} />
+        ))}
+      </div>
+      <span style={{ fontWeight: 700, minWidth: "36px", fontSize: "0.85rem" }}>{score}/10</span>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div style={{ marginBottom: "1.1rem" }}>
+      <div style={{ borderTop: "1px solid var(--border)", margin: "0.9rem 0 0.65rem" }} />
+      <div style={{ fontWeight: 700, marginBottom: "0.65rem", color: "var(--text)", fontSize: "0.88rem" }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+// ── Full detailed report (mirrors VideoAnalysis ReportView) ──────────────────
+function DetailedReport({ a }) {
+  if (!a) return null;
+  const s = a.stats || {};
+  return (
+    <div style={{ fontSize: "0.85rem" }}>
+      {/* Stats bar */}
+      <div style={{
+        background: "var(--bg)", borderRadius: "8px", padding: "0.65rem 0.9rem",
+        marginBottom: "0.9rem", display: "flex", flexWrap: "wrap", gap: "0.75rem", fontSize: "0.82rem",
+      }}>
+        {s.duration   && <span>⏱️ <strong>{s.duration}</strong></span>}
+        {s.wpm        && <span>📊 <strong>{s.wpm} wpm</strong> {s.wpm < 100 ? "🐢 Slow" : s.wpm <= 150 ? "✅ Good" : "⚡ Fast"}</span>}
+        {s.fillerTotal > 0 && <span>🗣️ Fillers: <strong>{Object.entries(s.fillerWords || {}).map(([w,c]) => `"${w}" ×${c}`).join(", ")}</strong></span>}
+        {s.pauses > 0 && <span>🔇 Pauses: <strong>{s.pauses}</strong></span>}
+        {s.rhythm?.speechRatio != null && <span>🎵 Speech: <strong>{s.rhythm.speechRatio}%</strong> {s.rhythm.speechRatio >= 75 ? "✅" : s.rhythm.speechRatio >= 55 ? "⚠️" : "❌"}</span>}
       </div>
 
-      {/* Score bars */}
-      {SCORE_LABELS.map(({ key, label, icon }) => (
-        <ScoreBar key={key} label={label} icon={icon} value={analysis[key]} />
-      ))}
+      {a.qualityWarning && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>🔈 {a.qualityWarning}</p>}
 
-      {/* Overall score */}
-      {analysis.overallScore != null && (
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginTop: "0.75rem", paddingTop: "0.75rem",
-          borderTop: "1px solid var(--border2)",
-        }}>
-          <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>⭐ Overall Score</span>
-          <span style={{
-            fontWeight: 800, fontSize: "1rem",
-            color: scoreColor(analysis.overallScore),
-            background: scoreBg(analysis.overallScore),
-            padding: "0.2rem 0.6rem", borderRadius: "8px",
-          }}>{analysis.overallScore}/10</span>
-        </div>
-      )}
+      {/* Speech scores */}
+      <Section title="🗣️ Speech Scores">
+        {[{ icon: "🗣️", label: "Fluency", v: a.fluency }, { icon: "📚", label: "Grammar", v: a.grammar },
+          { icon: "🔥", label: "Confidence", v: a.confidence }, { icon: "🧠", label: "Vocabulary", v: a.vocabulary }]
+          .map(({ icon, label, v }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+              <span style={{ width: "100px", color: "var(--muted)", fontSize: "0.8rem" }}>{icon} {label}</span>
+              <BlockScoreBar score={v} />
+            </div>
+          ))}
+        {s.cefrLevel && (
+          <p style={{ marginTop: "0.4rem", color: "var(--muted)", fontSize: "0.8rem" }}>
+            🎓 Level: <strong>{s.cefrLevel.level}</strong> — <em>{s.cefrLevel.description}</em>
+          </p>
+        )}
+        {a.topicRelevance != null && (
+          <div style={{ marginTop: "0.4rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.3rem" }}>
+              <span style={{ width: "100px", color: "var(--muted)", fontSize: "0.8rem" }}>🎯 On-topic</span>
+              <BlockScoreBar score={a.topicRelevance} />
+            </div>
+            {a.topicFeedback && <p style={{ color: "var(--muted)", fontSize: "0.8rem", fontStyle: "italic" }}>💬 {a.topicFeedback}</p>}
+          </div>
+        )}
+      </Section>
 
-      {/* Strengths */}
-      {analysis.strengths?.length > 0 && (
-        <div style={{ marginTop: "0.75rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--success)", marginBottom: "0.3rem" }}>✅ Strengths</div>
-          <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-            {analysis.strengths.map((s, i) => (
-              <li key={i} style={{ fontSize: "0.78rem", color: "var(--text2)", marginBottom: "0.2rem" }}>{s}</li>
+      {/* Visual presence */}
+      {a.eyeContact != null && (
+        <Section title="📹 Visual Presence">
+          {[{ icon: "👁️", label: "Eye Contact", v: a.eyeContact }, { icon: "🧍", label: "Body Language", v: a.bodyLanguage },
+            { icon: "😊", label: "Expression", v: a.facialExpression }, { icon: "✨", label: "Presence", v: a.overallPresence }]
+            .map(({ icon, label, v }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+                <span style={{ width: "110px", color: "var(--muted)", fontSize: "0.8rem" }}>{icon} {label}</span>
+                <BlockScoreBar score={v} />
+              </div>
             ))}
-          </ul>
-        </div>
+        </Section>
       )}
 
-      {/* Improvements */}
-      {analysis.improvements?.length > 0 && (
-        <div style={{ marginTop: "0.75rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--warning)", marginBottom: "0.3rem" }}>💡 Improvements</div>
-          <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-            {analysis.improvements.map((s, i) => (
-              <li key={i} style={{ fontSize: "0.78rem", color: "var(--text2)", marginBottom: "0.2rem" }}>{s}</li>
-            ))}
-          </ul>
-        </div>
+      {/* Pronunciation & Rhythm */}
+      {(a.pronunciationNote || a.rhythmNote) && (
+        <Section title="🎵 Pronunciation & Rhythm">
+          {a.pronunciationNote && <p style={{ marginBottom: "0.3rem" }}>🗣️ {a.pronunciationNote}</p>}
+          {a.rhythmNote        && <p>🎵 {a.rhythmNote}</p>}
+        </Section>
       )}
 
-      {/* Full comment */}
-      {analysis.overallComment && (
-        <p style={{
-          marginTop: "0.75rem", fontSize: "0.78rem", color: "var(--text2)",
-          lineHeight: 1.6, fontStyle: "italic",
-          paddingTop: "0.75rem", borderTop: "1px solid var(--border2)",
-        }}>
-          "{analysis.overallComment}"
-        </p>
+      {/* Grammar errors */}
+      {a.grammarErrors?.length > 0 && (
+        <Section title="❌ Grammar Issues">
+          {a.grammarErrors.map((e, i) => (
+            <div key={i} style={{ marginBottom: "0.5rem", paddingLeft: "0.5rem", borderLeft: "3px solid var(--danger)" }}>
+              <span style={{ color: "var(--muted)", fontStyle: "italic" }}>"{e.original}"</span>{" → "}
+              <strong style={{ color: "var(--success)" }}>"{e.correction}"</strong>
+              {e.rule && <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}> ({e.rule})</span>}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* Strong points */}
+      {a.strongPoints?.length > 0 && (
+        <Section title="✅ What They Did Well">
+          <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
+            {a.strongPoints.map((p, i) => <li key={i} style={{ marginBottom: "0.25rem" }}>{p}</li>)}
+          </ul>
+        </Section>
+      )}
+
+      {/* Visual observations */}
+      {(a.eyeContactNote || a.bodyLanguageNote || a.expressionNote || a.visualStrengths?.length > 0) && (
+        <Section title="📹 Visual Observations">
+          {a.eyeContactNote   && <p style={{ marginBottom: "0.3rem" }}>👁️ {a.eyeContactNote}</p>}
+          {a.bodyLanguageNote && <p style={{ marginBottom: "0.3rem" }}>🧍 {a.bodyLanguageNote}</p>}
+          {a.expressionNote   && <p style={{ marginBottom: "0.3rem" }}>😊 {a.expressionNote}</p>}
+          {a.visualStrengths?.map((s, i) => <p key={i} style={{ marginBottom: "0.25rem" }}>✅ {s}</p>)}
+        </Section>
+      )}
+
+      {/* Vocabulary */}
+      {(a.vocabularyHighlights?.strong?.length > 0 || a.vocabularyHighlights?.weak?.length > 0) && (
+        <Section title="📖 Vocabulary">
+          {a.vocabularyHighlights.strong?.length > 0 && <p style={{ marginBottom: "0.3rem" }}>💎 Good words: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>}
+          {a.vocabularyHighlights.weak?.length > 0   && <p>📖 Upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>}
+        </Section>
+      )}
+
+      {/* Speaking tips */}
+      {a.suggestions?.length > 0 && (
+        <Section title="💡 Speaking Tips">
+          <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
+            {a.suggestions.map((t, i) => <li key={i} style={{ marginBottom: "0.25rem" }}>{t}</li>)}
+          </ul>
+        </Section>
+      )}
+
+      {/* Presentation tips */}
+      {a.visualSuggestions?.length > 0 && (
+        <Section title="🎬 Presentation Tips">
+          <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
+            {a.visualSuggestions.map((t, i) => <li key={i} style={{ marginBottom: "0.25rem" }}>{t}</li>)}
+          </ul>
+        </Section>
+      )}
+
+      {/* Overall comment */}
+      {a.overallComment && (
+        <Section title="📝 Overall Feedback">
+          <p style={{ lineHeight: 1.7 }}>{a.overallComment}</p>
+        </Section>
       )}
     </div>
   );
 }
 
+// ── Main page ────────────────────────────────────────────────────────────────
 export default function CommunityFeed() {
   const [feed, setFeed]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
   const [playing, setPlaying]   = useState(null);
-  const [expanded, setExpanded] = useState({}); // reportId → bool for feedback panel
+  const [view, setView]         = useState({}); // id → "feedback" | "report" | null
 
   useEffect(() => {
     api.get("/video/community-feed")
@@ -122,7 +213,8 @@ export default function CommunityFeed() {
       .finally(() => setLoading(false));
   }, []);
 
-  const toggleFeedback = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleView = (id, mode) =>
+    setView(prev => ({ ...prev, [id]: prev[id] === mode ? null : mode }));
 
   if (loading) return (
     <Layout title="Community Feed">
@@ -188,8 +280,8 @@ export default function CommunityFeed() {
                 </div>
               </div>
 
-              {/* Short comment preview */}
-              {item.analysis?.overallComment && !expanded[item._id] && (
+              {/* Short comment — only when nothing expanded */}
+              {!view[item._id] && item.analysis?.overallComment && (
                 <p style={{ fontSize: "0.82rem", color: "var(--text2)", marginBottom: "1rem", lineHeight: 1.6, fontStyle: "italic" }}>
                   "{item.analysis.overallComment.slice(0, 180)}{item.analysis.overallComment.length > 180 ? "…" : ""}"
                 </p>
@@ -198,29 +290,19 @@ export default function CommunityFeed() {
               {/* Video player */}
               {playing === item._id ? (
                 <div>
-                  <video
-                    src={item.videoUrl}
-                    controls
-                    autoPlay
-                    playsInline
-                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px" }}
-                  />
-                  <button
-                    onClick={() => setPlaying(null)}
-                    style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}
-                  >
+                  <video src={item.videoUrl} controls autoPlay playsInline
+                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px" }} />
+                  <button onClick={() => setPlaying(null)}
+                    style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
                     ✕ Close video
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setPlaying(item._id)}
-                  style={{
-                    width: "100%", padding: "0.75rem", borderRadius: "10px",
-                    background: "rgba(124,111,255,0.1)", border: "1px solid rgba(124,111,255,0.25)",
-                    color: "var(--primary)", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer",
-                    transition: "all 0.18s",
-                  }}
+                <button onClick={() => setPlaying(item._id)} style={{
+                  width: "100%", padding: "0.75rem", borderRadius: "10px",
+                  background: "rgba(124,111,255,0.1)", border: "1px solid rgba(124,111,255,0.25)",
+                  color: "var(--primary)", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.18s",
+                }}
                   onMouseOver={e => e.currentTarget.style.background = "rgba(124,111,255,0.18)"}
                   onMouseOut={e => e.currentTarget.style.background = "rgba(124,111,255,0.1)"}
                 >
@@ -228,26 +310,89 @@ export default function CommunityFeed() {
                 </button>
               )}
 
-              {/* Feedback toggle */}
+              {/* Action buttons */}
               {item.analysis && (
-                <>
-                  <button
-                    onClick={() => toggleFeedback(item._id)}
-                    style={{
-                      marginTop: "0.6rem", width: "100%", padding: "0.5rem",
-                      borderRadius: "8px", background: "transparent",
-                      border: "1px solid var(--border2)",
-                      color: "var(--muted)", fontSize: "0.78rem",
-                      cursor: "pointer", transition: "all 0.18s",
-                    }}
-                    onMouseOver={e => e.currentTarget.style.borderColor = "var(--primary)"}
-                    onMouseOut={e => e.currentTarget.style.borderColor = "var(--border2)"}
-                  >
-                    {expanded[item._id] ? "▲ Hide Feedback" : "▼ View Feedback"}
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
+                  <button onClick={() => toggleView(item._id, "feedback")} style={{
+                    flex: 1, padding: "0.5rem", borderRadius: "8px", background: "transparent",
+                    border: `1px solid ${view[item._id] === "feedback" ? "var(--primary)" : "var(--border2)"}`,
+                    color: view[item._id] === "feedback" ? "var(--primary)" : "var(--muted)",
+                    fontSize: "0.78rem", cursor: "pointer", transition: "all 0.18s",
+                  }}>
+                    {view[item._id] === "feedback" ? "▲ Hide Feedback" : "📊 Feedback"}
                   </button>
+                  <button onClick={() => toggleView(item._id, "report")} style={{
+                    flex: 1, padding: "0.5rem", borderRadius: "8px", background: "transparent",
+                    border: `1px solid ${view[item._id] === "report" ? "var(--primary)" : "var(--border2)"}`,
+                    color: view[item._id] === "report" ? "var(--primary)" : "var(--muted)",
+                    fontSize: "0.78rem", cursor: "pointer", transition: "all 0.18s",
+                  }}>
+                    {view[item._id] === "report" ? "▲ Hide Report" : "📋 Full Report"}
+                  </button>
+                </div>
+              )}
 
-                  {expanded[item._id] && <FeedbackPanel analysis={item.analysis} />}
-                </>
+              {/* Quick feedback panel */}
+              {view[item._id] === "feedback" && item.analysis && (
+                <div style={{
+                  marginTop: "0.75rem", padding: "1rem", borderRadius: "10px",
+                  background: "var(--card2)", border: "1px solid var(--border2)",
+                }}>
+                  <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.75rem" }}>📊 Feedback</div>
+                  {SCORE_LABELS.map(({ key, label, icon }) => (
+                    <ScoreBar key={key} label={label} icon={icon} value={item.analysis[key]} />
+                  ))}
+                  {item.analysis.overallScore != null && (
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border2)",
+                    }}>
+                      <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>⭐ Overall</span>
+                      <span style={{
+                        fontWeight: 800, fontSize: "1rem", color: scoreColor(item.analysis.overallScore),
+                        background: scoreBg(item.analysis.overallScore), padding: "0.2rem 0.6rem", borderRadius: "8px",
+                      }}>{item.analysis.overallScore}/10</span>
+                    </div>
+                  )}
+                  {item.analysis.strongPoints?.length > 0 && (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--success)", marginBottom: "0.3rem" }}>✅ Strengths</div>
+                      <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+                        {item.analysis.strongPoints.map((s, i) => (
+                          <li key={i} style={{ fontSize: "0.78rem", color: "var(--text2)", marginBottom: "0.2rem" }}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {item.analysis.suggestions?.length > 0 && (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--warning)", marginBottom: "0.3rem" }}>💡 Tips</div>
+                      <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+                        {item.analysis.suggestions.map((s, i) => (
+                          <li key={i} style={{ fontSize: "0.78rem", color: "var(--text2)", marginBottom: "0.2rem" }}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {item.analysis.overallComment && (
+                    <p style={{
+                      marginTop: "0.75rem", fontSize: "0.78rem", color: "var(--text2)",
+                      lineHeight: 1.6, fontStyle: "italic",
+                      paddingTop: "0.75rem", borderTop: "1px solid var(--border2)",
+                    }}>"{item.analysis.overallComment}"</p>
+                  )}
+                </div>
+              )}
+
+              {/* Full detailed report */}
+              {view[item._id] === "report" && item.analysis && (
+                <div style={{
+                  marginTop: "0.75rem", padding: "1rem", borderRadius: "10px",
+                  background: "var(--card2)", border: "1px solid var(--border2)",
+                }}>
+                  <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.5rem" }}>📋 Detailed Analysis Report</div>
+                  <DetailedReport a={item.analysis} />
+                </div>
               )}
 
             </div>
