@@ -26,7 +26,6 @@ export default function AdminDashboard() {
   const [qCat, setQCat] = useState("");
   const [modal, setModal] = useState(null);
   const [fineInput, setFineInput] = useState("");
-  const [qCat, setQCat] = useState("");
 
   const load = async () => {
     setLoading(true);
