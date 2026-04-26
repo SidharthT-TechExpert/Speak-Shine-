@@ -10,16 +10,16 @@ import { exec } from "child_process";
 
 const router = express.Router();
 
-// Configure multer for video uploads (max 100MB)
+// Configure multer for video uploads (max 50MB)
 const upload = multer({
   dest: "tmp/uploads/",
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/webm"];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only video files are allowed (MP4, MOV, AVI, WEBM)"));
+      cb(new Error("Only video files are allowed (MP4, MOV, AVI, WEBM). Max size: 50MB"));
     }
   },
 });

@@ -76,7 +76,7 @@ node index.js
 
 ### 1. File Upload Limits
 Current settings:
-- Max file size: 100MB
+- Max file size: 50MB
 - Allowed formats: MP4, MOV, AVI, WEBM
 - Max duration: 5 minutes
 - Min duration: 30 seconds
