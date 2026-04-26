@@ -2,7 +2,24 @@ import express from "express";
 import User from "../../models/userSchema.js";
 import Status from "../../models/statusSchema.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
-import generatePoster from "../../poster.js";
+
+const router = express.Router();
+
+// Lazy-load generatePoster — canvas is a native module that may not be
+// available in all environments. Import only when actually needed.
+let _generatePoster = null;
+async function getGeneratePoster() {
+  if (!_generatePoster) {
+    try {
+      const mod = await import("../../poster.js");
+      _generatePoster = mod.default;
+    } catch (err) {
+      console.error("[Dashboard] poster.js unavailable (canvas not installed?):", err.message);
+      _generatePoster = null;
+    }
+  }
+  return _generatePoster;
+}
 
 const router = express.Router();
 
@@ -26,6 +43,11 @@ async function ensurePosterImage(status) {
 
   try {
     console.log("[Dashboard] Poster missing — auto-generating...");
+    const generatePoster = await getGeneratePoster();
+    if (!generatePoster) {
+      console.log("[Dashboard] Poster generation unavailable (canvas not installed)");
+      return status;
+    }
     const posterBase64 = await generatePoster({
       topic: status.todayTopic || "Speaking Practice",
       question: status.todayQuestion,
