@@ -156,7 +156,7 @@ router.post("/upload", authMiddleware, (req, res, next) => {
     });
 
     // Process in background
-    processInBackground(report._id, videoPath, user?.name || phone);
+    processInBackground(report._id, videoPath, phone, user?.name || phone);
 
   } catch (err) {
     console.error("[VideoUpload] Error:", err);
@@ -216,7 +216,7 @@ router.delete("/report/:reportId", authMiddleware, async (req, res) => {
 });
 
 // ── Background processor ─────────────────────────────────────────────────────
-async function processInBackground(reportId, videoPath, displayName) {
+async function processInBackground(reportId, videoPath, phone, displayName) {
   try {
     console.log(`[VideoAnalysis] Starting ${reportId}`);
 
