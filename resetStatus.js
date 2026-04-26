@@ -10,6 +10,7 @@ export async function resetStatus() {
     fineAppliedToday: false,
     todayTopic: null,
     todayQuestion: null,
+    todayCategory: null,
     todayPosterImage: null,
     posterExpiresAt: null,
   });
