@@ -11,6 +11,8 @@ import userRoutes from "./routes/users.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import questionRoutes from "./routes/questions.js";
 import videoAnalysisRoutes from "./routes/videoAnalysis.js";
+import attendanceRoutes from "./routes/attendance.js";
+import submissionRoutes from "./routes/submissions.js";
 
 dotenv.config();
 
@@ -42,11 +44,13 @@ app.use(express.json({ limit: "10mb" }));
 
 // ── API Routes ──────────────────────────────────────────────────────────────
 app.get("/api/health", (_, res) => res.json({ status: "ok", app: "Speak & Shine 🗣️" }));
-app.use("/api/auth",      authRoutes);
-app.use("/api/users",     userRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/questions", questionRoutes);
-app.use("/api/video",     videoAnalysisRoutes);
+app.use("/api/auth",        authRoutes);
+app.use("/api/users",       userRoutes);
+app.use("/api/dashboard",   dashboardRoutes);
+app.use("/api/questions",   questionRoutes);
+app.use("/api/video",       videoAnalysisRoutes);
+app.use("/api/attendance",  attendanceRoutes);
+app.use("/api/submissions", submissionRoutes);
 
 // API 404 — must be before the React catch-all
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));

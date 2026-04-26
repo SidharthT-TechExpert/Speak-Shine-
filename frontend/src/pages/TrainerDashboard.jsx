@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
+import AttendancePanel from "../components/AttendancePanel.jsx";
+import SubmissionControls from "../components/SubmissionControls.jsx";
 import api from "../api/client.js";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, BarChart, Bar, Cell } from "recharts";
 
@@ -9,7 +11,7 @@ const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, 
 const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
 const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
 const scoreColor = v => v>=7?"var(--success)":v>=5?"var(--warning)":"var(--danger)";
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"attendance",l:"📋 Attendance"}];
 
 export default function TrainerDashboard() {
   const [dash, setDash] = useState(null);
@@ -41,6 +43,21 @@ export default function TrainerDashboard() {
   const selectUser = async (user) => {
     setSelected(user); setTab("detail");
     if(!allScores[user.phone]){const{data}=await api.get(`/dashboard/scores/${user.phone}`);setAllScores(p=>({...p,[user.phone]:data.feedbackScores||[]}));}
+  };
+
+  const handleSubmissionUpdate = (type, newValue) => {
+    if (!selected) return;
+    // Update the selected user's submission count
+    setSelected(prev => ({
+      ...prev,
+      [`${type}Submissions`]: newValue
+    }));
+    // Also update in the users list
+    setUsers(prev => prev.map(u => 
+      u.phone === selected.phone 
+        ? { ...u, [`${type}Submissions`]: newValue }
+        : u
+    ));
   };
 
   const filteredUsers = useMemo(()=>{
@@ -213,6 +230,11 @@ export default function TrainerDashboard() {
         </>
       )}
 
+      {/* ATTENDANCE */}
+      {tab==="attendance"&&(
+        <AttendancePanel />
+      )}
+
       {/* STUDENT DETAIL */}
       {tab==="detail"&&selected&&(
         <>
@@ -222,6 +244,18 @@ export default function TrainerDashboard() {
             <StatCard icon="📹" label="Sessions"   value={selScores.length}                     color="#7c6fff"/>
             <StatCard icon="📅" label="This Week"  value={`${selected.weeklySubmissions||0}/7`} color="#4ade80"/>
           </div>
+
+          {/* Submission Controls */}
+          <div className="card" style={{marginBottom:"1rem"}}>
+            <div className="section-title">Manage Submissions</div>
+            <SubmissionControls 
+              phone={selected.phone}
+              weeklySubmissions={selected.weeklySubmissions || 0}
+              monthlySubmissions={selected.monthlySubmissions || 0}
+              onUpdate={handleSubmissionUpdate}
+            />
+          </div>
+
           <div className="stat-grid">
             {Object.entries(SCORES).map(([k,c])=>(
               <StatCard key={k} icon={k==="Fluency"?"🗣️":k==="Grammar"?"📝":k==="Confidence"?"💪":"📚"}

@@ -2,13 +2,16 @@ import { useEffect, useState, useMemo } from "react";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import Modal from "../components/Modal.jsx";
+import RoleSelector from "../components/RoleSelector.jsx";
+import AttendancePanel from "../components/AttendancePanel.jsx";
+import SubmissionControls from "../components/SubmissionControls.jsx";
 import api from "../api/client.js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 
 const CATS = ["Daily Life","Opinion","Personal Experience","English Growth","Future Goals","Fun Topic","Free Talk"];
 const PIE_COLORS = ["#7c6fff","#4ade80","#fbbf24","#ff6b9d","#38bdf8","#fb923c","#a78bfa"];
 const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, fontSize:12 };
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"questions",l:"❓ Questions"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"attendance",l:"📋 Attendance"},{id:"questions",l:"❓ Questions"}];
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -26,7 +29,7 @@ export default function AdminDashboard() {
   const [qCat, setQCat] = useState("");
   const [modal, setModal] = useState(null);
   const [fineInput, setFineInput] = useState("");
-  const [qCat, setQCat] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -40,6 +43,27 @@ export default function AdminDashboard() {
   const msg = (text, type="success") => { setFlash({text,type}); setTimeout(()=>setFlash(null),3000); };
   const changeRole = async (phone,role) => { await api.patch(`/users/${phone}/role`,{role}); msg(`Role → ${role}`); load(); };
   const toggleUser = async (phone) => { await api.patch(`/users/${phone}/toggle`); msg("Status toggled"); load(); };
+  
+  const viewStudentDetail = (user) => {
+    setSelectedStudent(user);
+    setTab("student-detail");
+  };
+
+  const handleSubmissionUpdate = (type, newValue) => {
+    if (!selectedStudent) return;
+    // Update the selected student's submission count
+    setSelectedStudent(prev => ({
+      ...prev,
+      [`${type}Submissions`]: newValue
+    }));
+    // Also update in the users list
+    setUsers(prev => prev.map(u => 
+      u.phone === selectedStudent.phone 
+        ? { ...u, [`${type}Submissions`]: newValue }
+        : u
+    ));
+  };
+
   const deleteUser = async (phone) => {
     setModal({
       type: "danger", title: "Remove User",
@@ -135,6 +159,7 @@ export default function AdminDashboard() {
 
       <div className="tab-bar">
         {TABS.map(t=><button key={t.id} className={`tab-btn${tab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>)}
+        {selectedStudent&&<button className={`tab-btn${tab==="student-detail"?" active":""}`} onClick={()=>setTab("student-detail")}>👤 {(selectedStudent.registeredName||selectedStudent.name||"").slice(0,12)}</button>}
       </div>
 
       {/* OVERVIEW */}
@@ -229,10 +254,11 @@ export default function AdminDashboard() {
                   <td style={{fontWeight:500,whiteSpace:"nowrap"}}>{u.registeredName||u.name||"—"}</td>
                   <td style={{color:"var(--muted)"}}>{u.phone}</td>
                   <td>
-                    <select value={u.role||"user"} onChange={e=>changeRole(u.phone,e.target.value)}
-                      style={{background:"var(--bg2)",border:"1px solid var(--border)",color:"var(--muted)",borderRadius:8,padding:"0.2rem 0.4rem",fontSize:"0.75rem"}}>
-                      {["user","trainer","admin"].map(r=><option key={r} value={r}>{r}</option>)}
-                    </select>
+                    <RoleSelector 
+                      phone={u.phone} 
+                      currentRole={u.role || "user"}
+                      onRoleChange={() => load()}
+                    />
                   </td>
                   <td>🔥 {u.streak||0}</td>
                   <td>{u.weeklySubmissions||0}/7</td>
@@ -240,6 +266,7 @@ export default function AdminDashboard() {
                   <td style={{color:u.fine>0?"var(--danger)":"var(--muted)",fontWeight:u.fine>0?600:400}}>₹{u.fine||0}</td>
                   <td><span style={{color:u.isActive?"var(--success)":"var(--danger)",fontSize:"0.8rem"}}>{u.isActive?"Active":"Disabled"}</span></td>
                   <td style={{whiteSpace:"nowrap"}}>
+                    <button className="btn-ghost" style={{marginRight:3}} onClick={()=>viewStudentDetail(u)}>View</button>
                     <button className="btn-ghost" style={{marginRight:3}} onClick={()=>adjustFine(u.phone,u.fine)}>±Fine</button>
                     <button className="btn-ghost" style={{marginRight:3}} onClick={()=>resetFine(u.phone)}>Reset</button>
                     <button className="btn-ghost" style={{marginRight:3}} onClick={()=>toggleUser(u.phone)}>{u.isActive?"Disable":"Enable"}</button>
@@ -348,6 +375,11 @@ export default function AdminDashboard() {
         </>
       )}
 
+      {/* ATTENDANCE */}
+      {tab==="attendance" && (
+        <AttendancePanel />
+      )}
+
       {/* QUESTIONS */}
       {tab==="questions" && (
         <>
@@ -403,6 +435,58 @@ export default function AdminDashboard() {
                   </tr>
                 ))}</tbody>
               </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* STUDENT DETAIL */}
+      {tab==="student-detail" && selectedStudent && (
+        <>
+          <div className="stat-grid" style={{marginBottom:"1rem"}}>
+            <StatCard icon="🔥" label="Streak" value={`${selectedStudent.streak||0} days`} color="#f97316"/>
+            <StatCard icon="💸" label="Fine" value={`₹${selectedStudent.fine||0}`} color="#f87171"/>
+            <StatCard icon="📅" label="Weekly" value={`${selectedStudent.weeklySubmissions||0}/7`} color="#4ade80"/>
+            <StatCard icon="📆" label="Monthly" value={selectedStudent.monthlySubmissions||0} color="#7c6fff"/>
+          </div>
+
+          <div className="card" style={{marginBottom:"1rem"}}>
+            <div className="section-title">Manage Submissions</div>
+            <SubmissionControls 
+              phone={selectedStudent.phone}
+              weeklySubmissions={selectedStudent.weeklySubmissions || 0}
+              monthlySubmissions={selectedStudent.monthlySubmissions || 0}
+              onUpdate={handleSubmissionUpdate}
+            />
+          </div>
+
+          <div className="card">
+            <div className="section-title">Student Information</div>
+            <div style={{display:"grid",gap:"0.75rem",fontSize:"0.9rem"}}>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"var(--muted)"}}>Name:</span>
+                <span style={{fontWeight:500}}>{selectedStudent.registeredName||selectedStudent.name||"—"}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"var(--muted)"}}>Phone:</span>
+                <span style={{fontWeight:500}}>{selectedStudent.phone}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"var(--muted)"}}>Role:</span>
+                <span style={{fontWeight:500}}>{selectedStudent.role||"user"}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"var(--muted)"}}>Status:</span>
+                <span style={{color:selectedStudent.isActive?"var(--success)":"var(--danger)",fontWeight:600}}>
+                  {selectedStudent.isActive?"Active":"Disabled"}
+                </span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"var(--muted)"}}>Today's Submission:</span>
+                <span style={{color:selectedStudent.completed?"var(--success)":"var(--danger)",fontWeight:600}}>
+                  {selectedStudent.completed?"✅ Submitted":"⏳ Pending"}
+                </span>
+              </div>
             </div>
           </div>
         </>

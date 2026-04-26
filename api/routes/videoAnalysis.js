@@ -195,7 +195,7 @@ router.get("/community-feed", authMiddleware, async (req, res) => {
     })
       .sort({ submittedAt: -1 })
       .limit(20)
-      .select("uploaderName submittedAt videoDuration videoUrl analysis.fluency analysis.grammar analysis.confidence analysis.vocabulary analysis.overallComment expiresAt")
+      .select("uploaderName submittedAt videoDuration videoUrl analysis expiresAt")
       .lean();
 
     res.json({ feed });
