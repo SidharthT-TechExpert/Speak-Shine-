@@ -4,7 +4,9 @@ import { useAuth } from "../context/AuthContext";
 import Chat from "./Chat";
 import GroupChat from "./GroupChat";
 
-const API_URL = import.meta.env.VITE_API_URL || "";
+const API_URL = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace("/api", "")
+  : (typeof window !== "undefined" ? window.location.origin : "");
 
 export default function ChatLauncher() {
   const { token, user } = useAuth();
