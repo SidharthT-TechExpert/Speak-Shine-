@@ -10,6 +10,7 @@ export default function VideoAnalysis() {
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
   const [myReports, setMyReports] = useState([]);
+  const [progressStage, setProgressStage] = useState("");
   const navigate = useNavigate();
 
   // Load user's recent reports on mount
@@ -17,27 +18,43 @@ export default function VideoAnalysis() {
     loadMyReports();
   }, []);
 
-  // Poll for report status if we have a reportId
+  // SSE subscription for real-time progress when we have a reportId
   useEffect(() => {
-    if (!reportId) return;
+    if (!reportId || !report || report.status === "completed" || report.status === "failed") return;
 
-    const interval = setInterval(async () => {
+    const token = localStorage.getItem("token");
+    const evtSource = new EventSource(
+      `/api/video/progress/${reportId}?token=${token}`
+    );
+
+    evtSource.onmessage = (e) => {
       try {
-        const res = await api.get(`/video/report/${reportId}`);
-        setReport(res.data);
-        
-        if (res.data.status === "completed" || res.data.status === "failed") {
-          clearInterval(interval);
-          loadMyReports(); // Refresh the list
+        const data = JSON.parse(e.data);
+        if (data.stage) setProgressStage(data.stage);
+        if (data.status === "completed" || data.status === "failed") {
+          evtSource.close();
+          // Fetch the full report now
+          api.get(`/video/report/${reportId}`).then(r => {
+            setReport(r.data);
+            loadMyReports();
+          });
         }
-      } catch (err) {
-        console.error("Poll error:", err);
-        clearInterval(interval);
-      }
-    }, 3000); // Poll every 3 seconds
+      } catch {}
+    };
 
-    return () => clearInterval(interval);
-  }, [reportId]);
+    evtSource.onerror = () => {
+      evtSource.close();
+      // Fallback: poll once after 5s
+      setTimeout(() => {
+        api.get(`/video/report/${reportId}`).then(r => {
+          setReport(r.data);
+          if (r.data.status === "completed" || r.data.status === "failed") loadMyReports();
+        }).catch(() => {});
+      }, 5000);
+    };
+
+    return () => evtSource.close();
+  }, [reportId, report?.status]);
 
   const loadMyReports = async () => {
     try {
@@ -186,7 +203,10 @@ export default function VideoAnalysis() {
               <div className="spinner-wrap">
                 <div className="spinner" />
                 <p style={{ color: "var(--muted)" }}>
-                  Analyzing your video... This usually takes 2-3 minutes.
+                  {progressStage || "Uploading and preparing video…"}
+                </p>
+                <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.5rem" }}>
+                  This usually takes 2-3 minutes
                 </p>
               </div>
             )}

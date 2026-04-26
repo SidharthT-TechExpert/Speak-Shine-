@@ -4,12 +4,15 @@ const JWT_SECRET = process.env.JWT_SECRET || "speakshine_secret_2024";
 
 export function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith("Bearer ")) {
+  // Also accept token from query string (needed for SSE EventSource)
+  const queryToken = req.query?.token;
+  const raw = header?.startsWith("Bearer ") ? header.split(" ")[1] : queryToken;
+
+  if (!raw) {
     return res.status(401).json({ error: "No token provided" });
   }
-  const token = header.split(" ")[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(raw, JWT_SECRET);
     req.user = decoded;
     next();
   } catch {

@@ -1,316 +1,221 @@
 /**
- * Web Video Processor - Adapts the WhatsApp feedback pipeline for web uploads
- * This module creates a bridge between web uploads and the existing AI pipeline
+ * Web Video Processor
+ * Runs the AI pipeline directly on a local file — bypasses WhatsApp download entirely.
  */
 
 import fs from "fs";
-import path from "path";
 import { exec } from "child_process";
-import { generateFeedback } from "./feedback.js";
+import { extractAudio } from "./extractAudio.js";
+import { transcribe } from "./transcribe.js";
+import { analyzeSpeech } from "./analyzeSpeech.js";
+import { analyzeVideo } from "./analyzeVideo.js";
+import { synthesizeOverallComment, parseFeedbackToStructure } from "./webFeedbackHelpers.js";
+import {
+  withTimeout,
+  startStage,
+  TRANSCRIBE_TIMEOUT_MS,
+  SPEECH_TIMEOUT_MS,
+  VISUAL_TIMEOUT_MS,
+} from "./pipeline.js";
 
 /**
- * Process a web-uploaded video using the existing AI pipeline
- * @param {string} videoPath - Path to the uploaded video file
- * @param {string} userId - User ID from JWT token
- * @param {string} phone - User's phone number
- * @param {string} displayName - User's display name
- * @param {Function} onProgress - Progress callback function
- * @returns {Promise<object>} Structured analysis result
+ * Process a locally uploaded video file through the AI pipeline.
+ * Does NOT use WhatsApp/Baileys at all.
+ *
+ * @param {string}   videoPath    - Absolute path to the uploaded video file
+ * @param {string}   displayName  - User's display name
+ * @param {Function} onProgress   - async (stage: string) => void
+ * @returns {Promise<object>}     - { analysis, duration }
  */
-export async function processWebVideo(videoPath, userId, phone, displayName, onProgress = () => {}) {
+export async function processWebVideo(videoPath, displayName = "User", onProgress = () => {}) {
+  const id = Date.now();
+  let audioPath = null;
+
   try {
-    // Validate video file exists
-    if (!fs.existsSync(videoPath)) {
-      throw new Error("Video file not found");
-    }
+    if (!fs.existsSync(videoPath)) throw new Error("Video file not found");
 
-    // Get video duration using ffprobe
     const duration = await getVideoDuration(videoPath);
-    
-    if (duration < 60) {
-      throw new Error("Video must be at least 1 minute long");
+
+    if (duration < 60) throw new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
+    if (duration > 300) throw new Error(`Video is too long. Maximum is 5 minutes.`);
+
+    await onProgress("Extracting audio…");
+
+    // Stage 1: Extract audio
+    const extractStage = startStage("extractAudio");
+    let qualityWarning, meanVolume;
+    try {
+      const extracted = await extractAudio(videoPath, id);
+      audioPath = extracted.audioPath;
+      qualityWarning = extracted.qualityWarning;
+      meanVolume = extracted.meanVolume ?? null;
+      extractStage.end();
+    } catch (err) {
+      extractStage.end(err);
+      throw err;
     }
 
-    if (duration > 300) {
-      throw new Error("Video must be less than 5 minutes long");
-    }
+    await onProgress("Analysing your video…");
 
-    // Create a mock WhatsApp message object for the existing pipeline
-    const mockMessage = {
-      key: { 
-        id: `web_${Date.now()}_${userId}`,
-        remoteJid: `${phone}@s.whatsapp.net`
-      },
-      message: {
-        videoMessage: {
-          url: videoPath, // Local file path instead of WhatsApp URL
-          seconds: duration,
-          mimetype: "video/mp4"
-        }
-      },
-      messageTimestamp: Math.floor(Date.now() / 1000)
-    };
+    // Stage 2: Visual + transcription in parallel
+    const parallelStage = startStage("parallel");
 
-    // Run the existing feedback pipeline
-    const feedbackText = await generateFeedback(
-      mockMessage,
-      `${phone}@s.whatsapp.net`,
-      duration,
-      null, // questionTopic - web uploads don't use daily questions
-      null, // questionText
-      null, // sock - not needed for local files
-      {
-        displayName,
-        onProgress,
-        // Slightly longer timeouts for web processing
-        transcribeTimeout: 240000, // 4 minutes
-        speechTimeout: 120000,     // 2 minutes  
-        visualTimeout: 240000,     // 4 minutes
-      }
+    const visualPromise = withTimeout(
+      analyzeVideo(videoPath),
+      Number(process.env.VISUAL_TIMEOUT_MS) || VISUAL_TIMEOUT_MS,
+      "visual"
     );
 
-    // Parse the formatted feedback text into structured data
-    const structuredAnalysis = parseFeedbackToStructure(feedbackText);
+    let transcription = null;
+    let speechResult = null;
+    let transcriptionError = null;
 
-    return {
-      success: true,
-      analysis: structuredAnalysis,
-      rawFeedback: feedbackText,
-      duration,
-      processedAt: new Date()
-    };
+    const speechChainPromise = withTimeout(
+      transcribe(audioPath, { meanVolume }),
+      Number(process.env.TRANSCRIBE_TIMEOUT_MS) || TRANSCRIBE_TIMEOUT_MS,
+      "transcription"
+    ).then(async (t) => {
+      transcription = t;
+      if (!t?.text || t.text.length < 10) return;
 
-  } catch (error) {
-    console.error("[WebVideoProcessor] Error:", error);
-    throw error;
+      await onProgress("Scoring your speech…");
+
+      const speechStage = startStage("analyzeSpeech");
+      try {
+        speechResult = await withTimeout(
+          analyzeSpeech(
+            t.text,
+            t.duration > 0 ? t.duration : duration,
+            t.words,
+            null, null,
+            t.pronunciationIssues || [],
+            t.rhythm || null
+          ),
+          Number(process.env.SPEECH_TIMEOUT_MS) || SPEECH_TIMEOUT_MS,
+          "speech"
+        );
+        speechStage.end();
+      } catch (err) {
+        speechStage.end(err);
+        throw err;
+      }
+    }).catch(err => { transcriptionError = err; });
+
+    const [, visualSettled] = await Promise.all([
+      speechChainPromise,
+      visualPromise
+        .then(v => ({ status: "fulfilled", value: v }))
+        .catch(e => ({ status: "rejected", reason: e })),
+    ]);
+
+    parallelStage.end();
+
+    const visual = visualSettled.status === "fulfilled" ? visualSettled.value : null;
+    if (visualSettled.status === "rejected") {
+      console.log("⚠️ Visual analysis failed (non-fatal):", visualSettled.reason?.message);
+    }
+
+    if (transcriptionError) throw new Error("Transcription failed: " + transcriptionError.message);
+    if (!transcription?.text || transcription.text.length < 10) throw new Error("Could not detect speech in the video.");
+    if (!speechResult) throw new Error("Speech scoring failed.");
+
+    await onProgress("Generating feedback…");
+
+    // Stage 3: Synthesize overall comment
+    speechResult.overallComment = await synthesizeOverallComment(speechResult, visual);
+
+    // Stage 4: Build structured analysis object directly (no text parsing needed)
+    const analysis = buildStructuredAnalysis(speechResult, visual, qualityWarning);
+
+    return { analysis, duration };
+
+  } finally {
+    if (audioPath && fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+    // NOTE: videoPath is cleaned up by the caller (videoAnalysis route)
   }
 }
 
 /**
- * Get video duration using ffprobe
- * Uses JSON output format — works without file extension
+ * Build structured analysis object directly from pipeline results.
+ * No regex parsing needed — we have the raw objects.
  */
-function getVideoDuration(videoPath) {
-  return new Promise((resolve, reject) => {
-    const cmd = `ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`;
+function buildStructuredAnalysis(speechResult, visual, qualityWarning) {
+  const s = speechResult._stats || {};
 
-    exec(cmd, { timeout: 30000 }, (err, stdout, stderr) => {
-      if (err || !stdout?.trim()) {
-        const fallback = `ffmpeg -i "${videoPath}" 2>&1 | grep Duration`;
-        exec(fallback, { timeout: 15000 }, (err2, out2) => {
-          const match = (out2 || "").match(/Duration:\s*(\d+):(\d+):(\d+)/);
-          if (match) {
-            const secs = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]);
-            if (secs > 0) return resolve(secs);
-          }
+  return {
+    // Speech scores
+    fluency:        speechResult.fluency,
+    grammar:        speechResult.grammar,
+    confidence:     speechResult.confidence,
+    vocabulary:     speechResult.vocabulary,
+    topicRelevance: speechResult.topicRelevance ?? null,
+
+    // Visual scores
+    eyeContact:       visual?.eyeContact ?? null,
+    bodyLanguage:     visual?.bodyLanguage ?? null,
+    facialExpression: visual?.facialExpression ?? null,
+    overallPresence:  visual?.overallPresence ?? null,
+
+    // Visual notes
+    eyeContactNote:   visual?.eyeContactNote ?? null,
+    bodyLanguageNote: visual?.bodyLanguageNote ?? null,
+    expressionNote:   visual?.expressionNote ?? null,
+    visualSuggestions: visual?.visualSuggestions ?? [],
+    visualStrengths:   visual?.visualStrengths ?? [],
+
+    // Feedback text
+    overallComment:  speechResult.overallComment,
+    strongPoints:    speechResult.strongPoints || [],
+    suggestions:     speechResult.suggestions || [],
+    grammarErrors:   speechResult.grammarErrors || [],
+    vocabularyHighlights: speechResult.vocabularyHighlights || { strong: [], weak: [] },
+
+    // Notes
+    pronunciationNote: speechResult.pronunciationNote ?? null,
+    rhythmNote:        speechResult.rhythmNote ?? null,
+    topicFeedback:     speechResult.topicFeedback ?? null,
+    qualityWarning:    qualityWarning ?? null,
+
+    // Stats
+    stats: {
+      duration:    s.duration ?? null,
+      wpm:         s.wpm ?? null,
+      fillerWords: s.fillerWords ?? {},
+      fillerTotal: s.fillerTotal ?? 0,
+      pauses:      s.pauses ?? 0,
+      cefrLevel:   s.cefrLevel ?? null,
+      rhythm:      s.rhythm ?? null,
+    },
+  };
+}
+
+/**
+ * Get video duration using ffprobe JSON output — works without file extension.
+ */
+export function getVideoDuration(videoPath) {
+  return new Promise((resolve, reject) => {
+    exec(
+      `ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
+      { timeout: 30000 },
+      (err, stdout, stderr) => {
+        if (err || !stdout?.trim()) {
           console.error("[ffprobe] failed:", stderr || err?.message);
           return reject(new Error("Could not read video duration. Please ensure the file is a valid video."));
-        });
-        return;
-      }
-
-      try {
-        const info = JSON.parse(stdout);
-        const dur =
-          parseFloat(info?.format?.duration) ||
-          parseFloat(info?.streams?.find(s => s.codec_type === "video")?.duration) ||
-          0;
-
-        if (!dur || dur <= 0) {
-          return reject(new Error("Could not determine video duration. Please try a different file."));
         }
-        resolve(Math.round(dur));
-      } catch (parseErr) {
-        return reject(new Error("Could not read video metadata. Please try a different file."));
+        try {
+          const info = JSON.parse(stdout);
+          const dur =
+            parseFloat(info?.format?.duration) ||
+            parseFloat(info?.streams?.find(s => s.codec_type === "video")?.duration) ||
+            0;
+          if (!dur || dur <= 0) return reject(new Error("Could not determine video duration."));
+          resolve(Math.round(dur));
+        } catch {
+          reject(new Error("Could not read video metadata."));
+        }
       }
-    });
+    );
   });
-}
-
-/**
- * Parse the formatted feedback text back into structured data for web display
- * This extracts scores, comments, and suggestions from the WhatsApp-formatted text
- */
-function parseFeedbackToStructure(feedbackText) {
-  const analysis = {
-    stats: {},
-    grammarErrors: [],
-    vocabularyHighlights: { strong: [], weak: [] },
-    strongPoints: [],
-    suggestions: [],
-    visualSuggestions: [],
-    visualStrengths: []
-  };
-
-  // Extract numeric scores using regex patterns
-  const scorePatterns = {
-    fluency: /🗣️ \*Fluency:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    grammar: /📚 \*Grammar:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    confidence: /🔥 \*Confidence:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    vocabulary: /🧠 \*Vocabulary:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    topicRelevance: /🎯 \*On-topic:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    eyeContact: /👁️ \*Eye Contact:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    bodyLanguage: /🧍 \*Body Language:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    facialExpression: /😊 \*Expression:\*\s+[🟩⬜]+\s+(\d+)\/10/,
-    overallPresence: /✨ \*Presence:\*\s+[🟩⬜]+\s+(\d+)\/10/
-  };
-
-  // Extract all scores
-  for (const [key, pattern] of Object.entries(scorePatterns)) {
-    const match = feedbackText.match(pattern);
-    if (match) {
-      analysis[key] = parseInt(match[1]);
-    }
-  }
-
-  // Extract duration and speaking pace
-  const durationMatch = feedbackText.match(/⏱️ \*Duration:\* ([\d:]+)/);
-  if (durationMatch) analysis.stats.duration = durationMatch[1];
-
-  const wpmMatch = feedbackText.match(/📊 \*Pace:\* (\d+) wpm/);
-  if (wpmMatch) analysis.stats.wpm = parseInt(wpmMatch[1]);
-
-  // Extract filler words
-  const fillerMatch = feedbackText.match(/🗣️ \*Filler words:\* (.+)/);
-  if (fillerMatch) {
-    const fillerText = fillerMatch[1];
-    const fillerWords = {};
-    let fillerTotal = 0;
-    
-    // Parse "word" ×count format
-    const fillerPattern = /"([^"]+)"\s*×(\d+)/g;
-    let match;
-    while ((match = fillerPattern.exec(fillerText)) !== null) {
-      const word = match[1];
-      const count = parseInt(match[2]);
-      fillerWords[word] = count;
-      fillerTotal += count;
-    }
-    
-    analysis.stats.fillerWords = fillerWords;
-    analysis.stats.fillerTotal = fillerTotal;
-  }
-
-  // Extract pauses
-  const pauseMatch = feedbackText.match(/🔇 \*Long pauses:\* (\d+) detected/);
-  if (pauseMatch) analysis.stats.pauses = parseInt(pauseMatch[1]);
-
-  // Extract CEFR level
-  const cefrMatch = feedbackText.match(/🎓 \*Level:\* ([A-C][1-2]) — _([^_]+)_/);
-  if (cefrMatch) {
-    analysis.stats.cefrLevel = {
-      level: cefrMatch[1],
-      description: cefrMatch[2]
-    };
-  }
-
-  // Extract overall comment (between 📝 and next section or end)
-  const commentMatch = feedbackText.match(/📝 (.+?)(?=\n━|$)/s);
-  if (commentMatch) {
-    analysis.overallComment = commentMatch[1].trim();
-  }
-
-  // Extract strong points
-  const strongPointsMatch = feedbackText.match(/✅ \*What you did well:\*\n((?:\s*• .+\n?)+)/);
-  if (strongPointsMatch) {
-    analysis.strongPoints = strongPointsMatch[1]
-      .split("\n")
-      .filter(Boolean)
-      .map(line => line.replace(/^\s*• /, "").trim())
-      .filter(Boolean);
-  }
-
-  // Extract speaking suggestions
-  const suggestionsMatch = feedbackText.match(/💡 \*Speaking Tips:\*\n((?:\s*• .+\n?)+)/);
-  if (suggestionsMatch) {
-    analysis.suggestions = suggestionsMatch[1]
-      .split("\n")
-      .filter(Boolean)
-      .map(line => line.replace(/^\s*• /, "").trim())
-      .filter(Boolean);
-  }
-
-  // Extract visual suggestions
-  const visualSuggestionsMatch = feedbackText.match(/🎬 \*Presentation Tips:\*\n((?:\s*• .+\n?)+)/);
-  if (visualSuggestionsMatch) {
-    analysis.visualSuggestions = visualSuggestionsMatch[1]
-      .split("\n")
-      .filter(Boolean)
-      .map(line => line.replace(/^\s*• /, "").trim())
-      .filter(Boolean);
-  }
-
-  // Extract grammar errors
-  const grammarSection = feedbackText.match(/❌ \*Grammar Issues:\*\n((?:\s*• .+\n?)+)/);
-  if (grammarSection) {
-    const errorLines = grammarSection[1].split("\n").filter(Boolean);
-    for (let i = 0; i < errorLines.length; i += 2) {
-      const errorLine = errorLines[i];
-      const ruleLine = errorLines[i + 1];
-      
-      const errorMatch = errorLine.match(/• _"([^"]+)"_ → \*"([^"]+)"\*/);
-      if (errorMatch) {
-        const error = {
-          original: errorMatch[1],
-          correction: errorMatch[2],
-          rule: ruleLine ? ruleLine.replace(/^\s*_\(([^)]+)\)_/, "$1") : ""
-        };
-        analysis.grammarErrors.push(error);
-      }
-    }
-  }
-
-  // Extract vocabulary highlights
-  const vocStrongMatch = feedbackText.match(/💎 \*Good vocabulary used:\* (.+)/);
-  if (vocStrongMatch) {
-    analysis.vocabularyHighlights.strong = vocStrongMatch[1]
-      .split(",")
-      .map(word => word.trim())
-      .filter(Boolean);
-  }
-
-  const vocWeakMatch = feedbackText.match(/📖 \*Words to upgrade:\* (.+)/);
-  if (vocWeakMatch) {
-    analysis.vocabularyHighlights.weak = vocWeakMatch[1]
-      .split(",")
-      .map(word => word.trim())
-      .filter(Boolean);
-  }
-
-  // Extract visual observation notes
-  const visualObservations = feedbackText.match(/📹 \*Visual Observations:\*\n((?:\s*[👁️🧍😊✅] .+\n?)+)/);
-  if (visualObservations) {
-    const observations = visualObservations[1];
-    
-    const eyeContactNote = observations.match(/👁️ (.+)/);
-    if (eyeContactNote) analysis.eyeContactNote = eyeContactNote[1].trim();
-    
-    const bodyLanguageNote = observations.match(/🧍 (.+)/);
-    if (bodyLanguageNote) analysis.bodyLanguageNote = bodyLanguageNote[1].trim();
-    
-    const expressionNote = observations.match(/😊 (.+)/);
-    if (expressionNote) analysis.expressionNote = expressionNote[1].trim();
-    
-    // Extract visual strengths (✅ lines)
-    const strengthMatches = observations.match(/✅ (.+)/g);
-    if (strengthMatches) {
-      analysis.visualStrengths = strengthMatches.map(match => 
-        match.replace(/✅ /, "").trim()
-      );
-    }
-  }
-
-  // Extract pronunciation and rhythm notes
-  const pronunciationMatch = feedbackText.match(/🗣️ \*Pronunciation:\* _([^_]+)_/);
-  if (pronunciationMatch) analysis.pronunciationNote = pronunciationMatch[1];
-
-  const rhythmMatch = feedbackText.match(/🎵 \*Rhythm:\* _([^_]+)_/);
-  if (rhythmMatch) analysis.rhythmNote = rhythmMatch[1];
-
-  const topicFeedbackMatch = feedbackText.match(/💬 _([^_]+)_/);
-  if (topicFeedbackMatch) analysis.topicFeedback = topicFeedbackMatch[1];
-
-  return analysis;
 }
 
 export { parseFeedbackToStructure };
