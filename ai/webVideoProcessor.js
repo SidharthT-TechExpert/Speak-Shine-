@@ -27,8 +27,8 @@ export async function processWebVideo(videoPath, userId, phone, displayName, onP
     // Get video duration using ffprobe
     const duration = await getVideoDuration(videoPath);
     
-    if (duration < 10) {
-      throw new Error("Video must be at least 10 seconds long");
+    if (duration < 60) {
+      throw new Error("Video must be at least 1 minute long");
     }
 
     if (duration > 300) {
@@ -88,21 +88,33 @@ export async function processWebVideo(videoPath, userId, phone, displayName, onP
 
 /**
  * Get video duration using ffprobe
+ * Adds .mp4 extension temporarily so ffprobe can detect the container format
  */
 function getVideoDuration(videoPath) {
   return new Promise((resolve, reject) => {
+    const needsRename = !videoPath.match(/\.(mp4|mov|avi|webm|mpeg|3gp|flv|wmv)$/i);
+    const probePath = needsRename ? videoPath + ".mp4" : videoPath;
+
+    if (needsRename) {
+      try { fs.renameSync(videoPath, probePath); } catch (e) {
+        return reject(new Error("Failed to prepare video file"));
+      }
+    }
+
     exec(
-      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`,
-      (err, stdout) => {
-        if (err) {
-          return reject(new Error("Failed to read video metadata"));
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${probePath}"`,
+      (err, stdout, stderr) => {
+        if (needsRename) {
+          try { fs.renameSync(probePath, videoPath); } catch (_) {}
         }
-        
+        if (err) {
+          console.error("[ffprobe] error:", stderr || err.message);
+          return reject(new Error("Could not read video duration. Please ensure the file is a valid video."));
+        }
         const duration = parseFloat((stdout || "").trim());
         if (isNaN(duration) || duration <= 0) {
-          return reject(new Error("Invalid video duration"));
+          return reject(new Error("Could not determine video duration. Please try a different file."));
         }
-        
         resolve(Math.round(duration));
       }
     );

@@ -80,7 +80,7 @@ Current settings:
 - Min file size: No minimum (accepts any size)
 - Allowed formats: MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV
 - Max duration: 5 minutes
-- Min duration: 10 seconds
+- Min duration: 1 minute (60 seconds)
 
 ### 2. Storage Management
 - Videos are **never stored permanently**

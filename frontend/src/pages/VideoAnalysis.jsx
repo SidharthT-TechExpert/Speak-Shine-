@@ -135,7 +135,7 @@ export default function VideoAnalysis() {
         <div className="card">
           <div className="section-title">📹 Upload Video for Analysis</div>
           <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-            Upload a video (10 seconds - 5 minutes) to get instant AI feedback on your speaking skills.
+            Upload a video (1 minute - 5 minutes) to get instant AI feedback on your speaking skills.
             Supported formats: MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV. File size: Any size up to 350MB. Reports are stored for 12 hours only.
           </p>
 

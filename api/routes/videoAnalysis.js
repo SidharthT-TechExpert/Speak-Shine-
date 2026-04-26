@@ -53,9 +53,9 @@ router.post("/upload", authMiddleware, upload.single("video"), async (req, res) 
     // Get video duration
     const duration = await getVideoDuration(videoPath);
     
-    if (duration < 10) {
+    if (duration < 60) {
       fs.unlinkSync(videoPath);
-      return res.status(400).json({ error: "Video must be at least 10 seconds long" });
+      return res.status(400).json({ error: "Video must be at least 1 minute long" });
     }
 
     if (duration > 300) {
@@ -179,15 +179,32 @@ router.delete("/report/:reportId", authMiddleware, async (req, res) => {
 
 /**
  * Get video duration using ffprobe
+ * Multer saves files without extension — we rename with .mp4 so ffprobe can detect format
  */
 function getVideoDuration(videoPath) {
   return new Promise((resolve, reject) => {
+    // Rename to add .mp4 extension so ffprobe can detect the container format
+    const renamedPath = videoPath + ".mp4";
+    try {
+      fs.renameSync(videoPath, renamedPath);
+    } catch (e) {
+      return reject(new Error("Failed to prepare video file"));
+    }
+
     exec(
-      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`,
-      (err, stdout) => {
-        if (err) return reject(new Error("Failed to read video metadata"));
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${renamedPath}"`,
+      (err, stdout, stderr) => {
+        // Rename back regardless of result
+        try { fs.renameSync(renamedPath, videoPath); } catch (_) {}
+
+        if (err) {
+          console.error("[ffprobe] error:", stderr || err.message);
+          return reject(new Error("Could not read video duration. Please ensure the file is a valid video."));
+        }
         const dur = parseFloat((stdout || "").trim());
-        if (isNaN(dur) || dur <= 0) return reject(new Error("Invalid video duration"));
+        if (isNaN(dur) || dur <= 0) {
+          return reject(new Error("Could not determine video duration. Please try a different file."));
+        }
         resolve(Math.round(dur));
       }
     );
