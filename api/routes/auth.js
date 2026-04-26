@@ -50,10 +50,19 @@ router.post("/register", async (req, res) => {
     if (!phone || !password || !name)
       return res.status(400).json({ error: "phone, password and name are required" });
 
+    // ── Phone validation ────────────────────────────────────────────────
+    // Accept: 10-digit Indian numbers (6-9 start) with optional +91 / 91 prefix
+    const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+    if (!/^[6-9]\d{9}$/.test(stripped)) {
+      return res.status(400).json({
+        error: "Enter a valid 10-digit Indian mobile number (e.g. 9876543210)",
+      });
+    }
+
     // Enforce 20-user limit (excluding admins/trainers)
     const userCount = await Auth.countDocuments({ role: "user" });
     if (userCount >= MAX_USERS)
-      return res.status(403).json({ error: "User limit reached (max 20)" });
+      return res.status(403).json({ error: `Registration closed — group is full (max ${MAX_USERS} members)` });
 
     const exists = await Auth.findOne({ phone });
     if (exists) return res.status(409).json({ error: "Phone already registered" });

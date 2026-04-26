@@ -805,3 +805,17 @@ input, select, textarea { font-family: inherit; outline: none; -webkit-appearanc
 .tick-sent      { color: rgba(255,255,255,0.45); }
 .tick-delivered { color: rgba(255,255,255,0.45); }
 .tick-seen      { color: #60a5fa; } /* blue like WhatsApp */
+
+/* ── Form validation states ─────────────────────────────────────────────── */
+.input-error  { border-color: #ef4444 !important; }
+.input-ok     { border-color: #22c55e !important; }
+.input-error-msg {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.input-hint {
+  color: rgba(255,255,255,0.35);
+  font-size: 12px;
+  margin-top: 4px;
+}
