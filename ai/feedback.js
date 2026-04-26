@@ -43,6 +43,7 @@ export async function generateFeedback(
     transcribeTimeout = TRANSCRIBE_TIMEOUT_MS,
     speechTimeout = SPEECH_TIMEOUT_MS,
     visualTimeout = VISUAL_TIMEOUT_MS,
+    displayName = null,
   } = opts;
 
   const pipelineStart = Date.now();
@@ -189,7 +190,7 @@ export async function generateFeedback(
     // -----------------------------------------------------------------------
     // Stage 5: Format combined feedback
     // -----------------------------------------------------------------------
-    const formatted = formatFeedback(speechResult, visual, user, qualityWarning);
+    const formatted = formatFeedback(speechResult, visual, user, qualityWarning, displayName);
 
     console.log(
       "[PIPELINE] total DONE elapsed=" + (Date.now() - pipelineStart)
@@ -305,8 +306,8 @@ Rules:
  * @param {string}      user    - User JID
  * @returns {string}
  */
-export function formatFeedback(result, visual, user, qualityWarning = null) {
-  const username = user.split("@")[0].split(":")[0];
+export function formatFeedback(result, visual, user, qualityWarning = null, displayName = null) {
+  const username = displayName || user.split("@")[0].split(":")[0];
   const s = result._stats;
 
   // --- Header ---

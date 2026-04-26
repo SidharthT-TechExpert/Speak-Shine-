@@ -1997,7 +1997,7 @@ async function startBot() {
 
         if (typeof cacheEntry === 'string') {
           const cachedChunks = chunkMessage(cacheEntry);
-          await sendChunks(sock, chatId, cachedChunks, [dbUser]);
+          await sendChunks(sock, chatId, cachedChunks, [actualUserJid]);
           return;
         }
 
@@ -2021,7 +2021,7 @@ async function startBot() {
         };
 
         // 🤖 AI Feedback (runs async, won't block submission)
-        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null, todayStatus?.todayQuestion || null, sock, { onProgress })
+        generateFeedback(msg, dbUser, video.seconds || 60, todayStatus?.todayTopic || null, todayStatus?.todayQuestion || null, sock, { onProgress, displayName: userPhone })
           .then((feedbackText) => {
             storeResult(hash, feedbackText);
 
@@ -2048,7 +2048,7 @@ async function startBot() {
                 safeSend(sock, chatId, { text: chunks[i], mentions: [actualUserJid] });
               }
             } else {
-              sendChunks(sock, chatId, chunks, [dbUser]);
+              sendChunks(sock, chatId, chunks, [actualUserJid]);
             }
           })
           .catch((err) => {
