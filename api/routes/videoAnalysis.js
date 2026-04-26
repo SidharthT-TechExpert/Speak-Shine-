@@ -18,6 +18,8 @@ const upload = multer({
   dest: "tmp/uploads/",
   limits: { fileSize: 350 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    console.log(`[VideoUpload] File MIME type: ${file.mimetype}`);
+    
     const allowedTypes = [
       "video/mp4", "video/quicktime", "video/x-msvideo", "video/webm",
       "video/mpeg", "video/3gpp", "video/x-flv", "video/x-ms-wmv",
@@ -27,9 +29,11 @@ const upload = multer({
     const isAllowed = allowedTypes.some(type => file.mimetype.startsWith(type));
     
     if (isAllowed) {
+      console.log(`[VideoUpload] File accepted: ${file.mimetype}`);
       cb(null, true);
     } else {
-      cb(new Error("Only video files are allowed (MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV)."));
+      console.error(`[VideoUpload] File rejected: ${file.mimetype}`);
+      cb(new Error(`File type not supported: ${file.mimetype}. Only video files are allowed (MP4, MOV, AVI, WEBM, MPEG, 3GP, FLV, WMV).`));
     }
   },
 });
