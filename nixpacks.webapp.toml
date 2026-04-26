@@ -3,14 +3,20 @@ nixPkgs = ["nodejs_20", "ffmpeg", "pkg-config", "python3"]
 
 [phases.install]
 cmds = [
-  "npm ci --omit=dev --omit=optional --ignore-scripts || npm install --omit=dev --omit=optional --ignore-scripts",
-  "cd api && npm ci --omit=dev || npm install --omit=dev",
-  "cd frontend && npm ci --omit=dev || npm install --omit=dev"
+  # Root dependencies (minimal, production only)
+  "npm ci --prefer-offline --no-audit --no-fund --omit=dev --omit=optional --ignore-scripts",
+  # API dependencies
+  "cd api && npm ci --prefer-offline --no-audit --no-fund --omit=dev",
+  # Frontend dependencies (build-time only)
+  "cd frontend && npm ci --prefer-offline --no-audit --no-fund"
 ]
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build"
+  # Build frontend with production optimizations
+  "cd frontend && NODE_ENV=production npm run build",
+  # Clean up frontend node_modules after build to save space
+  "rm -rf frontend/node_modules"
 ]
 
 [start]

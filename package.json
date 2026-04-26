@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node --max-old-space-size=512 index.js",
     "api": "node api/server.js",
-    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:frontend": "cd frontend && npm ci --prefer-offline --no-audit --no-fund && npm run build",
     "start:webapp": "NODE_ENV=production node api/server.js",
     "test": "vitest run"
   },

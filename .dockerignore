@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+api/node_modules/
+
+# Build outputs
+frontend/dist/
+*.log
+npm-debug.log*
+
+# Development files
+.git/
+.gitignore
+README.md
+*.md
+.env.local
+.env.development
+
+# Test files
+**/*.test.js
+**/*.spec.js
+coverage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Auth files (keep these but they're large)
+auth/
