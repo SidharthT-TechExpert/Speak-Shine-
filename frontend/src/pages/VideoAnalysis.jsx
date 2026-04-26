@@ -302,6 +302,7 @@ function RecordCard({ onAnalysisStarted }) {
   const timerRef        = useRef(null);
   const countdownRef    = useRef(null);
   const pendingBlobRef  = useRef(null); // holds blob until preview video mounts
+  const mimeTypeRef     = useRef("video/webm"); // store the actual MIME type used
 
   const MAX_SECONDS = 300; // 5 min hard cap
 
@@ -417,6 +418,8 @@ function RecordCard({ onAnalysisStarted }) {
       ? "video/webm"
       : "video/mp4";
 
+    mimeTypeRef.current = mimeType; // Store for later use
+
     // Higher bitrate for better quality: 2.5Mbps video + 128kbps audio
     const recorder = new MediaRecorder(stream, {
       mimeType,
@@ -483,11 +486,19 @@ function RecordCard({ onAnalysisStarted }) {
     setUploadProgress(0);
     setError(null);
     try {
-      const ext = recordedBlob.type.includes("mp4") ? "mp4" : "webm";
-      const file = new File([recordedBlob], `recording.${ext}`, { type: recordedBlob.type });
+      // Use the stored MIME type from recording
+      const mimeType = mimeTypeRef.current || "video/webm";
+      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+      
+      // Create File with explicit MIME type
+      const file = new File([recordedBlob], `recording.${ext}`, { type: mimeType });
+      
+      console.log(`[Upload] File type: ${file.type}, size: ${file.size}`);
+      
       const formData = new FormData();
       formData.append("video", file);
       formData.append("isPublic", "true"); // Always public
+      
       const res = await api.post("/video/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => { if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100)); },
