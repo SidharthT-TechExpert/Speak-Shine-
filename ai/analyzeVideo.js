@@ -352,17 +352,18 @@ export async function analyzeVideo(videoPath) {
 
   // Build batch index ranges — e.g. 16 frames / 4 per batch = 4 batches
   const totalBatches = Math.ceil(timestamps.length / GROQ_BATCH_LIMIT);
-  console.log(`[Visual] ${timestamps.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, processing one at a time`);
+  console.log(`[Visual] ${timestamps.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, processing all in parallel`);
 
-  const batchResults = [];
-
-  for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+  // Extract all frames for all batches in parallel, then fire all API calls at once.
+  // Each batch uses a different Groq key (round-robin), so 4 batches × 4 keys = no rate limit collisions.
+  // Memory: 4 frames × ~150KB base64 × 4 batches = ~2.4MB — well within safe limits.
+  const batchPromises = Array.from({ length: totalBatches }, async (_, batchIdx) => {
     const batchTimestamps = timestamps.slice(
       batchIdx * GROQ_BATCH_LIMIT,
       (batchIdx + 1) * GROQ_BATCH_LIMIT
     );
 
-    // Extract only this batch's frames into memory
+    // Extract this batch's frames into memory
     const frames = [];
     for (let i = 0; i < batchTimestamps.length; i++) {
       const globalIdx = batchIdx * GROQ_BATCH_LIMIT + i;
@@ -370,30 +371,24 @@ export async function analyzeVideo(videoPath) {
       if (frame) frames.push(frame);
     }
 
-    if (frames.length === 0) {
-      batchResults.push(null);
-      continue;
-    }
+    if (frames.length === 0) return null;
 
     const startSec = frames[0].timestamp;
     const endSec = frames[frames.length - 1].timestamp;
 
-    // Send this batch to Groq
     const result = await analyzeFrameBatch(
       frames,
       `batch${batchIdx + 1}/${totalBatches}`,
       { index: batchIdx, total: totalBatches, startSec, endSec }
     );
 
-    batchResults.push(result);
-
-    // Immediately free all base64 data — GC can reclaim before next batch
+    // Free base64 data immediately after sending
     frames.forEach(f => { f.base64 = null; });
 
-    if (batchIdx < totalBatches - 1) {
-      await new Promise(r => setTimeout(r, 1500));
-    }
-  }
+    return result;
+  });
+
+  const batchResults = await Promise.all(batchPromises);
 
   // Merge all batch results with 60/40 second-half weighting
   const merged = mergeWeightedBatchResults(batchResults);
