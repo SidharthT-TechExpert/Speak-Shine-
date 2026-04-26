@@ -95,7 +95,7 @@ POST /api/video/upload
 Authorization: Bearer <jwt_token>
 Content-Type: multipart/form-data
 
-Body: { video: <file> } // Max 50MB
+Body: { video: <file> } // Max 350MB
 
 Response:
 {
