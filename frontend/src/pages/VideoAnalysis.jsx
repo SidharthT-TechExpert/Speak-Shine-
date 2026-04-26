@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
+import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
@@ -284,6 +285,10 @@ function RecordCard({ onAnalysisStarted }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
   const [lightbox, setLightbox]     = useState(false);
+  const [noiseCancel, setNoiseCancel] = useState(true);  // toggle for RNNoise
+  const [ncStatus, setNcStatus]     = useState("idle");  // idle|loading|active|fallback
+
+  const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
   const liveVideoRef    = useRef(null);
   const previewVideoRef = useRef(null);
@@ -344,54 +349,76 @@ function RecordCard({ onAnalysisStarted }) {
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
-  }, []);
+    cleanupNC();
+    setNcStatus("idle");
+  }, [cleanupNC]);
 
   const startCountdown = async () => {
     setError(null);
     try {
+      // ── Option 1: browser-level noise suppression via getUserMedia constraints ──
       const constraints = {
         video: {
           ...(camId ? { deviceId: { exact: camId } } : {}),
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 360 },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
           aspectRatio: { ideal: 16 / 9 },
-          frameRate: { ideal: 30, min: 15 },
+          frameRate: { ideal: 30, min: 24 },
           facingMode: "user",
         },
         audio: {
           ...(micId ? { deviceId: { exact: micId } } : {}),
           echoCancellation: true,
-          noiseSuppression: true,
+          noiseSuppression: true,   // browser built-in
           autoGainControl: true,
           sampleRate: 48000,
+          channelCount: 1,
         },
       };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      // Don't touch liveVideoRef here — it doesn't exist yet.
-      // The useEffect above will attach it once the step re-renders.
+      const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      let finalStream = rawStream;
+
+      // ── Option 2: RNNoise WASM AI noise cancellation on top ──
+      if (noiseCancel) {
+        setNcStatus("loading");
+        finalStream = await applyNoiseCancellation(rawStream);
+        setNcStatus(finalStream !== rawStream ? "active" : "fallback");
+      }
+
+      streamRef.current = finalStream;
       setStep("countdown");
       setCountdown(3);
       let c = 3;
       countdownRef.current = setInterval(() => {
         c--;
         setCountdown(c);
-        if (c <= 0) { clearInterval(countdownRef.current); startRecording(stream); }
+        if (c <= 0) { clearInterval(countdownRef.current); startRecording(finalStream); }
       }, 1000);
     } catch (err) {
+      setNcStatus("idle");
       setError("Could not access camera/mic: " + err.message);
     }
   };
 
   const startRecording = (stream) => {
     chunksRef.current = [];
+
+    // Pick best codec — prefer VP9 (better quality/size), fallback to VP8, then mp4
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
       ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
       : MediaRecorder.isTypeSupported("video/webm")
       ? "video/webm"
       : "video/mp4";
 
-    const recorder = new MediaRecorder(stream, { mimeType });
+    // Higher bitrate for better quality: 2.5Mbps video + 128kbps audio
+    const recorder = new MediaRecorder(stream, {
+      mimeType,
+      videoBitsPerSecond: 2_500_000,
+      audioBitsPerSecond: 128_000,
+    });
     recorderRef.current = recorder;
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
@@ -530,6 +557,34 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           )}
 
+          {/* Noise cancellation toggle */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: "var(--card2)", border: "1px solid var(--border2)",
+            borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1.25rem",
+          }}>
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
+                🎙️ AI Noise Cancellation
+              </div>
+              <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                RNNoise WASM — removes background noise
+              </div>
+            </div>
+            <button onClick={() => setNoiseCancel(v => !v)} style={{
+              width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer",
+              background: noiseCancel ? "var(--success)" : "var(--border2)",
+              position: "relative", transition: "background 0.2s", flexShrink: 0,
+            }}>
+              <span style={{
+                position: "absolute", top: "3px",
+                left: noiseCancel ? "22px" : "3px",
+                width: "18px", height: "18px", borderRadius: "50%",
+                background: "#fff", transition: "left 0.2s",
+              }} />
+            </button>
+          </div>
+
           <button className="btn-primary" onClick={startCountdown} style={{ width: "100%" }}>
             🎬 Start Recording
           </button>
@@ -543,6 +598,18 @@ function RecordCard({ onAnalysisStarted }) {
           <video ref={liveVideoRef} autoPlay muted playsInline
             style={{ width: "100%", maxWidth: "480px", borderRadius: "12px", background: "#000", aspectRatio: "16/9", objectFit: "cover" }} />
           <div style={{ fontSize: "5rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1 }}>{countdown}</div>
+          {ncStatus === "loading" && (
+            <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI noise cancellation…</p>
+          )}
+          {ncStatus === "active" && (
+            <p style={{ color: "var(--success)", fontSize: "0.82rem" }}>✅ AI noise cancellation active</p>
+          )}
+          {ncStatus === "fallback" && (
+            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
+          )}
+          {!noiseCancel && (
+            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
+          )}
           <p style={{ color: "var(--muted)" }}>Get ready…</p>
         </div>
       )}
@@ -565,6 +632,15 @@ function RecordCard({ onAnalysisStarted }) {
                 animation: isPaused ? "none" : "blink 1s infinite" }} />
               {isPaused ? "PAUSED" : "REC"} {fmtTime(elapsed)}
             </div>
+            {/* NC status badge */}
+            {ncStatus === "active" && (
+              <div style={{
+                position: "absolute", top: "12px", right: "12px",
+                background: "rgba(34,211,160,0.85)", color: "#fff",
+                padding: "0.2rem 0.55rem", borderRadius: "99px",
+                fontSize: "0.68rem", fontWeight: 700,
+              }}>🎙️ AI NC</div>
+            )}
             {/* Timer bar */}
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: "rgba(255,255,255,0.15)", borderRadius: "0 0 12px 12px" }}>
               <div style={{ height: "100%", width: `${(elapsed / MAX_SECONDS) * 100}%`,
