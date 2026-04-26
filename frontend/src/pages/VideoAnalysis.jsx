@@ -271,18 +271,19 @@ function UploadCard({ onAnalysisStarted }) {
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
 
 function RecordCard({ onAnalysisStarted }) {
-  const [step, setStep]             = useState("setup"); // setup|countdown|recording|preview|uploading
+  const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
   const [mics, setMics]             = useState([]);
   const [camId, setCamId]           = useState("");
   const [micId, setMicId]           = useState("");
   const [countdown, setCountdown]   = useState(3);
-  const [elapsed, setElapsed]       = useState(0);   // seconds recorded
+  const [elapsed, setElapsed]       = useState(0);
   const [question, setQuestion]     = useState(null);
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [error, setError]           = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
+  const [lightbox, setLightbox]     = useState(false);
 
   const liveVideoRef    = useRef(null);
   const previewVideoRef = useRef(null);
@@ -476,6 +477,19 @@ function RecordCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">🎥 Record Video for Analysis</div>
 
+      {/* Lightbox */}
+      {lightbox && question?.posterImage && (
+        <div onClick={() => setLightbox(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1000,
+          background: "rgba(0,0,0,0.88)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "zoom-out",
+        }}>
+          <img src={question.posterImage} alt="Today's poster"
+            style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: "16px", boxShadow: "0 0 60px rgba(0,0,0,0.8)" }} />
+        </div>
+      )}
+
       {/* ── SETUP ── */}
       {step === "setup" && (
         <div>
@@ -516,7 +530,10 @@ function RecordCard({ onAnalysisStarted }) {
               </div>
               {question.posterImage && (
                 <img src={question.posterImage} alt="Today's poster"
-                  style={{ width: "100%", borderRadius: "10px", border: "1px solid var(--border)", objectFit: "contain" }} />
+                  onClick={() => setLightbox(true)}
+                  onMouseOver={e => e.currentTarget.style.transform = "scale(1.04)"}
+                  onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                  style={{ width: "100%", borderRadius: "10px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s" }} />
               )}
             </div>
           )}
@@ -589,7 +606,10 @@ function RecordCard({ onAnalysisStarted }) {
             {/* Poster thumbnail during recording */}
             {question?.posterImage && (
               <img src={question.posterImage} alt="Today's poster"
-                style={{ width: "100%", borderRadius: "10px", border: "1px solid var(--border)", objectFit: "contain" }} />
+                onClick={() => setLightbox(true)}
+                onMouseOver={e => e.currentTarget.style.transform = "scale(1.03)"}
+                onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
+                style={{ width: "100%", borderRadius: "10px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s" }} />
             )}
 
             <div style={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: "12px", padding: "1rem" }}>
