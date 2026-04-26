@@ -1,6 +1,5 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && cd frontend && npm install && npx vite build"
 
 [deploy]
 startCommand = "NODE_ENV=production node api/server.js"

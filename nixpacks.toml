@@ -1,1 +1,16 @@
-# Dockerfile is used instead — see Dockerfile for ffmpeg setup
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "pkg-config"]
+
+[phases.install]
+cmds = [
+  "npm install --ignore-scripts --omit=optional",
+  "cd frontend && npm install"
+]
+
+[phases.build]
+cmds = [
+  "cd frontend && npx vite build"
+]
+
+[start]
+cmd = "NODE_ENV=production node api/server.js"
