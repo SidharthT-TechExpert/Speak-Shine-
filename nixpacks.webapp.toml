@@ -3,13 +3,13 @@ nixPkgs = ["nodejs_20", "ffmpeg"]
 
 [phases.install]
 cmds = [
-  "npm install",
-  "cd frontend && npm install"
+  "npm install --omit=dev --omit=optional --ignore-scripts",
+  "npm install --prefix frontend --omit=dev"
 ]
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build"
+  "npm run build --prefix frontend"
 ]
 
 [start]
