@@ -722,11 +722,13 @@ function MonitoringPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const load = async () => {
     try {
       const res = await api.get("/monitoring");
       setData(res.data);
+      setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || "Failed to load monitoring data");
@@ -737,7 +739,7 @@ function MonitoringPanel() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 15000); // refresh every 15s
+    const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -746,99 +748,152 @@ function MonitoringPanel() {
   if (!data) return null;
 
   const { system, videos, queue, api: apiStats, activeUsers } = data;
-  const cpuColor = system.cpuPercent > 80 ? "var(--danger)" : system.cpuPercent > 60 ? "var(--warning)" : "var(--success)";
-  const memColor = system.memPercent > 85 ? "var(--danger)" : system.memPercent > 65 ? "var(--warning)" : "var(--success)";
+  const cpuColor = system.cpuPercent > 80 ? "#f87171" : system.cpuPercent > 60 ? "#fbbf24" : "#4ade80";
+  const memColor = system.memPercent > 85 ? "#f87171" : system.memPercent > 65 ? "#fbbf24" : "#4ade80";
+  const isIdle = videos.processing === 0 && videos.queued === 0;
 
   return (
-    <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
+    <div style={{display:"grid",gap:"1rem"}}>
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.5rem"}}>
         <div className="section-title" style={{margin:0}}>🖥️ System Monitor</div>
-        <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
-          <span style={{width:8,height:8,borderRadius:"50%",background:"var(--success)",display:"inline-block",animation:"blink 2s infinite"}}/>
-          <span style={{color:"var(--muted)",fontSize:"0.8rem"}}>Live · refreshes every 15s</span>
-          <button className="btn-secondary" style={{padding:"0.3rem 0.75rem",fontSize:"0.8rem"}} onClick={load}>↻ Refresh</button>
+        <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"0.4rem"}}>
+            <span style={{width:7,height:7,borderRadius:"50%",background:"#4ade80",display:"inline-block",boxShadow:"0 0 6px #4ade80"}}/>
+            <span style={{color:"var(--muted)",fontSize:"0.78rem"}}>
+              {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}` : "Live"}
+            </span>
+          </div>
+          <button className="btn-secondary" style={{padding:"0.3rem 0.8rem",fontSize:"0.8rem"}} onClick={load}>↻ Refresh</button>
         </div>
       </div>
 
-      {/* Top stats */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"0.75rem",marginBottom:"1rem"}}>
-        <StatCard icon="👥" label="Active Users" value={activeUsers} color="#7c6fff" />
-        <StatCard icon="⚙️" label="Processing" value={videos.processing + videos.queued > 0 ? `${videos.processing} now · ${videos.queued} queued` : "Idle"} color="#38bdf8" />
-        <StatCard icon="✅" label="Done Today" value={videos.completedToday} color="#4ade80" />
-        <StatCard icon="❌" label="Failed Today" value={videos.failedToday} color={videos.failedToday > 0 ? "#f87171" : "#4ade80"} />
-        <StatCard icon="⏱️" label="Avg Process Time" value={queue.avgProcessingMin ? `${queue.avgProcessingMin} min` : "—"} color="#fbbf24" />
-        <StatCard icon="🌐" label="Avg API Response" value={apiStats.avgResponseMs ? `${apiStats.avgResponseMs}ms` : "—"} color="#fb923c" />
+      {/* Row 1: 3 stat tiles */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.75rem"}}>
+        <MonStat icon="👥" label="Active Users" value={activeUsers} accent="#7c6fff" />
+        <MonStat icon="✅" label="Done Today" value={videos.completedToday} accent="#4ade80" />
+        <MonStat icon="❌" label="Failed Today" value={videos.failedToday} accent={videos.failedToday > 0 ? "#f87171" : "#4ade80"} />
       </div>
 
-      {/* System resources */}
-      <div className="card" style={{marginBottom:"1rem"}}>
-        <div className="section-title">💻 Server Resources</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1.5rem"}}>
-          <div>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.4rem",fontSize:"0.85rem"}}>
-              <span style={{color:"var(--muted)"}}>CPU Usage</span>
-              <span style={{color:cpuColor,fontWeight:600}}>{system.cpuPercent}%</span>
-            </div>
-            <div style={{background:"var(--bg)",borderRadius:6,height:10,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${system.cpuPercent}%`,background:cpuColor,borderRadius:6,transition:"width 0.5s"}}/>
-            </div>
-          </div>
-          <div>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.4rem",fontSize:"0.85rem"}}>
-              <span style={{color:"var(--muted)"}}>Memory</span>
-              <span style={{color:memColor,fontWeight:600}}>{system.memUsedMB}MB / {system.memTotalMB}MB ({system.memPercent}%)</span>
-            </div>
-            <div style={{background:"var(--bg)",borderRadius:6,height:10,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${system.memPercent}%`,background:memColor,borderRadius:6,transition:"width 0.5s"}}/>
-            </div>
-          </div>
+      {/* Row 2: 3 stat tiles */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.75rem"}}>
+        <MonStat icon="🎬" label="Processing Now" value={isIdle ? "Idle" : `${videos.processing} active`} accent="#38bdf8" />
+        <MonStat icon="⏱️" label="Avg Process Time" value={queue.avgProcessingMin ? `${queue.avgProcessingMin} min` : "—"} accent="#fbbf24" />
+        <MonStat icon="🌐" label="Avg API Response" value={apiStats.avgResponseMs ? `${apiStats.avgResponseMs}ms` : "—"} accent="#fb923c" />
+      </div>
+
+      {/* Server Resources */}
+      <div className="card">
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.25rem"}}>
+          <span style={{fontWeight:600,fontSize:"0.95rem"}}>💻 Server Resources</span>
+          <span style={{color:"var(--muted)",fontSize:"0.78rem"}}>Uptime: {system.uptimeHours}h</span>
         </div>
-        <div style={{marginTop:"1rem",color:"var(--muted)",fontSize:"0.82rem"}}>
-          Server uptime: <strong style={{color:"var(--text)"}}>{system.uptimeHours}h</strong>
+        <div style={{display:"grid",gap:"1.1rem"}}>
+          <ResourceBar label="CPU" value={system.cpuPercent} unit="%" color={cpuColor} />
+          <ResourceBar
+            label="Memory"
+            value={system.memPercent}
+            unit="%"
+            color={memColor}
+            sublabel={`${system.memUsedMB} MB / ${system.memTotalMB} MB`}
+          />
         </div>
       </div>
 
-      {/* Queue status */}
-      <div className="card" style={{marginBottom:"1rem"}}>
-        <div className="section-title">🚦 Video Queue</div>
-        {videos.queued === 0 && !videos.processing ? (
-          <p style={{color:"var(--success)",fontWeight:500}}>✅ Queue is empty — no videos waiting</p>
-        ) : (
-          <div style={{display:"grid",gap:"0.5rem",fontSize:"0.9rem"}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}>
-              <span style={{color:"var(--muted)"}}>Currently processing:</span>
-              <span style={{fontWeight:600,color:"var(--warning)"}}>
-                {videos.activeJobId ? `⚙️ ${String(videos.activeJobId).slice(-8)}…` : "None"}
-              </span>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between"}}>
-              <span style={{color:"var(--muted)"}}>Videos in queue:</span>
-              <span style={{fontWeight:600}}>{videos.queued}</span>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between"}}>
-              <span style={{color:"var(--muted)"}}>Estimated wait for next:</span>
-              <span style={{fontWeight:600}}>{queue.avgProcessingMin ? `~${queue.avgProcessingMin} min` : "~2.5 min"}</span>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Queue + Errors side by side on wide screens */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
 
-      {/* Recent errors */}
-      {queue.recentErrors && queue.recentErrors.length > 0 && (
+        {/* Queue */}
         <div className="card">
-          <div className="section-title">⚠️ Recent Errors ({queue.errorsToday} today)</div>
-          <div style={{display:"grid",gap:"0.5rem"}}>
-            {queue.recentErrors.map((e, i) => (
-              <div key={i} style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:8,padding:"0.6rem 0.85rem",fontSize:"0.82rem"}}>
-                <div style={{color:"var(--danger)",fontWeight:600,marginBottom:"0.2rem"}}>
-                  Report {String(e.reportId).slice(-8)}… · {new Date(e.at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
-                </div>
-                <div style={{color:"var(--muted)"}}>{e.error}</div>
-              </div>
-            ))}
+          <div style={{fontWeight:600,fontSize:"0.95rem",marginBottom:"1rem"}}>🚦 Video Queue</div>
+          {isIdle ? (
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",color:"#4ade80",fontWeight:500,fontSize:"0.9rem"}}>
+              <span style={{fontSize:"1.1rem"}}>✅</span> Queue empty
+            </div>
+          ) : (
+            <div style={{display:"grid",gap:"0.6rem",fontSize:"0.88rem"}}>
+              <QueueRow label="Processing" value={videos.activeJobId ? `#${String(videos.activeJobId).slice(-6)}` : "—"} valueColor="#fbbf24" />
+              <QueueRow label="Waiting" value={`${videos.queued} video${videos.queued !== 1 ? "s" : ""}`} />
+              <QueueRow label="Est. wait" value={queue.avgProcessingMin ? `~${queue.avgProcessingMin} min` : "~2.5 min"} />
+            </div>
+          )}
+          <div style={{marginTop:"1rem",paddingTop:"0.75rem",borderTop:"1px solid var(--border)",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",fontSize:"0.82rem",color:"var(--muted)"}}>
+            <span>Total processed: <strong style={{color:"var(--text)"}}>{queue.totalProcessed}</strong></span>
+            <span>Total failed: <strong style={{color: queue.totalFailed > 0 ? "#f87171" : "var(--text)"}}>{queue.totalFailed}</strong></span>
           </div>
         </div>
-      )}
+
+        {/* Errors */}
+        <div className="card">
+          <div style={{fontWeight:600,fontSize:"0.95rem",marginBottom:"1rem"}}>
+            ⚠️ Errors Today
+            {queue.errorsToday > 0 && (
+              <span style={{marginLeft:"0.5rem",background:"rgba(248,113,113,0.15)",color:"#f87171",borderRadius:99,padding:"0.1rem 0.5rem",fontSize:"0.75rem"}}>
+                {queue.errorsToday}
+              </span>
+            )}
+          </div>
+          {!queue.recentErrors || queue.recentErrors.length === 0 ? (
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",color:"#4ade80",fontWeight:500,fontSize:"0.9rem"}}>
+              <span style={{fontSize:"1.1rem"}}>✅</span> No errors today
+            </div>
+          ) : (
+            <div style={{display:"grid",gap:"0.5rem",maxHeight:160,overflowY:"auto"}}>
+              {queue.recentErrors.map((e, i) => (
+                <div key={i} style={{background:"rgba(248,113,113,0.07)",border:"1px solid rgba(248,113,113,0.18)",borderRadius:8,padding:"0.5rem 0.75rem"}}>
+                  <div style={{color:"#f87171",fontWeight:600,fontSize:"0.78rem",marginBottom:"0.2rem"}}>
+                    {String(e.reportId).slice(-8)} · {new Date(e.at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
+                  </div>
+                  <div style={{color:"var(--muted)",fontSize:"0.78rem",lineHeight:1.4}}>{e.error}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Small helpers ────────────────────────────────────────────────────────────
+function MonStat({ icon, label, value, accent }) {
+  return (
+    <div style={{
+      background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,
+      padding:"1rem",display:"flex",flexDirection:"column",gap:"0.35rem",
+      borderTop:`3px solid ${accent}`,
+    }}>
+      <div style={{fontSize:"1.4rem",lineHeight:1}}>{icon}</div>
+      <div style={{fontSize:"0.72rem",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600}}>{label}</div>
+      <div style={{fontSize:"1.35rem",fontWeight:700,color:"var(--text)",lineHeight:1}}>{value}</div>
+    </div>
+  );
+}
+
+function ResourceBar({ label, value, unit, color, sublabel }) {
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.4rem"}}>
+        <span style={{fontSize:"0.85rem",color:"var(--muted)"}}>{label}</span>
+        <div style={{textAlign:"right"}}>
+          <span style={{fontWeight:700,color,fontSize:"0.9rem"}}>{value}{unit}</span>
+          {sublabel && <span style={{color:"var(--muted)",fontSize:"0.75rem",marginLeft:"0.4rem"}}>({sublabel})</span>}
+        </div>
+      </div>
+      <div style={{background:"rgba(255,255,255,0.06)",borderRadius:99,height:8,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${Math.min(value,100)}%`,background:color,borderRadius:99,transition:"width 0.6s ease",boxShadow:`0 0 8px ${color}55`}}/>
+      </div>
+    </div>
+  );
+}
+
+function QueueRow({ label, value, valueColor }) {
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span style={{color:"var(--muted)"}}>{label}</span>
+      <span style={{fontWeight:600,color:valueColor||"var(--text)"}}>{value}</span>
     </div>
   );
 }
