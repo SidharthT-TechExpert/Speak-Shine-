@@ -1,9 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "ffmpeg"]
+nixPkgs = ["nodejs_22", "ffmpeg", "vips"]
 
 [phases.install]
 cmds = [
-  "npm ci --prefer-offline --no-audit --no-fund --omit=dev",
   "cd api && npm install --prefer-offline --no-audit --no-fund --omit=dev",
   "cd frontend && npm ci --prefer-offline --no-audit --no-fund"
 ]
