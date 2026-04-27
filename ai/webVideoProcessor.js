@@ -206,26 +206,44 @@ export function getVideoDuration(videoPath) {
         }
         try {
           const info = JSON.parse(stdout);
+          console.log("[ffprobe] Raw metadata:", JSON.stringify(info, null, 2));
 
           // Try format duration first
           let dur = parseFloat(info?.format?.duration);
+          console.log("[ffprobe] Format duration:", dur);
 
           // Fallback: calculate from nb_read_packets * avg frame duration
           if (!dur || dur <= 0) {
             const videoStream = info?.streams?.find(s => s.codec_type === "video");
             dur = parseFloat(videoStream?.duration) || 0;
+            console.log("[ffprobe] Video stream duration:", dur);
 
             // Last resort: use nb_read_packets and r_frame_rate
-            if (!dur && videoStream?.nb_read_packets && videoStream?.r_frame_rate) {
+            if ((!dur || dur <= 0) && videoStream?.nb_read_packets && videoStream?.r_frame_rate) {
               const [num, den] = videoStream.r_frame_rate.split("/").map(Number);
               const fps = den ? num / den : 0;
+              console.log("[ffprobe] Calculating from packets:", videoStream.nb_read_packets, "fps:", fps);
               if (fps > 0) dur = parseInt(videoStream.nb_read_packets) / fps;
             }
           }
 
-          if (!dur || dur <= 0) return reject(new Error("Could not determine video duration."));
+          console.log("[ffprobe] Final duration:", dur);
+          
+          // Emergency fallback: estimate from file size (very rough, ~1MB per 10 seconds for webm)
+          if (!dur || dur <= 0) {
+            const fileSize = fs.statSync(videoPath).size;
+            const estimatedDur = Math.round(fileSize / (1024 * 1024) * 10); // rough estimate
+            console.log("[ffprobe] Using file size estimate:", estimatedDur, "seconds");
+            if (estimatedDur > 0) {
+              dur = estimatedDur;
+            } else {
+              return reject(new Error("Could not determine video duration."));
+            }
+          }
+          
           resolve(Math.round(dur));
-        } catch {
+        } catch (parseErr) {
+          console.error("[ffprobe] Parse error:", parseErr);
           reject(new Error("Could not read video metadata."));
         }
       }
