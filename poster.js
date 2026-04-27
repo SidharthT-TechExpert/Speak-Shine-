@@ -1,4 +1,3 @@
-import { createCanvas } from "canvas";
 import fs from "fs";
 
 // ── Category → theme mapping ──────────────────────────────────────────────
@@ -166,6 +165,15 @@ function cornerAccent(ctx, x, y, size, color, flip = false) {
 
 // ── Main export ───────────────────────────────────────────────────────────
 export default async function generatePoster(question) {
+  // Lazy-load canvas so a native module failure does not crash the whole bot
+  let createCanvas;
+  try {
+    const canvasModule = await import("canvas");
+    createCanvas = canvasModule.createCanvas;
+  } catch (err) {
+    console.log("canvas module unavailable:", err.message);
+    return null;
+  }
   const theme = getTheme(question.category);
 
   const PAD = 80;       // horizontal padding

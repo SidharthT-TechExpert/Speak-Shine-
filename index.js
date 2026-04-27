@@ -344,16 +344,23 @@ async function startBot() {
         imageBuffer = await generatePoster(question);
       } catch (posterErr) {
         console.log("Poster generation failed:", posterErr.message);
+      }
+      if (!TARGET_GROUP) {
+        console.log("TARGET_GROUP not set");
         return;
       }
-      if (!imageBuffer || !TARGET_GROUP) {
-        console.log("No image buffer or TARGET_GROUP not set");
-        return;
+      let sent = false;
+      if (imageBuffer) {
+        sent = await safeSend(sock, TARGET_GROUP, {
+          image: imageBuffer,
+          mimetype: "image/png",
+        });
+      } else {
+        console.log("[sendQuestion] Canvas unavailable, sending text fallback");
+        sent = await safeSend(sock, TARGET_GROUP, {
+          text: "Speak & Shine - Daily Challenge\n\nCategory: " + (question.category || "General") + "\n\nTopic: " + (question.topic || "") + "\n\nQuestion: " + question.question + "\n\nSend your 1-min speaking video!",
+        });
       }
-      const sent = await safeSend(sock, TARGET_GROUP, {
-        image: imageBuffer,
-        mimetype: "image/png",
-      });
 
       if (sent) {
         await Question.findByIdAndDelete(question._id);
