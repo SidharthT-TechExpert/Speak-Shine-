@@ -2,15 +2,29 @@ import express from "express";
 import User from "../../models/userSchema.js";
 import Status from "../../models/statusSchema.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
-import { ensurePoster } from "../posterGenerator.js";
+import { generateSVGPoster } from "../posterGenerator.js";
 
 const router = express.Router();
+
+/** Get poster image — use bot's stored PNG if available, else generate SVG fallback */
+function getPosterImage(status) {
+  if (status?.todayPosterImage) {
+    const isExpired = status.posterExpiresAt && new Date() > new Date(status.posterExpiresAt);
+    if (!isExpired) return status.todayPosterImage;
+  }
+  // Fallback: generate SVG with correct category
+  if (!status?.todayQuestion) return null;
+  return generateSVGPoster({
+    topic:    status.todayTopic    || "Speaking Practice",
+    question: status.todayQuestion,
+    category: status.todayCategory || "General",
+  });
+}
 
 // GET /api/dashboard — today's overview (all roles)
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    let status = await Status.findOne().lean();
-    status = await ensurePoster(status);
+    const status = await Status.findOne().lean();
     const users = await User.find().lean();
 
     const completed = users.filter(u => u.completed);
@@ -23,7 +37,8 @@ router.get("/", authMiddleware, async (req, res) => {
         questionSent: status?.questionSentToday || false,
         topic: status?.todayTopic || null,
         question: status?.todayQuestion || null,
-        posterImage: status?.todayPosterImage || null,
+        category: status?.todayCategory || null,
+        posterImage: getPosterImage(status),
       },
       stats: {
         total: users.length,
@@ -92,7 +107,6 @@ router.get("/me", authMiddleware, async (req, res) => {
     }
 
     let status = await Status.findOne().lean();
-    status = await ensurePoster(status);
     const allUsers = await User.find().lean();
     const completed = allUsers.filter(u => u.completed).length;
     const totalFines = allUsers.reduce((s, u) => s + (u.fine || 0), 0);
@@ -116,7 +130,8 @@ router.get("/me", authMiddleware, async (req, res) => {
         questionSent: status?.questionSentToday || false,
         topic: status?.todayTopic || null,
         question: status?.todayQuestion || null,
-        posterImage: status?.todayPosterImage || null,
+        category: status?.todayCategory || null,
+        posterImage: getPosterImage(status),
       },
       stats: {
         total: allUsers.length,
