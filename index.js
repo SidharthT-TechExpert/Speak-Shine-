@@ -663,20 +663,27 @@ async function startBot() {
   // ================= DAILY RESET (12:00 AM) =================
   const dailyReset = async () => {
     try {
-      // Reset all users for next day
+      // ── Increment weekly/monthly submissions for users who submitted today ──
+      // This is the ONLY place these counters are incremented (not at video send time)
+      await User.updateMany({ completed: true }, { $inc: { weeklySubmissions: 1, monthlySubmissions: 1 } });
+      console.log("🔄 Incremented weekly/monthly submissions for today's submitters");
+
+      // Reset all users' daily completed flag for next day
       await User.updateMany({}, { completed: false });
 
-      // On Sunday (day 0) reset weekly submissions
-      const dayOfWeek = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata", weekday: "short" });
-      if (dayOfWeek === "Sun") {
-        await User.updateMany({}, { weeklySubmissions: 0, weeklyFine: 0 });
-        console.log("🔄 Weekly submissions + fines reset (Sunday)");
+      // On Sunday midnight (IST) reset weekly submissions + weekly fines
+      // dailyReset runs at 00:05 — check if it's Sunday (day 0)
+      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      const dayOfWeek = nowIST.getDay(); // 0 = Sunday
+      if (dayOfWeek === 0) {
+        await User.updateMany({}, { $set: { weeklySubmissions: 0, weeklyFine: 0 } });
+        console.log("🔄 Weekly submissions + fines reset (Sunday midnight)");
       }
 
       // On 1st of month reset monthly submissions
-      const dayOfMonth = new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata", day: "numeric" });
-      if (dayOfMonth === "1") {
-        await User.updateMany({}, { monthlySubmissions: 0 });
+      const dayOfMonth = nowIST.getDate();
+      if (dayOfMonth === 1) {
+        await User.updateMany({}, { $set: { monthlySubmissions: 0 } });
         console.log("🔄 Monthly submissions reset (1st of month)");
       }
 
@@ -1953,7 +1960,7 @@ async function startBot() {
 
         await User.findOneAndUpdate(
           { userId: dbUser },
-          { completed: true, $inc: { weeklySubmissions: 1 } },
+          { completed: true },
           { upsert: true },
         );
 
@@ -2032,7 +2039,6 @@ async function startBot() {
                 { userId: dbUser },
                 {
                   $push: { feedbackScores: { $each: [{ ...scores, date: new Date() }], $slice: -30 } },
-                  $inc: { monthlySubmissions: 1 },
                 }
               ).catch(() => { });
             }
