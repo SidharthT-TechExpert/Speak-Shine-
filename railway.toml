@@ -3,6 +3,6 @@ builder = "NIXPACKS"
 nixpacksConfigPath = "nixpacks.webapp.toml"
 
 [deploy]
-startCommand = "NODE_ENV=production node api/server.js"
+startCommand = "npm start"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
