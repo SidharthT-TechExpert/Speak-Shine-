@@ -2127,24 +2127,57 @@ async function startBot() {
   // ================= CRON =================
   if (!cronsRegistered) {
     cronsRegistered = true;
-    console.log("⏰ Registering cron jobs...");
+    console.log("Registering cron jobs...");
+
+    // Startup catch-up: if scheduled send time already passed today and not sent, send now
+    (async () => {
+      try {
+        await new Promise(r => setTimeout(r, 8000));
+        const s = await Status.findOne().lean();
+        if (!s || s.questionSentToday) return;
+        const sendTime = s.posterSendTime || "08:00";
+        const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+        const nowTime = String(nowIST.getHours()).padStart(2,"0") + ":" + String(nowIST.getMinutes()).padStart(2,"0");
+        const [sh, sm] = sendTime.split(":").map(Number);
+        const [nh, nm] = nowTime.split(":").map(Number);
+        const sendMins = sh * 60 + sm;
+        const nowMins = nh * 60 + nm;
+        if (nowMins >= sendMins && nowMins <= sendMins + 240) {
+          console.log("[Cron] Catch-up: " + sendTime + " already passed (now " + nowTime + "), sending now...");
+          await sendQuestion();
+        }
+      } catch (err) {
+        console.log("[Cron] Catch-up error:", err.message);
+      }
+    })();
+
+    // Every-minute tick: compare current IST time against configured posterSendTime in DB
+    cron.schedule("* * * * *", async () => {
+      try {
+        const s = await Status.findOne().lean();
+        if (!s) return;
+        const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+        const nowTime = String(nowIST.getHours()).padStart(2,"0") + ":" + String(nowIST.getMinutes()).padStart(2,"0");
+        const sendTime = s.posterSendTime || "08:00";
+        if (nowTime === sendTime) {
+          console.log("[Cron] Poster send time matched: " + nowTime);
+          await sendQuestion();
+        }
+        const genTime = s.questionGenerateTime || "07:00";
+        if (nowTime === genTime) {
+          const cnt = await Question.countDocuments();
+          if (cnt <= 7) {
+            console.log("[Cron] Pre-generate: low stock (" + cnt + "), generating 14...");
+            const { inserted, totalInDb } = await generateAndInsertQuestions(14);
+            safeSend(sock, OWNER, { text: "Pre-generate: Added " + inserted.length + " questions. Total: " + totalInDb });
+          }
+        }
+      } catch (err) {
+        console.log("[Cron] Minute tick error:", err.message);
+      }
+    }, { timezone: TIMEZONE });
 
     cron.schedule("30 7 * * *", sendGoodMorning, { timezone: TIMEZONE });
-
-    // First attempt at 8:00 AM sharp
-    cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
-
-    // Retry every 2 min from 8:02 to 8:30 in case first attempt failed
-    cron.schedule(
-      "*/2 8 * * *",
-      async () => {
-        const now = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-        const minutes = now.getMinutes();
-        if (minutes < 5 || minutes > 30) return; // only retry 8:05–9:30
-        await sendQuestion();
-      },
-      { timezone: TIMEZONE },
-    );
 
     cron.schedule(
       "0 15 * * *",
