@@ -2118,22 +2118,95 @@ async function startBot() {
     cronsRegistered = true;
     console.log("⏰ Registering cron jobs...");
 
-    cron.schedule("30 7 * * *", sendGoodMorning, { timezone: TIMEZONE });
+    // ── Dynamic schedule: poster send time + question generate time ───────
+    // These are read from DB and can be changed via the admin web dashboard.
+    // The bot polls DB every minute and reschedules automatically.
+    let activePosterSendTime = "08:00";
+    let activeGenerateTime   = "07:00";
+    let posterCronTask       = null;
+    let posterRetryCronTask  = null;
+    let generateCronTask     = null;
 
-    // First attempt at 8:00 AM sharp
-    cron.schedule("0 8 * * *", sendQuestion, { timezone: TIMEZONE });
+    /** "HH:MM" → cron expression "MM HH * * *" */
+    const timeToCron = (hhmm) => {
+      const [h, m] = hhmm.split(":").map(Number);
+      return `${m} ${h} * * *`;
+    };
 
-    // Retry every 2 min from 8:02 to 8:30 in case first attempt failed
-    cron.schedule(
-      "*/2 8 * * *",
-      async () => {
+    const schedulePosterCron = (hhmm) => {
+      if (posterCronTask)      { posterCronTask.stop();      posterCronTask = null; }
+      if (posterRetryCronTask) { posterRetryCronTask.stop(); posterRetryCronTask = null; }
+
+      const [h] = hhmm.split(":").map(Number);
+      posterCronTask = cron.schedule(timeToCron(hhmm), sendQuestion, { timezone: TIMEZONE });
+
+      // Retry every 2 min for 30 min after the scheduled time
+      posterRetryCronTask = cron.schedule(`*/2 ${h} * * *`, async () => {
         const now = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-        const minutes = now.getMinutes();
-        if (minutes < 5 || minutes > 30) return; // only retry 8:05–9:30
+        const [schedH, schedM] = hhmm.split(":").map(Number);
+        const nowMins   = now.getHours() * 60 + now.getMinutes();
+        const startMins = schedH * 60 + schedM + 2;
+        const endMins   = schedH * 60 + schedM + 30;
+        if (nowMins < startMins || nowMins > endMins) return;
         await sendQuestion();
-      },
-      { timezone: TIMEZONE },
-    );
+      }, { timezone: TIMEZONE });
+
+      activePosterSendTime = hhmm;
+      console.log(`[Cron] Poster send scheduled at ${hhmm} IST`);
+    };
+
+    const scheduleGenerateCron = (hhmm) => {
+      if (generateCronTask) { generateCronTask.stop(); generateCronTask = null; }
+
+      generateCronTask = cron.schedule(timeToCron(hhmm), async () => {
+        try {
+          const cnt = await Question.countDocuments();
+          if (cnt <= 7) {
+            console.log(`[Cron] Pre-generate: low stock (${cnt}), generating 14...`);
+            const { inserted, totalInDb } = await generateAndInsertQuestions(14);
+            console.log(`[Cron] Pre-generated ${inserted.length}. Total: ${totalInDb}`);
+            safeSend(sock, OWNER, {
+              text: `🔄 *Scheduled Pre-generate:* Added ${inserted.length} questions _(${cnt} were left)_\n📊 Total: ${totalInDb}`,
+            });
+          }
+        } catch (err) {
+          console.log("[Cron] Pre-generate error:", err.message);
+        }
+      }, { timezone: TIMEZONE });
+
+      activeGenerateTime = hhmm;
+      console.log(`[Cron] Question pre-generate scheduled at ${hhmm} IST`);
+    };
+
+    // Load saved times from DB on startup, then schedule
+    (async () => {
+      try {
+        const s = await Status.findOne().lean();
+        if (s?.posterSendTime)       activePosterSendTime = s.posterSendTime;
+        if (s?.questionGenerateTime) activeGenerateTime   = s.questionGenerateTime;
+      } catch (_) {}
+      schedulePosterCron(activePosterSendTime);
+      scheduleGenerateCron(activeGenerateTime);
+    })();
+
+    // Poll DB every minute — reschedule if admin changed the times via web dashboard
+    cron.schedule("* * * * *", async () => {
+      try {
+        const s = await Status.findOne().lean();
+        if (!s) return;
+        if (s.posterSendTime && s.posterSendTime !== activePosterSendTime) {
+          console.log(`[Cron] Poster time changed: ${activePosterSendTime} → ${s.posterSendTime}`);
+          schedulePosterCron(s.posterSendTime);
+        }
+        if (s.questionGenerateTime && s.questionGenerateTime !== activeGenerateTime) {
+          console.log(`[Cron] Generate time changed: ${activeGenerateTime} → ${s.questionGenerateTime}`);
+          scheduleGenerateCron(s.questionGenerateTime);
+        }
+      } catch (_) {}
+    }, { timezone: TIMEZONE });
+    // ─────────────────────────────────────────────────────────────────────
+
+    cron.schedule("30 7 * * *", sendGoodMorning, { timezone: TIMEZONE });
 
     cron.schedule(
       "0 15 * * *",
