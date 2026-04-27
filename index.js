@@ -375,6 +375,9 @@ async function startBot() {
             questionSentToday: true,
             todayTopic: question.topic || null,
             todayQuestion: question.question || null,
+            todayCategory: question.category || null,
+            todayPosterImage: imageBuffer ? ("data:image/png;base64," + imageBuffer.toString("base64")) : null,
+            posterExpiresAt: imageBuffer ? new Date(Date.now() + 15 * 60 * 60 * 1000) : null,
             recentCategories: updatedRecent,
           }
         });
