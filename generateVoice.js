@@ -35,10 +35,10 @@ export default async function generateVoice(text, filePath) {
       },
     );
 
-    // ⏱ timeout (10 sec)
-    request.setTimeout(10000, () => {
+    // ⏱ timeout (30 sec - increased for slow networks)
+    request.setTimeout(30000, () => {
       request.destroy();
-      reject(new Error("TTS request timeout"));
+      reject(new Error("TTS request timeout after 30s"));
     });
 
     request.on("error", (err) => {
