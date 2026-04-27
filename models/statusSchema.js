@@ -5,9 +5,15 @@ const statusSchema = new mongoose.Schema({
   notifiedEmpty: { type: Boolean, default: false },
   notifiedLast: { type: Boolean, default: false },
   fineAppliedToday: { type: Boolean, default: false },
-  todayTopic: { type: String, default: null },    // topic (broad subject)
-  todayQuestion: { type: String, default: null }, // actual question asked to members
-  recentCategories: { type: [String], default: [] },  // last 7 used categories (dedup window)
+  todayTopic: { type: String, default: null },
+  todayQuestion: { type: String, default: null },
+  todayCategory: { type: String, default: null },
+  todayPosterImage: { type: String, default: null },
+  posterExpiresAt: { type: Date, default: null },
+  recentCategories: { type: [String], default: [] },
+  // Configurable schedule times (HH:MM, 24h, IST)
+  posterSendTime: { type: String, default: "08:00" },
+  questionGenerateTime: { type: String, default: "07:00" },
 }, { timestamps: true });
 
 export default mongoose.model("Status", statusSchema);

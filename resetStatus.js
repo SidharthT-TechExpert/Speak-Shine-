@@ -4,12 +4,17 @@ import Status from "./models/statusSchema.js";
 
 export async function resetStatus() {
   await Status.updateOne({}, {
-    questionSentToday: false,
-    notifiedEmpty: false,
-    notifiedLast: false,
-    fineAppliedToday: false,
-    todayTopic: null,
-    todayQuestion: null,
+    $set: {
+      questionSentToday: false,
+      notifiedEmpty: false,
+      notifiedLast: false,
+      fineAppliedToday: false,
+      todayTopic: null,
+      todayQuestion: null,
+      todayCategory: null,
+      todayPosterImage: null,
+      posterExpiresAt: null,
+    }
   });
 }
 
