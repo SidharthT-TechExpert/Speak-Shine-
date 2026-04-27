@@ -1089,12 +1089,15 @@ async function startBot() {
       const user = msg.key.participant || msg.key.remoteJid;
       if (!user) return;
 
-      // For group messages, participant must be set â€” remoteJid is the group, not the sender
-      if (chatId.includes("@g.us") && !msg.key.participant) return;
+      // For group messages, participant must be set — remoteJid is the group, not the sender
+      // EXCEPT for fromMe messages (bot's own messages) where participant may not be set
+      if (chatId.includes("@g.us") && !msg.key.participant && !msg.key.fromMe) return;
 
       // Skip if the apparent sender is the bot itself (can happen with forwarded messages)
+      // EXCEPT for group commands (allow bot to respond to its own commands)
       const botPhone = sock.user?.id?.split(":")[0].split("@")[0] ?? "";
-      if (botPhone && user.includes(botPhone)) return;
+      const isBotSelfCommand = msg.key.fromMe && chatId.includes("@g.us") && text.startsWith("/");
+      if (botPhone && user.includes(botPhone) && !isBotSelfCommand) return;
 
       // Normalize userId - resolve @lid to real @s.whatsapp.net JID via group metadata
       const normalizeUserId = (id) => {
