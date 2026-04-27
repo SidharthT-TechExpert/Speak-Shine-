@@ -12,7 +12,7 @@ const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, 
 const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
 const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
 const scoreColor = v => v>=7?"var(--success)":v>=5?"var(--warning)":"var(--danger)";
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"attendance",l:"📋 Attendance"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"attendance",l:"📋 Attendance"},{id:"controls",l:"🔄 Controls"}];
 
 export default function TrainerDashboard() {
   const [dash, setDash] = useState(null);
@@ -282,6 +282,48 @@ export default function TrainerDashboard() {
       {/* ATTENDANCE */}
       {tab==="attendance"&&(
         <AttendancePanel />
+      )}
+
+      {/* CONTROLS */}
+      {tab==="controls"&&(
+        <div className="card" style={{maxWidth:480}}>
+          <div className="section-title">🔄 Reset Controls</div>
+          <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1.5rem"}}>
+            Manually trigger resets. These are normally done automatically by the bot at midnight.
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+            {[
+              { label:"🌅 Reset Day", desc:"Clears today's submissions & question status", key:"day", endpoint:"/users/reset/day" },
+              { label:"📅 Reset Weekly", desc:"Resets weekly submissions & weekly fines to 0", key:"weekly", endpoint:"/users/reset/weekly" },
+              { label:"📆 Reset Monthly", desc:"Resets monthly submission counts to 0", key:"monthly", endpoint:"/users/reset/monthly" },
+            ].map(({label,desc,key,endpoint})=>(
+              <div key={key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.75rem 1rem",background:"var(--bg-secondary)",borderRadius:10,border:"1px solid var(--border)"}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:"0.9rem"}}>{label}</div>
+                  <div style={{color:"var(--muted)",fontSize:"0.78rem"}}>{desc}</div>
+                </div>
+                <button
+                  className="btn-ghost danger"
+                  style={{fontSize:"0.82rem",whiteSpace:"nowrap"}}
+                  disabled={resetting===key}
+                  onClick={()=>setModal({
+                    type:"danger", title:label,
+                    message:`${desc}. This cannot be undone. Continue?`,
+                    confirmText:"Yes, Reset",
+                    onConfirm: async()=>{
+                      setModal(null); setResetting(key);
+                      try{ await api.post(endpoint); msg(`${label} done!`); const [d,u]=await Promise.all([api.get("/dashboard"),api.get("/users")]); setDash(d.data); setUsers(u.data); }
+                      catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                      finally{ setResetting(""); }
+                    },
+                  })}
+                >
+                  {resetting===key?"Resetting…":"Reset"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* STUDENT DETAIL */}

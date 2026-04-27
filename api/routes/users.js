@@ -128,4 +128,38 @@ router.post("/reset/monthly", authMiddleware, requireRole("admin", "trainer"), a
   }
 });
 
+// POST /api/users/reset/day — admin/trainer: reset daily submissions + status flags
+router.post("/reset/day", authMiddleware, requireRole("admin", "trainer"), async (req, res) => {
+  try {
+    const Status = (await import("../../models/statusSchema.js")).default;
+    await User.updateMany({}, { $set: { completed: false } });
+    await Status.updateOne({}, {
+      $set: {
+        questionSentToday: false,
+        notifiedEmpty: false,
+        notifiedLast: false,
+        fineAppliedToday: false,
+        todayTopic: null,
+        todayQuestion: null,
+        todayCategory: null,
+        todayPosterImage: null,
+        posterExpiresAt: null,
+      }
+    }, { upsert: true });
+    res.json({ success: true, message: "Daily submissions and status reset for all users" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users/reset/fines — admin: reset ALL users' fines to 0
+router.post("/reset/fines", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    await User.updateMany({}, { $set: { fine: 0, weeklyFine: 0 } });
+    res.json({ success: true, message: "All fines reset to 0" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

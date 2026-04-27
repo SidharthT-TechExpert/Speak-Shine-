@@ -537,6 +537,7 @@ export default function AdminDashboard() {
 
       {/* SETTINGS */}
       {tab==="settings" && (
+        <>
         <div className="card" style={{maxWidth:480}}>
           <div className="section-title">⚙️ Bot Schedule Settings</div>
           <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1.5rem"}}>
@@ -586,6 +587,48 @@ export default function AdminDashboard() {
             The bot checks for time changes every minute. After saving, the new schedule takes effect automatically — no restart needed.
           </div>
         </div>
+
+        {/* Reset Controls */}
+        <div className="card" style={{maxWidth:480,marginTop:"1rem"}}>
+          <div className="section-title">🔄 Reset Controls</div>
+          <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1.5rem"}}>
+            Manually trigger resets. These are normally done automatically by the bot at midnight.
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+            {[
+              { label:"🌅 Reset Day", desc:"Clears today's submissions & question status", key:"day", endpoint:"/users/reset/day", role:"both" },
+              { label:"📅 Reset Weekly", desc:"Resets weekly submissions & weekly fines to 0", key:"weekly", endpoint:"/users/reset/weekly", role:"both" },
+              { label:"📆 Reset Monthly", desc:"Resets monthly submission counts to 0", key:"monthly", endpoint:"/users/reset/monthly", role:"both" },
+              { label:"💸 Reset All Fines", desc:"Clears ALL users' fines to ₹0", key:"fines", endpoint:"/users/reset/fines", role:"admin" },
+            ].map(({label,desc,key,endpoint})=>(
+              <div key={key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.75rem 1rem",background:"var(--bg-secondary)",borderRadius:10,border:"1px solid var(--border)"}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:"0.9rem"}}>{label}</div>
+                  <div style={{color:"var(--muted)",fontSize:"0.78rem"}}>{desc}</div>
+                </div>
+                <button
+                  className="btn-ghost danger"
+                  style={{fontSize:"0.82rem",whiteSpace:"nowrap"}}
+                  disabled={resetting===key}
+                  onClick={()=>setModal({
+                    type:"danger", title:label,
+                    message:`${desc}. This cannot be undone. Continue?`,
+                    confirmText:"Yes, Reset",
+                    onConfirm: async()=>{
+                      setModal(null); setResetting(key);
+                      try{ await api.post(endpoint); msg(`${label} done!`); load(); }
+                      catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                      finally{ setResetting(""); }
+                    },
+                  })}
+                >
+                  {resetting===key?"Resetting…":"Reset"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        </>
       )}
 
       {/* STUDENT DETAIL */}
