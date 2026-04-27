@@ -2135,6 +2135,29 @@ async function startBot() {
     cronsRegistered = true;
     console.log("Registering cron jobs...");
 
+    // Catch-up on startup: if send time already passed today and question not sent, send now
+    (async () => {
+      try {
+        await new Promise(r => setTimeout(r, 8000)); // wait 8s for WA connection
+        const s = await Status.findOne().lean();
+        if (!s || s.questionSentToday) return;
+        const sendTime = s.posterSendTime || "08:00";
+        const nowIST  = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+        const nowTime = String(nowIST.getHours()).padStart(2,"0") + ":" + String(nowIST.getMinutes()).padStart(2,"0");
+        const [sh, sm] = sendTime.split(":").map(Number);
+        const [nh, nm] = nowTime.split(":").map(Number);
+        const sendMins = sh * 60 + sm;
+        const nowMins  = nh * 60 + nm;
+        // If current time is past send time (up to 4 hours window) and not sent yet
+        if (nowMins >= sendMins && nowMins <= sendMins + 240) {
+          console.log("[Cron] Catch-up: send time " + sendTime + " already passed, sending now...");
+          await sendQuestion();
+        }
+      } catch (err) {
+        console.log("[Cron] Catch-up error:", err.message);
+      }
+    })();
+
     // Every-minute tick: checks current IST time against configured send times in DB.
     // Simple and reliable - no dynamic reschedule complexity.
     cron.schedule("* * * * *", async () => {
