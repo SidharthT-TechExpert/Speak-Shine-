@@ -5,6 +5,7 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import qrcode from "qrcode-terminal";
+import { updateQR } from "./api/routes/qr.js";
 import cron from "node-cron";
 import dotenv from "dotenv";
 import { connectDB, safeDB, startDBHealthCheck } from "./db.js";
@@ -2219,7 +2220,11 @@ async function startBot() {
   let reconnecting = false;
 
   sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
-    if (qr) qrcode.generate(qr, { small: true });
+    if (qr) {
+      qrcode.generate(qr, { small: true });
+      updateQR(qr); // Send to web endpoint
+      console.log('📱 QR Code available at: http://localhost:3001/api/qr');
+    }
 
     if (connection === "open") {
       const wasReconnecting = reconnecting;

@@ -19,6 +19,7 @@ import videoAnalysisRoutes from "./routes/videoAnalysis.js";
 import attendanceRoutes from "./routes/attendance.js";
 import submissionRoutes from "./routes/submissions.js";
 import chatRoutes from "./routes/chat.js";
+import qrRoutes from "./routes/qr.js";
 
 dotenv.config();
 
@@ -237,6 +238,7 @@ app.use("/api/video",       videoAnalysisRoutes);
 app.use("/api/attendance",  attendanceRoutes);
 app.use("/api/submissions", submissionRoutes);
 app.use("/api/chat",        chatRoutes);
+app.use("/api/qr",          qrRoutes);
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 
