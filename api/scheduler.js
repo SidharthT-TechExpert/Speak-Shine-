@@ -8,6 +8,8 @@ import cron from "node-cron";
 import Status from "../models/statusSchema.js";
 import Question from "../models/questionSchema.js";
 import User from "../models/userSchema.js";
+import DailyReport from "../models/dailyReportSchema.js";
+import VideoReport from "../models/videoReportSchema.js";
 import { generateAndInsertQuestions } from "../ai/questionGenerator.js";
 import { resetStatus } from "../resetStatus.js";
 
@@ -169,11 +171,97 @@ async function dailyReset() {
   }
 }
 
+/**
+ * Generate daily reports at 12:00 AM IST
+ * Creates a report for each user showing yesterday's performance
+ */
+async function generateDailyReports() {
+  try {
+    console.log("[Scheduler] 📊 Generating daily reports...");
+
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+    const reportDate = new Date(nowIST);
+    reportDate.setHours(0, 0, 0, 0);
+    
+    // Report expires at 8 AM today
+    const expiresAt = new Date(reportDate);
+    expiresAt.setHours(8, 0, 0, 0);
+
+    // Get all users
+    const users = await User.find({}).lean();
+    
+    // Get yesterday's date range (for finding video reports)
+    const yesterdayStart = new Date(reportDate);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const yesterdayEnd = new Date(reportDate);
+
+    let reportsCreated = 0;
+
+    for (const user of users) {
+      // Find yesterday's video report
+      const videoReport = await VideoReport.findOne({
+        userId: user._id,
+        submittedAt: { $gte: yesterdayStart, $lt: yesterdayEnd },
+        status: "completed"
+      }).sort({ submittedAt: -1 }).lean();
+
+      const report = {
+        userId: user._id,
+        phone: user.phone,
+        date: reportDate,
+        submitted: !!videoReport,
+        submittedAt: videoReport?.submittedAt || null,
+        
+        // Scores from yesterday's video
+        fluency: videoReport?.analysis?.fluency || null,
+        grammar: videoReport?.analysis?.grammar || null,
+        confidence: videoReport?.analysis?.confidence || null,
+        vocabulary: videoReport?.analysis?.vocabulary || null,
+        
+        // Visual scores
+        eyeContact: videoReport?.analysis?.eyeContact || null,
+        bodyLanguage: videoReport?.analysis?.bodyLanguage || null,
+        facialExpression: videoReport?.analysis?.facialExpression || null,
+        
+        // Current stats
+        streak: user.streak || 0,
+        weeklySubmissions: user.weeklySubmissions || 0,
+        monthlySubmissions: user.monthlySubmissions || 0,
+        
+        // Feedback
+        overallComment: videoReport?.analysis?.overallComment || null,
+        strongPoints: videoReport?.analysis?.strongPoints || [],
+        suggestions: videoReport?.analysis?.suggestions || [],
+        
+        expiresAt,
+      };
+
+      await DailyReport.create(report);
+      reportsCreated++;
+    }
+
+    // Update status to mark reports as generated
+    await Status.updateOne({}, {
+      $set: {
+        dailyReportGenerated: true,
+        reportExpiresAt: expiresAt,
+      }
+    }, { upsert: true });
+
+    console.log(`[Scheduler] ✅ Generated ${reportsCreated} daily reports (expire at 08:00)`);
+  } catch (err) {
+    console.error("[Scheduler] ❌ Daily report generation error:", err);
+  }
+}
+
 export function startDailyReset() {
   console.log("[Scheduler] Starting daily reset scheduler...");
   
-  // Run at 00:05 (12:05 AM) IST every day
+  // Generate reports at 00:00 (12:00 AM) IST
+  cron.schedule("0 0 * * *", generateDailyReports, { timezone: TIMEZONE });
+  
+  // Run reset at 00:05 (12:05 AM) IST
   cron.schedule("5 0 * * *", dailyReset, { timezone: TIMEZONE });
   
-  console.log("[Scheduler] ✅ Daily reset scheduler running (00:05 IST)");
+  console.log("[Scheduler] ✅ Daily reset scheduler running (00:00 reports, 00:05 reset)");
 }

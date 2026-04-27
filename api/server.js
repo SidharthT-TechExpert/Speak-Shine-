@@ -20,6 +20,7 @@ import attendanceRoutes from "./routes/attendance.js";
 import submissionRoutes from "./routes/submissions.js";
 import chatRoutes from "./routes/chat.js";
 import qrRoutes from "./routes/qr.js";
+import dailyReportRoutes from "./routes/dailyReport.js";
 import { startScheduler } from "./scheduler.js";
 import { startDailyReset } from "./scheduler.js";
 
@@ -240,15 +241,16 @@ app.use(express.json({ limit: "10mb" }));
 
 // ── API Routes ──────────────────────────────────────────────────────────────
 app.get("/api/health", (_, res) => res.json({ status: "ok", app: "Speak & Shine 🗣️" }));
-app.use("/api/auth",        authRoutes);
-app.use("/api/users",       userRoutes);
-app.use("/api/dashboard",   dashboardRoutes);
-app.use("/api/questions",   questionRoutes);
-app.use("/api/video",       videoAnalysisRoutes);
-app.use("/api/attendance",  attendanceRoutes);
-app.use("/api/submissions", submissionRoutes);
-app.use("/api/chat",        chatRoutes);
-app.use("/api/qr",          qrRoutes);
+app.use("/api/auth",         authRoutes);
+app.use("/api/users",        userRoutes);
+app.use("/api/dashboard",    dashboardRoutes);
+app.use("/api/questions",    questionRoutes);
+app.use("/api/video",        videoAnalysisRoutes);
+app.use("/api/attendance",   attendanceRoutes);
+app.use("/api/submissions",  submissionRoutes);
+app.use("/api/chat",         chatRoutes);
+app.use("/api/qr",           qrRoutes);
+app.use("/api/daily-report", dailyReportRoutes);
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 

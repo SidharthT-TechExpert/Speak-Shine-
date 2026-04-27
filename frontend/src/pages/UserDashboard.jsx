@@ -35,7 +35,88 @@ export default function UserDashboard() {
 
   return (
     <Layout title="My Dashboard">
-      {data?.today?.question && (
+      {/* Show Daily Report (12 AM - 8 AM) */}
+      {data?.showReport && data?.dailyReport && (
+        <div className="daily-poster" style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)" }}>
+          <div className="daily-poster-header">
+            <div className="daily-poster-brand">📊 Yesterday's Performance</div>
+            <div className="daily-poster-sub">DAILY REPORT</div>
+            {data.dailyReport.submitted && (
+              <div className="daily-poster-badge" style={{ background: "#4ade80" }}>✅ Submitted</div>
+            )}
+            {!data.dailyReport.submitted && (
+              <div className="daily-poster-badge" style={{ background: "#f87171" }}>❌ Missed</div>
+            )}
+          </div>
+
+          {data.dailyReport.submitted ? (
+            <>
+              {/* Scores */}
+              <div style={{ marginTop: "1.5rem" }}>
+                <div className="daily-poster-section-label">YOUR SCORES</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", marginTop: "0.75rem" }}>
+                  {[
+                    { label: "Fluency", value: data.dailyReport.fluency, icon: "🗣️" },
+                    { label: "Grammar", value: data.dailyReport.grammar, icon: "📝" },
+                    { label: "Confidence", value: data.dailyReport.confidence, icon: "💪" },
+                    { label: "Vocabulary", value: data.dailyReport.vocabulary, icon: "📚" },
+                  ].map(({ label, value, icon }) => (
+                    <div key={label} style={{ background: "rgba(255,255,255,0.05)", padding: "0.75rem", borderRadius: "8px", textAlign: "center" }}>
+                      <div style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>{icon}</div>
+                      <div style={{ fontSize: "0.75rem", color: "#8888aa", marginBottom: "0.25rem" }}>{label}</div>
+                      <div style={{ fontSize: "1.5rem", fontWeight: "bold", color: value >= 7 ? "#4ade80" : value >= 5 ? "#fbbf24" : "#f87171" }}>
+                        {value || "—"}/10
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Overall Comment */}
+              {data.dailyReport.overallComment && (
+                <div style={{ marginTop: "1.5rem" }}>
+                  <div className="daily-poster-section-label">💬 FEEDBACK</div>
+                  <div style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "8px", marginTop: "0.75rem", fontSize: "0.9rem", lineHeight: "1.6" }}>
+                    {data.dailyReport.overallComment}
+                  </div>
+                </div>
+              )}
+
+              {/* Stats */}
+              <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1.5rem" }}>🔥</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: "bold", marginTop: "0.25rem" }}>{data.dailyReport.streak}</div>
+                  <div style={{ fontSize: "0.75rem", color: "#8888aa" }}>Streak</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1.5rem" }}>📅</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: "bold", marginTop: "0.25rem" }}>{data.dailyReport.weeklySubmissions}/7</div>
+                  <div style={{ fontSize: "0.75rem", color: "#8888aa" }}>This Week</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "1.5rem" }}>📆</div>
+                  <div style={{ fontSize: "1.25rem", fontWeight: "bold", marginTop: "0.25rem" }}>{data.dailyReport.monthlySubmissions}</div>
+                  <div style={{ fontSize: "0.75rem", color: "#8888aa" }}>This Month</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ marginTop: "1.5rem", textAlign: "center", padding: "2rem" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>😔</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "0.5rem" }}>You missed yesterday's challenge</div>
+              <div style={{ fontSize: "0.9rem", color: "#8888aa" }}>Don't worry! Today is a new opportunity to shine.</div>
+            </div>
+          )}
+
+          <div className="daily-poster-cta" style={{ marginTop: "1.5rem" }}>
+            ⏰ New question arrives at 8:00 AM
+          </div>
+        </div>
+      )}
+
+      {/* Show Question (8 AM onwards) */}
+      {!data?.showReport && data?.today?.question && (
         <div className="daily-poster">
           {/* Header */}
           <div className="daily-poster-header">

@@ -11,6 +11,9 @@ const statusSchema = new mongoose.Schema({
   todayPosterImage: { type: String, default: null },
   posterExpiresAt: { type: Date, default: null },
   recentCategories: { type: [String], default: [] },
+  // Daily report tracking
+  dailyReportGenerated: { type: Boolean, default: false },
+  reportExpiresAt: { type: Date, default: null },
   // Configurable schedule times (HH:MM, 24h, IST)
   posterSendTime: { type: String, default: "08:00" },
   questionGenerateTime: { type: String, default: "07:00" },

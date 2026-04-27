@@ -1,6 +1,7 @@
 import express from "express";
 import User from "../../models/userSchema.js";
 import Status from "../../models/statusSchema.js";
+import DailyReport from "../../models/dailyReportSchema.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { generateSVGPoster } from "../posterGenerator.js";
 
@@ -115,6 +116,27 @@ router.get("/me", authMiddleware, async (req, res) => {
       .slice(0, 5)
       .map(u => ({ name: u.name, userId: u.userId, streak: u.streak || 0, weeklySubmissions: u.weeklySubmissions || 0 }));
 
+    // Check if we should show daily report (12 AM - 8 AM)
+    let dailyReport = null;
+    let showReport = false;
+    
+    if (status?.dailyReportGenerated && status?.reportExpiresAt) {
+      const now = new Date();
+      if (now < new Date(status.reportExpiresAt)) {
+        // We're in the report window
+        showReport = true;
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        
+        if (user) {
+          dailyReport = await DailyReport.findOne({
+            userId: user._id,
+            date: todayStart,
+          }).lean();
+        }
+      }
+    }
+
     res.json({
       profile: user ? {
         name: user.name,
@@ -133,6 +155,9 @@ router.get("/me", authMiddleware, async (req, res) => {
         category: status?.todayCategory || null,
         posterImage: getPosterImage(status),
       },
+      dailyReport: showReport ? dailyReport : null,
+      showReport,
+      reportExpiresAt: showReport ? status.reportExpiresAt : null,
       stats: {
         total: allUsers.length,
         completed,

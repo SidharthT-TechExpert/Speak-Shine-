@@ -14,6 +14,8 @@ export async function resetStatus() {
       todayCategory: null,
       todayPosterImage: null,
       posterExpiresAt: null,
+      dailyReportGenerated: false,
+      reportExpiresAt: null,
     }
   });
 }
