@@ -239,22 +239,25 @@ export function generateSVGPoster({ topic, question, category }) {
 
 /**
  * Ensure a poster exists in DB for today's question.
- * Generates and saves one with 14h TTL if missing or expired.
+ * If the WhatsApp bot already stored one, use it as-is.
+ * Only generate a new one if there's genuinely no poster stored.
  */
 export async function ensurePoster(status) {
   if (!status || !status.todayQuestion) return status;
 
-  // Clear expired poster
-  const isExpired = status.posterExpiresAt && new Date() > new Date(status.posterExpiresAt);
-  if (isExpired) {
+  // ── If poster exists and not expired, use it directly ──────────────────
+  if (status.todayPosterImage) {
+    const isExpired = status.posterExpiresAt && new Date() > new Date(status.posterExpiresAt);
+    if (!isExpired) return status; // ✅ use bot's poster as-is
+
+    // Expired — clear it so we regenerate below
     await Status.updateOne({}, { $set: { todayPosterImage: null, posterExpiresAt: null } });
     status = { ...status, todayPosterImage: null, posterExpiresAt: null };
   }
 
-  if (status.todayPosterImage) return status; // already fresh
-
+  // ── No poster stored — generate one (fallback only) ────────────────────
   try {
-    console.log("[Poster] Generating SVG poster...");
+    console.log("[Poster] No poster in DB — generating fallback SVG...");
     const posterDataUri = generateSVGPoster({
       topic:    status.todayTopic    || "Speaking Practice",
       question: status.todayQuestion,
@@ -266,7 +269,7 @@ export async function ensurePoster(status) {
       {},
       { $set: { todayPosterImage: posterDataUri, posterExpiresAt: expiresAt } }
     );
-    console.log("[Poster] Saved to DB (expires in 14h)");
+    console.log("[Poster] Fallback poster saved to DB");
     return { ...status, todayPosterImage: posterDataUri, posterExpiresAt: expiresAt };
   } catch (err) {
     console.error("[Poster] Generation failed:", err.message);
