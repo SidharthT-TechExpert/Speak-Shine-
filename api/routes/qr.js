@@ -31,6 +31,21 @@ export async function updateQR(qrData) {
     }
   } else {
     console.log('[QR] Using in-memory storage (Redis not available)');
+    // Retry storing in Redis after a delay
+    setTimeout(async () => {
+      if (isRedisAvailable() && latestQR) {
+        try {
+          const redis = getRedisClient();
+          await redis.set('whatsapp:qr:data', latestQR);
+          await redis.set('whatsapp:qr:timestamp', qrTimestamp.toISOString());
+          await redis.expire('whatsapp:qr:data', 120);
+          await redis.expire('whatsapp:qr:timestamp', 120);
+          console.log('[QR] Successfully stored in Redis (delayed)');
+        } catch (error) {
+          console.error('[QR] Failed to store QR in Redis (delayed):', error);
+        }
+      }
+    }, 1000); // Retry after 1 second
   }
   
   console.log('📱 QR code updated, accessible at /api/qr');
