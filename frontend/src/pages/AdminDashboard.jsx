@@ -33,6 +33,8 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState({ posterSendTime: "08:00", questionGenerateTime: "07:00" });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [resetting, setResetting] = useState("");
+  const [publishQ, setPublishQ] = useState(null); // selected question for webapp publish
+  const [publishCustom, setPublishCustom] = useState({ topic:"", question:"", category:"" }); // manual entry
 
   const load = async () => {
     setLoading(true);
@@ -277,33 +279,59 @@ export default function AdminDashboard() {
           {/* Publish question to webapp */}
           <div className="card" style={{marginBottom:"1rem"}}>
             <div className="section-title">📢 Publish Question to Webapp</div>
-            <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1rem"}}>Pick a question from the bank and publish it so webapp users can see today's challenge.</p>
-            <div style={{display:"flex",gap:"0.75rem",flexWrap:"wrap",alignItems:"flex-end"}}>
-              <select className="form-input" style={{flex:1,minWidth:200}}
-                onChange={e => {
-                  const q = questions.find(x=>x._id===e.target.value);
-                  if(q) setQForm({category:q.category,topic:q.topic,question:q.question,_id:q._id});
-                }}
-                defaultValue="">
-                <option value="" disabled>— Select a question —</option>
-                {questions.map(q=>(
-                  <option key={q._id} value={q._id}>[{q.category}] {q.topic}: {q.question.slice(0,60)}…</option>
-                ))}
-              </select>
-              <button className="btn-primary" onClick={async()=>{
-                if(!qForm.question){msg("Select a question first","danger");return;}
-                try{
-                  await api.patch("/dashboard/today-question",{topic:qForm.topic,question:qForm.question,category:qForm.category});
-                  msg("✅ Question published to webapp!");
-                  load();
-                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
-              }}>Publish</button>
+            <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1rem"}}>Set today's question so all webapp users can see and submit their video.</p>
+
+            {/* Pick from bank */}
+            <div style={{marginBottom:"1rem"}}>
+              <label className="form-label">Pick from Question Bank</label>
+              <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+                <select className="form-input" style={{flex:1,minWidth:200}}
+                  value={publishQ?._id||""}
+                  onChange={e=>{
+                    const q=questions.find(x=>x._id===e.target.value);
+                    setPublishQ(q||null);
+                    if(q) setPublishCustom({topic:q.topic,question:q.question,category:q.category});
+                  }}>
+                  <option value="">— Select a question —</option>
+                  {questions.map(q=>(
+                    <option key={q._id} value={q._id}>[{q.category}] {q.topic}: {q.question.slice(0,55)}…</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            {qForm.question && (
-              <div style={{marginTop:"0.75rem",padding:"0.75rem",background:"var(--bg-secondary)",borderRadius:8,fontSize:"0.9rem"}}>
-                <strong>{qForm.topic}</strong> — {qForm.question}
+
+            {/* Or type manually */}
+            <div style={{marginBottom:"1rem"}}>
+              <label className="form-label">Or Enter Manually</label>
+              <input className="form-input" style={{marginBottom:"0.5rem"}} placeholder="Topic (e.g. Future Goals)"
+                value={publishCustom.topic} onChange={e=>{ setPublishQ(null); setPublishCustom(p=>({...p,topic:e.target.value})); }}/>
+              <textarea className="form-input" rows={2} placeholder="Question text…"
+                style={{resize:"vertical"}}
+                value={publishCustom.question} onChange={e=>{ setPublishQ(null); setPublishCustom(p=>({...p,question:e.target.value})); }}/>
+            </div>
+
+            {/* Preview */}
+            {publishCustom.question && (
+              <div style={{padding:"0.75rem",background:"var(--bg-secondary)",borderRadius:8,fontSize:"0.9rem",marginBottom:"1rem",border:"1px solid var(--border)"}}>
+                <div style={{color:"var(--muted)",fontSize:"0.75rem",marginBottom:"0.25rem"}}>Preview:</div>
+                <strong>{publishCustom.topic}</strong>{publishCustom.topic?" — ":""}{publishCustom.question}
               </div>
             )}
+
+            <button className="btn-primary" onClick={async()=>{
+              if(!publishCustom.question.trim()){msg("Enter or select a question first","danger");return;}
+              try{
+                await api.patch("/dashboard/today-question",{
+                  topic:publishCustom.topic,
+                  question:publishCustom.question,
+                  category:publishCustom.category||"General"
+                });
+                msg("✅ Question published! Users can now see it.");
+                setPublishQ(null);
+                setPublishCustom({topic:"",question:"",category:""});
+                load();
+              }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+            }}>📢 Publish to Webapp</button>
           </div>
 
           <div className="card">
