@@ -19,6 +19,8 @@ const MOTIVATIONAL = [
   "Speak with confidence. The world is ready to listen. 🌍",
 ];
 
+const SCORES = { fluency: "#7c6fff", grammar: "#4ade80", confidence: "#fbbf24", vocabulary: "#ff6b9d" };
+
 function QuestionCountdown({ posterSendTime, name, streak }) {
   const [remaining, setRemaining] = useState(null);
   const [quote] = useState(() => MOTIVATIONAL[Math.floor(Math.random() * MOTIVATIONAL.length)]);
