@@ -1,23 +1,57 @@
 import express from 'express';
 import QRCode from 'qrcode';
+import { getRedisClient, isRedisAvailable } from '../../redis.js';
 
 const router = express.Router();
 
-// Store the latest QR code data
+// Store the latest QR code data (fallback if Redis unavailable)
 let latestQR = null;
 let qrTimestamp = null;
 
 // Function to be called from index.js to update QR code
-export function updateQR(qrData) {
+export async function updateQR(qrData) {
   latestQR = qrData;
   qrTimestamp = new Date();
+  
+  // Store in Redis if available
+  if (isRedisAvailable()) {
+    try {
+      const redis = getRedisClient();
+      await redis.set('whatsapp:qr:data', qrData);
+      await redis.set('whatsapp:qr:timestamp', qrTimestamp.toISOString());
+      await redis.expire('whatsapp:qr:data', 120); // Expire after 2 minutes
+      await redis.expire('whatsapp:qr:timestamp', 120);
+    } catch (error) {
+      console.error('Failed to store QR in Redis:', error);
+    }
+  }
+  
   console.log('📱 QR code updated, accessible at /api/qr');
 }
 
 // GET /api/qr - Display QR code as image
 router.get('/', async (req, res) => {
   try {
-    if (!latestQR) {
+    let qrData = latestQR;
+    let timestamp = qrTimestamp;
+
+    // Try to get from Redis first
+    if (isRedisAvailable()) {
+      try {
+        const redis = getRedisClient();
+        const redisQR = await redis.get('whatsapp:qr:data');
+        const redisTimestamp = await redis.get('whatsapp:qr:timestamp');
+        
+        if (redisQR) {
+          qrData = redisQR;
+          timestamp = redisTimestamp ? new Date(redisTimestamp) : new Date();
+        }
+      } catch (error) {
+        console.error('Failed to get QR from Redis:', error);
+      }
+    }
+
+    if (!qrData) {
       return res.send(`
         <!DOCTYPE html>
         <html>
@@ -42,8 +76,8 @@ router.get('/', async (req, res) => {
     }
 
     // Generate QR code image
-    const qrImage = await QRCode.toDataURL(latestQR);
-    const age = Math.floor((Date.now() - qrTimestamp) / 1000);
+    const qrImage = await QRCode.toDataURL(qrData);
+    const age = Math.floor((Date.now() - timestamp) / 1000);
 
     res.send(`
       <!DOCTYPE html>
@@ -115,7 +149,7 @@ router.get('/', async (req, res) => {
           </div>
 
           <p class="warning">⚠️ QR codes expire after 60 seconds. Page auto-refreshes every 30 seconds.</p>
-          <p><small>Last updated: ${qrTimestamp.toLocaleTimeString()}</small></p>
+          <p><small>Last updated: ${timestamp.toLocaleTimeString()}</small></p>
         </div>
       </body>
       </html>
