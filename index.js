@@ -339,10 +339,20 @@ async function startBot() {
       const question = q[0];
 
       // ── Generate & send poster ───────────────────────────────────────────
-      await generatePoster(question);
-
+      let imageBuffer = null;
+      try {
+        imageBuffer = await generatePoster(question);
+      } catch (posterErr) {
+        console.log("Poster generation failed:", posterErr.message);
+        return;
+      }
+      if (!imageBuffer || !TARGET_GROUP) {
+        console.log("No image buffer or TARGET_GROUP not set");
+        return;
+      }
       const sent = await safeSend(sock, TARGET_GROUP, {
-        image: { url: "./daily.png" },
+        image: imageBuffer,
+        mimetype: "image/png",
       });
 
       if (sent) {
