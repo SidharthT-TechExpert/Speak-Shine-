@@ -1,0 +1,220 @@
+/**
+ * videoQueue.js — Simple in-memory video processing queue.
+ * Processes videos one at a time (FIFO). Emits SSE progress updates.
+ * Tracks stats for the monitoring dashboard.
+ */
+
+import VideoReport from "../models/videoReportSchema.js";
+import User from "../models/userSchema.js";
+import { processWebVideo } from "../ai/webVideoProcessor.js";
+import fs from "fs";
+
+// ── Queue state ──────────────────────────────────────────────────────────────
+const queue = [];           // [{ reportId, videoPath, phone, displayName, addedAt }]
+let activeJob = null;       // currently processing job
+let isProcessing = false;
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+const stats = {
+  totalProcessed: 0,
+  totalFailed: 0,
+  processingTimes: [],      // last 20 durations in ms
+  errorsToday: [],          // [{ reportId, error, at }]
+};
+
+// ── SSE clients: reportId → res ──────────────────────────────────────────────
+const sseClients = new Map();
+
+export function registerSseClient(reportId, res) {
+  sseClients.set(String(reportId), res);
+}
+
+export function unregisterSseClient(reportId) {
+  sseClients.delete(String(reportId));
+}
+
+function pushProgress(reportId, data) {
+  const client = sseClients.get(String(reportId));
+  if (client) client.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function closeSse(reportId) {
+  const client = sseClients.get(String(reportId));
+  if (client) { client.end(); sseClients.delete(String(reportId)); }
+}
+
+// ── Enqueue ──────────────────────────────────────────────────────────────────
+export function enqueue(job) {
+  // job: { reportId, videoPath, phone, displayName }
+  queue.push({ ...job, addedAt: Date.now() });
+  const position = queue.length;
+  const estimatedWait = estimateWait(position);
+
+  // Notify user of their queue position
+  pushProgress(job.reportId, {
+    status: "queued",
+    position,
+    queueLength: queue.length,
+    estimatedWait,
+  });
+
+  if (!isProcessing) processNext();
+  return { position, estimatedWait };
+}
+
+// ── Process next job ─────────────────────────────────────────────────────────
+async function processNext() {
+  if (isProcessing || queue.length === 0) return;
+
+  isProcessing = true;
+  activeJob = queue.shift();
+
+  // Notify all remaining jobs of updated positions
+  queue.forEach((job, i) => {
+    pushProgress(job.reportId, {
+      status: "queued",
+      position: i + 1,
+      queueLength: queue.length,
+      estimatedWait: estimateWait(i + 1),
+    });
+  });
+
+  const { reportId, videoPath, phone, displayName } = activeJob;
+  const startTime = Date.now();
+
+  // 10-minute hard timeout
+  const processingTimeout = setTimeout(async () => {
+    console.error(`[Queue] ${reportId} TIMEOUT`);
+    try {
+      await VideoReport.findByIdAndUpdate(reportId, {
+        status: "failed",
+        errorMessage: "Processing timeout. Please try again.",
+      });
+      pushProgress(reportId, { status: "failed", error: "Processing timeout" });
+      closeSse(reportId);
+    } catch {}
+    finishJob(reportId, startTime, "timeout");
+  }, 10 * 60 * 1000);
+
+  try {
+    console.log(`[Queue] Processing ${reportId} (queue remaining: ${queue.length})`);
+
+    const result = await processWebVideo(videoPath, displayName, async (stage) => {
+      console.log(`[Queue] ${reportId}: ${stage}`);
+      pushProgress(reportId, { status: "processing", stage });
+    });
+
+    await VideoReport.findByIdAndUpdate(reportId, {
+      status: "completed",
+      analysis: result.analysis,
+    });
+
+    const { fluency, grammar, confidence, vocabulary } = result.analysis;
+    if (fluency != null || grammar != null) {
+      await User.findOneAndUpdate(
+        { phone },
+        {
+          $push: {
+            feedbackScores: {
+              $each: [{ fluency, grammar, confidence, vocabulary, date: new Date() }],
+              $slice: -30,
+            },
+          },
+        }
+      );
+    }
+
+    pushProgress(reportId, { status: "completed" });
+    closeSse(reportId);
+    console.log(`[Queue] ${reportId} completed`);
+    finishJob(reportId, startTime, "success");
+
+  } catch (err) {
+    console.error(`[Queue] ${reportId} failed:`, err.message);
+
+    await VideoReport.findByIdAndUpdate(reportId, {
+      status: "failed",
+      errorMessage: err.message || "Analysis failed",
+    });
+
+    pushProgress(reportId, { status: "failed", error: err.message });
+    closeSse(reportId);
+
+    stats.totalFailed++;
+    stats.errorsToday.push({ reportId: String(reportId), error: err.message, at: new Date() });
+    // Keep only last 50 errors
+    if (stats.errorsToday.length > 50) stats.errorsToday.shift();
+
+    finishJob(reportId, startTime, "error");
+
+  } finally {
+    clearTimeout(processingTimeout);
+    if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+  }
+}
+
+function finishJob(reportId, startTime, outcome) {
+  const elapsed = Date.now() - startTime;
+  if (outcome === "success") {
+    stats.totalProcessed++;
+    stats.processingTimes.push(elapsed);
+    if (stats.processingTimes.length > 20) stats.processingTimes.shift();
+  }
+  activeJob = null;
+  isProcessing = false;
+  processNext();
+}
+
+// ── Retry (re-enqueue from R2 URL) ──────────────────────────────────────────
+export async function enqueueRetry(reportId, videoUrl, phone, displayName) {
+  const tempPath = `./tmp/retry-${reportId}-${Date.now()}.mp4`;
+
+  try {
+    const response = await fetch(videoUrl);
+    if (!response.ok) throw new Error("Failed to download video from R2");
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(tempPath, Buffer.from(buffer));
+    return enqueue({ reportId, videoPath: tempPath, phone, displayName });
+  } catch (err) {
+    await VideoReport.findByIdAndUpdate(reportId, {
+      status: "failed",
+      errorMessage: "Retry failed: " + err.message,
+    });
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    throw err;
+  }
+}
+
+// ── Monitoring helpers ───────────────────────────────────────────────────────
+export function getQueueStats() {
+  const avgMs = stats.processingTimes.length
+    ? stats.processingTimes.reduce((a, b) => a + b, 0) / stats.processingTimes.length
+    : null;
+
+  // Reset errorsToday at midnight (simple check)
+  const now = new Date();
+  stats.errorsToday = stats.errorsToday.filter(e => {
+    const d = new Date(e.at);
+    return d.getDate() === now.getDate() && d.getMonth() === now.getMonth();
+  });
+
+  return {
+    queueLength: queue.length,
+    isProcessing,
+    activeJobId: activeJob?.reportId || null,
+    totalProcessed: stats.totalProcessed,
+    totalFailed: stats.totalFailed,
+    avgProcessingMs: avgMs ? Math.round(avgMs) : null,
+    avgProcessingMin: avgMs ? (avgMs / 60000).toFixed(1) : null,
+    errorsToday: stats.errorsToday.length,
+    recentErrors: stats.errorsToday.slice(-5),
+  };
+}
+
+export function estimateWait(position) {
+  const avgMs = stats.processingTimes.length
+    ? stats.processingTimes.reduce((a, b) => a + b, 0) / stats.processingTimes.length
+    : 150000; // default 2.5 min estimate
+  const totalMs = avgMs * position;
+  return Math.ceil(totalMs / 60000); // minutes
+}

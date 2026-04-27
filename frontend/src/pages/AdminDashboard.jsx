@@ -11,7 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 const CATS = ["Daily Life","Opinion","Personal Experience","English Growth","Future Goals","Fun Topic","Free Talk"];
 const PIE_COLORS = ["#7c6fff","#4ade80","#fbbf24","#ff6b9d","#38bdf8","#fb923c","#a78bfa"];
 const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, fontSize:12 };
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"attendance",l:"📋 Attendance"},{id:"questions",l:"❓ Questions"},{id:"settings",l:"⚙️ Settings"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"attendance",l:"📋 Attendance"},{id:"questions",l:"❓ Questions"},{id:"monitoring",l:"🖥️ Monitor"},{id:"settings",l:"⚙️ Settings"}];
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -563,6 +563,9 @@ export default function AdminDashboard() {
         </>
       )}
 
+      {/* MONITORING */}
+      {tab==="monitoring" && <MonitoringPanel />}
+
       {/* SETTINGS */}
       {tab==="settings" && (
         <>
@@ -711,5 +714,131 @@ export default function AdminDashboard() {
         </>
       )}
     </Layout>
+  );
+}
+
+// ── Monitoring Panel ─────────────────────────────────────────────────────────
+function MonitoringPanel() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = async () => {
+    try {
+      const res = await api.get("/monitoring");
+      setData(res.data);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to load monitoring data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 15000); // refresh every 15s
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) return <div className="spinner-wrap"><div className="spinner"/><p style={{color:"var(--muted)"}}>Loading…</p></div>;
+  if (error) return <div className="error-box"><p>{error}</p><button className="btn-primary" style={{marginTop:"0.75rem"}} onClick={load}>Retry</button></div>;
+  if (!data) return null;
+
+  const { system, videos, queue, api: apiStats, activeUsers } = data;
+  const cpuColor = system.cpuPercent > 80 ? "var(--danger)" : system.cpuPercent > 60 ? "var(--warning)" : "var(--success)";
+  const memColor = system.memPercent > 85 ? "var(--danger)" : system.memPercent > 65 ? "var(--warning)" : "var(--success)";
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
+        <div className="section-title" style={{margin:0}}>🖥️ System Monitor</div>
+        <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+          <span style={{width:8,height:8,borderRadius:"50%",background:"var(--success)",display:"inline-block",animation:"blink 2s infinite"}}/>
+          <span style={{color:"var(--muted)",fontSize:"0.8rem"}}>Live · refreshes every 15s</span>
+          <button className="btn-secondary" style={{padding:"0.3rem 0.75rem",fontSize:"0.8rem"}} onClick={load}>↻ Refresh</button>
+        </div>
+      </div>
+
+      {/* Top stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"0.75rem",marginBottom:"1rem"}}>
+        <StatCard icon="👥" label="Active Users" value={activeUsers} color="#7c6fff" />
+        <StatCard icon="⚙️" label="Processing" value={videos.processing + videos.queued > 0 ? `${videos.processing} now · ${videos.queued} queued` : "Idle"} color="#38bdf8" />
+        <StatCard icon="✅" label="Done Today" value={videos.completedToday} color="#4ade80" />
+        <StatCard icon="❌" label="Failed Today" value={videos.failedToday} color={videos.failedToday > 0 ? "#f87171" : "#4ade80"} />
+        <StatCard icon="⏱️" label="Avg Process Time" value={queue.avgProcessingMin ? `${queue.avgProcessingMin} min` : "—"} color="#fbbf24" />
+        <StatCard icon="🌐" label="Avg API Response" value={apiStats.avgResponseMs ? `${apiStats.avgResponseMs}ms` : "—"} color="#fb923c" />
+      </div>
+
+      {/* System resources */}
+      <div className="card" style={{marginBottom:"1rem"}}>
+        <div className="section-title">💻 Server Resources</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1.5rem"}}>
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.4rem",fontSize:"0.85rem"}}>
+              <span style={{color:"var(--muted)"}}>CPU Usage</span>
+              <span style={{color:cpuColor,fontWeight:600}}>{system.cpuPercent}%</span>
+            </div>
+            <div style={{background:"var(--bg)",borderRadius:6,height:10,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${system.cpuPercent}%`,background:cpuColor,borderRadius:6,transition:"width 0.5s"}}/>
+            </div>
+          </div>
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.4rem",fontSize:"0.85rem"}}>
+              <span style={{color:"var(--muted)"}}>Memory</span>
+              <span style={{color:memColor,fontWeight:600}}>{system.memUsedMB}MB / {system.memTotalMB}MB ({system.memPercent}%)</span>
+            </div>
+            <div style={{background:"var(--bg)",borderRadius:6,height:10,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${system.memPercent}%`,background:memColor,borderRadius:6,transition:"width 0.5s"}}/>
+            </div>
+          </div>
+        </div>
+        <div style={{marginTop:"1rem",color:"var(--muted)",fontSize:"0.82rem"}}>
+          Server uptime: <strong style={{color:"var(--text)"}}>{system.uptimeHours}h</strong>
+        </div>
+      </div>
+
+      {/* Queue status */}
+      <div className="card" style={{marginBottom:"1rem"}}>
+        <div className="section-title">🚦 Video Queue</div>
+        {videos.queued === 0 && !videos.processing ? (
+          <p style={{color:"var(--success)",fontWeight:500}}>✅ Queue is empty — no videos waiting</p>
+        ) : (
+          <div style={{display:"grid",gap:"0.5rem",fontSize:"0.9rem"}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{color:"var(--muted)"}}>Currently processing:</span>
+              <span style={{fontWeight:600,color:"var(--warning)"}}>
+                {videos.activeJobId ? `⚙️ ${String(videos.activeJobId).slice(-8)}…` : "None"}
+              </span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{color:"var(--muted)"}}>Videos in queue:</span>
+              <span style={{fontWeight:600}}>{videos.queued}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{color:"var(--muted)"}}>Estimated wait for next:</span>
+              <span style={{fontWeight:600}}>{queue.avgProcessingMin ? `~${queue.avgProcessingMin} min` : "~2.5 min"}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Recent errors */}
+      {queue.recentErrors && queue.recentErrors.length > 0 && (
+        <div className="card">
+          <div className="section-title">⚠️ Recent Errors ({queue.errorsToday} today)</div>
+          <div style={{display:"grid",gap:"0.5rem"}}>
+            {queue.recentErrors.map((e, i) => (
+              <div key={i} style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.2)",borderRadius:8,padding:"0.6rem 0.85rem",fontSize:"0.82rem"}}>
+                <div style={{color:"var(--danger)",fontWeight:600,marginBottom:"0.2rem"}}>
+                  Report {String(e.reportId).slice(-8)}… · {new Date(e.at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
+                </div>
+                <div style={{color:"var(--muted)"}}>{e.error}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

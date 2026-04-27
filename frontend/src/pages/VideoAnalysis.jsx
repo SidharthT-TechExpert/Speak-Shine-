@@ -15,6 +15,7 @@ export default function VideoAnalysis() {
   const [reportId, setReportId]       = useState(null);
   const [report, setReport]           = useState(null);
   const [progressStage, setProgressStage] = useState("");
+  const [queueInfo, setQueueInfo]     = useState(null); // { position, queueLength, estimatedWait }
   const [myReports, setMyReports]     = useState([]);
   const [modal, setModal]             = useState(null);
 
@@ -28,9 +29,15 @@ export default function VideoAnalysis() {
     evtSource.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
-        if (data.stage) setProgressStage(data.stage);
+        if (data.status === "queued") {
+          setQueueInfo({ position: data.position, queueLength: data.queueLength, estimatedWait: data.estimatedWait });
+          setProgressStage(`Position #${data.position} in queue…`);
+          return;
+        }
+        if (data.stage) { setProgressStage(data.stage); setQueueInfo(null); }
         if (data.status === "completed" || data.status === "failed") {
           evtSource.close();
+          setQueueInfo(null);
           api.get(`/video/report/${reportId}`).then(r => {
             setReport(r.data); loadMyReports();
           });
@@ -60,6 +67,7 @@ export default function VideoAnalysis() {
     setReportId(id);
     setReport({ status: "processing" });
     setProgressStage("");
+    setQueueInfo(null);
     loadMyReports();
     setTimeout(() => document.getElementById("report-section")?.scrollIntoView({ behavior: "smooth" }), 200);
   };
@@ -142,10 +150,21 @@ export default function VideoAnalysis() {
             {(report.status === "loading" || report.status === "processing") && (
               <div className="spinner-wrap">
                 <div className="spinner" />
-                <p style={{ color: "var(--muted)" }}>
-                  {report.status === "loading" ? "Loading report…" : (progressStage || "Starting analysis…")}
-                </p>
-                {report.status === "processing" && (
+                {queueInfo && queueInfo.position > 1 ? (
+                  <>
+                    <p style={{ color: "var(--warning)", fontWeight: 600, marginTop: "0.75rem" }}>
+                      🚦 Position #{queueInfo.position} in queue
+                    </p>
+                    <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.25rem" }}>
+                      ~{queueInfo.estimatedWait} min estimated wait
+                    </p>
+                  </>
+                ) : (
+                  <p style={{ color: "var(--muted)" }}>
+                    {report.status === "loading" ? "Loading report…" : (progressStage || "Starting analysis…")}
+                  </p>
+                )}
+                {report.status === "processing" && !queueInfo && (
                   <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.5rem" }}>Usually takes 2–3 minutes</p>
                 )}
               </div>

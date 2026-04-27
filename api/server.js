@@ -21,6 +21,7 @@ import submissionRoutes from "./routes/submissions.js";
 import chatRoutes from "./routes/chat.js";
 import qrRoutes from "./routes/qr.js";
 import dailyReportRoutes from "./routes/dailyReport.js";
+import monitoringRoutes, { setOnlineUsersRef, recordResponseTime } from "./routes/monitoring.js";
 import { startScheduler } from "./scheduler.js";
 import { startDailyReset } from "./scheduler.js";
 
@@ -71,6 +72,7 @@ io.use((socket, next) => {
 
 // Track online users: phone → socketId
 const onlineUsers = new Map();
+setOnlineUsersRef(onlineUsers);
 
 io.on("connection", (socket) => {
   const { phone, name, role } = socket.user;
@@ -239,6 +241,13 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 
+// ── Response time middleware ─────────────────────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => recordResponseTime(Date.now() - start));
+  next();
+});
+
 // ── API Routes ──────────────────────────────────────────────────────────────
 app.get("/api/health", (_, res) => res.json({ status: "ok", app: "Speak & Shine 🗣️" }));
 app.use("/api/auth",         authRoutes);
@@ -251,6 +260,7 @@ app.use("/api/submissions",  submissionRoutes);
 app.use("/api/chat",         chatRoutes);
 app.use("/api/qr",           qrRoutes);
 app.use("/api/daily-report", dailyReportRoutes);
+app.use("/api/monitoring",   monitoringRoutes);
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 
