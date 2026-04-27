@@ -246,4 +246,54 @@ router.patch("/settings", authMiddleware, requireRole("admin"), async (req, res)
   }
 });
 
+// GET /api/dashboard/debug-report — debug daily report status (admin only)
+router.get("/debug-report", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    const status = await Status.findOne().lean();
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    
+    const todayStart = new Date(nowIST);
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const reportCount = await DailyReport.countDocuments({
+      date: { $gte: todayStart }
+    });
+    
+    res.json({
+      currentTime: now,
+      currentTimeIST: nowIST,
+      status: {
+        dailyReportGenerated: status?.dailyReportGenerated || false,
+        reportExpiresAt: status?.reportExpiresAt || null,
+        questionSentToday: status?.questionSentToday || false,
+      },
+      reportCount,
+      showReport: status?.dailyReportGenerated && status?.reportExpiresAt && now < new Date(status.reportExpiresAt),
+      explanation: !status?.dailyReportGenerated 
+        ? "Reports not generated yet (scheduler hasn't run at midnight)"
+        : now >= new Date(status.reportExpiresAt)
+        ? "Report window expired (past 8 AM)"
+        : "Report should be visible",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/dashboard/generate-report-now — manually trigger report generation (admin only, for testing)
+router.post("/generate-report-now", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    // Import the function dynamically
+    const { generateDailyReports } = await import("../scheduler.js");
+    
+    // Generate reports
+    await generateDailyReports();
+    
+    res.json({ success: true, message: "Daily reports generated successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

@@ -175,7 +175,7 @@ async function dailyReset() {
  * Generate daily reports at 12:00 AM IST
  * Creates a report for each user showing yesterday's performance
  */
-async function generateDailyReports() {
+export async function generateDailyReports() {
   try {
     console.log("[Scheduler] 📊 Generating daily reports...");
 
