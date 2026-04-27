@@ -109,7 +109,7 @@ router.post("/upload", authMiddleware, (req, res, next) => {
     }
     if (duration > 300) {
       if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-      return res.status(400).json({ error: `Video is too long. Maximum is 5 minutes.` });
+      return res.status(400).json({ error: `Video is too long (${duration}s). Maximum is 5 minutes.` });
     }
 
     // Create report

@@ -37,7 +37,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     const duration = await getVideoDuration(videoPath);
 
     if (duration < 60) throw new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
-    if (duration > 300) throw new Error(`Video is too long. Maximum is 5 minutes.`);
+    if (duration > 300) throw new Error(`Video is too long (${duration}s). Maximum is 5 minutes.`);
 
     await onProgress("Extracting audio…");
 
