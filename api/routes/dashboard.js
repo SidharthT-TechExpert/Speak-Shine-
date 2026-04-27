@@ -158,6 +158,7 @@ router.get("/me", authMiddleware, async (req, res) => {
       dailyReport: showReport ? dailyReport : null,
       showReport,
       reportExpiresAt: showReport ? status.reportExpiresAt : null,
+      posterSendTime: status?.posterSendTime || "08:00",
       stats: {
         total: allUsers.length,
         completed,

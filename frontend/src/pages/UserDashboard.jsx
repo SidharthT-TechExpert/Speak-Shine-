@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
@@ -8,7 +8,138 @@ import {
   CartesianGrid, Legend, RadarChart, Radar, PolarGrid, PolarAngleAxis,
 } from "recharts";
 
-const SCORES = { fluency: "#7c6fff", grammar: "#4ade80", confidence: "#fbbf24", vocabulary: "#ff6b9d" };
+const MOTIVATIONAL = [
+  "Every great speaker started exactly where you are. 🌟",
+  "Your voice has the power to inspire. Use it today! 💪",
+  "Consistency beats perfection. Show up every day. 🔥",
+  "The best time to practice was yesterday. The second best is now. ⚡",
+  "Fluency is built one video at a time. You've got this! 🎯",
+  "Champions don't wait for the perfect moment — they create it. 🏆",
+  "Your streak is your superpower. Keep it alive! 🚀",
+  "Speak with confidence. The world is ready to listen. 🌍",
+];
+
+function QuestionCountdown({ posterSendTime, name, streak }) {
+  const [remaining, setRemaining] = useState(null);
+  const [quote] = useState(() => MOTIVATIONAL[Math.floor(Math.random() * MOTIVATIONAL.length)]);
+  const timerRef = useRef(null);
+
+  const calcRemaining = () => {
+    const now = new Date();
+    // Convert current time to IST
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const [h, m] = (posterSendTime || "08:00").split(":").map(Number);
+
+    const target = new Date(nowIST);
+    target.setHours(h, m, 0, 0);
+
+    // If scheduled time already passed today, target tomorrow
+    if (nowIST >= target) target.setDate(target.getDate() + 1);
+
+    const diffMs = target - nowIST;
+    const totalSec = Math.floor(diffMs / 1000);
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    return { hrs, mins, secs, totalSec };
+  };
+
+  useEffect(() => {
+    setRemaining(calcRemaining());
+    timerRef.current = setInterval(() => setRemaining(calcRemaining()), 1000);
+    return () => clearInterval(timerRef.current);
+  }, [posterSendTime]);
+
+  const pad = n => String(n).padStart(2, "0");
+  const [hh, mm] = (posterSendTime || "08:00").split(":");
+  const h = parseInt(hh), ampm = h >= 12 ? "PM" : "AM";
+  const displayTime = `${h > 12 ? h - 12 : h || 12}:${mm} ${ampm} IST`;
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, #1a1a2e 0%, #0f0f23 60%, #16162a 100%)",
+      border: "1px solid rgba(124,111,255,0.25)",
+      borderRadius: 16,
+      padding: "1.75rem 1.5rem",
+      marginBottom: "1rem",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Glow orb */}
+      <div style={{
+        position: "absolute", top: -40, right: -40,
+        width: 160, height: 160, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(124,111,255,0.18) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* Greeting */}
+      <div style={{ fontSize: "0.8rem", color: "#8888aa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.4rem" }}>
+        Good {getGreeting()} {name ? `, ${name.split(" ")[0]}` : ""}! 👋
+      </div>
+
+      {/* Main message */}
+      <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.25rem" }}>
+        Today's question drops at <span style={{ color: "#7c6fff" }}>{displayTime}</span>
+      </div>
+      <div style={{ fontSize: "0.85rem", color: "#8888aa", marginBottom: "1.5rem" }}>
+        Get ready to speak your best today!
+      </div>
+
+      {/* Countdown */}
+      {remaining && (
+        <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem" }}>
+          {[
+            { val: pad(remaining.hrs),  label: "Hours" },
+            { val: pad(remaining.mins), label: "Minutes" },
+            { val: pad(remaining.secs), label: "Seconds" },
+          ].map(({ val, label }) => (
+            <div key={label} style={{
+              flex: 1, background: "rgba(124,111,255,0.12)", border: "1px solid rgba(124,111,255,0.25)",
+              borderRadius: 12, padding: "0.85rem 0.5rem", textAlign: "center",
+            }}>
+              <div style={{ fontSize: "2rem", fontWeight: 800, color: "#7c6fff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ fontSize: "0.68rem", color: "#8888aa", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Streak reminder */}
+      {streak > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: "0.5rem",
+          background: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.2)",
+          borderRadius: 10, padding: "0.6rem 0.85rem", marginBottom: "1rem",
+          fontSize: "0.85rem",
+        }}>
+          <span style={{ fontSize: "1.2rem" }}>🔥</span>
+          <span style={{ color: "#f97316", fontWeight: 600 }}>{streak}-day streak!</span>
+          <span style={{ color: "#8888aa" }}>Don't break it — submit when the question arrives.</span>
+        </div>
+      )}
+
+      {/* Motivational quote */}
+      <div style={{
+        borderLeft: "3px solid rgba(124,111,255,0.5)",
+        paddingLeft: "0.85rem",
+        color: "#8888aa",
+        fontSize: "0.85rem",
+        fontStyle: "italic",
+        lineHeight: 1.5,
+      }}>
+        "{quote}"
+      </div>
+    </div>
+  );
+}
+
+function getGreeting() {
+  const h = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  return "evening";
+}
 const tt = { background: "#16162a", border: "1px solid #252545", borderRadius: 10, fontSize: 12 };
 const avg = (arr, k) => { const v = arr.filter(s => s[k] != null).map(s => s[k]); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : "—"; };
 const scoreColor = v => v >= 7 ? "var(--success)" : v >= 5 ? "var(--warning)" : "var(--danger)";
@@ -216,7 +347,16 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {profile && (
+      {/* No question yet — show motivational countdown */}
+      {!data?.showReport && !data?.today?.question && (
+        <QuestionCountdown
+          posterSendTime={data?.posterSendTime || "08:00"}
+          name={profile?.name}
+          streak={profile?.streak || 0}
+        />
+      )}
+
+      {profile && data?.today?.question && (
         <div className={`status-banner ${profile.completed ? "done" : "pending"}`}>
           {profile.completed ? "✅ You've submitted today — great work!" : "⏳ Haven't submitted today yet. Send your video on WhatsApp or upload here!"}
         </div>
