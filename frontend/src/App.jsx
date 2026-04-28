@@ -18,7 +18,7 @@ const LiveSession     = lazy(() => import("./pages/LiveSession.jsx"));
 
 function PageLoader() {
   return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:"var(--bg, #0d0d1a)" }}>
+    <div className="spinner-wrap" style={{ height: "100vh" }}>
       <div className="spinner" />
     </div>
   );
