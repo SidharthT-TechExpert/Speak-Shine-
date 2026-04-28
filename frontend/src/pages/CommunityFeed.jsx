@@ -290,8 +290,14 @@ export default function CommunityFeed() {
               {/* Video player */}
               {playing === item._id ? (
                 <div>
-                  <video src={item.videoUrl} controls autoPlay playsInline
-                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px" }} />
+                  <video
+                    src={item.videoUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px" }}
+                  />
                   <button onClick={() => setPlaying(null)}
                     style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
                     ✕ Close video
@@ -299,14 +305,55 @@ export default function CommunityFeed() {
                 </div>
               ) : (
                 <button onClick={() => setPlaying(item._id)} style={{
-                  width: "100%", padding: "0.75rem", borderRadius: "10px",
-                  background: "rgba(124,111,255,0.1)", border: "1px solid rgba(124,111,255,0.25)",
-                  color: "var(--primary)", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.18s",
-                }}
-                  onMouseOver={e => e.currentTarget.style.background = "rgba(124,111,255,0.18)"}
-                  onMouseOut={e => e.currentTarget.style.background = "rgba(124,111,255,0.1)"}
-                >
-                  ▶ Watch Video
+                  width: "100%",
+                  borderRadius: "10px",
+                  background: "#0a0a14",
+                  border: "1px solid rgba(124,111,255,0.25)",
+                  cursor: "pointer",
+                  padding: 0,
+                  overflow: "hidden",
+                  position: "relative",
+                  aspectRatio: "16/9",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  {/* Blurred thumbnail from video */}
+                  <video
+                    src={`${item.videoUrl}#t=2`}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    style={{
+                      position: "absolute", inset: 0,
+                      width: "100%", height: "100%",
+                      objectFit: "cover",
+                      filter: "blur(6px) brightness(0.45)",
+                      borderRadius: "10px",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  {/* Play button overlay */}
+                  <div style={{
+                    position: "relative", zIndex: 1,
+                    width: 52, height: 52, borderRadius: "50%",
+                    background: "rgba(124,111,255,0.85)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 4px 20px rgba(124,111,255,0.5)",
+                  }}>
+                    <span style={{ fontSize: "1.3rem", marginLeft: 3 }}>▶</span>
+                  </div>
+                  {/* Duration badge */}
+                  {item.videoDuration && (
+                    <span style={{
+                      position: "absolute", bottom: 8, right: 10, zIndex: 1,
+                      background: "rgba(0,0,0,0.7)", color: "#fff",
+                      fontSize: "0.72rem", fontWeight: 600,
+                      padding: "0.15rem 0.45rem", borderRadius: 6,
+                    }}>
+                      {Math.floor(item.videoDuration / 60)}:{String(item.videoDuration % 60).padStart(2, "0")}
+                    </span>
+                  )}
                 </button>
               )}
 

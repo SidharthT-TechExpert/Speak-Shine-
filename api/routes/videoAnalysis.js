@@ -42,6 +42,7 @@ router.post("/confirm", authMiddleware, async (req, res) => {
 
   const userId = req.user.id;
   const phone  = req.user.phone;
+  const isWebm = mimeType.includes("webm") || key.endsWith(".webm");
 
   try {
     const user = await User.findOne({ phone });
@@ -60,15 +61,23 @@ router.post("/confirm", authMiddleware, async (req, res) => {
       uploaderName: user?.name || phone,
     });
 
-    console.log(`[VideoConfirm] Report created: ${report._id} key=${key}`);
+    console.log(`[VideoConfirm] Report created: ${report._id} key=${key} webm=${isWebm}`);
+
+    // For WebM recordings: transcode to MP4 in background so seeking works in browser
+    // Analysis starts immediately using the original URL; MP4 URL is updated after transcode
+    if (isWebm) {
+      transcodeWebmToMp4(report._id, key, publicUrl, userId.toString()).catch(err =>
+        console.error(`[Transcode] Failed for ${report._id}:`, err.message)
+      );
+    }
 
     // Queue analysis — pass the R2 URL, no local file needed
     const { position, estimatedWait } = enqueue({
       reportId:    report._id,
-      videoPath:   publicUrl,   // R2 public URL — ffmpeg reads directly
+      videoPath:   publicUrl,
       phone,
       displayName: user?.name || phone,
-      fromUrl:     true,        // flag: don't try to unlink this path
+      fromUrl:     true,
     });
 
     res.json({
@@ -80,11 +89,55 @@ router.post("/confirm", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("[VideoConfirm] Error:", err.message);
-    // Clean up R2 if report creation failed
     try { await deleteFromR2(key); } catch {}
     res.status(500).json({ error: err.message || "Failed to start analysis" });
   }
 });
+
+// ── Transcode WebM → MP4 for proper seeking support ─────────────────────────
+async function transcodeWebmToMp4(reportId, webmKey, webmUrl, userId) {
+  const { exec } = await import("child_process");
+  const { promisify } = await import("util");
+  const execAsync = promisify(exec);
+
+  const tmpWebm = `./tmp/uploads/transcode-${reportId}.webm`;
+  const tmpMp4  = `./tmp/uploads/transcode-${reportId}.mp4`;
+
+  try {
+    // Download WebM from R2
+    console.log(`[Transcode] Downloading WebM for ${reportId}…`);
+    const resp = await fetch(webmUrl);
+    if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    fs.writeFileSync(tmpWebm, Buffer.from(buf));
+
+    // Transcode to MP4 with fast-start (moov atom at front = seekable)
+    console.log(`[Transcode] Converting to MP4…`);
+    await execAsync(
+      `ffmpeg -i "${tmpWebm}" -c:v copy -c:a aac -movflags +faststart "${tmpMp4}" -y`,
+      { timeout: 120000 }
+    );
+
+    // Upload MP4 to R2
+    const mp4Key = webmKey.replace(/\.webm$/, ".mp4");
+    const mp4Url = await uploadToR2(tmpMp4, mp4Key, "video/mp4");
+    console.log(`[Transcode] MP4 saved: ${mp4Url}`);
+
+    // Update report with MP4 URL
+    await VideoReport.findByIdAndUpdate(reportId, {
+      videoUrl: mp4Url,
+      videoKey: mp4Key,
+      videoFileName: path.basename(mp4Key),
+    });
+
+    // Delete original WebM from R2
+    await deleteFromR2(webmKey);
+    console.log(`[Transcode] Done for ${reportId}`);
+  } finally {
+    if (fs.existsSync(tmpWebm)) fs.unlinkSync(tmpWebm);
+    if (fs.existsSync(tmpMp4))  fs.unlinkSync(tmpMp4);
+  }
+}
 
 // ── SSE progress stream ──────────────────────────────────────────────────────
 // GET /api/video/progress/:reportId
