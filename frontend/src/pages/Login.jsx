@@ -186,7 +186,13 @@ export default function Login({ loginFor = "user", showRegister = false }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="auth-logo">{meta.icon}</div>
+        <div className="auth-logo">
+          <img
+            src="/icons/icon-192.png"
+            alt="Speak & Shine"
+            style={{ width: 80, height: 80, borderRadius: 22, boxShadow: "0 8px 32px rgba(139,92,246,0.4)" }}
+          />
+        </div>
         <h1 className="auth-title">{meta.title}</h1>
         <p className="auth-sub">{meta.sub}</p>
 
