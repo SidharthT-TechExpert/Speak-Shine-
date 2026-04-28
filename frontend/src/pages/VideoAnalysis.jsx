@@ -10,16 +10,24 @@ import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 
 export default function VideoAnalysis() {
   const [mode, setMode] = useState("upload"); // "upload" | "record"
+  const [todayQuestion, setTodayQuestion] = useState(null);
 
   // shared state
   const [reportId, setReportId]       = useState(null);
   const [report, setReport]           = useState(null);
   const [progressStage, setProgressStage] = useState("");
-  const [queueInfo, setQueueInfo]     = useState(null); // { position, queueLength, estimatedWait }
+  const [queueInfo, setQueueInfo]     = useState(null);
   const [myReports, setMyReports]     = useState([]);
   const [modal, setModal]             = useState(null);
 
-  useEffect(() => { loadMyReports(); }, []);
+  useEffect(() => {
+    loadMyReports();
+    // Fetch today's question for the top card
+    api.get("/dashboard/me").then(r => {
+      const t = r.data?.today;
+      if (t?.question) setTodayQuestion({ question: t.question, topic: t.topic, category: t.category });
+    }).catch(() => {});
+  }, []);
 
   // SSE for real-time progress
   useEffect(() => {
@@ -121,6 +129,31 @@ export default function VideoAnalysis() {
       )}
       <div className="video-analysis-page">
 
+        {/* ── Today's Question Card — same style as dashboard poster ── */}
+        {todayQuestion && (
+          <div className="daily-poster" style={{ marginBottom: "1rem" }}>
+            <div className="daily-poster-header">
+              <div className="daily-poster-brand">✦ Speak &amp; Shine</div>
+              <div className="daily-poster-sub">DAILY SPEAKING CHALLENGE</div>
+              {todayQuestion.category && (
+                <div className="daily-poster-badge">{todayQuestion.category}</div>
+              )}
+            </div>
+
+            {todayQuestion.topic && (
+              <div className="daily-poster-topic-wrap">
+                <div className="daily-poster-section-label">TOPIC</div>
+                <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
+              </div>
+            )}
+
+            <div className="daily-poster-question-wrap">
+              <div className="daily-poster-section-label">❓ QUESTION</div>
+              <div className="daily-poster-question">{todayQuestion.question}</div>
+            </div>
+          </div>
+        )}
+
         {/* Mode switcher */}
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
           <button
@@ -135,7 +168,7 @@ export default function VideoAnalysis() {
 
         {mode === "upload"
           ? <UploadCard onAnalysisStarted={onAnalysisStarted} />
-          : <RecordCard  onAnalysisStarted={onAnalysisStarted} />
+          : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} />
         }
 
         {/* Report Section */}
@@ -315,7 +348,7 @@ function UploadCard({ onAnalysisStarted }) {
 // ── Record Card ──────────────────────────────────────────────────────────────
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
 
-function RecordCard({ onAnalysisStarted }) {
+function RecordCard({ onAnalysisStarted, question }) {
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
   const [mics, setMics]             = useState([]);
@@ -323,14 +356,12 @@ function RecordCard({ onAnalysisStarted }) {
   const [micId, setMicId]           = useState("");
   const [countdown, setCountdown]   = useState(3);
   const [elapsed, setElapsed]       = useState(0);
-  const [question, setQuestion]     = useState(null);
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [error, setError]           = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
-  const [lightbox, setLightbox]     = useState(false);
-  const [noiseCancel, setNoiseCancel] = useState(true);  // toggle for RNNoise
-  const [ncStatus, setNcStatus]     = useState("idle");  // idle|loading|active|fallback
+  const [noiseCancel, setNoiseCancel] = useState(true);
+  const [ncStatus, setNcStatus]     = useState("idle");
 
   const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
@@ -360,16 +391,6 @@ function RecordCard({ onAnalysisStarted }) {
       }
     })();
     return () => cleanup();
-  }, []);
-
-  // Fetch today's question from dashboard (same one sent to WhatsApp group)
-  useEffect(() => {
-    api.get("/dashboard").then(r => {
-      const t = r.data?.today;
-      if (t?.question) {
-        setQuestion({ question: t.question, topic: t.topic, category: t.topic, posterImage: t.posterImage });
-      }
-    }).catch(() => {});
   }, []);
 
   // Attach stream to live video once countdown/recording step renders the element
@@ -575,19 +596,6 @@ function RecordCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">🎥 Record Video for Analysis</div>
 
-      {/* Lightbox */}
-      {lightbox && question?.posterImage && (
-        <div onClick={() => setLightbox(false)} style={{
-          position: "fixed", inset: 0, zIndex: 1000,
-          background: "rgba(0,0,0,0.88)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          cursor: "zoom-out",
-        }}>
-          <img src={question.posterImage} alt="Today's poster"
-            style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: "16px", boxShadow: "0 0 60px rgba(0,0,0,0.8)" }} />
-        </div>
-      )}
-
       {/* ── SETUP ── */}
       {step === "setup" && (
         <div>
@@ -613,42 +621,8 @@ function RecordCard({ onAnalysisStarted }) {
             </div>
           </div>
 
-          {/* Today's question — text + poster */}
-          {question && (
-            <div style={{ marginBottom: "1.25rem" }}>
-              <div style={{ fontSize: "0.65rem", color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
-                📅 Today's Question
-              </div>
-              {/* Question text card */}
-              <div style={{
-                background: "linear-gradient(135deg, rgba(124,111,255,0.12), rgba(79,70,229,0.08))",
-                border: "1px solid rgba(124,111,255,0.25)",
-                borderRadius: 12, padding: "0.9rem 1rem", marginBottom: "0.75rem",
-              }}>
-                {question.topic && (
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginBottom: "0.35rem" }}>
-                    🏷️ {question.topic}
-                  </div>
-                )}
-                <div style={{ fontSize: "0.95rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.55 }}>
-                  ❓ {question.question}
-                </div>
-              </div>
-              {/* Poster thumbnail */}
-              {question.posterImage && (
-                <>
-                  <img src={question.posterImage} alt="Today's poster"
-                    onClick={() => setLightbox(true)}
-                    onMouseOver={e => e.currentTarget.style.transform = "scale(1.02)"}
-                    onMouseOut={e => e.currentTarget.style.transform = "scale(1)"}
-                    style={{ width: "100%", maxWidth: "400px", borderRadius: "12px", border: "2px solid var(--border)", objectFit: "contain", cursor: "pointer", transition: "transform 0.2s", display: "block", margin: "0 auto" }} />
-                  <p style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "center" }}>Click to enlarge</p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Noise cancellation toggle */}          <div style={{
+          {/* Noise cancellation toggle */}
+          <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             background: "var(--card2)", border: "1px solid var(--border2)",
             borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1.25rem",
@@ -707,24 +681,6 @@ function RecordCard({ onAnalysisStarted }) {
       {/* ── RECORDING ── */}
       {step === "recording" && (
         <div>
-          {/* Today's question banner — always visible above video */}
-          {question && (
-            <div style={{
-              background: "linear-gradient(135deg, rgba(124,111,255,0.12), rgba(79,70,229,0.08))",
-              border: "1px solid rgba(124,111,255,0.25)",
-              borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "0.85rem",
-            }}>
-              {question.topic && (
-                <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.3rem" }}>
-                  📌 {question.topic}
-                </div>
-              )}
-              <div style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.5 }}>
-                ❓ {question.question}
-              </div>
-            </div>
-          )}
-
           {/* Video — 9:16 on mobile, 16:9 on desktop */}
           <div style={{ position: "relative", marginBottom: "0.85rem" }}>
             <video ref={liveVideoRef} autoPlay muted playsInline
@@ -829,16 +785,6 @@ function RecordCard({ onAnalysisStarted }) {
       {/* ── PREVIEW ── */}
       {step === "preview" && (
         <div>
-          {question && (
-            <div style={{
-              background: "linear-gradient(135deg, rgba(124,111,255,0.12), rgba(79,70,229,0.08))",
-              border: "1px solid rgba(124,111,255,0.25)",
-              borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "0.85rem",
-            }}>
-              {question.topic && <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginBottom: "0.25rem" }}>🏷️ {question.topic}</div>}
-              <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.5 }}>❓ {question.question}</div>
-            </div>
-          )}
           <p style={{ color: "var(--muted)", marginBottom: "1rem", fontSize: "0.9rem" }}>
             Review your recording before submitting for analysis.
             {elapsed < 60 && <span style={{ color: "var(--danger)" }}> ⚠️ Too short ({fmtTime(elapsed)}) — minimum 1 minute.</span>}
