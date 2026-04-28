@@ -272,8 +272,31 @@ if (isProd) {
   const distPath = path.join(__dirname, "../frontend/dist");
   if (fs.existsSync(distPath)) {
     console.log("📦 Serving frontend from:", distPath);
-    app.use(express.static(distPath));
-    app.get("*", (_, res) => res.sendFile(path.join(distPath, "index.html")));
+    // Serve static assets with correct MIME types and long-term caching
+    app.use(express.static(distPath, {
+      maxAge: "1y",
+      immutable: true,
+      setHeaders(res, filePath) {
+        // Ensure JS modules get the correct MIME type
+        if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+          res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+        } else if (filePath.endsWith(".css")) {
+          res.setHeader("Content-Type", "text/css; charset=utf-8");
+        }
+        // index.html should never be cached
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        }
+      },
+    }));
+    // SPA fallback — all non-API, non-asset routes serve index.html
+    app.get("*", (req, res) => {
+      // Don't serve index.html for asset requests that weren't found
+      if (req.path.match(/\.(js|css|png|jpg|svg|ico|wasm|json)$/)) {
+        return res.status(404).send("Not found");
+      }
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   } else {
     console.warn("⚠️ Frontend dist not found — API-only mode");
   }
