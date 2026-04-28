@@ -11,6 +11,8 @@ const statusSchema = new mongoose.Schema({
   todayPosterImage: { type: String, default: null },
   posterExpiresAt: { type: Date, default: null },
   recentCategories: { type: [String], default: [] },
+  // Monthly reflection
+  isMonthlyReflectionDay: { type: Boolean, default: false },
   // Daily report tracking
   dailyReportGenerated: { type: Boolean, default: false },
   reportExpiresAt: { type: Date, default: null },

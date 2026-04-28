@@ -16,6 +16,7 @@ export async function resetStatus() {
       posterExpiresAt: null,
       dailyReportGenerated: false,
       reportExpiresAt: null,
+      isMonthlyReflectionDay: false,
     }
   });
 }

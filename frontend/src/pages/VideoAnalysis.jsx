@@ -11,6 +11,7 @@ import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 export default function VideoAnalysis() {
   const [mode, setMode] = useState("upload"); // "upload" | "record"
   const [todayQuestion, setTodayQuestion] = useState(null);
+  const [isMonthlyReflection, setIsMonthlyReflection] = useState(false);
 
   // shared state
   const [reportId, setReportId]       = useState(null);
@@ -26,6 +27,7 @@ export default function VideoAnalysis() {
     api.get("/dashboard/me").then(r => {
       const t = r.data?.today;
       if (t?.question) setTodayQuestion({ question: t.question, topic: t.topic, category: t.category });
+      if (t?.isMonthlyReflection) setIsMonthlyReflection(true);
     }).catch(() => {});
   }, []);
 
@@ -141,8 +143,77 @@ export default function VideoAnalysis() {
       )}
       <div className="video-analysis-page">
 
-        {/* ── Today's Question Card — same style as dashboard poster ── */}
-        {todayQuestion && (
+        {/* ── Monthly Reflection Card (last day of month) ── */}
+        {isMonthlyReflection && (
+          <div style={{
+            background: "linear-gradient(135deg, #1a0a2e 0%, #2d1060 50%, #1a0a2e 100%)",
+            border: "2px solid rgba(167,139,250,0.5)",
+            borderRadius: 18,
+            padding: "1.5rem",
+            marginBottom: "1rem",
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 8px 40px rgba(139,92,246,0.25)",
+          }}>
+            {/* Glow */}
+            <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"radial-gradient(circle, rgba(167,139,250,0.2) 0%, transparent 70%)", pointerEvents:"none" }} />
+
+            {/* Header */}
+            <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1.25rem" }}>
+              <div style={{ fontSize:"2.5rem" }}>🌟</div>
+              <div>
+                <div style={{ fontSize:"0.7rem", color:"rgba(167,139,250,0.8)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em" }}>
+                  End of Month
+                </div>
+                <div style={{ fontSize:"1.3rem", fontWeight:800, color:"#fff", lineHeight:1.2 }}>
+                  Monthly Reflection
+                </div>
+                <div style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.6)", marginTop:"0.2rem" }}>
+                  Record a video answering all questions below
+                </div>
+              </div>
+            </div>
+
+            {/* Questions list */}
+            <div style={{ display:"flex", flexDirection:"column", gap:"0.6rem", marginBottom:"1.25rem" }}>
+              {[
+                { n:"1", q:"How many reviews did you attend this month?" },
+                { n:"2", q:"How many reviews passed and how many failed? Why did you fail?" },
+                { n:"3", q:"How many extensions did you take this month?" },
+                { n:"4", q:"What is your current growth and progress in the program?" },
+                { n:"5", q:"What did you do this month to improve your communication skill?" },
+                { n:"6", q:"What is your communication skill level now compared to last month?" },
+              ].map(({ n, q }) => (
+                <div key={n} style={{
+                  display:"flex", gap:"0.75rem", alignItems:"flex-start",
+                  background:"rgba(255,255,255,0.06)",
+                  border:"1px solid rgba(167,139,250,0.2)",
+                  borderRadius:12, padding:"0.75rem 1rem",
+                }}>
+                  <div style={{
+                    minWidth:26, height:26, borderRadius:"50%",
+                    background:"rgba(139,92,246,0.3)", border:"1px solid rgba(139,92,246,0.5)",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:"0.75rem", fontWeight:800, color:"#a78bfa", flexShrink:0,
+                  }}>{n}</div>
+                  <div style={{ fontSize:"0.88rem", color:"rgba(255,255,255,0.9)", lineHeight:1.5 }}>{q}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tip */}
+            <div style={{
+              background:"rgba(139,92,246,0.12)", border:"1px solid rgba(139,92,246,0.25)",
+              borderRadius:10, padding:"0.75rem 1rem",
+              fontSize:"0.8rem", color:"rgba(255,255,255,0.7)", lineHeight:1.5,
+            }}>
+              💡 <strong style={{ color:"#a78bfa" }}>Tip:</strong> Speak clearly and answer each question in order. This counts as your daily submission — same rules apply.
+            </div>
+          </div>
+        )}
+
+        {/* ── Today's Question Card — regular days ── */}
+        {todayQuestion && !isMonthlyReflection && (
           <div className="daily-poster" style={{ marginBottom: "1rem" }}>
             <div className="daily-poster-header">
               <div className="daily-poster-brand">✦ Speak &amp; Shine</div>
@@ -180,7 +251,7 @@ export default function VideoAnalysis() {
 
         {mode === "upload"
           ? <UploadCard onAnalysisStarted={onAnalysisStarted} />
-          : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} />
+          : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} />
         }
 
         {/* Report Section */}
@@ -431,7 +502,7 @@ function UploadCard({ onAnalysisStarted }) {
 // ── Record Card ──────────────────────────────────────────────────────────────
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
 
-function RecordCard({ onAnalysisStarted, question }) {
+function RecordCard({ onAnalysisStarted, question, isMonthlyReflection }) {
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
   const [mics, setMics]             = useState([]);
@@ -693,6 +764,25 @@ function RecordCard({ onAnalysisStarted, question }) {
           <p style={{ color: "var(--muted)", marginBottom: "1.25rem", fontSize: "0.9rem" }}>
             Minimum 1 min · Max 5 min · Speak clearly to the camera
           </p>
+
+          {/* Monthly reflection reminder inside record card */}
+          {isMonthlyReflection && (
+            <div style={{
+              background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)",
+              borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "1.25rem",
+              fontSize: "0.82rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6,
+            }}>
+              🌟 <strong style={{ color: "#a78bfa" }}>Monthly Reflection Day!</strong> Answer all 6 questions in your video:
+              <ol style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                <li>How many reviews did you attend this month?</li>
+                <li>How many passed / failed? Why did you fail?</li>
+                <li>How many extensions did you take this month?</li>
+                <li>What is your current growth and progress?</li>
+                <li>What did you do to improve communication this month?</li>
+                <li>What is your communication skill level now vs last month?</li>
+              </ol>
+            </div>
+          )}
 
           {/* Device selectors */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>

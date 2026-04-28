@@ -652,50 +652,97 @@ export default function UserDashboard() {
 
       {/* Show Question (8 AM onwards) — hide if already completed */}
       {!data?.showReport && data?.today?.question && !profile?.completed && (
-        <div className="daily-poster">
+        <div className="daily-poster" style={data?.today?.isMonthlyReflection ? {
+          background: "linear-gradient(135deg, #1a0a2e 0%, #2d1060 50%, #1a0a2e 100%)",
+          border: "2px solid rgba(167,139,250,0.5)",
+          boxShadow: "0 8px 40px rgba(139,92,246,0.25)",
+        } : {}}>
           {/* Header */}
           <div className="daily-poster-header">
-            <div className="daily-poster-brand">✦ Speak &amp; Shine</div>
-            <div className="daily-poster-sub">DAILY SPEAKING CHALLENGE</div>
+            <div className="daily-poster-brand">
+              {data?.today?.isMonthlyReflection ? "🌟 Speak & Shine" : "✦ Speak & Shine"}
+            </div>
+            <div className="daily-poster-sub">
+              {data?.today?.isMonthlyReflection ? "MONTHLY REFLECTION" : "DAILY SPEAKING CHALLENGE"}
+            </div>
             {data.today.category && (
-              <div className="daily-poster-badge">{data.today.category}</div>
+              <div className="daily-poster-badge" style={data?.today?.isMonthlyReflection ? {
+                background: "rgba(139,92,246,0.3)", border: "1px solid rgba(167,139,250,0.5)", color: "#c4b5fd"
+              } : {}}>
+                {data.today.category}
+              </div>
             )}
           </div>
 
-          {/* Topic */}
-          {data.today.topic && (
-            <div className="daily-poster-topic-wrap">
-              <div className="daily-poster-section-label">TOPIC</div>
-              <div className="daily-poster-topic">"{data.today.topic}"</div>
+          {/* Monthly Reflection: numbered questions */}
+          {data?.today?.isMonthlyReflection ? (
+            <div style={{ marginTop: "1rem" }}>
+              <div className="daily-poster-section-label">📋 REFLECTION QUESTIONS</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "0.75rem" }}>
+                {[
+                  "How many reviews did you attend this month?",
+                  "How many reviews passed and how many failed? Why did you fail?",
+                  "How many extensions did you take this month?",
+                  "What is your current growth and progress in the program?",
+                  "What did you do this month to improve your communication skill?",
+                  "What is your communication skill level now compared to last month?",
+                ].map((q, i) => (
+                  <div key={i} style={{
+                    display: "flex", gap: "0.75rem", alignItems: "flex-start",
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(167,139,250,0.2)",
+                    borderRadius: 10, padding: "0.65rem 0.85rem",
+                  }}>
+                    <div style={{
+                      minWidth: 24, height: 24, borderRadius: "50%",
+                      background: "rgba(139,92,246,0.3)", border: "1px solid rgba(139,92,246,0.5)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.72rem", fontWeight: 800, color: "#a78bfa", flexShrink: 0,
+                    }}>{i + 1}</div>
+                    <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.9)", lineHeight: 1.5 }}>{q}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{
+                marginTop: "0.85rem", background: "rgba(139,92,246,0.1)",
+                border: "1px solid rgba(139,92,246,0.25)", borderRadius: 10,
+                padding: "0.65rem 0.85rem", fontSize: "0.78rem", color: "rgba(255,255,255,0.65)",
+              }}>
+                💡 Record a video answering all 6 questions. Same rules apply — counts as your daily submission.
+              </div>
             </div>
+          ) : (
+            <>
+              {/* Topic */}
+              {data.today.topic && (
+                <div className="daily-poster-topic-wrap">
+                  <div className="daily-poster-section-label">TOPIC</div>
+                  <div className="daily-poster-topic">"{data.today.topic}"</div>
+                </div>
+              )}
+              {/* Question */}
+              <div className="daily-poster-question-wrap">
+                <div className="daily-poster-section-label">❓ QUESTION</div>
+                <div className="daily-poster-question">{data.today.question}</div>
+              </div>
+            </>
           )}
-
-          {/* Question */}
-          <div className="daily-poster-question-wrap">
-            <div className="daily-poster-section-label">❓ QUESTION</div>
-            <div className="daily-poster-question">{data.today.question}</div>
-          </div>
 
           {/* CTA Button */}
           <button 
             className="daily-poster-cta" 
             onClick={() => navigate('/video-analysis')}
             style={{ 
-              cursor: 'pointer',
-              border: 'none',
-              width: '100%',
-              transition: 'transform 0.2s, box-shadow 0.2s'
+              cursor: 'pointer', border: 'none', width: '100%',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              ...(data?.today?.isMonthlyReflection ? {
+                background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
+                boxShadow: "0 4px 20px rgba(139,92,246,0.4)",
+              } : {}),
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px rgba(124, 111, 255, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
           >
-            🎥 Upload Your Speaking Video Now!
+            {data?.today?.isMonthlyReflection ? "🌟 Record Monthly Reflection Video" : "🎥 Upload Your Speaking Video Now!"}
           </button>
         </div>
       )}

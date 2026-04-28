@@ -155,6 +155,7 @@ router.get("/me", authMiddleware, async (req, res) => {
         question: status?.todayQuestion || null,
         category: status?.todayCategory || null,
         posterImage: getPosterImage(status),
+        isMonthlyReflection: status?.isMonthlyReflectionDay || false,
       },
       dailyReport: showReport ? dailyReport : null,
       showReport,

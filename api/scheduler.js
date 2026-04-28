@@ -16,11 +16,52 @@ import { deleteFromR2 } from "../r2.js";
 
 const TIMEZONE = "Asia/Kolkata";
 
+// Monthly reflection questions — shown on the last day of every month
+export const MONTHLY_REFLECTION_QUESTIONS = [
+  "How many reviews did you attend this month?",
+  "How many reviews passed and how many failed? Why did you fail?",
+  "How many extensions did you take this month?",
+  "What is your current growth and progress in the program?",
+  "What did you do this month to improve your communication skill?",
+  "What is your communication skill level now compared to last month?",
+];
+
+export const MONTHLY_REFLECTION_TOPIC = "Monthly Reflection";
+export const MONTHLY_REFLECTION_CATEGORY = "Monthly Reflection";
+
+/** Returns true if today is the last day of the month (IST) */
+function isLastDayOfMonth() {
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+  const tomorrow = new Date(nowIST);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.getDate() === 1;
+}
+
 async function publishDailyQuestion() {
   try {
     const statusCheck = await Status.findOne();
     if (statusCheck?.questionSentToday) {
       return; // already published today
+    }
+
+    // ── Last day of month → publish Monthly Reflection instead ──────────
+    if (isLastDayOfMonth()) {
+      const reflectionText = MONTHLY_REFLECTION_QUESTIONS
+        .map((q, i) => `${i + 1}. ${q}`)
+        .join("\n");
+
+      await Status.updateOne({}, {
+        $set: {
+          questionSentToday: true,
+          isMonthlyReflectionDay: true,
+          todayTopic: MONTHLY_REFLECTION_TOPIC,
+          todayQuestion: reflectionText,
+          todayCategory: MONTHLY_REFLECTION_CATEGORY,
+        }
+      }, { upsert: true });
+
+      console.log("[Scheduler] 🌟 Monthly Reflection published for last day of month");
+      return;
     }
 
     // Ensure question bank has questions
