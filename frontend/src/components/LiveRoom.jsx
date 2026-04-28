@@ -7,18 +7,20 @@ import {
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import api from "../api/client.js";
+import { useToast } from "./Toast.jsx";
 
 // ── Admin controls panel shown inside the room ───────────────────────────────
 function AdminControls({ sessionId }) {
   const participants = useParticipants();
   const [busy, setBusy] = useState({});
+  const toast = useToast();
 
   const action = async (type, identity) => {
     setBusy(b => ({ ...b, [identity]: true }));
     try {
       await api.post(`/live-sessions/${sessionId}/${type}/${encodeURIComponent(identity)}`);
     } catch (e) {
-      alert(e.response?.data?.error || `${type} failed`);
+      toast(e.response?.data?.error || `${type} failed`, "error");
     } finally {
       setBusy(b => ({ ...b, [identity]: false }));
     }

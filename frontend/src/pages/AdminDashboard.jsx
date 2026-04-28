@@ -5,6 +5,8 @@ import StatCard from "../components/StatCard.jsx";
 import Modal from "../components/Modal.jsx";
 import RoleSelector from "../components/RoleSelector.jsx";
 import SubmissionControls from "../components/SubmissionControls.jsx";
+import { useConfirm } from "../components/ConfirmDialog.jsx";
+import { useToast } from "../components/Toast.jsx";
 import api from "../api/client.js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 
@@ -850,6 +852,7 @@ export default function AdminDashboard() {
 // ── Live Sessions Panel ───────────────────────────────────────────────────────
 function LiveSessionsPanel() {
   const navigate = useNavigate();
+  const confirm  = useConfirm();
   const [sessions, setSessions]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showForm, setShowForm]     = useState(false);
@@ -894,7 +897,8 @@ function LiveSessionsPanel() {
   };
 
   const end = async (id) => {
-    if (!confirm("End this session for all participants?")) return;
+    const ok = await confirm({ title: "End Session", message: "End this session for all participants?", confirmText: "End Session", type: "danger" });
+    if (!ok) return;
     setBusy(b => ({ ...b, [id]: "ending" }));
     try { await api.post(`/live-sessions/${id}/end`); notify("Session ended."); load(); }
     catch (err) { notify(err.response?.data?.error || "Failed to end", "error"); }
@@ -902,7 +906,8 @@ function LiveSessionsPanel() {
   };
 
   const cancel = async (id) => {
-    if (!confirm("Cancel this scheduled session? This cannot be undone.")) return;
+    const ok = await confirm({ title: "Cancel Session", message: "Cancel this scheduled session? This cannot be undone.", confirmText: "Yes, Cancel", type: "danger" });
+    if (!ok) return;
     setBusy(b => ({ ...b, [id]: "cancelling" }));
     try { await api.delete(`/live-sessions/${id}`); notify("Session cancelled."); load(); }
     catch (err) { notify(err.response?.data?.error || "Failed to cancel", "error"); }

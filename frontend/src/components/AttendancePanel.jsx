@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import api from "../api/client.js";
+import { useToast } from "./Toast.jsx";
 
 export default function AttendancePanel() {
+  const toast = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState({}); // phone → status map
@@ -58,7 +60,7 @@ export default function AttendancePanel() {
       // Revert on error
       setAttendance((prev) => ({ ...prev, [phone]: previousStatus }));
       console.error("Failed to mark attendance:", err);
-      alert(err.response?.data?.error || "Failed to mark attendance");
+      toast(err.response?.data?.error || "Failed to mark attendance", "error");
     }
   };
 

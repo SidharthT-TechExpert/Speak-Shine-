@@ -1,29 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "../api/client.js";
+import { useToast } from "./Toast.jsx";
 
 export default function SubmissionControls({ phone, weeklySubmissions, monthlySubmissions, onUpdate }) {
   const [loading, setLoading] = useState({ weekly: false, monthly: false });
-  const [error, setError] = useState(null);
+  const toast = useToast();
 
   const adjustSubmission = async (type, delta) => {
     setLoading((prev) => ({ ...prev, [type]: true }));
-    setError(null);
-
     try {
       const response = await api.patch(`/submissions/${phone}/${type}`, { delta });
       const newValue = response.data[`${type}Submissions`];
-      
-      // Update parent component state with new value
-      if (onUpdate) {
-        onUpdate(type, newValue);
-      }
+      if (onUpdate) onUpdate(type, newValue);
     } catch (err) {
-      console.error(`Failed to adjust ${type} submissions:`, err);
-      const errorMessage = err.response?.data?.error || `Failed to adjust ${type} submissions`;
-      setError(errorMessage);
-      
-      // Display error toast (using alert for now, can be replaced with toast library)
-      alert(errorMessage);
+      toast(err.response?.data?.error || `Failed to adjust ${type} submissions`, "error");
     } finally {
       setLoading((prev) => ({ ...prev, [type]: false }));
     }
@@ -31,17 +21,6 @@ export default function SubmissionControls({ phone, weeklySubmissions, monthlySu
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {error && (
-        <div style={{ 
-          padding: "0.75rem", 
-          background: "var(--danger)", 
-          color: "#fff", 
-          borderRadius: "8px",
-          fontSize: "0.875rem"
-        }}>
-          {error}
-        </div>
-      )}
       
       <SubmissionCounter
         label="Weekly Submissions"

@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { lazy, Suspense } from "react";
+import { ToastProvider } from "./components/Toast.jsx";
+import { ConfirmProvider } from "./components/ConfirmDialog.jsx";
 import ChatLauncher from "./components/ChatLauncher.jsx";
 import InstallPrompt from "./components/InstallPrompt.jsx";
 
@@ -53,9 +55,11 @@ function HomeRedirect() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+      <ToastProvider>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
             {/* Root */}
             <Route path="/" element={<HomeRedirect />} />
 
@@ -112,10 +116,12 @@ export default function App() {
             {/* Catch-all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Suspense>
-        <ChatLauncher />
-        <InstallPrompt />
-      </BrowserRouter>
+            </Suspense>
+            <ChatLauncher />
+            <InstallPrompt />
+          </BrowserRouter>
+        </ConfirmProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
