@@ -9,57 +9,179 @@ const META = {
   user:    { title: "Speak & Shine",  icon: "🗣️", sub: "Track your progress" },
 };
 
+// ── Validators ────────────────────────────────────────────────────────────────
+function validatePhone(val) {
+  if (!val.trim()) return "Phone number is required";
+  const digits = val.replace(/^(\+91|91)/, "").replace(/\D/g, "");
+  if (digits.length < 10) return "Must be at least 10 digits";
+  if (!/^\d+$/.test(digits)) return "Digits only";
+  return "";
+}
+
+function validatePassword(val) {
+  if (!val) return "Password is required";
+  if (val.length < 6) return "At least 6 characters";
+  return "";
+}
+
+function passwordStrength(val) {
+  if (!val) return 0;
+  let score = 0;
+  if (val.length >= 6)  score++;
+  if (val.length >= 10) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  return score; // 0–5
+}
+
+const STRENGTH_LABEL = ["", "Very Weak", "Weak", "Fair", "Strong", "Very Strong"];
+const STRENGTH_COLOR = ["", "#f87171", "#fb923c", "#fbbf24", "#4ade80", "#22c55e"];
+
+// ── Field component ───────────────────────────────────────────────────────────
+function Field({ label, type = "text", placeholder, value, onChange, onBlur, error, touched, hint, showStrength }) {
+  const [show, setShow] = useState(false);
+  const isPassword = type === "password";
+  const strength = showStrength ? passwordStrength(value) : 0;
+  const isValid = touched && !error && value;
+
+  return (
+    <div className="form-group" style={{ marginBottom: "1.1rem" }}>
+      <label className="form-label">{label}</label>
+      <div style={{ position: "relative" }}>
+        <input
+          className="form-input"
+          type={isPassword && show ? "text" : type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          autoComplete="off"
+          style={{
+            borderColor: touched
+              ? error ? "var(--danger)" : isValid ? "#22c55e" : undefined
+              : undefined,
+            paddingRight: isPassword ? "2.5rem" : isValid ? "2.5rem" : undefined,
+            transition: "border-color 0.2s",
+          }}
+        />
+        {/* show/hide toggle for password */}
+        {isPassword && (
+          <button type="button" onClick={() => setShow(s => !s)} style={{
+            position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+            background: "none", border: "none", cursor: "pointer",
+            color: "var(--muted)", fontSize: "0.85rem", padding: "0.2rem",
+          }}>
+            {show ? "🙈" : "👁️"}
+          </button>
+        )}
+        {/* green tick when valid */}
+        {!isPassword && isValid && (
+          <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#22c55e", fontSize: "0.9rem" }}>✓</span>
+        )}
+      </div>
+
+      {/* Password strength bar */}
+      {showStrength && value && (
+        <div style={{ marginTop: "0.4rem" }}>
+          <div style={{ display: "flex", gap: "3px", marginBottom: "0.2rem" }}>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} style={{
+                flex: 1, height: 3, borderRadius: 2,
+                background: i <= strength ? STRENGTH_COLOR[strength] : "var(--border)",
+                transition: "background 0.3s",
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: "0.72rem", color: STRENGTH_COLOR[strength] }}>
+            {STRENGTH_LABEL[strength]}
+          </div>
+        </div>
+      )}
+
+      {/* Error or hint */}
+      {touched && error ? (
+        <div style={{ color: "var(--danger)", fontSize: "0.78rem", marginTop: "0.3rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          ⚠ {error}
+        </div>
+      ) : hint && !value ? (
+        <div style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: "0.3rem" }}>{hint}</div>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Login page ────────────────────────────────────────────────────────────────
 export default function Login({ loginFor = "user", showRegister = false }) {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ phone: "", password: "" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldError, setFieldError] = useState({ phone: "", password: "" });
   const meta = META[loginFor] || META.user;
 
-  // Preload the likely destination chunk while user fills in the form
+  const [form, setForm]       = useState({ phone: "", password: "" });
+  const [touched, setTouched] = useState({ phone: false, password: false });
+  const [errors, setErrors]   = useState({ phone: "", password: "" });
+  const [serverError, setServerError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Preload destination chunk while user types
   useEffect(() => {
     if (loginFor === "admin")        import("./AdminDashboard.jsx");
     else if (loginFor === "trainer") import("./TrainerDashboard.jsx");
     else                             import("./UserDashboard.jsx");
   }, [loginFor]);
 
-  const validate = () => {
-    const errs = { phone: "", password: "" };
-    if (!form.phone.trim()) errs.phone = "Phone number is required";
-    if (!form.password)     errs.password = "Password is required";
-    setFieldError(errs);
-    return !errs.phone && !errs.password;
+  // Live validation on every keystroke
+  const validate = (f) => ({
+    phone:    validatePhone(f.phone),
+    password: validatePassword(f.password),
+  });
+
+  const handleChange = (field, val) => {
+    const next = { ...form, [field]: val };
+    setForm(next);
+    setServerError("");
+    if (touched[field]) {
+      setErrors(validate(next));
+    }
   };
+
+  const handleBlur = (field) => {
+    setTouched(p => ({ ...p, [field]: true }));
+    setErrors(validate(form));
+  };
+
+  const isFormValid = !errors.phone && !errors.password && form.phone && form.password;
 
   const submit = async (e) => {
     e.preventDefault();
-    setError("");
-    if (!validate()) return;
+    // Touch all fields to show errors
+    setTouched({ phone: true, password: true });
+    const errs = validate(form);
+    setErrors(errs);
+    if (errs.phone || errs.password) return;
+
     setLoading(true);
+    setServerError("");
     try {
       const { data } = await api.post("/auth/login", form);
       if (loginFor === "admin" && data.role !== "admin") {
-        setError("Admin credentials required.");
+        setServerError("Admin credentials required.");
         return;
       }
       if (loginFor === "trainer" && !["trainer", "admin"].includes(data.role)) {
-        setError("Trainer credentials required.");
+        setServerError("Trainer credentials required.");
         return;
       }
       login(data.token, { phone: data.phone, role: data.role, name: data.name });
-      if (data.role === "admin") navigate("/admin", { replace: true });
-      else if (data.role === "trainer") navigate("/trainer", { replace: true });
-      else navigate("/dashboard", { replace: true });
+      if (data.role === "admin")        navigate("/admin",     { replace: true });
+      else if (data.role === "trainer") navigate("/trainer",   { replace: true });
+      else                              navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err.response?.data?.error || "Invalid phone or password. Please try again.");
+      setServerError(err.response?.data?.error || "Invalid phone or password.");
     } finally {
       setLoading(false);
     }
   };
-
-  const clearFieldError = (field) => setFieldError(p => ({ ...p, [field]: "" }));
 
   return (
     <div className="auth-page">
@@ -68,71 +190,51 @@ export default function Login({ loginFor = "user", showRegister = false }) {
         <h1 className="auth-title">{meta.title}</h1>
         <p className="auth-sub">{meta.sub}</p>
 
-        {/* Global error banner */}
-        {error && (
+        {/* Server error banner */}
+        {serverError && (
           <div style={{
-            background: "rgba(248,113,113,0.1)",
-            border: "1px solid rgba(248,113,113,0.35)",
-            borderRadius: 10,
-            padding: "0.7rem 1rem",
-            marginBottom: "1rem",
-            color: "#f87171",
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
+            background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.35)",
+            borderRadius: 10, padding: "0.7rem 1rem", marginBottom: "1rem",
+            color: "#f87171", fontSize: "0.875rem", fontWeight: 500,
+            display: "flex", alignItems: "center", gap: "0.5rem",
           }}>
-            ❌ {error}
+            ❌ {serverError}
           </div>
         )}
 
         <form onSubmit={submit} noValidate autoComplete="off">
-          <div className="form-group">
-            <label className="form-label">Phone Number</label>
-            <input
-              className="form-input"
-              type="text"
-              placeholder="e.g. 918848096746"
-              value={form.phone}
-              onChange={e => { setForm({ ...form, phone: e.target.value }); clearFieldError("phone"); setError(""); }}
-              style={fieldError.phone ? { borderColor: "var(--danger)" } : {}}
-              autoComplete="tel"
-            />
-            {fieldError.phone && (
-              <div style={{ color: "var(--danger)", fontSize: "0.78rem", marginTop: "0.3rem" }}>
-                {fieldError.phone}
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input
-              className="form-input"
-              type="password"
-              placeholder="Enter password"
-              value={form.password}
-              onChange={e => { setForm({ ...form, password: e.target.value }); clearFieldError("password"); setError(""); }}
-              style={fieldError.password ? { borderColor: "var(--danger)" } : {}}
-              autoComplete="current-password"
-            />
-            {fieldError.password && (
-              <div style={{ color: "var(--danger)", fontSize: "0.78rem", marginTop: "0.3rem" }}>
-                {fieldError.password}
-              </div>
-            )}
-          </div>
+          <Field
+            label="Phone Number"
+            type="tel"
+            placeholder="e.g. 918848096746"
+            value={form.phone}
+            onChange={e => handleChange("phone", e.target.value)}
+            onBlur={() => handleBlur("phone")}
+            error={errors.phone}
+            touched={touched.phone}
+            hint="Enter your registered phone number"
+          />
+          <Field
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            value={form.password}
+            onChange={e => handleChange("password", e.target.value)}
+            onBlur={() => handleBlur("password")}
+            error={errors.password}
+            touched={touched.password}
+            hint="Minimum 6 characters"
+          />
 
           <button
             type="submit"
             className="btn-primary"
-            style={{ width: "100%", marginTop: "0.5rem", position: "relative" }}
+            style={{ width: "100%", marginTop: "0.25rem", opacity: loading ? 0.8 : 1 }}
             disabled={loading}
           >
             {loading ? (
               <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}>
-                <span style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+                <span style={{ width: 15, height: 15, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
                 Signing in…
               </span>
             ) : "Sign In"}
@@ -142,7 +244,6 @@ export default function Login({ loginFor = "user", showRegister = false }) {
         {showRegister && (
           <p className="auth-link">No account? <Link to="/register">Register</Link></p>
         )}
-
         {loginFor === "user" && (
           <div className="auth-portals">
             <Link to="/admin/login">Admin Portal →</Link>
