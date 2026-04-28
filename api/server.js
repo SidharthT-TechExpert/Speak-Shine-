@@ -276,6 +276,14 @@ if (isProd) {
     const files = fs.readdirSync(distPath);
     console.log("📁 Dist contents:", files);
     console.log("📦 Serving frontend from:", distPath);
+    
+    // Enable SharedArrayBuffer for FFmpeg.wasm (video compression)
+    app.use((req, res, next) => {
+      res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+      res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+      next();
+    });
+    
     // Serve static assets with correct MIME types and long-term caching
     app.use(express.static(distPath, {
       maxAge: "1y",

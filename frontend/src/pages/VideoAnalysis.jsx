@@ -3,6 +3,7 @@ import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
+import { useVideoCompression } from "../hooks/useVideoCompression.js";
 
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
@@ -319,55 +320,83 @@ export default function VideoAnalysis() {
   );
 }
 
-// ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
+// ── Upload Card (direct-to-R2 flow with compression) ────────────────────────
 function UploadCard({ onAnalysisStarted }) {
   const [file, setFile]           = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
-  const [stage, setStage]         = useState(""); // "uploading" | "confirming"
+  const [stage, setStage]         = useState(""); // "compressing" | "uploading" | "confirming"
   const [error, setError]         = useState(null);
+  const [originalSize, setOriginalSize] = useState(0);
+  const [compressedSize, setCompressedSize] = useState(0);
+
+  const { compressVideo, isCompressing, compressionProgress, compressionError, isSupported } = useVideoCompression();
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
     if (f.size > 350 * 1024 * 1024) { setError("File size must be less than 350MB."); return; }
-    setFile(f); setError(null);
+    setFile(f); 
+    setOriginalSize(f.size);
+    setCompressedSize(0);
+    setError(null);
   };
 
   const handleUpload = async () => {
     if (!file) { setError("Please select a video file"); return; }
-    setUploading(true); setProgress(0); setError(null); setStage("uploading");
+    setUploading(true); setProgress(0); setError(null);
 
     try {
-      // Step 1: Get presigned URL from our server
+      let fileToUpload = file;
+
+      // Step 1: Compress video if supported and file is large
+      if (isSupported() && file.size > 10 * 1024 * 1024) { // Compress if > 10MB
+        setStage("compressing");
+        try {
+          console.log("[Upload] Compressing video before upload...");
+          fileToUpload = await compressVideo(file);
+          setCompressedSize(fileToUpload.size);
+          console.log(`[Upload] Compression complete: ${(file.size / 1024 / 1024).toFixed(1)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(1)}MB`);
+        } catch (compErr) {
+          console.warn("[Upload] Compression failed, uploading original:", compErr);
+          // Continue with original file if compression fails
+          fileToUpload = file;
+        }
+      }
+
+      setStage("uploading");
+
+      // Step 2: Get presigned URL from our server
       const { data: presign } = await api.get("/video/presign", {
-        params: { filename: file.name, mimeType: file.type || "video/webm" },
+        params: { filename: fileToUpload.name, mimeType: fileToUpload.type || "video/mp4" },
       });
 
-      // Step 2: Upload directly to R2 — Railway never touches the file
+      // Step 3: Upload directly to R2 — Railway never touches the file
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", presign.uploadUrl);
-        xhr.setRequestHeader("Content-Type", file.type || "video/webm");
+        xhr.setRequestHeader("Content-Type", fileToUpload.type || "video/mp4");
         xhr.upload.onprogress = (e) => {
           if (e.total) setProgress(Math.round((e.loaded / e.total) * 100));
         };
         xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`R2 upload failed: ${xhr.status}`));
         xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.send(file);
+        xhr.send(fileToUpload);
       });
 
-      // Step 3: Tell our server the upload is done — start analysis
+      // Step 4: Tell our server the upload is done — start analysis
       setStage("confirming");
       const { data } = await api.post("/video/confirm", {
         key:       presign.key,
         publicUrl: presign.publicUrl,
-        mimeType:  file.type || "video/webm",
+        mimeType:  fileToUpload.type || "video/mp4",
         isPublic:  true,
       });
 
       onAnalysisStarted(data.reportId);
       setFile(null);
+      setOriginalSize(0);
+      setCompressedSize(0);
       document.getElementById("video-input").value = "";
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Upload failed");
@@ -376,11 +405,17 @@ function UploadCard({ onAnalysisStarted }) {
     }
   };
 
+  const getSavingsText = () => {
+    if (!compressedSize || !originalSize) return null;
+    const savings = ((1 - compressedSize / originalSize) * 100).toFixed(0);
+    return `Compressed: ${(originalSize / 1024 / 1024).toFixed(1)}MB → ${(compressedSize / 1024 / 1024).toFixed(1)}MB (${savings}% smaller)`;
+  };
+
   return (
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours · Videos shared in Community Feed
+        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Auto-compressed for faster upload · Reports stored 12 hours
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"
@@ -389,24 +424,51 @@ function UploadCard({ onAnalysisStarted }) {
         {file && !uploading && (
           <div style={{ color: "var(--muted)", marginBottom: "1rem", fontSize: "0.9rem" }}>
             📄 {file.name} — {(file.size / 1024 / 1024).toFixed(1)} MB
+            {file.size > 10 * 1024 * 1024 && isSupported() && (
+              <div style={{ color: "var(--success)", marginTop: "0.25rem" }}>
+                ✨ Will be compressed before upload (saves bandwidth & time)
+              </div>
+            )}
           </div>
         )}
         {uploading && (
           <div style={{ marginBottom: "1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", fontSize: "0.9rem", color: "var(--muted)" }}>
-              <span>{stage === "confirming" ? "Starting analysis…" : progress < 100 ? "Uploading to cloud…" : "Finalising…"}</span>
-              {stage !== "confirming" && <span>{progress}%</span>}
+              <span>
+                {stage === "compressing" ? "🔄 Compressing video..." : 
+                 stage === "confirming" ? "Starting analysis…" : 
+                 progress < 100 ? "☁️ Uploading to cloud…" : "Finalising…"}
+              </span>
+              {stage === "compressing" && <span>{compressionProgress}%</span>}
+              {stage === "uploading" && <span>{progress}%</span>}
             </div>
             <div style={{ background: "var(--bg)", borderRadius: "6px", height: "8px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: stage === "confirming" ? "100%" : `${progress}%`, background: "var(--primary)", borderRadius: "6px", transition: "width 0.3s ease" }} />
+              <div style={{ 
+                height: "100%", 
+                width: stage === "compressing" ? `${compressionProgress}%` :
+                       stage === "confirming" ? "100%" : `${progress}%`, 
+                background: stage === "compressing" ? "var(--warning)" : "var(--primary)", 
+                borderRadius: "6px", 
+                transition: "width 0.3s ease" 
+              }} />
             </div>
+            {getSavingsText() && stage === "uploading" && (
+              <div style={{ fontSize: "0.75rem", color: "var(--success)", marginTop: "0.4rem" }}>
+                ✅ {getSavingsText()}
+              </div>
+            )}
           </div>
         )}
         <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
-          {uploading ? (stage === "confirming" ? "Starting analysis…" : `Uploading ${progress}%…`) : "Upload & Analyze"}
+          {uploading ? 
+            (stage === "compressing" ? `Compressing ${compressionProgress}%…` :
+             stage === "confirming" ? "Starting analysis…" : 
+             `Uploading ${progress}%…`) : 
+            "Upload & Analyze"}
         </button>
       </div>
       {error && <div className="error-box" style={{ marginTop: "1rem" }}><p>{error}</p></div>}
+      {compressionError && <div className="error-box" style={{ marginTop: "1rem" }}><p>⚠️ Compression failed, uploading original file...</p></div>}
     </div>
   );
 }
@@ -553,8 +615,9 @@ function RecordCard({ onAnalysisStarted, question }) {
     // Higher bitrate for better quality: 2.5Mbps video + 128kbps audio
     const recorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: 2_500_000,
-      audioBitsPerSecond: 128_000,
+      // Optimized bitrates for speech analysis (60% smaller files, good quality)
+      videoBitsPerSecond: 1_000_000,  // 1 Mbps (down from 2.5 Mbps)
+      audioBitsPerSecond: 96_000,     // 96 kbps (down from 128 kbps)
     });
     recorderRef.current = recorder;
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
