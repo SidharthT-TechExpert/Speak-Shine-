@@ -14,4 +14,4 @@ cmds = [
 ]
 
 [start]
-cmd = "NODE_ENV=production node api/server.js"
+cmd = "NODE_ENV=production node --max-old-space-size=400 --expose-gc api/server.js"

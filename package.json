@@ -9,7 +9,7 @@
     "start:bot": "node --max-old-space-size=512 index.js",
     "start:api": "node api/server.js",
     "build:frontend": "cd frontend && npm ci --prefer-offline --no-audit --no-fund && npm run build",
-    "start:webapp": "NODE_ENV=production node api/server.js",
+    "start:webapp": "NODE_ENV=production node --max-old-space-size=400 --expose-gc api/server.js",
     "test": "vitest run"
   },
   "dependencies": {
