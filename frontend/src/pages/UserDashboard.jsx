@@ -803,11 +803,13 @@ export default function UserDashboard() {
               streak={profile?.streak || 0}
               navigate={navigate}
             />
-          : <SubmitNudge
-              name={profile?.name}
-              streak={profile?.streak || 0}
-              navigate={navigate}
-            />
+          : (data?.today?.isMonthlyReflection || data?.today?.isMonthlyGoals || data?.today?.isWeeklyReflection)
+            ? null  // No urgency nudge on special reflection/goals days — the card above is enough
+            : <SubmitNudge
+                name={profile?.name}
+                streak={profile?.streak || 0}
+                navigate={navigate}
+              />
       )}
 
       <div className="stat-grid">

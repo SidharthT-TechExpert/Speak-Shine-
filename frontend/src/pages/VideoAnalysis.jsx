@@ -323,8 +323,8 @@ export default function VideoAnalysis() {
           </div>
         )}
 
-        {/* ── Today's Question Card — regular days ── */}
-        {todayQuestion && !isMonthlyReflection && (
+        {/* ── Today's Question Card — regular days only ── */}
+        {todayQuestion && !isMonthlyReflection && !isMonthlyGoals && !isWeeklyReflection && (
           <div className="daily-poster" style={{ marginBottom: "1rem" }}>
             <div className="daily-poster-header">
               <div className="daily-poster-brand">✦ Speak &amp; Shine</div>
