@@ -35,7 +35,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
   try {
     if (!isUrl && !fs.existsSync(videoPath)) throw new Error("Video file not found");
 
-    const duration = await getVideoDuration(videoPath);
+    const duration = await getVideoDuration(videoPath, isUrl);
 
     if (duration < 60) throw new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
     if (duration > 300) throw new Error(`Video is too long (${duration}s). Maximum is 5 minutes.`);
@@ -194,7 +194,7 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning) {
 /**
  * Get video duration using ffprobe JSON output — works without file extension.
  */
-export function getVideoDuration(videoPath) {
+export function getVideoDuration(videoPath, isUrl = false) {
   return new Promise((resolve, reject) => {
     // For URLs, also use -count_packets to handle WebM without duration header
     const args = isUrl
