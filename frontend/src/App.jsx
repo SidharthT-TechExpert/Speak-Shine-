@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import ChatLauncher from "./components/ChatLauncher.jsx";
+import InstallPrompt from "./components/InstallPrompt.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import UserDashboard from "./pages/UserDashboard.jsx";
@@ -94,6 +95,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <ChatLauncher />
+        <InstallPrompt />
       </BrowserRouter>
     </AuthProvider>
   );
