@@ -206,17 +206,15 @@ export function getVideoDuration(videoPath) {
         }
         try {
           const info = JSON.parse(stdout);
-          console.log("[ffprobe] Raw metadata:", JSON.stringify(info, null, 2));
+          // [ffprobe] Raw metadata removed — too verbose for production
 
           // Try format duration first
           let dur = parseFloat(info?.format?.duration);
-          console.log("[ffprobe] Format duration:", dur);
 
           // Fallback: calculate from nb_read_packets * avg frame duration
           if (!dur || dur <= 0) {
             const videoStream = info?.streams?.find(s => s.codec_type === "video");
             dur = parseFloat(videoStream?.duration) || 0;
-            console.log("[ffprobe] Video stream duration:", dur);
 
             // Last resort: use nb_read_packets and r_frame_rate
             if ((!dur || dur <= 0) && videoStream?.nb_read_packets && videoStream?.r_frame_rate) {
@@ -232,8 +230,7 @@ export function getVideoDuration(videoPath) {
           // Emergency fallback: estimate from file size (very rough, ~1MB per 10 seconds for webm)
           if (!dur || dur <= 0) {
             const fileSize = fs.statSync(videoPath).size;
-            const estimatedDur = Math.round(fileSize / (1024 * 1024) * 10); // rough estimate
-            console.log("[ffprobe] Using file size estimate:", estimatedDur, "seconds");
+            const estimatedDur = Math.round(fileSize / (1024 * 1024) * 10);
             if (estimatedDur > 0) {
               dur = estimatedDur;
             } else {
