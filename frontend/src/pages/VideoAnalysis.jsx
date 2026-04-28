@@ -281,7 +281,7 @@ function UploadCard({ onAnalysisStarted }) {
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    if (f.size > 350 * 1024 * 1024) { setError("File size must be less than 350MB"); return; }
+    if (f.size > 100 * 1024 * 1024) { setError("File size must be less than 100MB. Please compress your video or record a shorter clip."); return; }
     setFile(f); setError(null);
   };
 
@@ -311,7 +311,7 @@ function UploadCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours · Videos shared in Community Feed
+        Minimum 1 minute · Max 5 minutes · Up to 100MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours · Videos shared in Community Feed
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"

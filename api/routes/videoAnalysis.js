@@ -11,10 +11,10 @@ import { enqueue, enqueueRetry, registerSseClient, unregisterSseClient, estimate
 
 const router = express.Router();
 
-// Configure multer for video uploads (max 350MB)
+// Configure multer for video uploads (max 100MB — large files cause OOM on Railway)
 const upload = multer({
   dest: "tmp/uploads/",
-  limits: { fileSize: 350 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
 // ── SSE progress stream ──────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ router.post("/upload", authMiddleware, (req, res, next) => {
     if (err) {
       console.error("[VideoUpload] Multer error:", err.message);
       if (err.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "File too large. Maximum size is 350MB." });
+        return res.status(400).json({ error: "File too large. Maximum size is 100MB. Please compress your video." });
       }
       return res.status(400).json({ error: err.message || "File upload failed" });
     }
