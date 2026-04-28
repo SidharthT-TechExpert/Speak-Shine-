@@ -520,6 +520,11 @@ export default function UserDashboard() {
   const latest = scores.slice(-1)[0];
   const chartData = scores.map((s, i) => ({ session: `#${i+1}`, Fluency: s.fluency, Grammar: s.grammar, Confidence: s.confidence, Vocabulary: s.vocabulary }));
   const radarData = latest ? Object.keys(SCORES).map(k => ({ subject: k.charAt(0).toUpperCase()+k.slice(1), score: latest[k] || 0 })) : [];
+  const [sessionPage, setSessionPage] = useState(1);
+  const SESSION_PAGE_SIZE = 5;
+  const reversedScores = [...scores].reverse();
+  const totalPages = Math.ceil(reversedScores.length / SESSION_PAGE_SIZE);
+  const pagedScores = reversedScores.slice((sessionPage - 1) * SESSION_PAGE_SIZE, sessionPage * SESSION_PAGE_SIZE);
 
   return (
     <Layout title="My Dashboard">
@@ -741,6 +746,35 @@ export default function UserDashboard() {
 
       {scores.length > 0 ? (
         <>
+          {/* Top Streaks — shown first */}
+          {data?.topStreak?.length > 0 && (
+            <div className="card" style={{ marginBottom: "1rem" }}>
+              <div className="section-title">🏆 Top Streaks</div>
+              <div className="streak-list">
+                {data.topStreak.map((u, i) => (
+                  <div className="streak-row" key={i}>
+                    <span className="streak-rank">{["🥇","🥈","🥉"][i] || `${i+1}.`}</span>
+                    <span className="streak-name">{u.name || u.userId?.split("@")[0]}</span>
+                    <span className="streak-val">🔥 {u.streak} days</span>
+                    <span className="streak-sub">{u.weeklySubmissions}/7</span>
+                    <span style={{
+                      marginLeft: "auto",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      padding: "0.2rem 0.6rem",
+                      borderRadius: 20,
+                      background: u.completed ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
+                      color: u.completed ? "#4ade80" : "#f87171",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {u.completed ? "✅ Done" : "⏳ Pending"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="stat-grid">
             {Object.entries(SCORES).map(([k, c]) => (
               <StatCard key={k} icon={k==="fluency"?"🗣️":k==="grammar"?"📝":k==="confidence"?"💪":"📚"}
@@ -797,18 +831,49 @@ export default function UserDashboard() {
               <table className="data-table">
                 <thead><tr><th>#</th><th>Date</th><th>Fluency</th><th>Grammar</th><th>Confidence</th><th>Vocabulary</th></tr></thead>
                 <tbody>
-                  {[...scores].reverse().map((s, i) => (
-                    <tr key={i}>
-                      <td style={{ color: "var(--muted)" }}>{scores.length - i}</td>
-                      <td style={{ color: "var(--muted)" }}>{s.date ? new Date(s.date).toLocaleDateString("en-IN") : "—"}</td>
-                      {["fluency","grammar","confidence","vocabulary"].map(k => (
-                        <td key={k} style={{ fontWeight: 600, color: scoreColor(s[k] || 0) }}>{s[k] ?? "—"}/10</td>
-                      ))}
-                    </tr>
-                  ))}
+                  {pagedScores.map((s, i) => {
+                    const globalIdx = scores.length - ((sessionPage - 1) * SESSION_PAGE_SIZE + i);
+                    return (
+                      <tr key={i}>
+                        <td style={{ color: "var(--muted)" }}>{globalIdx}</td>
+                        <td style={{ color: "var(--muted)" }}>{s.date ? new Date(s.date).toLocaleDateString("en-IN") : "—"}</td>
+                        {["fluency","grammar","confidence","vocabulary"].map(k => (
+                          <td key={k} style={{ fontWeight: 600, color: scoreColor(s[k] || 0) }}>{s[k] ?? "—"}/10</td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem", marginTop: "1rem", flexWrap: "wrap" }}>
+                <button
+                  className="btn-ghost"
+                  style={{ padding: "0.3rem 0.75rem", fontSize: "0.82rem" }}
+                  onClick={() => setSessionPage(p => Math.max(1, p - 1))}
+                  disabled={sessionPage === 1}
+                >← Prev</button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    className={sessionPage === p ? "btn-primary" : "btn-ghost"}
+                    style={{ padding: "0.3rem 0.65rem", fontSize: "0.82rem", minWidth: 34 }}
+                    onClick={() => setSessionPage(p)}
+                  >{p}</button>
+                ))}
+
+                <button
+                  className="btn-ghost"
+                  style={{ padding: "0.3rem 0.75rem", fontSize: "0.82rem" }}
+                  onClick={() => setSessionPage(p => Math.min(totalPages, p + 1))}
+                  disabled={sessionPage === totalPages}
+                >Next →</button>
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -896,33 +961,6 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {data?.topStreak?.length > 0 && (
-        <div className="card" style={{ marginTop: "1rem" }}>
-          <div className="section-title">🏆 Top Streaks</div>
-          <div className="streak-list">
-            {data.topStreak.map((u, i) => (
-              <div className="streak-row" key={i}>
-                <span className="streak-rank">{["🥇","🥈","🥉"][i] || `${i+1}.`}</span>
-                <span className="streak-name">{u.name || u.userId?.split("@")[0]}</span>
-                <span className="streak-val">🔥 {u.streak} days</span>
-                <span className="streak-sub">{u.weeklySubmissions}/7</span>
-                <span style={{
-                  marginLeft: "auto",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  padding: "0.2rem 0.6rem",
-                  borderRadius: 20,
-                  background: u.completed ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
-                  color: u.completed ? "#4ade80" : "#f87171",
-                  whiteSpace: "nowrap",
-                }}>
-                  {u.completed ? "✅ Done" : "⏳ Pending"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </Layout>
   );
 }
