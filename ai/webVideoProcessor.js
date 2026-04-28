@@ -196,10 +196,9 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning) {
  */
 export function getVideoDuration(videoPath) {
   return new Promise((resolve, reject) => {
-    // For URLs, use -i without -count_packets (faster, no full scan needed)
-    const isUrl = videoPath.startsWith("http");
+    // For URLs, also use -count_packets to handle WebM without duration header
     const args = isUrl
-      ? `ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`
+      ? `ffprobe -v quiet -print_format json -show_format -show_streams -count_packets "${videoPath}"`
       : `ffprobe -v quiet -print_format json -show_format -show_streams -count_packets "${videoPath}"`;
     exec(
       args,

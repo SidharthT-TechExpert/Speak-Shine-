@@ -63,29 +63,45 @@ router.post("/confirm", authMiddleware, async (req, res) => {
 
     console.log(`[VideoConfirm] Report created: ${report._id} key=${key} webm=${isWebm}`);
 
-    // For WebM recordings: transcode to MP4 in background so seeking works in browser
-    // Analysis starts immediately using the original URL; MP4 URL is updated after transcode
     if (isWebm) {
-      transcodeWebmToMp4(report._id, key, publicUrl, userId.toString()).catch(err =>
-        console.error(`[Transcode] Failed for ${report._id}:`, err.message)
-      );
+      // For WebM: transcode first, THEN queue analysis with the MP4 URL
+      transcodeWebmToMp4(report._id, key, publicUrl, userId.toString())
+        .then(mp4Url => {
+          enqueue({
+            reportId:    report._id,
+            videoPath:   mp4Url,
+            phone,
+            displayName: user?.name || phone,
+            fromUrl:     true,
+          });
+        })
+        .catch(err => {
+          console.error(`[Transcode] Failed for ${report._id}:`, err.message);
+          // Fall back to original WebM URL
+          enqueue({
+            reportId:    report._id,
+            videoPath:   publicUrl,
+            phone,
+            displayName: user?.name || phone,
+            fromUrl:     true,
+          });
+        });
+    } else {
+      enqueue({
+        reportId:    report._id,
+        videoPath:   publicUrl,
+        phone,
+        displayName: user?.name || phone,
+        fromUrl:     true,
+      });
     }
-
-    // Queue analysis — pass the R2 URL, no local file needed
-    const { position, estimatedWait } = enqueue({
-      reportId:    report._id,
-      videoPath:   publicUrl,
-      phone,
-      displayName: user?.name || phone,
-      fromUrl:     true,
-    });
 
     res.json({
       success: true,
       reportId: report._id,
-      message: position === 1 ? "Processing now…" : `You are #${position} in queue.`,
-      queuePosition: position,
-      estimatedWait,
+      message: isWebm ? "Video uploaded. Transcoding for best quality, then analysing…" : "Processing now…",
+      queuePosition: 1,
+      estimatedWait: isWebm ? 3 : 1,
     });
   } catch (err) {
     console.error("[VideoConfirm] Error:", err.message);
@@ -133,6 +149,8 @@ async function transcodeWebmToMp4(reportId, webmKey, webmUrl, userId) {
     // Delete original WebM from R2
     await deleteFromR2(webmKey);
     console.log(`[Transcode] Done for ${reportId}`);
+
+    return mp4Url; // return so analysis can use it
   } finally {
     if (fs.existsSync(tmpWebm)) fs.unlinkSync(tmpWebm);
     if (fs.existsSync(tmpMp4))  fs.unlinkSync(tmpMp4);
