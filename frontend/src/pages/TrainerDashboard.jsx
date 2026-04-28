@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import Modal from "../components/Modal.jsx";
-import AttendancePanel from "../components/AttendancePanel.jsx";
 import SubmissionControls from "../components/SubmissionControls.jsx";
 import api from "../api/client.js";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, BarChart, Bar, Cell } from "recharts";
@@ -13,7 +12,7 @@ const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, 
 const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
 const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
 const scoreColor = v => v>=7?"var(--success)":v>=5?"var(--warning)":"var(--danger)";
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"attendance",l:"📋 Attendance"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"submissions",l:"📝 Submissions"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
 
 export default function TrainerDashboard() {
   const [dash, setDash] = useState(null);
@@ -280,9 +279,135 @@ export default function TrainerDashboard() {
         </>
       )}
 
-      {/* ATTENDANCE */}
-      {tab==="attendance"&&(
-        <AttendancePanel />
+      {/* SUBMISSIONS */}
+      {tab==="submissions"&&(
+        <>
+          <div className="stat-grid" style={{marginBottom:"1rem"}}>
+            <StatCard icon="✅" label="Submitted Today" value={users.filter(u=>u.completed).length} color="#4ade80"/>
+            <StatCard icon="⏳" label="Not Submitted"   value={users.filter(u=>!u.completed).length} color="#f87171"/>
+            <StatCard icon="👥" label="Total Students"  value={users.length} color="#7c6fff"/>
+          </div>
+
+          <div className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:"0.5rem"}}>
+              <div className="section-title" style={{margin:0}}>Student Submissions</div>
+              <input className="form-input" style={{width:220}} placeholder="Search name or phone…" value={search} onChange={e=>setSearch(e.target.value)}/>
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Today</th>
+                    <th>Streak</th>
+                    <th>Weekly</th>
+                    <th>Monthly</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(u=>(
+                    <tr key={u.userId}>
+                      <td style={{fontWeight:500}}>{u.registeredName||u.name||"—"}</td>
+                      <td style={{color:"var(--muted)"}}>{u.phone}</td>
+                      <td>
+                        <span style={{
+                          padding:"0.25rem 0.65rem",
+                          borderRadius:20,
+                          fontSize:"0.75rem",
+                          fontWeight:600,
+                          background:u.completed?"rgba(74,222,128,0.15)":"rgba(248,113,113,0.15)",
+                          color:u.completed?"#4ade80":"#f87171"
+                        }}>
+                          {u.completed?"✅":"⏳"}
+                        </span>
+                      </td>
+                      <td>🔥 {u.streak||0}</td>
+                      <td>
+                        <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                          <span style={{minWidth:35}}>{u.weeklySubmissions||0}/7</span>
+                          <div style={{display:"flex",gap:"0.25rem"}}>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/weekly`,{delta:-1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,weeklySubmissions:res.data.weeklySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                              disabled={(u.weeklySubmissions||0)===0}
+                            >−</button>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/weekly`,{delta:1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,weeklySubmissions:res.data.weeklySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                            >+</button>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                          <span style={{minWidth:25}}>{u.monthlySubmissions||0}</span>
+                          <div style={{display:"flex",gap:"0.25rem"}}>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/monthly`,{delta:-1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,monthlySubmissions:res.data.monthlySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                              disabled={(u.monthlySubmissions||0)===0}
+                            >−</button>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/monthly`,{delta:1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,monthlySubmissions:res.data.monthlySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                            >+</button>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{whiteSpace:"nowrap"}}>
+                        <button
+                          className="btn-ghost"
+                          style={{
+                            marginRight:4,
+                            fontSize:"0.78rem",
+                            color: u.completed ? "#4ade80" : "#f87171",
+                            borderColor: u.completed ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)",
+                          }}
+                          onClick={async()=>{
+                            try{
+                              const res = await api.patch(`/users/${u.phone}/toggle-submitted`);
+                              setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,completed:res.data.completed}:user));
+                            }catch(e){console.error(e);}
+                          }}
+                        >
+                          {u.completed ? "✅ Submitted" : "⏳ Not Submitted"}
+                        </button>
+                        <button className="btn-ghost" onClick={()=>selectUser(u)}>View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* LIVE SESSIONS */}

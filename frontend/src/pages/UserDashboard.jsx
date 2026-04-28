@@ -366,216 +366,118 @@ function SubmitNudge({ name, streak, navigate }) {
 
 function CelebrationCard({ name, streak, navigate }) {
   const [quote] = useState(() => CELEBRATION_MESSAGES[Math.floor(Math.random() * CELEBRATION_MESSAGES.length)]);
-  const [confetti, setConfetti] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setConfetti(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
 
   return (
     <div style={{
-      background: "linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)",
-      border: "2px solid rgba(74,222,128,0.5)",
-      borderRadius: 16,
-      padding: "1.75rem 1.5rem",
+      background: "linear-gradient(160deg, #0a2e1a 0%, #0d3d22 60%, #0f4d2a 100%)",
+      border: "1px solid rgba(74,222,128,0.35)",
+      borderRadius: 20,
+      padding: "1.75rem",
       marginBottom: "1.5rem",
       position: "relative",
       overflow: "hidden",
-      boxShadow: "0 8px 32px rgba(74,222,128,0.2)",
+      boxShadow: "0 4px 40px rgba(74,222,128,0.12)",
     }}>
-      {/* Animated celebration glow */}
-      <div style={{
-        position: "absolute", top: -80, left: -80,
-        width: 250, height: 250, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(74,222,128,0.3) 0%, transparent 70%)",
-        pointerEvents: "none",
-        animation: "float 4s ease-in-out infinite",
-      }} />
-      <div style={{
-        position: "absolute", bottom: -60, right: -60,
-        width: 200, height: 200, borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(34,197,94,0.25) 0%, transparent 70%)",
-        pointerEvents: "none",
-        animation: "float 3s ease-in-out infinite reverse",
-      }} />
+      {/* subtle glow blobs */}
+      <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"radial-gradient(circle, rgba(74,222,128,0.18) 0%, transparent 70%)", pointerEvents:"none" }} />
+      <div style={{ position:"absolute", bottom:-40, left:-40, width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle, rgba(34,197,94,0.12) 0%, transparent 70%)", pointerEvents:"none" }} />
 
-      {/* Success badge */}
-      <div style={{
-        position: "absolute", top: "1rem", right: "1rem",
-        background: "#4ade80",
-        color: "#065f46",
-        padding: "0.4rem 0.8rem", borderRadius: 20,
-        fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase",
-        letterSpacing: "0.05em",
-        boxShadow: "0 4px 12px rgba(74,222,128,0.3)",
-      }}>
-        ✅ COMPLETED
-      </div>
-
-      {/* Confetti effect */}
-      {confetti && (
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-          pointerEvents: "none",
-          background: "url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🎉%3C/text%3E%3C/svg%3E') repeat",
-          backgroundSize: "50px 50px",
-          opacity: 0.15,
-          animation: "confettiFall 3s linear",
-        }} />
-      )}
-
-      {/* Header */}
-      <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.8)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
-        🎊 Congratulations{name ? `, ${name.split(" ")[0]}` : ""}!
-      </div>
-
-      {/* Main message */}
-      <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#fff", marginBottom: "0.75rem", lineHeight: 1.3 }}>
-        ✨ Mission Accomplished Today!
-      </div>
-
-      {/* Achievement stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem", marginTop: "1.25rem", marginBottom: "1.25rem" }}>
-        <div style={{
-          background: "rgba(255,255,255,0.15)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 12,
-          padding: "0.9rem 0.5rem",
-          textAlign: "center",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-        }}>
-          <div style={{ fontSize: "1.8rem", marginBottom: "0.2rem" }}>✅</div>
-          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginBottom: "0.1rem" }}>Done</div>
-          <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.8)", textTransform: "uppercase" }}>Today</div>
-        </div>
-
-        {streak > 0 && (
-          <div style={{
-            background: "rgba(249,115,22,0.25)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(249,115,22,0.4)",
-            borderRadius: 12,
-            padding: "0.9rem 0.5rem",
-            textAlign: "center",
-            boxShadow: "0 4px 12px rgba(249,115,22,0.2)",
-          }}>
-            <div style={{ fontSize: "1.8rem", marginBottom: "0.2rem" }}>🔥</div>
-            <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginBottom: "0.1rem" }}>{streak}</div>
-            <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.8)", textTransform: "uppercase" }}>Day Streak</div>
+      {/* top row */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"1.25rem" }}>
+        <div>
+          <div style={{ fontSize:"0.7rem", color:"rgba(74,222,128,0.8)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"0.4rem" }}>
+            🎊 {name ? `Well done, ${name.split(" ")[0]}!` : "Well done!"}
           </div>
-        )}
-
-        <div style={{
-          background: "rgba(255,255,255,0.15)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 12,
-          padding: "0.9rem 0.5rem",
-          textAlign: "center",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-        }}>
-          <div style={{ fontSize: "1.8rem", marginBottom: "0.2rem" }}>🏆</div>
-          <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginBottom: "0.1rem" }}>Win</div>
-          <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.8)", textTransform: "uppercase" }}>Earned</div>
+          <div style={{ fontSize:"1.5rem", fontWeight:800, color:"#fff", lineHeight:1.2 }}>
+            Today's challenge<br/>complete ✅
+          </div>
         </div>
+        <div style={{
+          background:"rgba(74,222,128,0.15)",
+          border:"1px solid rgba(74,222,128,0.4)",
+          color:"#4ade80",
+          padding:"0.35rem 0.85rem",
+          borderRadius:20,
+          fontSize:"0.72rem",
+          fontWeight:700,
+          textTransform:"uppercase",
+          letterSpacing:"0.06em",
+          whiteSpace:"nowrap",
+          flexShrink:0,
+        }}>✓ Submitted</div>
       </div>
 
-      {/* Streak celebration */}
+      {/* stats row */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"0.6rem", marginBottom:"1.25rem" }}>
+        {[
+          { icon:"✅", value:"Done", sub:"Today", accent:"rgba(74,222,128,0.2)", border:"rgba(74,222,128,0.3)" },
+          { icon:"🔥", value:streak||0, sub:"Day Streak", accent:"rgba(249,115,22,0.2)", border:"rgba(249,115,22,0.35)" },
+          { icon:"🏆", value:"Win", sub:"Earned", accent:"rgba(251,191,36,0.15)", border:"rgba(251,191,36,0.3)" },
+        ].map((s,i) => (
+          <div key={i} style={{
+            background:s.accent,
+            border:`1px solid ${s.border}`,
+            borderRadius:14,
+            padding:"0.85rem 0.5rem",
+            textAlign:"center",
+          }}>
+            <div style={{ fontSize:"1.6rem", lineHeight:1, marginBottom:"0.35rem" }}>{s.icon}</div>
+            <div style={{ fontSize:"1rem", fontWeight:800, color:"#fff" }}>{s.value}</div>
+            <div style={{ fontSize:"0.6rem", color:"rgba(255,255,255,0.6)", textTransform:"uppercase", letterSpacing:"0.06em", marginTop:"0.15rem" }}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* streak message */}
       {streak > 0 && (
         <div style={{
-          background: "rgba(255,255,255,0.1)",
-          border: "2px solid rgba(255,255,255,0.2)",
-          borderRadius: 12,
-          padding: "1rem",
-          marginBottom: "1.25rem",
-          textAlign: "center",
+          background:"rgba(255,255,255,0.06)",
+          border:"1px solid rgba(255,255,255,0.1)",
+          borderRadius:12,
+          padding:"0.85rem 1rem",
+          marginBottom:"1rem",
+          display:"flex",
+          alignItems:"center",
+          gap:"0.75rem",
         }}>
-          <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#fff", marginBottom: "0.4rem" }}>
-            🎯 {streak} Days of Consistency!
-          </div>
-          <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.85)", lineHeight: 1.5 }}>
-            {streak >= 30 ? "You're a legend! 30+ days of dedication!" :
-             streak >= 14 ? "Two weeks strong! You're unstoppable!" :
-             streak >= 7 ? "One week milestone! Keep the momentum!" :
-             "Every day counts! You're building greatness!"}
+          <span style={{ fontSize:"1.4rem", flexShrink:0 }}>🎯</span>
+          <div>
+            <div style={{ fontWeight:700, color:"#fff", fontSize:"0.9rem" }}>{streak} Days of Consistency!</div>
+            <div style={{ fontSize:"0.78rem", color:"rgba(255,255,255,0.65)", marginTop:"0.15rem" }}>
+              {streak >= 30 ? "You're a legend! 30+ days of dedication!" :
+               streak >= 14 ? "Two weeks strong! You're unstoppable!" :
+               streak >= 7  ? "One week milestone! Keep the momentum!" :
+               "Every day counts. You're building greatness!"}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Next steps */}
-      <div style={{
-        background: "rgba(255,255,255,0.1)",
-        border: "1px solid rgba(255,255,255,0.2)",
-        borderRadius: 12,
-        padding: "1rem",
-        marginBottom: "1rem",
-      }}>
-        <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.9)", marginBottom: "0.6rem", fontWeight: 600 }}>
-          📅 What's Next?
-        </div>
-        <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6 }}>
-          • Check your feedback scores below<br/>
-          • Review your performance insights<br/>
-          • Come back tomorrow for a new challenge!
-        </div>
-      </div>
-
-      {/* View feedback button */}
+      {/* CTA */}
       <button
-        onClick={() => {
-          const scoresSection = document.querySelector('.section-title');
-          if (scoresSection) scoresSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
+        onClick={() => document.querySelector(".section-title")?.scrollIntoView({ behavior:"smooth", block:"start" })}
         style={{
-          width: "100%",
-          background: "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)",
-          color: "#065f46",
-          border: "none",
-          borderRadius: 12,
-          padding: "1rem 1.5rem",
-          fontSize: "1rem",
-          fontWeight: 800,
-          cursor: "pointer",
-          transition: "all 0.3s ease",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          boxShadow: "0 6px 20px rgba(74,222,128,0.3)",
-          marginBottom: "1rem",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-3px) scale(1.02)";
-          e.currentTarget.style.boxShadow = "0 10px 30px rgba(74,222,128,0.4)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateY(0) scale(1)";
-          e.currentTarget.style.boxShadow = "0 6px 20px rgba(74,222,128,0.3)";
+          width:"100%",
+          background:"linear-gradient(135deg, #22c55e, #16a34a)",
+          color:"#fff",
+          border:"none",
+          borderRadius:12,
+          padding:"0.85rem",
+          fontSize:"0.9rem",
+          fontWeight:700,
+          cursor:"pointer",
+          letterSpacing:"0.04em",
+          boxShadow:"0 4px 16px rgba(34,197,94,0.3)",
+          marginBottom:"1rem",
         }}
       >
         📊 View My Feedback Scores
       </button>
 
-      {/* Motivational quote */}
-      <div style={{
-        borderLeft: "3px solid rgba(255,255,255,0.5)",
-        paddingLeft: "0.85rem",
-        color: "rgba(255,255,255,0.95)",
-        fontSize: "0.9rem",
-        fontStyle: "italic",
-        lineHeight: 1.5,
-        fontWeight: 500,
-      }}>
+      {/* quote */}
+      <div style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.55)", fontStyle:"italic", paddingLeft:"0.75rem", borderLeft:"2px solid rgba(74,222,128,0.4)" }}>
         💫 {quote}
       </div>
-
-      {/* Add keyframes for animations */}
-      <style>{`
-        @keyframes confettiFall {
-          0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100%) rotate(360deg); opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 }
@@ -594,13 +496,20 @@ export default function UserDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [liveSessions, setLiveSessions] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get("/dashboard/me")
-      .then(r => setData(r.data))
-      .catch(err => setError(err.response?.data?.error || "Failed to load data"))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get("/dashboard/me"),
+      api.get("/live-sessions").catch(() => ({ data: [] })),
+    ]).then(([d, ls]) => {
+      setData(d.data);
+      // show only live + upcoming sessions
+      setLiveSessions((ls.data || []).filter(s => s.status === "live" || s.status === "scheduled"));
+    })
+    .catch(err => setError(err.response?.data?.error || "Failed to load data"))
+    .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Layout title="My Dashboard"><div className="spinner-wrap"><div className="spinner"/><p style={{color:"var(--muted)"}}>Loading…</p></div></Layout>;
@@ -736,8 +645,8 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Show Question (8 AM onwards) */}
-      {!data?.showReport && data?.today?.question && (
+      {/* Show Question (8 AM onwards) — hide if already completed */}
+      {!data?.showReport && data?.today?.question && !profile?.completed && (
         <div className="daily-poster">
           {/* Header */}
           <div className="daily-poster-header">
@@ -906,6 +815,84 @@ export default function UserDashboard() {
         <div className="card empty-state">
           <div className="empty-icon">📹</div>
           <p>No feedback scores yet. Submit a video via WhatsApp to get started!</p>
+        </div>
+      )}
+
+      {/* Live Sessions */}
+      {liveSessions.length > 0 && (
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <div className="section-title">🎥 Live Sessions</div>
+          <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
+            {liveSessions.map(s => {
+              const isLive = s.status === "live";
+              return (
+                <div key={s._id} style={{
+                  background: isLive ? "rgba(74,222,128,0.05)" : "var(--bg-secondary)",
+                  border: `1px solid ${isLive ? "rgba(74,222,128,0.4)" : "rgba(96,165,250,0.25)"}`,
+                  borderRadius: 12,
+                  padding: "1rem 1.25rem",
+                  position: "relative",
+                  overflow: "hidden",
+                }}>
+                  {isLive && (
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 3,
+                      background: "linear-gradient(90deg, #4ade80, #22c55e)",
+                    }} />
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+                        <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>{s.title}</span>
+                        <span style={{
+                          fontSize: "0.65rem",
+                          fontWeight: 700,
+                          padding: "0.15rem 0.5rem",
+                          borderRadius: 20,
+                          textTransform: "uppercase",
+                          background: isLive ? "rgba(74,222,128,0.15)" : "rgba(96,165,250,0.15)",
+                          color: isLive ? "#4ade80" : "#60a5fa",
+                        }}>
+                          {isLive ? "🔴 Live Now" : "Scheduled"}
+                        </span>
+                      </div>
+                      {s.description && (
+                        <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.4rem" }}>
+                          {s.description}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+                        📅 {new Date(s.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                        {s.participantCount > 0 && ` · 👥 ${s.participantCount} joined`}
+                      </div>
+                    </div>
+                    {isLive && (
+                      <button
+                        onClick={() => window.open(`/live/${s._id}`, "_blank")}
+                        style={{
+                          background: "linear-gradient(135deg,#4ade80,#22c55e)",
+                          color: "#065f46",
+                          border: "none",
+                          borderRadius: 10,
+                          padding: "0.5rem 1rem",
+                          fontWeight: 700,
+                          fontSize: "0.82rem",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        📹 Join Now
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

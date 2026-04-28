@@ -82,6 +82,19 @@ router.patch("/:phone/toggle", authMiddleware, requireRole("admin"), async (req,
   }
 });
 
+// PATCH /api/users/:phone/toggle-submitted — admin/trainer: toggle today's submission status
+router.patch("/:phone/toggle-submitted", authMiddleware, requireRole("admin", "trainer"), async (req, res) => {
+  try {
+    const user = await User.findOne({ userId: { $regex: req.params.phone } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    user.completed = !user.completed;
+    await user.save();
+    res.json({ success: true, completed: user.completed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/users/:phone — admin: remove user
 router.delete("/:phone", authMiddleware, requireRole("admin"), async (req, res) => {
   try {

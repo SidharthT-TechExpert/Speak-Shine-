@@ -4,7 +4,6 @@ import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import Modal from "../components/Modal.jsx";
 import RoleSelector from "../components/RoleSelector.jsx";
-import AttendancePanel from "../components/AttendancePanel.jsx";
 import SubmissionControls from "../components/SubmissionControls.jsx";
 import api from "../api/client.js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
@@ -12,7 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 const CATS = ["Daily Life","Opinion","Personal Experience","English Growth","Future Goals","Fun Topic","Free Talk"];
 const PIE_COLORS = ["#7c6fff","#4ade80","#fbbf24","#ff6b9d","#38bdf8","#fb923c","#a78bfa"];
 const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, fontSize:12 };
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"attendance",l:"📋 Attendance"},{id:"questions",l:"❓ Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"monitoring",l:"🖥️ Monitor"},{id:"settings",l:"⚙️ Settings"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"submissions",l:"📝 Submissions"},{id:"questions",l:"❓ Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"monitoring",l:"🖥️ Monitor"},{id:"settings",l:"⚙️ Settings"}];
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -499,11 +498,6 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* ATTENDANCE */}
-      {tab==="attendance" && (
-        <AttendancePanel />
-      )}
-
       {/* QUESTIONS */}
       {tab==="questions" && (
         <>
@@ -558,6 +552,138 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}</tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* SUBMISSIONS */}
+      {tab==="submissions" && (
+        <>
+          <div className="stat-grid" style={{marginBottom:"1rem"}}>
+            <StatCard icon="✅" label="Submitted Today" value={users.filter(u=>u.completed).length} color="#4ade80"/>
+            <StatCard icon="⏳" label="Not Submitted"   value={users.filter(u=>!u.completed).length} color="#f87171"/>
+            <StatCard icon="👥" label="Total Students"  value={users.length} color="#7c6fff"/>
+          </div>
+
+          <div className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:"0.5rem"}}>
+              <div className="section-title" style={{margin:0}}>Student Submissions</div>
+              <input className="form-input" style={{width:220}} placeholder="Search name or phone…" value={search} onChange={e=>setSearch(e.target.value)}/>
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Today</th>
+                    <th>Streak</th>
+                    <th>Weekly</th>
+                    <th>Monthly</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(u=>(
+                    <tr key={u.userId}>
+                      <td style={{fontWeight:500}}>{u.registeredName||u.name||"—"}</td>
+                      <td style={{color:"var(--muted)"}}>{u.phone}</td>
+                      <td>
+                        <span style={{
+                          padding:"0.25rem 0.65rem",
+                          borderRadius:20,
+                          fontSize:"0.75rem",
+                          fontWeight:600,
+                          background:u.completed?"rgba(74,222,128,0.15)":"rgba(248,113,113,0.15)",
+                          color:u.completed?"#4ade80":"#f87171"
+                        }}>
+                          {u.completed?"✅":"⏳"}
+                        </span>
+                      </td>
+                      <td>🔥 {u.streak||0}</td>
+                      <td>
+                        <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                          <span style={{minWidth:35}}>{u.weeklySubmissions||0}/7</span>
+                          <div style={{display:"flex",gap:"0.25rem"}}>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/weekly`,{delta:-1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,weeklySubmissions:res.data.weeklySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                              disabled={(u.weeklySubmissions||0)===0}
+                            >−</button>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/weekly`,{delta:1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,weeklySubmissions:res.data.weeklySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                            >+</button>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+                          <span style={{minWidth:25}}>{u.monthlySubmissions||0}</span>
+                          <div style={{display:"flex",gap:"0.25rem"}}>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/monthly`,{delta:-1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,monthlySubmissions:res.data.monthlySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                              disabled={(u.monthlySubmissions||0)===0}
+                            >−</button>
+                            <button
+                              className="btn-ghost"
+                              style={{padding:"0.2rem 0.4rem",fontSize:"0.75rem",minWidth:28}}
+                              onClick={async()=>{
+                                try{
+                                  const res=await api.patch(`/submissions/${u.phone}/monthly`,{delta:1});
+                                  setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,monthlySubmissions:res.data.monthlySubmissions}:user));
+                                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                              }}
+                            >+</button>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{whiteSpace:"nowrap"}}>
+                        <button
+                          className="btn-ghost"
+                          style={{
+                            marginRight:4,
+                            fontSize:"0.78rem",
+                            color: u.completed ? "#4ade80" : "#f87171",
+                            borderColor: u.completed ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)",
+                          }}
+                          onClick={async()=>{
+                            try{
+                              const res = await api.patch(`/users/${u.phone}/toggle-submitted`);
+                              setUsers(prev=>prev.map(user=>user.phone===u.phone?{...user,completed:res.data.completed}:user));
+                              msg(res.data.completed?"Marked as submitted":"Marked as not submitted");
+                            }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+                          }}
+                        >
+                          {u.completed ? "✅ Submitted" : "⏳ Not Submitted"}
+                        </button>
+                        <button className="btn-ghost" onClick={()=>viewStudentDetail(u)}>View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </div>
@@ -663,7 +789,6 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* LIVE SESSIONS */}
       {/* LIVE SESSIONS */}
       {tab==="live" && <LiveSessionsPanel />}
 
