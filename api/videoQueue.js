@@ -172,19 +172,39 @@ function finishJob(reportId, startTime, outcome) {
 
 // ── Retry (re-enqueue from R2 URL) ──────────────────────────────────────────
 export async function enqueueRetry(reportId, videoUrl, phone, displayName) {
+  const tempPath = `./tmp/retry-${reportId}-${Date.now()}.mp4`;
+
   try {
-    // For retry, we can directly use the R2 URL instead of downloading
-    // This saves memory and is faster
-    console.log(`[Queue] Retrying ${reportId} from R2 URL: ${videoUrl}`);
+    console.log(`[Queue] Retrying ${reportId} - downloading from R2: ${videoUrl}`);
+    
+    // Download video from R2 to temp file
+    // ffprobe cannot read from HTTPS URLs directly in Railway environment
+    const response = await fetch(videoUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download video from R2: ${response.status} ${response.statusText}`);
+    }
+    
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(tempPath, Buffer.from(buffer));
+    
+    console.log(`[Queue] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB to ${tempPath}`);
+    
     return enqueue({ 
       reportId, 
-      videoPath: videoUrl,  // Use R2 URL directly
+      videoPath: tempPath,  // Use local temp file
       phone, 
-      displayName,
-      fromUrl: true  // Important: tells the processor it's a URL
+      displayName
     });
   } catch (err) {
     console.error(`[Queue] Retry failed for ${reportId}:`, err.message);
+    
+    // Clean up temp file on error
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {}
+    }
+    
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "failed",
       errorMessage: "Retry failed: " + err.message,

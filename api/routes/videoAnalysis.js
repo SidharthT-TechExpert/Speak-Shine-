@@ -11,6 +11,52 @@ import { enqueue, enqueueRetry, registerSseClient, unregisterSseClient, estimate
 
 const router = express.Router();
 
+// ── Helper: Download video from R2 and enqueue ──────────────────────────────
+// ffprobe cannot read from HTTPS URLs in Railway environment
+async function downloadAndEnqueue(reportId, videoUrl, phone, displayName) {
+  const tempPath = `./tmp/uploads/confirm-${reportId}-${Date.now()}.mp4`;
+  
+  try {
+    console.log(`[VideoConfirm] Downloading video for ${reportId}...`);
+    
+    // Ensure tmp directory exists
+    fs.mkdirSync(path.dirname(tempPath), { recursive: true });
+    
+    const response = await fetch(videoUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
+    }
+    
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(tempPath, Buffer.from(buffer));
+    
+    console.log(`[VideoConfirm] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    
+    // Enqueue for processing
+    enqueue({
+      reportId,
+      videoPath: tempPath,
+      phone,
+      displayName,
+    });
+  } catch (err) {
+    console.error(`[VideoConfirm] Download failed for ${reportId}:`, err.message);
+    
+    // Clean up temp file
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {}
+    }
+    
+    // Mark report as failed
+    await VideoReport.findByIdAndUpdate(reportId, {
+      status: "failed",
+      errorMessage: "Failed to download video for processing: " + err.message,
+    });
+  }
+}
+
 // Configure multer for video uploads (max 100MB — large files cause OOM on Railway)
 const upload = multer({
   dest: "tmp/uploads/",
@@ -67,33 +113,17 @@ router.post("/confirm", authMiddleware, async (req, res) => {
       // For WebM: transcode first, THEN queue analysis with the MP4 URL
       transcodeWebmToMp4(report._id, key, publicUrl, userId.toString())
         .then(mp4Url => {
-          enqueue({
-            reportId:    report._id,
-            videoPath:   mp4Url,
-            phone,
-            displayName: user?.name || phone,
-            fromUrl:     true,
-          });
+          // Download and enqueue for processing
+          downloadAndEnqueue(report._id, mp4Url, phone, user?.name || phone);
         })
         .catch(err => {
           console.error(`[Transcode] Failed for ${report._id}:`, err.message);
           // Fall back to original WebM URL
-          enqueue({
-            reportId:    report._id,
-            videoPath:   publicUrl,
-            phone,
-            displayName: user?.name || phone,
-            fromUrl:     true,
-          });
+          downloadAndEnqueue(report._id, publicUrl, phone, user?.name || phone);
         });
     } else {
-      enqueue({
-        reportId:    report._id,
-        videoPath:   publicUrl,
-        phone,
-        displayName: user?.name || phone,
-        fromUrl:     true,
-      });
+      // Download and enqueue for processing
+      downloadAndEnqueue(report._id, publicUrl, phone, user?.name || phone);
     }
 
     res.json({
