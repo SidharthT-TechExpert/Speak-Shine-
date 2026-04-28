@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 /**
- * Temporary video analysis reports — auto-deleted after 12 hours.
+ * Temporary video analysis reports — auto-deleted after 18 hours.
  * Users can submit videos via the website and view their analysis report.
  * Reports are NOT permanently stored — only cached for quick review.
  */
@@ -91,10 +91,10 @@ const videoReportSchema = new mongoose.Schema({
   isPublic:   { type: Boolean, default: false }, // user opted in to community feed
   uploaderName: { type: String, default: null }, // display name for community feed
 
-  // Auto-delete after 12 hours
+  // Auto-delete after 18 hours
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 12 * 60 * 60 * 1000),
+    default: () => new Date(Date.now() + 18 * 60 * 60 * 1000),
   },
 });
 

@@ -247,7 +247,7 @@ export default function VideoAnalysis() {
         {/* Recent Reports */}
         {myReports.length > 0 && (
           <div className="card" style={{ marginTop: "1rem" }}>
-            <div className="section-title">📋 Recent Reports (Last 12 Hours)</div>
+            <div className="section-title">📋 Recent Reports (Last 18 Hours)</div>
             <div className="table-wrap">
               <table className="data-table">
                 <thead>
@@ -384,7 +384,7 @@ function UploadCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours
+        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"
