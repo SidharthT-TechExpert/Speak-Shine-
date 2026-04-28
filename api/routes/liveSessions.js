@@ -1,14 +1,14 @@
-const express = require("express");
-const router = express.Router();
-const { AccessToken, RoomServiceClient } = require("livekit-server-sdk");
-const LiveSession = require("../../models/liveSessionSchema");
-const auth = require("../middleware/auth");
+import express from "express";
+import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
+import LiveSession from "../../models/liveSessionSchema.js";
+import auth from "../middleware/auth.js";
 
-const LIVEKIT_URL    = process.env.LIVEKIT_URL    || "wss://your-project.livekit.cloud";
+const router = express.Router();
+
+const LIVEKIT_URL        = process.env.LIVEKIT_URL    || "wss://your-project.livekit.cloud";
 const LIVEKIT_API_KEY    = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 
-// Warn at startup if not configured
 if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
   console.warn("[LiveKit] WARNING: LIVEKIT_API_KEY or LIVEKIT_API_SECRET not set");
 }
@@ -18,7 +18,7 @@ function getRoomService() {
   return new RoomServiceClient(httpUrl, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
 }
 
-// ── GET /api/live-sessions ──────────────────────────────────────────────────
+// GET /api/live-sessions
 router.get("/", auth, async (req, res) => {
   try {
     const filter = {};
@@ -31,7 +31,7 @@ router.get("/", auth, async (req, res) => {
   }
 });
 
-// ── GET /api/live-sessions/:id ──────────────────────────────────────────────
+// GET /api/live-sessions/:id
 router.get("/:id", auth, async (req, res) => {
   try {
     const session = await LiveSession.findById(req.params.id);
@@ -42,12 +42,12 @@ router.get("/:id", auth, async (req, res) => {
   }
 });
 
-// ── POST /api/live-sessions ─────────────────────────────────────────────────
+// POST /api/live-sessions
 router.post("/", auth, async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   const { title, scheduledAt, description } = req.body;
   if (!title?.trim()) return res.status(400).json({ error: "Title is required" });
-  if (!scheduledAt) return res.status(400).json({ error: "scheduledAt is required" });
+  if (!scheduledAt)   return res.status(400).json({ error: "scheduledAt is required" });
   try {
     const session = await LiveSession.create({
       title: title.trim(),
@@ -61,7 +61,7 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-// ── POST /api/live-sessions/:id/start ──────────────────────────────────────
+// POST /api/live-sessions/:id/start
 router.post("/:id/start", auth, async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   try {
@@ -75,7 +75,6 @@ router.post("/:id/start", auth, async (req, res) => {
     session.roomName  = roomName;
     await session.save();
 
-    // Broadcast via Socket.io
     const io = req.app.get("io");
     if (io) io.emit("session:live", { sessionId: session._id, title: session.title, roomName });
 
@@ -85,7 +84,7 @@ router.post("/:id/start", auth, async (req, res) => {
   }
 });
 
-// ── POST /api/live-sessions/:id/token ──────────────────────────────────────
+// POST /api/live-sessions/:id/token
 router.post("/:id/token", auth, async (req, res) => {
   if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
     return res.status(500).json({ error: "LiveKit credentials not configured" });
@@ -101,16 +100,15 @@ router.post("/:id/token", auth, async (req, res) => {
 
     const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity, name, ttl: "4h" });
     at.addGrant({
-      roomJoin:    true,
-      room:        session.roomName,
-      canPublish:  true,
+      roomJoin:     true,
+      room:         session.roomName,
+      canPublish:   true,
       canSubscribe: true,
-      roomAdmin:   isAdmin,
+      roomAdmin:    isAdmin,
     });
 
     const token = await at.toJwt();
 
-    // Track participant
     if (!session.participants.includes(identity)) {
       session.participants.push(identity);
       await session.save();
@@ -122,7 +120,7 @@ router.post("/:id/token", auth, async (req, res) => {
   }
 });
 
-// ── POST /api/live-sessions/:id/end ────────────────────────────────────────
+// POST /api/live-sessions/:id/end
 router.post("/:id/end", auth, async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   try {
@@ -134,7 +132,6 @@ router.post("/:id/end", auth, async (req, res) => {
     session.endedAt = new Date();
     await session.save();
 
-    // Delete LiveKit room
     try {
       const svc = getRoomService();
       await svc.deleteRoom(session.roomName);
@@ -142,7 +139,6 @@ router.post("/:id/end", auth, async (req, res) => {
       console.warn("[LiveKit] Could not delete room:", e.message);
     }
 
-    // Broadcast
     const io = req.app.get("io");
     if (io) io.emit("session:ended", { sessionId: session._id });
 
@@ -152,7 +148,7 @@ router.post("/:id/end", auth, async (req, res) => {
   }
 });
 
-// ── POST /api/live-sessions/:id/mute/:participantIdentity ──────────────────
+// POST /api/live-sessions/:id/mute/:participantIdentity
 router.post("/:id/mute/:participantIdentity", auth, async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   try {
@@ -162,9 +158,8 @@ router.post("/:id/mute/:participantIdentity", auth, async (req, res) => {
     const participants = await svc.listParticipants(session.roomName);
     const target = participants.find(p => p.identity === req.params.participantIdentity);
     if (!target) return res.status(404).json({ error: "Participant not found in room" });
-    // Mute all audio tracks
     for (const track of target.tracks) {
-      if (track.type === 0) { // audio
+      if (track.type === 0) {
         await svc.mutePublishedTrack(session.roomName, target.identity, track.sid, true);
       }
     }
@@ -174,7 +169,7 @@ router.post("/:id/mute/:participantIdentity", auth, async (req, res) => {
   }
 });
 
-// ── POST /api/live-sessions/:id/remove/:participantIdentity ────────────────
+// POST /api/live-sessions/:id/remove/:participantIdentity
 router.post("/:id/remove/:participantIdentity", auth, async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
   try {
@@ -188,4 +183,4 @@ router.post("/:id/remove/:participantIdentity", auth, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

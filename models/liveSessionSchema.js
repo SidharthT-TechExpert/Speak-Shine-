@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const liveSessionSchema = new mongoose.Schema({
   title:        { type: String, required: true, trim: true },
@@ -6,14 +6,13 @@ const liveSessionSchema = new mongoose.Schema({
   scheduledAt:  { type: Date, required: true },
   status:       { type: String, enum: ["scheduled", "live", "ended"], default: "scheduled" },
   roomName:     { type: String, unique: true, sparse: true },
-  createdBy:    { type: String, required: true }, // admin phone
-  participants: [{ type: String }],               // phone numbers who joined
+  createdBy:    { type: String, required: true },
+  participants: [{ type: String }],
   startedAt:    { type: Date, default: null },
   endedAt:      { type: Date, default: null },
   createdAt:    { type: Date, default: Date.now },
 });
 
-// Virtual fields
 liveSessionSchema.virtual("participantCount").get(function () {
   return this.participants.length;
 });
@@ -24,4 +23,4 @@ liveSessionSchema.virtual("durationMinutes").get(function () {
 
 liveSessionSchema.set("toJSON", { virtuals: true });
 
-module.exports = mongoose.model("LiveSession", liveSessionSchema);
+export default mongoose.model("LiveSession", liveSessionSchema);
