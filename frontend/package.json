@@ -9,9 +9,12 @@
   },
   "dependencies": {
     "@jitsi/rnnoise-wasm": "^0.2.1",
+    "@livekit/components-react": "^2.9.20",
+    "@livekit/components-styles": "^1.2.0",
     "@tailwindcss/vite": "4.2.4",
     "@vitejs/plugin-react": "^4.3.1",
     "axios": "^1.7.7",
+    "livekit-client": "^2.18.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",

@@ -2,6 +2,58 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import Modal from "./Modal.jsx";
+import { io } from "socket.io-client";
+
+// ── Live session banner (shown on all pages when a session goes live) ────────
+function LiveSessionBanner() {
+  const [liveSession, setLiveSession] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if there's already a live session on mount
+    fetch("/api/live-sessions?status=live", {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+      .then(r => r.json())
+      .then(sessions => { if (sessions.length > 0) setLiveSession(sessions[0]); })
+      .catch(() => {});
+
+    // Listen for real-time events
+    const socket = io({ path: "/socket.io", transports: ["websocket"] });
+    socket.on("session:live", (data) => setLiveSession(data));
+    socket.on("session:ended", () => setLiveSession(null));
+    return () => socket.disconnect();
+  }, []);
+
+  if (!liveSession) return null;
+
+  return (
+    <div style={{
+      position: "fixed", bottom: "5rem", left: "50%", transform: "translateX(-50%)",
+      zIndex: 9998, width: "calc(100% - 2rem)", maxWidth: 420,
+      background: "linear-gradient(135deg, #7c6fff, #4f46e5)",
+      borderRadius: 14, padding: "0.85rem 1rem",
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem",
+      boxShadow: "0 8px 32px rgba(124,111,255,0.5)",
+      animation: "slideUpIn 0.4s ease",
+    }}>
+      <div>
+        <div style={{ fontWeight: 700, color: "#fff", fontSize: "0.9rem" }}>🔴 Live Now!</div>
+        <div style={{ color: "rgba(255,255,255,0.85)", fontSize: "0.8rem" }}>{liveSession.title}</div>
+      </div>
+      <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+        <button
+          onClick={() => navigate(`/live/${liveSession.sessionId || liveSession._id}`)}
+          style={{ background: "#fff", color: "#4f46e5", border: "none", borderRadius: 10, padding: "0.5rem 1rem", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+        >Join Now</button>
+        <button
+          onClick={() => setLiveSession(null)}
+          style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "none", borderRadius: 10, padding: "0.5rem 0.75rem", cursor: "pointer", fontSize: "0.85rem" }}
+        >✕</button>
+      </div>
+    </div>
+  );
+}
 
 function useInstall() {
   const [prompt, setPrompt] = useState(null);
@@ -216,6 +268,7 @@ export default function Layout({ children, title }) {
         {title && <h1 className="page-title">{title}</h1>}
         {children}
       </main>
+      <LiveSessionBanner />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import AdminDashboard from "./pages/AdminDashboard.jsx";
 import TrainerDashboard from "./pages/TrainerDashboard.jsx";
 import VideoAnalysis from "./pages/VideoAnalysis.jsx";
 import CommunityFeed from "./pages/CommunityFeed.jsx";
+import LiveSession from "./pages/LiveSession.jsx";
 
 // Redirect logged-in users away from auth pages
 function GuestRoute({ children, loginFor }) {
@@ -78,6 +79,11 @@ export default function App() {
           <Route path="/community" element={
             <ProtectedRoute roles={["user","admin","trainer"]} loginPath="/login">
               <CommunityFeed />
+            </ProtectedRoute>
+          } />
+          <Route path="/live/:id" element={
+            <ProtectedRoute roles={["user","admin","trainer"]} loginPath="/login">
+              <LiveSession />
             </ProtectedRoute>
           } />
           <Route path="/admin" element={

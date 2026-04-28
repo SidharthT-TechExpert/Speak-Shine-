@@ -21,6 +21,7 @@ import submissionRoutes from "./routes/submissions.js";
 import chatRoutes from "./routes/chat.js";
 import qrRoutes from "./routes/qr.js";
 import dailyReportRoutes from "./routes/dailyReport.js";
+import liveSessionRoutes from "./routes/liveSessions.js";
 import monitoringRoutes, { setOnlineUsersRef, recordResponseTime } from "./routes/monitoring.js";
 import { recoverStuckJobs } from "./videoQueue.js";
 import { startScheduler } from "./scheduler.js";
@@ -261,6 +262,7 @@ app.use("/api/submissions",  submissionRoutes);
 app.use("/api/chat",         chatRoutes);
 app.use("/api/qr",           qrRoutes);
 app.use("/api/daily-report", dailyReportRoutes);
+app.use("/api/live-sessions", liveSessionRoutes);
 app.use("/api/monitoring",   monitoringRoutes);
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));

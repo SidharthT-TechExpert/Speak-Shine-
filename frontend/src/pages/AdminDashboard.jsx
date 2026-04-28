@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -662,6 +663,9 @@ export default function AdminDashboard() {
         </>
       )}
 
+      {/* LIVE SESSIONS */}
+      {tab==="settings" && <LiveSessionsPanel />}
+
       {/* STUDENT DETAIL */}
       {tab==="student-detail" && selectedStudent && (
         <>
@@ -714,6 +718,126 @@ export default function AdminDashboard() {
         </>
       )}
     </Layout>
+  );
+}
+
+// ── Live Sessions Panel ───────────────────────────────────────────────────────
+function LiveSessionsPanel() {
+  const [sessions, setSessions]   = useState([]);
+  const [form, setForm]           = useState({ title: "", scheduledAt: "", description: "" });
+  const [saving, setSaving]       = useState(false);
+  const [busy, setBusy]           = useState({});
+  const navigate = useNavigate?.() || null;
+
+  const load = async () => {
+    try {
+      const res = await api.get("/live-sessions");
+      setSessions(res.data);
+    } catch {}
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const create = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post("/live-sessions", form);
+      setForm({ title: "", scheduledAt: "", description: "" });
+      load();
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to create session");
+    } finally { setSaving(false); }
+  };
+
+  const start = async (id) => {
+    setBusy(b => ({ ...b, [id]: "starting" }));
+    try { await api.post(`/live-sessions/${id}/start`); load(); }
+    catch (err) { alert(err.response?.data?.error || "Failed to start"); }
+    finally { setBusy(b => ({ ...b, [id]: null })); }
+  };
+
+  const end = async (id) => {
+    if (!confirm("End this session for all participants?")) return;
+    setBusy(b => ({ ...b, [id]: "ending" }));
+    try { await api.post(`/live-sessions/${id}/end`); load(); }
+    catch (err) { alert(err.response?.data?.error || "Failed to end"); }
+    finally { setBusy(b => ({ ...b, [id]: null })); }
+  };
+
+  const statusColor = { scheduled: "#60a5fa", live: "#4ade80", ended: "#8888aa" };
+
+  return (
+    <div className="card" style={{ maxWidth: 600, marginTop: "1rem" }}>
+      <div className="section-title">🎥 Live Sessions</div>
+
+      {/* Create form */}
+      <form onSubmit={create} style={{ marginBottom: "1.5rem" }}>
+        <div className="form-group" style={{ marginBottom: "0.75rem" }}>
+          <label className="form-label">Session Title</label>
+          <input className="form-input" placeholder="e.g. Weekly Speaking Practice" required
+            value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+        </div>
+        <div className="form-group" style={{ marginBottom: "0.75rem" }}>
+          <label className="form-label">Scheduled Date & Time</label>
+          <input className="form-input" type="datetime-local" required
+            value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} />
+        </div>
+        <div className="form-group" style={{ marginBottom: "1rem" }}>
+          <label className="form-label">Description (optional)</label>
+          <input className="form-input" placeholder="What will be covered…"
+            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+        </div>
+        <button type="submit" className="btn-primary" disabled={saving}>
+          {saving ? "Scheduling…" : "📅 Schedule Session"}
+        </button>
+      </form>
+
+      {/* Session list */}
+      {sessions.length === 0 && <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>No sessions yet.</p>}
+      {sessions.map(s => (
+        <div key={s._id} style={{
+          background: "var(--bg-secondary)", border: "1px solid var(--border)",
+          borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "0.75rem",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, marginBottom: "0.2rem" }}>{s.title}</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+                {new Date(s.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                {s.participantCount > 0 && ` · ${s.participantCount} joined`}
+                {s.durationMinutes && ` · ${s.durationMinutes} min`}
+              </div>
+            </div>
+            <span style={{
+              fontSize: "0.7rem", fontWeight: 700, padding: "0.2rem 0.6rem",
+              borderRadius: 20, background: `${statusColor[s.status]}22`,
+              color: statusColor[s.status], textTransform: "uppercase",
+            }}>{s.status}</span>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+            {s.status === "scheduled" && (
+              <button className="btn-primary" style={{ fontSize: "0.82rem", padding: "0.4rem 0.85rem" }}
+                disabled={busy[s._id] === "starting"} onClick={() => start(s._id)}>
+                {busy[s._id] === "starting" ? "Starting…" : "🔴 Go Live"}
+              </button>
+            )}
+            {s.status === "live" && (
+              <>
+                <button className="btn-primary" style={{ fontSize: "0.82rem", padding: "0.4rem 0.85rem" }}
+                  onClick={() => window.open(`/live/${s._id}`, "_blank")}>
+                  📹 Join as Admin
+                </button>
+                <button className="btn-danger" style={{ fontSize: "0.82rem", padding: "0.4rem 0.85rem" }}
+                  disabled={busy[s._id] === "ending"} onClick={() => end(s._id)}>
+                  {busy[s._id] === "ending" ? "Ending…" : "⏹ End Session"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
