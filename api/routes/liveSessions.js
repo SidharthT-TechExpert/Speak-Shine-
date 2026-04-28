@@ -1,7 +1,7 @@
 import express from "express";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import LiveSession from "../../models/liveSessionSchema.js";
-import auth from "../middleware/auth.js";
+import { authMiddleware as auth } from "../middleware/auth.js";
 
 const router = express.Router();
 
