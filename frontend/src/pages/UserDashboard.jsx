@@ -656,19 +656,29 @@ export default function UserDashboard() {
           background: "linear-gradient(135deg, #1a0a2e 0%, #2d1060 50%, #1a0a2e 100%)",
           border: "2px solid rgba(167,139,250,0.5)",
           boxShadow: "0 8px 40px rgba(139,92,246,0.25)",
+        } : data?.today?.isMonthlyGoals ? {
+          background: "linear-gradient(135deg, #0a1f0a 0%, #0d3d1a 50%, #0a2e12 100%)",
+          border: "2px solid rgba(74,222,128,0.45)",
+          boxShadow: "0 8px 40px rgba(34,197,94,0.2)",
         } : {}}>
           {/* Header */}
           <div className="daily-poster-header">
             <div className="daily-poster-brand">
-              {data?.today?.isMonthlyReflection ? "🌟 Speak & Shine" : "✦ Speak & Shine"}
+              {data?.today?.isMonthlyReflection ? "🌟 Speak & Shine"
+               : data?.today?.isMonthlyGoals ? "🎯 Speak & Shine"
+               : "✦ Speak & Shine"}
             </div>
             <div className="daily-poster-sub">
-              {data?.today?.isMonthlyReflection ? "MONTHLY REFLECTION" : "DAILY SPEAKING CHALLENGE"}
+              {data?.today?.isMonthlyReflection ? "MONTHLY REFLECTION"
+               : data?.today?.isMonthlyGoals ? "MONTHLY GOAL SETTING"
+               : "DAILY SPEAKING CHALLENGE"}
             </div>
             {data.today.category && (
-              <div className="daily-poster-badge" style={data?.today?.isMonthlyReflection ? {
-                background: "rgba(139,92,246,0.3)", border: "1px solid rgba(167,139,250,0.5)", color: "#c4b5fd"
-              } : {}}>
+              <div className="daily-poster-badge" style={
+                data?.today?.isMonthlyReflection ? { background:"rgba(139,92,246,0.3)", border:"1px solid rgba(167,139,250,0.5)", color:"#c4b5fd" }
+                : data?.today?.isMonthlyGoals ? { background:"rgba(34,197,94,0.25)", border:"1px solid rgba(74,222,128,0.5)", color:"#4ade80" }
+                : {}
+              }>
                 {data.today.category}
               </div>
             )}
@@ -702,14 +712,44 @@ export default function UserDashboard() {
                   </div>
                 ))}
               </div>
-              <div style={{
-                marginTop: "0.85rem", background: "rgba(139,92,246,0.1)",
-                border: "1px solid rgba(139,92,246,0.25)", borderRadius: 10,
-                padding: "0.65rem 0.85rem", fontSize: "0.78rem", color: "rgba(255,255,255,0.65)",
-              }}>
+              <div style={{ marginTop:"0.85rem", background:"rgba(139,92,246,0.1)", border:"1px solid rgba(139,92,246,0.25)", borderRadius:10, padding:"0.65rem 0.85rem", fontSize:"0.78rem", color:"rgba(255,255,255,0.65)" }}>
                 💡 Record a video answering all 6 questions. Same rules apply — counts as your daily submission.
               </div>
             </div>
+
+          /* Monthly Goals: numbered questions */
+          ) : data?.today?.isMonthlyGoals ? (
+            <div style={{ marginTop: "1rem" }}>
+              <div className="daily-poster-section-label">🎯 GOAL SETTING QUESTIONS</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "0.75rem" }}>
+                {[
+                  "What is your main goal for this month in the program?",
+                  "What is your dream or target you are working toward right now?",
+                  "What specific steps will you take this month to improve your communication?",
+                  "What was your biggest challenge last month and how will you overcome it this month?",
+                  "How many reviews are you planning to attend this month?",
+                  "What will you do differently this month to grow faster?",
+                ].map((q, i) => (
+                  <div key={i} style={{
+                    display: "flex", gap: "0.75rem", alignItems: "flex-start",
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(74,222,128,0.2)",
+                    borderRadius: 10, padding: "0.65rem 0.85rem",
+                  }}>
+                    <div style={{
+                      minWidth: 24, height: 24, borderRadius: "50%",
+                      background: "rgba(34,197,94,0.25)", border: "1px solid rgba(74,222,128,0.5)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.72rem", fontWeight: 800, color: "#4ade80", flexShrink: 0,
+                    }}>{i + 1}</div>
+                    <div style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.9)", lineHeight: 1.5 }}>{q}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop:"0.85rem", background:"rgba(34,197,94,0.08)", border:"1px solid rgba(74,222,128,0.25)", borderRadius:10, padding:"0.65rem 0.85rem", fontSize:"0.78rem", color:"rgba(255,255,255,0.65)" }}>
+                💡 Be specific and speak from the heart. Your goals drive your growth — say them out loud with confidence!
+              </div>
+            </div>
+
           ) : (
             <>
               {/* Topic */}
@@ -728,21 +768,22 @@ export default function UserDashboard() {
           )}
 
           {/* CTA Button */}
-          <button 
-            className="daily-poster-cta" 
+          <button
+            className="daily-poster-cta"
             onClick={() => navigate('/video-analysis')}
-            style={{ 
+            style={{
               cursor: 'pointer', border: 'none', width: '100%',
               transition: 'transform 0.2s, box-shadow 0.2s',
-              ...(data?.today?.isMonthlyReflection ? {
-                background: "linear-gradient(135deg, #7c3aed, #5b21b6)",
-                boxShadow: "0 4px 20px rgba(139,92,246,0.4)",
-              } : {}),
+              ...(data?.today?.isMonthlyReflection ? { background:"linear-gradient(135deg,#7c3aed,#5b21b6)", boxShadow:"0 4px 20px rgba(139,92,246,0.4)" }
+                : data?.today?.isMonthlyGoals ? { background:"linear-gradient(135deg,#16a34a,#15803d)", boxShadow:"0 4px 20px rgba(34,197,94,0.4)" }
+                : {}),
             }}
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
           >
-            {data?.today?.isMonthlyReflection ? "🌟 Record Monthly Reflection Video" : "🎥 Upload Your Speaking Video Now!"}
+            {data?.today?.isMonthlyReflection ? "🌟 Record Monthly Reflection Video"
+             : data?.today?.isMonthlyGoals ? "🎯 Record Monthly Goals Video"
+             : "🎥 Upload Your Speaking Video Now!"}
           </button>
         </div>
       )}

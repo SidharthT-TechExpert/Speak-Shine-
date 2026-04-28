@@ -17,6 +17,7 @@ export async function resetStatus() {
       dailyReportGenerated: false,
       reportExpiresAt: null,
       isMonthlyReflectionDay: false,
+      isMonthlyGoalsDay: false,
     }
   });
 }

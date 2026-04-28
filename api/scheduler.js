@@ -29,12 +29,32 @@ export const MONTHLY_REFLECTION_QUESTIONS = [
 export const MONTHLY_REFLECTION_TOPIC = "Monthly Reflection";
 export const MONTHLY_REFLECTION_CATEGORY = "Monthly Reflection";
 
+// Monthly goal-setting questions — shown on the 1st of every month
+export const MONTHLY_GOALS_QUESTIONS = [
+  "What is your main goal for this month in the program?",
+  "What is your dream or target you are working toward right now?",
+  "What specific steps will you take this month to improve your communication?",
+  "What was your biggest challenge last month and how will you overcome it this month?",
+  "How many reviews are you planning to attend this month?",
+  "What will you do differently this month to grow faster?",
+];
+
+export const MONTHLY_GOALS_TOPIC = "Monthly Goal Setting";
+export const MONTHLY_GOALS_CATEGORY = "Monthly Goals";
+
 /** Returns true if today is the last day of the month (IST) */
 function isLastDayOfMonth() {
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-  const tomorrow = new Date(nowIST);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.getDate() === 1;
+  const now = new Date();
+  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const lastDate = new Date(istDate.getFullYear(), istDate.getMonth() + 1, 0).getDate();
+  return istDate.getDate() === lastDate;
+}
+
+/** Returns true if today is the 1st of the month (IST) */
+function isFirstDayOfMonth() {
+  const now = new Date();
+  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  return istDate.getDate() === 1;
 }
 
 async function publishDailyQuestion() {
@@ -42,6 +62,26 @@ async function publishDailyQuestion() {
     const statusCheck = await Status.findOne();
     if (statusCheck?.questionSentToday) {
       return; // already published today
+    }
+
+    // ── 1st of month → publish Monthly Goal Setting ──────────────────────
+    if (isFirstDayOfMonth()) {
+      const goalsText = MONTHLY_GOALS_QUESTIONS
+        .map((q, i) => `${i + 1}. ${q}`)
+        .join("\n");
+
+      await Status.updateOne({}, {
+        $set: {
+          questionSentToday: true,
+          isMonthlyGoalsDay: true,
+          todayTopic: MONTHLY_GOALS_TOPIC,
+          todayQuestion: goalsText,
+          todayCategory: MONTHLY_GOALS_CATEGORY,
+        }
+      }, { upsert: true });
+
+      console.log("[Scheduler] 🎯 Monthly Goal Setting published for 1st of month");
+      return;
     }
 
     // ── Last day of month → publish Monthly Reflection instead ──────────

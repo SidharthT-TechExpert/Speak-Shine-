@@ -13,6 +13,7 @@ const statusSchema = new mongoose.Schema({
   recentCategories: { type: [String], default: [] },
   // Monthly reflection
   isMonthlyReflectionDay: { type: Boolean, default: false },
+  isMonthlyGoalsDay: { type: Boolean, default: false },
   // Daily report tracking
   dailyReportGenerated: { type: Boolean, default: false },
   reportExpiresAt: { type: Date, default: null },

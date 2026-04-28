@@ -156,6 +156,7 @@ router.get("/me", authMiddleware, async (req, res) => {
         category: status?.todayCategory || null,
         posterImage: getPosterImage(status),
         isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+        isMonthlyGoals: status?.isMonthlyGoalsDay || false,
       },
       dailyReport: showReport ? dailyReport : null,
       showReport,
@@ -304,6 +305,7 @@ router.post("/demo-monthly-reflection", authMiddleware, requireRole("admin"), as
       $set: {
         questionSentToday: true,
         isMonthlyReflectionDay: true,
+        isMonthlyGoalsDay: false,
         todayTopic: MONTHLY_REFLECTION_TOPIC,
         todayQuestion: reflectionText,
         todayCategory: MONTHLY_REFLECTION_CATEGORY,
@@ -315,19 +317,41 @@ router.post("/demo-monthly-reflection", authMiddleware, requireRole("admin"), as
   }
 });
 
-// POST /api/dashboard/demo-monthly-reflection-off — turn off monthly reflection mode (admin only)
+// POST /api/dashboard/demo-monthly-goals — force monthly goal-setting mode ON (admin only, for testing)
+router.post("/demo-monthly-goals", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    const { MONTHLY_GOALS_QUESTIONS, MONTHLY_GOALS_TOPIC, MONTHLY_GOALS_CATEGORY } = await import("../scheduler.js");
+    const goalsText = MONTHLY_GOALS_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join("\n");
+    await Status.updateOne({}, {
+      $set: {
+        questionSentToday: true,
+        isMonthlyGoalsDay: true,
+        isMonthlyReflectionDay: false,
+        todayTopic: MONTHLY_GOALS_TOPIC,
+        todayQuestion: goalsText,
+        todayCategory: MONTHLY_GOALS_CATEGORY,
+      }
+    }, { upsert: true });
+    res.json({ success: true, message: "Monthly goal-setting mode activated — refresh the app to see it" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/dashboard/demo-monthly-reflection-off — turn off monthly reflection/goals mode (admin only)
 router.post("/demo-monthly-reflection-off", authMiddleware, requireRole("admin"), async (req, res) => {
   try {
     await Status.updateOne({}, {
       $set: {
         isMonthlyReflectionDay: false,
+        isMonthlyGoalsDay: false,
         questionSentToday: false,
         todayTopic: null,
         todayQuestion: null,
         todayCategory: null,
       }
     });
-    res.json({ success: true, message: "Monthly reflection mode turned off" });
+    res.json({ success: true, message: "Monthly mode turned off" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
