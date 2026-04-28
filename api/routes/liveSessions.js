@@ -44,7 +44,7 @@ router.get("/:id", auth, async (req, res) => {
 
 // POST /api/live-sessions
 router.post("/", auth, async (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  if (!["admin", "trainer"].includes(req.user.role)) return res.status(403).json({ error: "Admin or Trainer only" });
   const { title, scheduledAt, description } = req.body;
   if (!title?.trim()) return res.status(400).json({ error: "Title is required" });
   if (!scheduledAt)   return res.status(400).json({ error: "scheduledAt is required" });
@@ -63,7 +63,7 @@ router.post("/", auth, async (req, res) => {
 
 // POST /api/live-sessions/:id/start
 router.post("/:id/start", auth, async (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  if (!["admin", "trainer"].includes(req.user.role)) return res.status(403).json({ error: "Admin or Trainer only" });
   try {
     const session = await LiveSession.findById(req.params.id);
     if (!session) return res.status(404).json({ error: "Session not found" });
@@ -122,7 +122,7 @@ router.post("/:id/token", auth, async (req, res) => {
 
 // POST /api/live-sessions/:id/end
 router.post("/:id/end", auth, async (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+  if (!["admin", "trainer"].includes(req.user.role)) return res.status(403).json({ error: "Admin or Trainer only" });
   try {
     const session = await LiveSession.findById(req.params.id);
     if (!session) return res.status(404).json({ error: "Session not found" });

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -12,7 +13,7 @@ const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, 
 const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
 const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
 const scoreColor = v => v>=7?"var(--success)":v>=5?"var(--warning)":"var(--danger)";
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"attendance",l:"📋 Attendance"},{id:"controls",l:"🔄 Controls"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"attendance",l:"📋 Attendance"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
 
 export default function TrainerDashboard() {
   const [dash, setDash] = useState(null);
@@ -284,6 +285,9 @@ export default function TrainerDashboard() {
         <AttendancePanel />
       )}
 
+      {/* LIVE SESSIONS */}
+      {tab==="live" && <TrainerLivePanel />}
+
       {/* CONTROLS */}
       {tab==="controls"&&(
         <div className="card" style={{maxWidth:480}}>
@@ -431,5 +435,159 @@ export default function TrainerDashboard() {
         </>
       )}
     </Layout>
+  );
+}
+
+// ── Trainer Live Sessions Panel ───────────────────────────────────────────────
+function TrainerLivePanel() {
+  const navigate = useNavigate();
+  const [sessions, setSessions]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [form, setForm]           = useState({ title: "", scheduledAt: "", description: "" });
+  const [saving, setSaving]       = useState(false);
+  const [busy, setBusy]           = useState({});
+  const [toast, setToast]         = useState(null);
+
+  const notify = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const load = async () => {
+    try { const res = await api.get("/live-sessions"); setSessions(res.data); }
+    catch {} finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const create = async (e) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      await api.post("/live-sessions", form);
+      setForm({ title: "", scheduledAt: "", description: "" });
+      setShowForm(false); notify("Session scheduled!"); load();
+    } catch (err) { notify(err.response?.data?.error || "Failed", "error"); }
+    finally { setSaving(false); }
+  };
+
+  const start = async (id) => {
+    setBusy(b => ({ ...b, [id]: "starting" }));
+    try { await api.post(`/live-sessions/${id}/start`); notify("Session is now LIVE! 🔴"); load(); }
+    catch (err) { notify(err.response?.data?.error || "Failed", "error"); }
+    finally { setBusy(b => ({ ...b, [id]: null })); }
+  };
+
+  const end = async (id) => {
+    if (!confirm("End this session for all participants?")) return;
+    setBusy(b => ({ ...b, [id]: "ending" }));
+    try { await api.post(`/live-sessions/${id}/end`); notify("Session ended."); load(); }
+    catch (err) { notify(err.response?.data?.error || "Failed", "error"); }
+    finally { setBusy(b => ({ ...b, [id]: null })); }
+  };
+
+  const live      = sessions.filter(s => s.status === "live");
+  const scheduled = sessions.filter(s => s.status === "scheduled");
+  const ended     = sessions.filter(s => s.status === "ended");
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      {toast && (
+        <div style={{
+          position: "fixed", top: "5rem", right: "1rem", zIndex: 9999,
+          background: toast.type === "error" ? "#7f1d1d" : "#065f46",
+          border: `1px solid ${toast.type === "error" ? "rgba(248,113,113,0.4)" : "rgba(74,222,128,0.4)"}`,
+          color: "#fff", padding: "0.75rem 1.25rem", borderRadius: 12,
+          fontSize: "0.9rem", fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}>
+          {toast.type === "error" ? "❌" : "✅"} {toast.msg}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 800 }}>🎥 Live Sessions</h2>
+          <p style={{ margin: "0.25rem 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>Schedule and manage live video sessions</p>
+        </div>
+        <button onClick={() => setShowForm(f => !f)} style={{
+          background: showForm ? "rgba(248,113,113,0.15)" : "linear-gradient(135deg,#7c6fff,#4f46e5)",
+          border: showForm ? "1px solid rgba(248,113,113,0.3)" : "none",
+          color: showForm ? "#f87171" : "#fff",
+          borderRadius: 12, padding: "0.65rem 1.25rem", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer",
+        }}>
+          {showForm ? "✕ Cancel" : "+ Schedule Session"}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: "rgba(124,111,255,0.08)", border: "1px solid rgba(124,111,255,0.25)", borderRadius: 16, padding: "1.5rem", marginBottom: "1.5rem" }}>
+          <form onSubmit={create}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+              <div><label className="form-label">Title *</label><input className="form-input" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+              <div><label className="form-label">Date & Time *</label><input className="form-input" type="datetime-local" required value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} /></div>
+            </div>
+            <div style={{ marginBottom: "1rem" }}><label className="form-label">Description</label><input className="form-input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Scheduling…" : "📅 Schedule"}</button>
+          </form>
+        </div>
+      )}
+
+      {loading && <div className="spinner-wrap"><div className="spinner" /></div>}
+
+      {live.length > 0 && <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>🔴 Live Now</div>
+        {live.map(s => <TrainerSessionCard key={s._id} s={s} onStart={start} onEnd={end} busy={busy} navigate={navigate} />)}
+      </div>}
+
+      {scheduled.length > 0 && <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>📅 Upcoming</div>
+        {scheduled.map(s => <TrainerSessionCard key={s._id} s={s} onStart={start} onEnd={end} busy={busy} navigate={navigate} />)}
+      </div>}
+
+      {ended.length > 0 && <div>
+        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>✅ Past</div>
+        {ended.slice(0, 5).map(s => <TrainerSessionCard key={s._id} s={s} onStart={start} onEnd={end} busy={busy} navigate={navigate} />)}
+      </div>}
+
+      {!loading && sessions.length === 0 && (
+        <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--muted)" }}>
+          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎥</div>
+          <div style={{ fontWeight: 600 }}>No sessions yet</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrainerSessionCard({ s, onStart, onEnd, busy, navigate }) {
+  const isLive = s.status === "live", isScheduled = s.status === "scheduled";
+  return (
+    <div style={{
+      background: isLive ? "rgba(74,222,128,0.05)" : "var(--bg-secondary)",
+      border: `1px solid ${isLive ? "rgba(74,222,128,0.4)" : isScheduled ? "rgba(96,165,250,0.25)" : "rgba(255,255,255,0.06)"}`,
+      borderRadius: 14, padding: "1rem 1.25rem", marginBottom: "0.75rem",
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+            <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>{s.title}</span>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "0.15rem 0.5rem", borderRadius: 20, textTransform: "uppercase", background: isLive ? "rgba(74,222,128,0.15)" : isScheduled ? "rgba(96,165,250,0.15)" : "rgba(107,114,128,0.15)", color: isLive ? "#4ade80" : isScheduled ? "#60a5fa" : "#6b7280" }}>
+              {isLive ? "🔴 Live" : isScheduled ? "Scheduled" : "Ended"}
+            </span>
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+            📅 {new Date(s.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+            {s.participantCount > 0 && ` · 👥 ${s.participantCount} joined`}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+          {isScheduled && <button onClick={() => onStart(s._id)} disabled={busy[s._id] === "starting"} style={{ background: "linear-gradient(135deg,#4ade80,#22c55e)", color: "#065f46", border: "none", borderRadius: 10, padding: "0.5rem 1rem", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>{busy[s._id] === "starting" ? "Starting…" : "🔴 Go Live"}</button>}
+          {isLive && <>
+            <button onClick={() => window.open(`/live/${s._id}`, "_blank")} style={{ background: "linear-gradient(135deg,#7c6fff,#4f46e5)", color: "#fff", border: "none", borderRadius: 10, padding: "0.5rem 1rem", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>📹 Join</button>
+            <button onClick={() => onEnd(s._id)} disabled={busy[s._id] === "ending"} style={{ background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.3)", color: "#f87171", borderRadius: 10, padding: "0.5rem 0.85rem", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>{busy[s._id] === "ending" ? "Ending…" : "⏹ End"}</button>
+          </>}
+        </div>
+      </div>
+    </div>
   );
 }
