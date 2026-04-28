@@ -149,7 +149,10 @@ async function processNext() {
 
   } finally {
     clearTimeout(processingTimeout);
-    if (videoPath && fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+    // Only unlink if it's a local file path (not an R2 URL)
+    if (videoPath && !videoPath.startsWith("http") && fs.existsSync(videoPath)) {
+      fs.unlinkSync(videoPath);
+    }
     // Hint to GC to free memory after heavy video processing
     if (global.gc) global.gc();
   }

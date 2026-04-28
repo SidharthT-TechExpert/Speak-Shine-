@@ -1,10 +1,12 @@
 /**
  * r2.js — Cloudflare R2 client (S3-compatible)
- * Exports uploadToR2, deleteFromR2, getR2Key
+ * Exports uploadToR2, deleteFromR2, getR2Key, getPresignedUploadUrl
  */
 
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
 
@@ -72,4 +74,21 @@ export async function deleteFromR2(key) {
   } catch (err) {
     console.log(`[R2] Delete failed (ignored): ${err.message}`);
   }
+}
+
+/**
+ * Generate a presigned PUT URL so the browser can upload directly to R2.
+ * The URL expires in 15 minutes.
+ *
+ * @param {string} key      — R2 object key (from getR2Key)
+ * @param {string} mimeType — e.g. "video/webm"
+ * @returns {Promise<string>} — presigned PUT URL
+ */
+export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
+  const command = new PutObjectCommand({
+    Bucket:      BUCKET,
+    Key:         key,
+    ContentType: mimeType,
+  });
+  return getSignedUrl(r2, command, { expiresIn: 900 }); // 15 min
 }

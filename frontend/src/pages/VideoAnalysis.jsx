@@ -271,39 +271,60 @@ export default function VideoAnalysis() {
   );
 }
 
-// ── Upload Card (original flow) ──────────────────────────────────────────────
+// ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
 function UploadCard({ onAnalysisStarted }) {
   const [file, setFile]           = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
+  const [stage, setStage]         = useState(""); // "uploading" | "confirming"
   const [error, setError]         = useState(null);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    if (f.size > 100 * 1024 * 1024) { setError("File size must be less than 100MB. Please compress your video or record a shorter clip."); return; }
+    if (f.size > 350 * 1024 * 1024) { setError("File size must be less than 350MB."); return; }
     setFile(f); setError(null);
   };
 
   const handleUpload = async () => {
     if (!file) { setError("Please select a video file"); return; }
-    setUploading(true); setProgress(0); setError(null);
+    setUploading(true); setProgress(0); setError(null); setStage("uploading");
+
     try {
-      const formData = new FormData();
-      formData.append("video", file);
-      formData.append("isPublic", "true"); // Always public
-      const res = await api.post("/video/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (e) => { if (e.total) setProgress(Math.round((e.loaded / e.total) * 100)); },
-        timeout: 0,
+      // Step 1: Get presigned URL from our server
+      const { data: presign } = await api.get("/video/presign", {
+        params: { filename: file.name, mimeType: file.type || "video/webm" },
       });
-      onAnalysisStarted(res.data.reportId);
+
+      // Step 2: Upload directly to R2 — Railway never touches the file
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", presign.uploadUrl);
+        xhr.setRequestHeader("Content-Type", file.type || "video/webm");
+        xhr.upload.onprogress = (e) => {
+          if (e.total) setProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`R2 upload failed: ${xhr.status}`));
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(file);
+      });
+
+      // Step 3: Tell our server the upload is done — start analysis
+      setStage("confirming");
+      const { data } = await api.post("/video/confirm", {
+        key:       presign.key,
+        publicUrl: presign.publicUrl,
+        mimeType:  file.type || "video/webm",
+        isPublic:  true,
+      });
+
+      onAnalysisStarted(data.reportId);
       setFile(null);
       document.getElementById("video-input").value = "";
     } catch (err) {
-      setError(err.response?.data?.error || "Upload failed");
+      setError(err.response?.data?.error || err.message || "Upload failed");
     } finally {
-      setUploading(false); setProgress(0);
+      setUploading(false); setProgress(0); setStage("");
     }
   };
 
@@ -311,7 +332,7 @@ function UploadCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max 5 minutes · Up to 100MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours · Videos shared in Community Feed
+        Minimum 1 minute · Max 5 minutes · Up to 350MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 12 hours · Videos shared in Community Feed
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"
@@ -325,17 +346,16 @@ function UploadCard({ onAnalysisStarted }) {
         {uploading && (
           <div style={{ marginBottom: "1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", fontSize: "0.9rem", color: "var(--muted)" }}>
-              <span>{progress < 100 ? "Uploading…" : "Processing upload…"}</span>
-              <span>{progress}%</span>
+              <span>{stage === "confirming" ? "Starting analysis…" : progress < 100 ? "Uploading to cloud…" : "Finalising…"}</span>
+              {stage !== "confirming" && <span>{progress}%</span>}
             </div>
             <div style={{ background: "var(--bg)", borderRadius: "6px", height: "8px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${progress}%`, background: "var(--primary)", borderRadius: "6px", transition: "width 0.3s ease" }} />
+              <div style={{ height: "100%", width: stage === "confirming" ? "100%" : `${progress}%`, background: "var(--primary)", borderRadius: "6px", transition: "width 0.3s ease" }} />
             </div>
           </div>
         )}
-
         <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
-          {uploading ? `Uploading ${progress}%…` : "Upload & Analyze"}
+          {uploading ? (stage === "confirming" ? "Starting analysis…" : `Uploading ${progress}%…`) : "Upload & Analyze"}
         </button>
       </div>
       {error && <div className="error-box" style={{ marginTop: "1rem" }}><p>{error}</p></div>}
@@ -560,26 +580,33 @@ function RecordCard({ onAnalysisStarted, question }) {
       }
       
       const ext = mimeType.includes("mp4") ? "mp4" : "webm";
-      
-      console.log(`[Upload] Creating file with MIME type: ${mimeType}, size: ${recordedBlob.size}`);
-      
-      // Create File with explicit MIME type
       const file = new File([recordedBlob], `recording.${ext}`, { type: mimeType });
-      
-      console.log(`[Upload] File created - type: ${file.type}, size: ${file.size}, name: ${file.name}`);
-      
-      const formData = new FormData();
-      formData.append("video", file);
-      formData.append("isPublic", "true"); // Always public
-      
-      console.log(`[Upload] FormData created, starting upload...`);
-      
-      const res = await api.post("/video/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (e) => { if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100)); },
-        timeout: 0,
+
+      // Step 1: Get presigned URL
+      const { data: presign } = await api.get("/video/presign", {
+        params: { filename: file.name, mimeType: file.type },
       });
-      onAnalysisStarted(res.data.reportId);
+
+      // Step 2: Upload directly to R2
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", presign.uploadUrl);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.upload.onprogress = (e) => { if (e.total) setUploadProgress(Math.round((e.loaded / e.total) * 100)); };
+        xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`));
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(file);
+      });
+
+      // Step 3: Confirm with server
+      const { data } = await api.post("/video/confirm", {
+        key:       presign.key,
+        publicUrl: presign.publicUrl,
+        mimeType:  file.type,
+        isPublic:  true,
+      });
+
+      onAnalysisStarted(data.reportId);
       setStep("setup");
       setRecordedBlob(null);
       setElapsed(0);

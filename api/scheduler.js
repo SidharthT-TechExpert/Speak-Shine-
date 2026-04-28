@@ -12,6 +12,7 @@ import DailyReport from "../models/dailyReportSchema.js";
 import VideoReport from "../models/videoReportSchema.js";
 import { generateAndInsertQuestions } from "../ai/questionGenerator.js";
 import { resetStatus } from "../resetStatus.js";
+import { deleteFromR2 } from "../r2.js";
 
 const TIMEZONE = "Asia/Kolkata";
 
@@ -259,6 +260,29 @@ export async function generateDailyReports() {
   }
 }
 
+// ── Clean expired R2 videos ──────────────────────────────────────────────────
+async function cleanExpiredVideos() {
+  try {
+    const expired = await VideoReport.find({
+      expiresAt: { $lt: new Date() },
+      videoKey:  { $ne: null },
+    }).select("_id videoKey").lean();
+
+    if (expired.length === 0) return;
+
+    console.log(`[Scheduler] Cleaning ${expired.length} expired video(s) from R2…`);
+
+    for (const report of expired) {
+      await deleteFromR2(report.videoKey);
+      await VideoReport.updateOne({ _id: report._id }, { $set: { videoKey: null, videoUrl: null } });
+    }
+
+    console.log(`[Scheduler] ✅ Cleaned ${expired.length} expired video(s)`);
+  } catch (err) {
+    console.error("[Scheduler] Video cleanup error:", err.message);
+  }
+}
+
 export function startDailyReset() {
   console.log("[Scheduler] Starting daily reset scheduler...");
   
@@ -267,6 +291,9 @@ export function startDailyReset() {
   
   // Run reset at 00:05 (12:05 AM) IST
   cron.schedule("5 0 * * *", dailyReset, { timezone: TIMEZONE });
+
+  // Clean up expired R2 videos every hour
+  cron.schedule("0 * * * *", cleanExpiredVideos, { timezone: TIMEZONE });
   
   console.log("[Scheduler] ✅ Daily reset scheduler running (00:00 reports, 00:05 reset)");
 }

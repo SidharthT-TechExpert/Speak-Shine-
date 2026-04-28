@@ -30,9 +30,10 @@ import {
 export async function processWebVideo(videoPath, displayName = "User", onProgress = () => {}) {
   const id = Date.now();
   let audioPath = null;
+  const isUrl = videoPath.startsWith("http");
 
   try {
-    if (!fs.existsSync(videoPath)) throw new Error("Video file not found");
+    if (!isUrl && !fs.existsSync(videoPath)) throw new Error("Video file not found");
 
     const duration = await getVideoDuration(videoPath);
 
@@ -132,6 +133,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
   } finally {
     if (audioPath && fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
     // NOTE: videoPath is cleaned up by the caller (videoAnalysis route)
+    // If videoPath is a URL, nothing to clean up here
   }
 }
 
@@ -194,10 +196,13 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning) {
  */
 export function getVideoDuration(videoPath) {
   return new Promise((resolve, reject) => {
-    // Use -count_packets to force ffprobe to scan the full file
-    // This fixes webm files recorded by browsers that lack duration in header
+    // For URLs, use -i without -count_packets (faster, no full scan needed)
+    const isUrl = videoPath.startsWith("http");
+    const args = isUrl
+      ? `ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`
+      : `ffprobe -v quiet -print_format json -show_format -show_streams -count_packets "${videoPath}"`;
     exec(
-      `ffprobe -v quiet -print_format json -show_format -show_streams -count_packets "${videoPath}"`,
+      args,
       { timeout: 30000 },
       (err, stdout, stderr) => {
         if (err || !stdout?.trim()) {
@@ -227,13 +232,14 @@ export function getVideoDuration(videoPath) {
 
           console.log("[ffprobe] Final duration:", dur);
           
-          // Emergency fallback: estimate from file size (very rough, ~1MB per 10 seconds for webm)
+          // Emergency fallback: estimate from file size (only for local files)
           if (!dur || dur <= 0) {
-            const fileSize = fs.statSync(videoPath).size;
-            const estimatedDur = Math.round(fileSize / (1024 * 1024) * 10);
-            if (estimatedDur > 0) {
-              dur = estimatedDur;
-            } else {
+            if (!isUrl) {
+              const fileSize = fs.statSync(videoPath).size;
+              const estimatedDur = Math.round(fileSize / (1024 * 1024) * 10);
+              if (estimatedDur > 0) { dur = estimatedDur; }
+            }
+            if (!dur || dur <= 0) {
               return reject(new Error("Could not determine video duration."));
             }
           }

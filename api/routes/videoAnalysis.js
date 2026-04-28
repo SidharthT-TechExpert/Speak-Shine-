@@ -6,7 +6,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import VideoReport from "../../models/videoReportSchema.js";
 import User from "../../models/userSchema.js";
 import { getVideoDuration } from "../../ai/webVideoProcessor.js";
-import { uploadToR2, deleteFromR2, getR2Key } from "../../r2.js";
+import { uploadToR2, deleteFromR2, getR2Key, getPresignedUploadUrl } from "../../r2.js";
 import { enqueue, enqueueRetry, registerSseClient, unregisterSseClient, estimateWait } from "../videoQueue.js";
 
 const router = express.Router();
@@ -15,6 +15,75 @@ const router = express.Router();
 const upload = multer({
   dest: "tmp/uploads/",
   limits: { fileSize: 100 * 1024 * 1024 },
+});
+
+// ── Presigned upload URL ─────────────────────────────────────────────────────
+// GET /api/video/presign?filename=foo.mp4&mimeType=video/mp4
+// Returns a presigned PUT URL so the browser uploads directly to R2 (no Railway RAM used)
+router.get("/presign", authMiddleware, async (req, res) => {
+  try {
+    const { filename = "video.webm", mimeType = "video/webm" } = req.query;
+    const key = getR2Key(req.user.id, filename);
+    const uploadUrl = await getPresignedUploadUrl(key, mimeType);
+    const publicUrl = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
+    res.json({ uploadUrl, key, publicUrl });
+  } catch (err) {
+    console.error("[Presign] Error:", err.message);
+    res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+// ── Confirm direct upload & start analysis ───────────────────────────────────
+// POST /api/video/confirm
+// Called after browser has uploaded directly to R2
+router.post("/confirm", authMiddleware, async (req, res) => {
+  const { key, publicUrl, mimeType = "video/webm", isPublic = true } = req.body;
+  if (!key || !publicUrl) return res.status(400).json({ error: "key and publicUrl are required" });
+
+  const userId = req.user.id;
+  const phone  = req.user.phone;
+
+  try {
+    const user = await User.findOne({ phone });
+
+    // Mark user as submitted
+    await User.findOneAndUpdate({ phone }, { completed: true });
+
+    const report = await VideoReport.create({
+      userId,
+      phone,
+      videoFileName: path.basename(key),
+      status: "processing",
+      videoUrl: publicUrl,
+      videoKey: key,
+      isPublic: isPublic === true || isPublic === "true",
+      uploaderName: user?.name || phone,
+    });
+
+    console.log(`[VideoConfirm] Report created: ${report._id} key=${key}`);
+
+    // Queue analysis — pass the R2 URL, no local file needed
+    const { position, estimatedWait } = enqueue({
+      reportId:    report._id,
+      videoPath:   publicUrl,   // R2 public URL — ffmpeg reads directly
+      phone,
+      displayName: user?.name || phone,
+      fromUrl:     true,        // flag: don't try to unlink this path
+    });
+
+    res.json({
+      success: true,
+      reportId: report._id,
+      message: position === 1 ? "Processing now…" : `You are #${position} in queue.`,
+      queuePosition: position,
+      estimatedWait,
+    });
+  } catch (err) {
+    console.error("[VideoConfirm] Error:", err.message);
+    // Clean up R2 if report creation failed
+    try { await deleteFromR2(key); } catch {}
+    res.status(500).json({ error: err.message || "Failed to start analysis" });
+  }
 });
 
 // ── SSE progress stream ──────────────────────────────────────────────────────
