@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_22", "ffmpeg", "vips"]
 cmds = [
   "npm install --prefer-offline --no-audit --no-fund --omit=dev",
   "cd api && npm install --prefer-offline --no-audit --no-fund --omit=dev",
-  "cd frontend && npm ci --prefer-offline --no-audit --no-fund"
+  "cd frontend && npm install --prefer-offline --no-audit --no-fund --legacy-peer-deps"
 ]
 
 [phases.build]
