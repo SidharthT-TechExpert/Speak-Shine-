@@ -56,25 +56,24 @@ function LiveSessionBanner() {
 }
 
 function useInstall() {
-  const [prompt, setPrompt] = useState(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [prompt, setPrompt] = useState(() => window.__pwaInstallPrompt || null);
+  const [isInstalled, setIsInstalled] = useState(
+    () => window.matchMedia("(display-mode: standalone)").matches
+  );
 
   useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsInstalled(true);
-      return;
-    }
-    const handler = (e) => { e.preventDefault(); setPrompt(e); };
-    window.addEventListener("beforeinstallprompt", handler);
+    if (isInstalled) return;
+    const onReady = () => setPrompt(window.__pwaInstallPrompt);
+    window.addEventListener("pwa-prompt-ready", onReady, { once: true });
     window.addEventListener("appinstalled", () => setIsInstalled(true));
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+    return () => window.removeEventListener("pwa-prompt-ready", onReady);
+  }, [isInstalled]);
 
   const install = async () => {
     if (!prompt) return false;
     prompt.prompt();
     const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") setPrompt(null);
+    if (outcome === "accepted") { setPrompt(null); window.__pwaInstallPrompt = null; }
     return outcome === "accepted";
   };
 

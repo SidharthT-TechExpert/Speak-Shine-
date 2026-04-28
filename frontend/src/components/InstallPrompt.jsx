@@ -23,14 +23,29 @@ export default function InstallPrompt() {
       return;
     }
 
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setTimeout(() => setShow(true), 2000);
+    const tryCapture = () => {
+      if (window.__pwaInstallPrompt) {
+        setDeferredPrompt(window.__pwaInstallPrompt);
+        setTimeout(() => setShow(true), 2000);
+      }
     };
-    window.addEventListener("beforeinstallprompt", handler);
+
+    // Already captured before React mounted
+    if (window.__pwaInstallPrompt) {
+      tryCapture();
+    } else {
+      // Wait for it
+      window.addEventListener("pwa-prompt-ready", tryCapture, { once: true });
+      // Also listen directly as fallback
+      const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); setTimeout(() => setShow(true), 2000); };
+      window.addEventListener("beforeinstallprompt", handler);
+      return () => {
+        window.removeEventListener("pwa-prompt-ready", tryCapture);
+        window.removeEventListener("beforeinstallprompt", handler);
+      };
+    }
+
     window.addEventListener("appinstalled", () => { setShow(false); setInstalled(true); });
-    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   const handleInstall = async () => {
