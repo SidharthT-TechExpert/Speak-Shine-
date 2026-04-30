@@ -104,8 +104,9 @@ router.get("/presign", authMiddleware, async (req, res) => {
   try {
     const { filename = "video.webm", mimeType = "video/webm" } = req.query;
     
-    // Validate MIME type
-    if (!ALLOWED_VIDEO_TYPES.includes(mimeType)) {
+    // Validate MIME type - check if it starts with an allowed video type (handles codec suffixes)
+    const baseType = mimeType.split(';')[0].trim(); // Extract base type before semicolon
+    if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
       return res.status(400).json({ error: "Invalid file type. Only video files are allowed." });
     }
     
@@ -127,15 +128,16 @@ router.post("/confirm", authMiddleware, async (req, res) => {
   const { key, publicUrl, mimeType = "video/webm", isPublic = true } = req.body;
   if (!key || !publicUrl) return res.status(400).json({ error: "key and publicUrl are required" });
 
-  // Validate MIME type
-  if (!ALLOWED_VIDEO_TYPES.includes(mimeType)) {
+  // Validate MIME type - check if it starts with an allowed video type (handles codec suffixes)
+  const baseType = mimeType.split(';')[0].trim(); // Extract base type before semicolon
+  if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
     try { await deleteFromR2(key); } catch {}
     return res.status(400).json({ error: "Invalid file type. Only video files are allowed." });
   }
 
   const userId = req.user.id;
   const phone  = req.user.phone;
-  const isWebm = mimeType.includes("webm") || key.endsWith(".webm");
+  const isWebm = baseType.includes("webm") || key.endsWith(".webm");
 
   // Normalise phone — strip country code so it matches the WhatsApp User document
   const strippedPhone = phone.replace(/^(\+91|91)/, "");
@@ -314,8 +316,9 @@ router.post("/upload", authMiddleware, (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No video file uploaded" });
 
-    // Validate MIME type
-    if (!ALLOWED_VIDEO_TYPES.includes(req.file.mimetype)) {
+    // Validate MIME type - check if it starts with an allowed video type (handles codec suffixes)
+    const baseType = req.file.mimetype.split(';')[0].trim();
+    if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
       securityFlags.push('mime_mismatch');
       await UploadAudit.logUpload({
         userId: req.user.id,
