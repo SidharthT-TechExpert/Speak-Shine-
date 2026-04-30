@@ -1,133 +1,222 @@
-# Video Upload & Recording Fixes
+# Video Upload Fixes - Complete Documentation
 
-## CRITICAL FIX - Express 5 Wildcard Route (RESOLVED)
+## Issue 1: CSP Blocking R2 Video Uploads ✅ FIXED
+**Status**: Resolved  
+**Date**: 2026-04-30
 
-**Problem:** Server was crashing on startup with `PathError: Missing parameter name`
-- Express 5 with newer `path-to-regexp` doesn't support wildcard routes with `app.get()`
-- First tried `app.get("*", ...)` → Error: `Missing parameter name at index 1: *`
-- Then tried `app.get("/*", ...)` → Error: `Missing parameter name at index 2: /*`
-- Both wildcard patterns are incompatible with Express 5
+### Problem
+Content Security Policy (CSP) was blocking:
+1. R2 presigned URL uploads (connect-src)
+2. Google Fonts loading (font-src, style-src)
+3. Video recording in browser
 
-**Solution:**
-- Changed from `app.get("/*", ...)` to `app.use((req, res, next) => {...})` in `api/server.js` line 433
-- `app.use()` middleware is the correct Express 5 pattern for catch-all routes
-- Server now starts successfully without path-to-regexp errors
+### Root Cause
+R2 presigned URLs use the pattern: `https://bucket.account-id.r2.cloudflarestorage.com`
+- The bucket name is dynamic
+- The account ID is fixed: `95507d8602ddb955795f0d78ed3d2df5`
+- Required specific wildcard pattern in CSP
+- CSP wildcards only match ONE level: `*.example.com` matches `sub.example.com` but NOT `sub.sub.example.com`
+
+### Solution
+Updated CSP in `api/server.js`:
+```javascript
+"connect-src": [
+  "'self'",
+  "https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com", // R2 presigned URLs
+  "https://pub-1c5ce667ea4445fb98d667349b649704.r2.dev", // R2 public URL
+  // ... other domains
+],
+"font-src": ["'self'", "https://fonts.gstatic.com"],
+"style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+```
+
+### Verification
+- ✅ R2 uploads work without CSP errors
+- ✅ MIME type validation handles `video/webm;codecs=vp9,opus` correctly (splits on `;`)
+- ✅ Google Fonts load properly
 
 ---
 
-## Issues Fixed
+## Issue 2: Express 5 Wildcard Route Crash ✅ FIXED
+**Status**: Resolved  
+**Date**: 2026-04-30
 
-### 1. CSP Blocking R2 Uploads ✅
-**Problem:** Content Security Policy was blocking uploads to R2 presigned URLs
-- Error: `Connecting to 'https://speak-shine-videos.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com/...' violates the following Content Security Policy directive`
-- Root cause: CSP wildcard `https://*.r2.cloudflarestorage.com` only matches ONE level of subdomain
-- R2 presigned URLs use TWO levels: `bucket.account-id.r2.cloudflarestorage.com`
+### Problem
+Server crashed immediately on startup with:
+```
+PathError: Missing parameter name at index 1: *
+```
 
-**Solution:**
-- Updated `api/server.js` CSP `connect-src` directive
-- Changed from: `https://*.r2.cloudflarestorage.com`
-- Changed to: `https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com`
-- This allows all bucket subdomains under the specific R2 account
+### Root Cause
+Express 5 with newer `path-to-regexp` doesn't support wildcard routes:
+- `app.get("*")` → Error at index 1
+- `app.get("/*")` → Error at index 2
 
-### 2. MIME Type Validation ✅
-**Problem:** User reported "Invalid file type" error when recording through website
-- Recorded videos use MIME type: `video/webm;codecs=vp9,opus`
-- Backend validation was already correct (splits on `;` to get base type)
+### Solution
+Changed from route handler to middleware pattern in `api/server.js` (line ~433):
+```javascript
+// OLD (broken in Express 5):
+app.get("*", (req, res) => { ... });
 
-**Status:** Already working correctly
-- Code in `api/routes/videoAnalysis.js` properly handles codec suffixes
-- `ALLOWED_VIDEO_TYPES` includes `video/webm`
-- All three validation points (presign, confirm, upload) handle codec suffixes
+// NEW (Express 5 compatible):
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api/")) {
+    return res.sendFile(path.join(distPath, "index.html"));
+  }
+  next();
+});
+```
 
-### 3. Font Loading CSP Error ✅
-**Problem:** Google Fonts being blocked by CSP
-- Error: `Loading the font 'https://fonts.gstatic.com/...' violates the following Content Security Policy directive`
-- Root cause: `font-src` not explicitly set, falling back to restrictive `default-src`
+### Verification
+- ✅ Server starts successfully
+- ✅ SPA routing works correctly
+- ✅ API routes not affected
 
-**Solution:**
-- Added `https://fonts.gstatic.com` to `font-src` directive
-- Added `https://fonts.googleapis.com` to `style-src` directive (for font stylesheets)
+---
 
-### 4. Frontend 404 Error ✅
-**Problem:** Console shows `GET https://speak-shine.up.railway.app/video-analysis 404 (Not Found)`
-- This is a frontend routing issue, not a backend API issue
-- The route `/video-analysis` doesn't exist - the correct route is `/api/video/*`
+## Issue 3: JWT_SECRET Module Initialization Order ✅ FIXED
+**Status**: Resolved  
+**Date**: 2026-04-30
 
-**Status:** Not a real issue
-- This is likely a browser extension or service worker trying to fetch a non-existent route
-- All actual API calls use `/api/video/presign`, `/api/video/confirm`, etc.
-- Frontend routing handles `/video-analysis` page correctly via React Router
+### Problem
+Server failed to start locally with:
+```
+❌ FATAL: JWT_SECRET environment variable is not set.
+```
+Even though `.env` file existed and contained `JWT_SECRET`.
+
+### Root Cause
+ES6 module initialization order issue:
+1. `api/server.js` imports route files at the top
+2. Route files (`auth.js`, `users.js`) import `auth.js` middleware
+3. These files check `process.env.JWT_SECRET` **during import time**
+4. This happens **before** `dotenv.config()` runs in `server.js`
+
+The environment loading logs never appeared because the code crashed during module import, before any code in `server.js` could execute.
+
+### Solution
+Replaced eager initialization with lazy getter pattern in:
+- `api/middleware/auth.js`
+- `api/routes/auth.js`
+- `api/routes/users.js`
+
+```javascript
+// OLD (broken - checks at import time):
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("❌ FATAL: JWT_SECRET environment variable is not set.");
+  process.exit(1);
+}
+
+// NEW (works - checks at runtime):
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is not set");
+  }
+  return secret;
+}
+
+// Usage:
+jwt.sign(payload, getJwtSecret(), options);
+jwt.verify(token, getJwtSecret());
+```
+
+### Verification
+Server logs now show:
+```
+[ENV] JWT_SECRET loaded: true
+✅ MongoDB Connected
+✅ Speak & Shine API running on port 3001
+```
+
+---
+
+## Issue 4: FFmpeg Missing in Railway Deployment ⚠️ IN PROGRESS
+**Status**: Investigating  
+**Date**: 2026-04-30
+
+### Problem
+Video processing fails with:
+```
+[ffprobe] failed: spawn ffprobe ENOENT
+[Queue] failed: Could not read video duration
+```
+
+### Root Cause
+`ffprobe` (part of ffmpeg) not found in Railway container PATH.
+
+### Attempted Solutions
+1. ✅ Updated `nixpacks.webapp.toml` to use `ffmpeg-full` instead of `ffmpeg`
+2. ✅ Removed invalid `aptPkgs` (Nixpacks doesn't support apt, only nix packages)
+3. ✅ Added verification commands to check ffmpeg installation during build
+
+### Current Configuration (`nixpacks.webapp.toml`)
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_22", "ffmpeg-full", "vips"]
+
+[phases.install]
+cmds = [
+  "echo '=== Verifying ffmpeg installation ==='",
+  "which ffmpeg || echo 'WARNING: ffmpeg not found in PATH'",
+  "which ffprobe || echo 'WARNING: ffprobe not found in PATH'",
+  "ffmpeg -version || echo 'WARNING: ffmpeg not executable'",
+  "ffprobe -version || echo 'WARNING: ffprobe not executable'",
+  # ... npm install commands
+]
+```
+
+### Next Steps
+1. ⏳ Wait for Railway rebuild to complete
+2. 🔍 Check build logs for ffmpeg verification output
+3. If ffmpeg is installed but not in PATH, may need to:
+   - Set PATH environment variable in Railway
+   - Use absolute path to ffmpeg in code
+   - Try different nixpkg package name (e.g., `ffmpeg_6-full`)
+
+### Affected Code
+- `ai/webVideoProcessor.js` - `getVideoDuration()` function uses `ffprobe`
+- `api/routes/videoAnalysis.js` - Video upload route calls `getVideoDuration()`
+
+---
 
 ## Summary
 
-**CRITICAL:** Fixed server crash on startup that was preventing all deployments.
+| Issue | Status | Impact |
+|-------|--------|--------|
+| CSP blocking R2 uploads | ✅ Fixed | High - Users can upload videos |
+| Express 5 wildcard crash | ✅ Fixed | Critical - Server starts |
+| JWT_SECRET initialization | ✅ Fixed | Critical - Local development works |
+| FFmpeg missing | ⚠️ In Progress | High - Video processing fails |
 
-All video upload and recording issues have been fixed:
+## Files Modified
+- `api/server.js` - CSP config, Express 5 routing, dotenv loading
+- `api/middleware/auth.js` - Lazy JWT_SECRET getter
+- `api/routes/auth.js` - Lazy JWT_SECRET getter
+- `api/routes/users.js` - Lazy JWT_SECRET getter
+- `nixpacks.webapp.toml` - ffmpeg installation and verification
 
-1. **Express 5 Wildcard Route Crash** - CRITICAL FIX - Server was crashing immediately on startup (RESOLVED)
-2. **CSP Blocking R2 Uploads** - Fixed by updating CSP to allow R2 presigned URLs with bucket subdomain pattern
-3. **MIME Type Validation** - Already working correctly, handles codec suffixes properly
-4. **Font Loading CSP Error** - Fixed by adding Google Fonts to font-src and style-src directives
-5. **Frontend 404 Error** - Not a real issue, likely browser extension or service worker
-
-The main fixes were:
-- **CRITICAL**: Changed Express route from `app.get("*")` to `app.use()` middleware for Express 5 compatibility
-- Updated Content Security Policy in `api/server.js` to allow R2 presigned upload URLs
-- Added Google Fonts domains to CSP to prevent font loading errors
+## Environment Notes
+- **Railway**: Uses environment variables from dashboard, not `.env` file
+- **Local**: Uses `.env` file loaded by `dotenv.config()`
+- **Security features**: All optional features remain disabled by default
+  - `ENABLE_CODEC_VALIDATION=false`
+  - `ENABLE_VIRUS_SCAN=false`
+  - `ENABLE_CONTENT_MODERATION=false`
 
 ## Testing Checklist
 
 ### Local Testing
-- [ ] Start backend: `npm run start:api`
-- [ ] Start frontend: `cd frontend && npm run dev`
-- [ ] Test video recording with webcam
-- [ ] Verify upload progress shows correctly
-- [ ] Confirm video analysis starts after upload
-- [ ] Check browser console for CSP errors
+- [x] Server starts without JWT_SECRET error
+- [x] Environment variables load correctly from `.env`
+- [ ] Video recording works with webcam
+- [ ] Upload progress shows correctly
+- [ ] Video analysis completes successfully
 
 ### Railway Deployment Testing
-- [ ] Push changes to Railway
-- [ ] Verify frontend builds successfully
-- [ ] Test video recording on deployed site
-- [ ] Verify R2 uploads work without CSP errors
-- [ ] Check that analysis completes successfully
-
-## Files Modified
-
-1. **api/server.js**
-   - Updated CSP `connect-src` to allow R2 presigned URLs with bucket subdomain
-   - Line ~280: Changed wildcard pattern to match R2 account-specific URLs
-
-## Environment Variables Required
-
-These must be set in Railway dashboard:
-- `R2_ENDPOINT` - Already set: `https://95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com`
-- `R2_BUCKET_NAME` - Already set: `speak-shine-videos`
-- `R2_PUBLIC_URL` - Already set: `https://pub-1c5ce667ea4445fb98d667349b649704.r2.dev`
-- `R2_ACCESS_KEY_ID` - Already configured
-- `R2_SECRET_ACCESS_KEY` - Already configured
-
-## How R2 Presigned URLs Work
-
-1. Frontend requests presigned URL: `GET /api/video/presign?filename=recording.webm&mimeType=video/webm`
-2. Backend generates presigned PUT URL using AWS SDK
-3. Presigned URL format: `https://BUCKET.ACCOUNT_ID.r2.cloudflarestorage.com/path?signature...`
-4. Frontend uploads directly to R2 using presigned URL (bypasses Railway)
-5. Frontend confirms upload: `POST /api/video/confirm` with key and publicUrl
-6. Backend downloads from R2 and starts analysis
-
-## CSP Wildcard Behavior
-
-CSP wildcards only match ONE level of subdomain:
-- ✅ `https://*.example.com` matches `https://sub.example.com`
-- ❌ `https://*.example.com` does NOT match `https://sub.sub.example.com`
-- ✅ `https://*.sub.example.com` matches `https://anything.sub.example.com`
-
-This is why we needed to change from `*.r2.cloudflarestorage.com` to `*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com`.
-
-## Next Steps
-
-1. Test locally to verify CSP fix works
-2. Push to Railway and test on production
-3. Monitor browser console for any remaining CSP errors
-4. Verify video recording and upload flow works end-to-end
+- [x] Server starts successfully
+- [x] No Express 5 wildcard route errors
+- [x] CSP allows R2 uploads
+- [ ] FFmpeg/ffprobe available in container
+- [ ] Video processing completes successfully
