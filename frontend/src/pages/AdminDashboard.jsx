@@ -37,6 +37,14 @@ export default function AdminDashboard() {
   const [resetting, setResetting] = useState("");
   const [publishQ, setPublishQ] = useState(null); // selected question for webapp publish
   const [publishCustom, setPublishCustom] = useState({ topic:"", question:"", category:"" }); // manual entry
+  const [newMember, setNewMember] = useState({ name:"", phone:"", password:"", role:"user" });
+  const [newMemberLoading, setNewMemberLoading] = useState(false);
+  // Admin OTP verification state for adding members
+  const [adminOtpStep, setAdminOtpStep] = useState("idle"); // "idle" | "sent" | "verified"
+  const [adminOtp, setAdminOtp] = useState("");
+  const [adminOtpLoading, setAdminOtpLoading] = useState(false);
+  const [adminOtpError, setAdminOtpError] = useState("");
+  const [adminActionToken, setAdminActionToken] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -358,10 +366,140 @@ export default function AdminDashboard() {
 
       {/* USERS */}
       {tab==="users" && (
-        <div className="card">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:"0.5rem"}}>
-            <div className="section-title" style={{margin:0}}>All Users ({filteredUsers.length})</div>
-            <input className="form-input" style={{width:220}} placeholder="Search name or phone…" value={search} onChange={e=>setSearch(e.target.value)}/>
+        <>
+          {/* Add Member — requires admin OTP verification first */}
+          <div className="card" style={{marginBottom:"1rem"}}>
+            <div className="section-title">➕ Add New Member</div>
+
+            {/* Step 1: Admin identity verification */}
+            {adminOtpStep === "idle" && (
+              <div>
+                <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1rem"}}>
+                  To add a member, first verify your identity via OTP sent to your registered phone.
+                </p>
+                {adminOtpError && (
+                  <div style={{color:"#f87171",fontSize:"0.82rem",marginBottom:"0.75rem"}}>❌ {adminOtpError}</div>
+                )}
+                <button className="btn-primary" disabled={adminOtpLoading} onClick={async()=>{
+                  setAdminOtpLoading(true); setAdminOtpError("");
+                  try {
+                    await api.post("/users/admin-send-otp");
+                    setAdminOtpStep("sent");
+                  } catch(e) {
+                    setAdminOtpError(e?.response?.data?.error || "Failed to send OTP");
+                  } finally { setAdminOtpLoading(false); }
+                }}>
+                  {adminOtpLoading ? "Sending…" : "🔐 Verify My Identity (Send OTP)"}
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Enter OTP */}
+            {adminOtpStep === "sent" && (
+              <div>
+                <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1rem"}}>
+                  Enter the 6-digit OTP sent to your registered phone number.
+                </p>
+                {adminOtpError && (
+                  <div style={{color:"#f87171",fontSize:"0.82rem",marginBottom:"0.75rem"}}>❌ {adminOtpError}</div>
+                )}
+                <div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
+                  <input className="form-input" style={{width:160,letterSpacing:"0.2em",textAlign:"center",fontSize:"1.1rem"}}
+                    type="text" inputMode="numeric" maxLength={6} placeholder="000000"
+                    value={adminOtp} onChange={e=>setAdminOtp(e.target.value.replace(/\D/g,"").slice(0,6))}/>
+                  <button className="btn-primary" disabled={adminOtpLoading||adminOtp.length!==6} onClick={async()=>{
+                    setAdminOtpLoading(true); setAdminOtpError("");
+                    try {
+                      const {data} = await api.post("/users/admin-verify-otp",{otp:adminOtp});
+                      setAdminActionToken(data.actionToken);
+                      setAdminOtpStep("verified");
+                      setAdminOtp("");
+                    } catch(e) {
+                      setAdminOtpError(e?.response?.data?.error || "Invalid OTP");
+                      setAdminOtp("");
+                    } finally { setAdminOtpLoading(false); }
+                  }}>
+                    {adminOtpLoading ? "Verifying…" : "Verify OTP"}
+                  </button>
+                  <button className="btn-ghost" onClick={()=>{setAdminOtpStep("idle");setAdminOtp("");setAdminOtpError("");}}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Add member form (identity verified) */}
+            {adminOtpStep === "verified" && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setNewMemberLoading(true);
+                try {
+                  await api.post("/users/admin-create", { ...newMember, actionToken: adminActionToken });
+                  msg(`✅ Account created for ${newMember.name}`);
+                  setNewMember({ name:"", phone:"", password:"", role:"user" });
+                  setAdminOtpStep("idle");
+                  setAdminActionToken("");
+                  load();
+                } catch (err) {
+                  const errMsg = err?.response?.data?.error || "Failed to create account";
+                  // If token expired, reset to idle
+                  if (errMsg.includes("expired") || errMsg.includes("token")) {
+                    setAdminOtpStep("idle");
+                    setAdminActionToken("");
+                    msg("Session expired. Please re-verify your identity.", "danger");
+                  } else {
+                    msg(errMsg, "danger");
+                  }
+                } finally {
+                  setNewMemberLoading(false);
+                }
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"1rem",color:"#4ade80",fontSize:"0.85rem"}}>
+                  ✅ Identity verified — you can now add a member
+                  <button type="button" className="btn-ghost" style={{fontSize:"0.75rem",padding:"0.2rem 0.5rem"}}
+                    onClick={()=>{setAdminOtpStep("idle");setAdminActionToken("");}}>
+                    Re-verify
+                  </button>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Full Name</label>
+                    <input className="form-input" placeholder="Member name" value={newMember.name}
+                      onChange={e=>setNewMember(p=>({...p,name:e.target.value}))} required minLength={2}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Phone (10 digits)</label>
+                    <input className="form-input" placeholder="9876543210" type="tel" value={newMember.phone}
+                      onChange={e=>setNewMember(p=>({...p,phone:e.target.value}))} required maxLength={13}/>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Password</label>
+                    <input className="form-input" placeholder="Min 6 characters" type="password" value={newMember.password}
+                      onChange={e=>setNewMember(p=>({...p,password:e.target.value}))} required minLength={6}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Role</label>
+                    <select className="form-input" value={newMember.role}
+                      onChange={e=>setNewMember(p=>({...p,role:e.target.value}))}>
+                      <option value="user">User</option>
+                      <option value="trainer">Trainer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" className="btn-primary" disabled={newMemberLoading}>
+                  {newMemberLoading ? "Creating…" : "Create Account"}
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:"0.5rem"}}>
+              <div className="section-title" style={{margin:0}}>All Users ({filteredUsers.length})</div>
+              <input className="form-input" style={{width:220}} placeholder="Search name or phone…" value={search} onChange={e=>setSearch(e.target.value)}/>
           </div>
           <div className="table-wrap">
             <table className="data-table">
@@ -394,6 +532,7 @@ export default function AdminDashboard() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* REPORTS */}

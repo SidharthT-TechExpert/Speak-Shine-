@@ -1,10 +1,57 @@
 import express from "express";
-import bcrypt from "bcryptjs";
+import argon2 from "argon2";
+import jwt from "jsonwebtoken";
+import { randomInt } from "crypto";
 import User from "../../models/userSchema.js";
 import Auth from "../../models/authSchema.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { getRedisClient, isRedisAvailable } from "../../redis.js";
 
 const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET;
+const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
+const OTP_TTL = 300;
+
+// ── OTP helpers (reused from auth.js pattern) ─────────────────────────────────
+function adminOtpKey(phone) { return `otp:admin-action:${phone}`; }
+
+function generateOTP() { return String(randomInt(100000, 1000000)); }
+
+async function storeAdminOTP(phone, otp) {
+  if (isRedisAvailable()) {
+    await getRedisClient().set(adminOtpKey(phone), otp, "EX", OTP_TTL);
+  } else {
+    global._otpStore = global._otpStore || {};
+    global._otpStore[adminOtpKey(phone)] = { otp, exp: Date.now() + OTP_TTL * 1000 };
+  }
+}
+
+async function getAdminOTP(phone) {
+  if (isRedisAvailable()) return await getRedisClient().get(adminOtpKey(phone));
+  const entry = global._otpStore?.[adminOtpKey(phone)];
+  return entry && entry.exp > Date.now() ? entry.otp : null;
+}
+
+async function deleteAdminOTP(phone) {
+  if (isRedisAvailable()) {
+    await getRedisClient().del(adminOtpKey(phone));
+  } else {
+    delete global._otpStore?.[adminOtpKey(phone)];
+  }
+}
+
+async function sendSmsOTP(phone, otp) {
+  if (!TWO_FACTOR_KEY) {
+    console.log(`[AdminOTP] DEV MODE — OTP for ${phone}: ${otp}`);
+    return true;
+  }
+  const stripped = phone.replace(/^(\+91|91)/, "");
+  const { default: fetch } = await import("node-fetch");
+  const url = `https://2factor.in/API/V1/${TWO_FACTOR_KEY}/SMS/${stripped}/${otp}/OTP1`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return data.Status === "Success";
+}
 
 // GET /api/users — admin & trainer: all users with stats
 router.get("/", authMiddleware, requireRole("admin", "trainer"), async (req, res) => {
@@ -172,6 +219,107 @@ router.post("/reset/fines", authMiddleware, requireRole("admin"), async (req, re
     res.json({ success: true, message: "All fines reset to 0" });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users/admin-send-otp — admin sends OTP to their own registered phone
+// Must be authenticated as admin. Used to verify identity before creating a member.
+router.post("/admin-send-otp", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    const adminAuth = await Auth.findById(req.user.id).lean();
+    if (!adminAuth) return res.status(404).json({ error: "Admin account not found" });
+
+    const phone = adminAuth.phone;
+    const otp = generateOTP();
+    await storeAdminOTP(phone, otp);
+    await sendSmsOTP(phone, otp);
+
+    res.json({ success: true, message: `OTP sent to your registered number ${phone.slice(0, 5)}XXXXX` });
+  } catch (err) {
+    console.error("[AdminSendOTP] Error:", err.message);
+    res.status(500).json({ error: "Failed to send OTP. Please try again." });
+  }
+});
+
+// POST /api/users/admin-verify-otp — admin verifies OTP, gets a short-lived action token
+router.post("/admin-verify-otp", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) return res.status(400).json({ error: "OTP is required" });
+
+    const adminAuth = await Auth.findById(req.user.id).lean();
+    if (!adminAuth) return res.status(404).json({ error: "Admin account not found" });
+
+    const phone = adminAuth.phone;
+    const stored = await getAdminOTP(phone);
+
+    if (!stored) return res.status(400).json({ error: "OTP expired or not found. Request a new one." });
+    if (stored !== String(otp).trim()) return res.status(400).json({ error: "Incorrect OTP" });
+
+    await deleteAdminOTP(phone);
+
+    // Issue a 10-minute action token tied to this admin
+    const actionToken = jwt.sign(
+      { adminId: req.user.id, purpose: "admin-create" },
+      JWT_SECRET,
+      { expiresIn: "10m" }
+    );
+    res.json({ success: true, actionToken });
+  } catch (err) {
+    console.error("[AdminVerifyOTP] Error:", err.message);
+    res.status(500).json({ error: "Verification failed. Please try again." });
+  }
+});
+
+// POST /api/users/admin-create — admin only: create a new member account
+// Requires a valid actionToken from /admin-verify-otp
+router.post("/admin-create", authMiddleware, requireRole("admin"), async (req, res) => {
+  try {
+    const { phone, password, name, role = "user", actionToken } = req.body;
+
+    // Verify admin OTP token
+    if (!actionToken) return res.status(400).json({ error: "Admin OTP verification required. Please verify your identity first." });
+    try {
+      const decoded = jwt.verify(actionToken, JWT_SECRET);
+      if (decoded.purpose !== "admin-create" || decoded.adminId !== String(req.user.id)) {
+        return res.status(400).json({ error: "Invalid or expired action token. Please re-verify." });
+      }
+    } catch {
+      return res.status(400).json({ error: "Action token expired. Please verify your OTP again." });
+    }
+
+    if (!phone || !password || !name)
+      return res.status(400).json({ error: "phone, password and name are required" });
+    if (!["user", "trainer", "admin"].includes(role))
+      return res.status(400).json({ error: "Invalid role" });
+
+    const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+    if (!/^[6-9]\d{9}$/.test(stripped))
+      return res.status(400).json({ error: "Enter a valid 10-digit Indian mobile number" });
+    if (password.length < 6)
+      return res.status(400).json({ error: "Password must be at least 6 characters" });
+
+    const exists = await Auth.findOne({ phone: { $in: [phone, stripped, `91${stripped}`] } });
+    if (exists) return res.status(409).json({ error: "Phone already registered" });
+
+    const hash = await argon2.hash(password);
+
+    // Try to auto-link to existing WhatsApp user
+    let waUser = await User.findOne({ phone: { $in: [phone, stripped] } });
+    if (!waUser) waUser = await User.findOne({ userId: { $regex: stripped } });
+
+    await Auth.create({
+      phone: stripped,
+      password: hash,
+      name,
+      role,
+      userId: waUser?.userId || null,
+    });
+
+    res.json({ success: true, message: `Account created for ${name}` });
+  } catch (err) {
+    console.error("[AdminCreate] Error:", err.message);
+    res.status(500).json({ error: "Failed to create account. Please try again." });
   }
 });
 

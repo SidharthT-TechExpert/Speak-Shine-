@@ -9,6 +9,7 @@ import InstallPrompt from "./components/InstallPrompt.jsx";
 // Lazy-load all pages — each becomes its own JS chunk, only loaded when needed
 const Login           = lazy(() => import("./pages/Login.jsx"));
 const Register        = lazy(() => import("./pages/Register.jsx"));
+const ForgotPassword  = lazy(() => import("./pages/ForgotPassword.jsx"));
 const UserDashboard   = lazy(() => import("./pages/UserDashboard.jsx"));
 const AdminDashboard  = lazy(() => import("./pages/AdminDashboard.jsx"));
 const TrainerDashboard= lazy(() => import("./pages/TrainerDashboard.jsx"));
@@ -65,11 +66,12 @@ export default function App() {
 
             {/* User auth */}
             <Route path="/login" element={
-              <GuestRoute loginFor="user"><Login showRegister /></GuestRoute>
+              <GuestRoute loginFor="user"><Login /></GuestRoute>
             } />
-            <Route path="/register" element={
-              <GuestRoute loginFor="user"><Register /></GuestRoute>
-            } />
+            {/* /register is disabled — admin creates members from the dashboard */}
+            <Route path="/register" element={<Navigate to="/login" replace />} />
+            {/* Forgot password — open to all (phone OTP verification required) */}
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Admin auth */}
             <Route path="/admin/login" element={

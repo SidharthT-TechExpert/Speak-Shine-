@@ -247,6 +247,12 @@ export default function Login({ loginFor = "user", showRegister = false }) {
           </button>
         </form>
 
+        <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
+          <Link to="/forgot-password" style={{ color: "var(--muted)", fontSize: "0.82rem", textDecoration: "none" }}>
+            Forgot password?
+          </Link>
+        </div>
+
         {showRegister && (
           <p className="auth-link">No account? <Link to="/register">Register</Link></p>
         )}
