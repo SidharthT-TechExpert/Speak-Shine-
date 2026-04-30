@@ -10,15 +10,15 @@ COPY package.json package-lock.json ./
 COPY api/package.json api/package-lock.json* ./api/
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 
-# Install all deps in one cached layer
-RUN npm ci --omit=dev --no-audit --no-fund --prefer-offline && \
-    cd api && npm install --omit=dev --no-audit --no-fund --prefer-offline && \
+# Install all deps in one cached layer (including dev deps for build)
+RUN npm ci --no-audit --no-fund --prefer-offline && \
+    cd api && npm install --no-audit --no-fund --prefer-offline && \
     cd ../frontend && npm ci --no-audit --no-fund --prefer-offline
 
 # ── Build stage ───────────────────────────────────────────────────────────────
 FROM deps AS builder
 COPY . .
-RUN cd frontend && NODE_ENV=production npm run build
+RUN cd frontend && NODE_ENV=production npm run build && ls -la dist/
 
 # ── Final image — only what's needed to run ───────────────────────────────────
 FROM node:22-slim AS runner
