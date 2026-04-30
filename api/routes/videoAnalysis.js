@@ -57,10 +57,10 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName) {
   }
 }
 
-// Configure multer for video uploads (max 100MB — large files cause OOM on Railway)
+// Configure multer for video uploads (max 110MB — large files cause OOM on Railway)
 const upload = multer({
   dest: "tmp/uploads/",
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 110 * 1024 * 1024 },
 });
 
 // ── Presigned upload URL ─────────────────────────────────────────────────────

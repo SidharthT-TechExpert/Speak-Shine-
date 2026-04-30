@@ -25,7 +25,7 @@
 - ✅ **Credentials**: Properly handled with CORS
 
 ### 4. **Input Validation**
-- ✅ **File upload limits**: 100MB max (prevents DoS)
+- ✅ **File upload limits**: 110MB max (prevents DoS)
 - ✅ **MongoDB queries**: Using Mongoose (prevents NoSQL injection)
 - ✅ **No dangerous operators**: No `$where`, `eval()`, or `new Function()`
 
