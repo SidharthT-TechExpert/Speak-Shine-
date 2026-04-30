@@ -4,7 +4,7 @@
  */
 
 import fs from "fs";
-import { exec, execFile } from "child_process";
+import { exec, execFile, execSync } from "child_process";
 import { promisify } from "util";
 import { extractAudio } from "./extractAudio.js";
 import { transcribe } from "./transcribe.js";
@@ -212,20 +212,22 @@ export function getVideoDuration(videoPath, isUrl = false) {
     // Find which ffprobe exists
     let ffprobeCmd = 'ffprobe';
     
-    // For Nix store, we need to use shell to expand the glob
+    // For Nix store, we need to use shell to find ffprobe
     if (process.env.NIX_STORE || process.env.NIXPACKS_METADATA) {
       // Running in Nixpacks environment - use shell to find ffprobe
-      const { execSync } = require('child_process');
       try {
-        ffprobeCmd = execSync('which ffprobe || find /nix/store -name ffprobe -type f 2>/dev/null | head -1', {
+        const result = execSync('which ffprobe || find /nix/store -name ffprobe -type f 2>/dev/null | head -1', {
           encoding: 'utf8',
           timeout: 5000
         }).trim();
-        if (ffprobeCmd) {
+        if (result) {
+          ffprobeCmd = result;
           console.log('[ffprobe] Found at:', ffprobeCmd);
+        } else {
+          console.error('[ffprobe] Could not locate ffprobe binary in Nix store');
         }
       } catch (findErr) {
-        console.error('[ffprobe] Could not locate ffprobe binary:', findErr.message);
+        console.error('[ffprobe] Error searching for ffprobe:', findErr.message);
       }
     }
 
