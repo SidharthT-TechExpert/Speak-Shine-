@@ -18,9 +18,9 @@ const TEST_VIDEO_PATH = process.argv.find(arg => arg.startsWith('--video='))?.sp
 const NUM_USERS = parseInt(process.argv.find(arg => arg.startsWith('--users='))?.split('=')[1] || '10');
 const CONCURRENT = parseInt(process.argv.find(arg => arg.startsWith('--concurrent='))?.split('=')[1] || '5');
 
-// Test credentials (create a test account first)
-const TEST_PHONE = process.env.TEST_PHONE || '9999999999';
-const TEST_PASSWORD = process.env.TEST_PASSWORD || 'test123';
+// Test credentials (can be passed via command line or environment)
+const TEST_PHONE = process.argv.find(arg => arg.startsWith('--phone='))?.split('=')[1] || process.env.TEST_PHONE || '9999999999';
+const TEST_PASSWORD = process.argv.find(arg => arg.startsWith('--password='))?.split('=')[1] || process.env.TEST_PASSWORD || 'test123';
 
 let authToken = null;
 
