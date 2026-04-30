@@ -77,9 +77,15 @@
 
 ### 🟢 **MEDIUM** - ✅ MOSTLY FIXED
 
-#### 6. **JWT Token Expiration Too Long** - ACCEPTABLE
-**Status:** ⏳ Current 7-day expiration acceptable for user experience  
-**Future:** Consider refresh token rotation
+#### 6. ✅ **JWT Token Expiration Too Long** - FIXED
+**Status:** ✅ Implemented - Refresh token rotation with 15-minute access tokens  
+**Details:**
+- Access tokens: 15 minutes (short-lived)
+- Refresh tokens: 7 days (long-lived)
+- Automatic token refresh on expiration
+- Token rotation on each refresh (old token invalidated)
+- Max 5 active refresh tokens per user
+- Refresh token reuse detection (security)
 
 #### 7. ✅ **No Content Security Policy (CSP)** - FIXED
 **Status:** ✅ Implemented - CSP headers configured
@@ -119,10 +125,10 @@
 6. ✅ Add HSTS headers
 7. ✅ Add security event logging
 8. ✅ Implement production-safe error handling
+9. ✅ Implement refresh token rotation
 
 ### Optional Future Improvements
-9. ⏳ Implement CSRF protection (lower priority for JWT-based API)
-10. ⏳ Implement refresh token rotation
+10. ⏳ Implement CSRF protection (lower priority for JWT-based API)
 11. ⏳ Add input sanitization for rich user content
 12. ⏳ Security audit by third party
 13. ⏳ Penetration testing
@@ -134,6 +140,7 @@
 
 - [x] Passwords hashed with Argon2
 - [x] JWT tokens with expiration
+- [x] Refresh token rotation (15-min access, 7-day refresh)
 - [x] Rate limiting on sensitive endpoints
 - [x] CORS configured for production
 - [x] Environment variables for secrets
@@ -148,12 +155,11 @@
 - [x] Filename sanitization
 - [x] Production-safe error messages
 - [ ] CSRF protection (optional for JWT-based API)
-- [ ] Refresh token rotation
 
 ---
 
 ## 📞 Security Contact
 
-For security issues, please contact: [Your Security Email]
+For security issues, please contact: [sidhartht900@gmail.com]
 
 **Do not** open public GitHub issues for security vulnerabilities.
