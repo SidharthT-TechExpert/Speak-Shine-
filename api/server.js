@@ -57,6 +57,9 @@ process.on("unhandledRejection", (reason, promise) => {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+const httpServer = createServer(app);
+const PORT = process.env.PORT || process.env.API_PORT || 3001;
+const isProd = process.env.NODE_ENV === "production";
 
 // Trust proxy - required for Railway/reverse proxies to get real client IP
 app.set('trust proxy', 1);
@@ -70,10 +73,6 @@ if (isProd) {
     next();
   });
 }
-
-const httpServer = createServer(app);
-const PORT = process.env.PORT || process.env.API_PORT || 3001;
-const isProd = process.env.NODE_ENV === "production";
 
 // ── Socket.io ───────────────────────────────────────────────────────────────
 const io = new SocketIO(httpServer, {
