@@ -1,4 +1,4 @@
-const CACHE_NAME = "speak-shine-v3";
+const CACHE_NAME = "speak-shine-v4";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
