@@ -1,16 +1,17 @@
 # Video Upload & Recording Fixes
 
-## CRITICAL FIX - Express 5 Wildcard Route
+## CRITICAL FIX - Express 5 Wildcard Route (RESOLVED)
 
-**Problem:** Server was crashing on startup with `PathError: Missing parameter name at index 1: *`
-- Express 5 with newer `path-to-regexp` doesn't support bare `*` wildcard
-- The SPA fallback route `app.get("*", ...)` was causing immediate crash
-- Server couldn't start, preventing all deployments
+**Problem:** Server was crashing on startup with `PathError: Missing parameter name`
+- Express 5 with newer `path-to-regexp` doesn't support wildcard routes with `app.get()`
+- First tried `app.get("*", ...)` → Error: `Missing parameter name at index 1: *`
+- Then tried `app.get("/*", ...)` → Error: `Missing parameter name at index 2: /*`
+- Both wildcard patterns are incompatible with Express 5
 
 **Solution:**
-- Changed `app.get("*", ...)` to `app.get("/*", ...)` in `api/server.js` line 433
-- Express 5 requires `/*` instead of `*` for catch-all routes
-- Server now starts successfully
+- Changed from `app.get("/*", ...)` to `app.use((req, res, next) => {...})` in `api/server.js` line 433
+- `app.use()` middleware is the correct Express 5 pattern for catch-all routes
+- Server now starts successfully without path-to-regexp errors
 
 ---
 
@@ -63,14 +64,14 @@
 
 All video upload and recording issues have been fixed:
 
-1. **Express 5 Wildcard Route Crash** - CRITICAL FIX - Server was crashing immediately on startup
+1. **Express 5 Wildcard Route Crash** - CRITICAL FIX - Server was crashing immediately on startup (RESOLVED)
 2. **CSP Blocking R2 Uploads** - Fixed by updating CSP to allow R2 presigned URLs with bucket subdomain pattern
 3. **MIME Type Validation** - Already working correctly, handles codec suffixes properly
 4. **Font Loading CSP Error** - Fixed by adding Google Fonts to font-src and style-src directives
 5. **Frontend 404 Error** - Not a real issue, likely browser extension or service worker
 
 The main fixes were:
-- **CRITICAL**: Changed Express route from `app.get("*")` to `app.get("/*")` for Express 5 compatibility
+- **CRITICAL**: Changed Express route from `app.get("*")` to `app.use()` middleware for Express 5 compatibility
 - Updated Content Security Policy in `api/server.js` to allow R2 presigned upload URLs
 - Added Google Fonts domains to CSP to prevent font loading errors
 
