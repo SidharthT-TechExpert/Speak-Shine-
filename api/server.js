@@ -376,9 +376,37 @@ app.use((req, res, next) => {
 
 // ── API Routes ──────────────────────────────────────────────────────────────
 app.get("/api/health", (_, res) => res.json({ status: "ok", app: "Speak & Shine 🗣️" }));
+
+// Debug endpoint to list all registered routes (only in development)
+if (!isProd) {
+  app.get("/api/debug/routes", (req, res) => {
+    const routes = [];
+    app._router.stack.forEach((middleware) => {
+      if (middleware.route) {
+        routes.push({
+          path: middleware.route.path,
+          methods: Object.keys(middleware.route.methods)
+        });
+      } else if (middleware.name === 'router') {
+        middleware.handle.stack.forEach((handler) => {
+          if (handler.route) {
+            const path = middleware.regexp.source.replace('\\/?(?=\\/|$)', '').replace(/\\\//g, '/').replace('^', '');
+            routes.push({
+              path: path + handler.route.path,
+              methods: Object.keys(handler.route.methods)
+            });
+          }
+        });
+      }
+    });
+    res.json({ routes });
+  });
+}
+
 app.use("/api/auth",         authRoutes);
 app.use("/api/users",        userRoutes);
 app.use("/api/dashboard",    dashboardRoutes);
+console.log("[Routes] Dashboard routes mounted at /api/dashboard");
 app.use("/api/questions",    questionRoutes);
 app.use("/api/video",        videoUploadLimiter, videoAnalysisRoutes); // Apply video rate limiter
 app.use("/api/attendance",   attendanceRoutes);
