@@ -241,8 +241,14 @@ router.post("/login", loginLimiter, async (req, res) => {
       return res.status(400).json({ error: "Invalid credentials" });
 
     const auth = await Auth.findOne({ phone });
-    if (!auth) return res.status(401).json({ error: "Invalid credentials" });
-    if (!auth.isActive) return res.status(403).json({ error: "Account disabled" });
+    if (!auth) {
+      console.log(`[Login] No auth found for phone: ${phone}`);
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    if (!auth.isActive) {
+      console.log(`[Login] Account disabled for phone: ${phone}`);
+      return res.status(403).json({ error: "Account disabled" });
+    }
 
     // Check if account is locked
     if (auth.lockUntil && auth.lockUntil > Date.now()) {
