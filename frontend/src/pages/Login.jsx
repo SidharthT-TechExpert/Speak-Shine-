@@ -212,7 +212,7 @@ export default function Login({ loginFor = "user", showRegister = false }) {
           <Field
             label="Phone Number"
             type="tel"
-            placeholder="e.g. 918848096746"
+            placeholder="e.g. 919876543210"
             value={form.phone}
             onChange={e => handleChange("phone", e.target.value)}
             onBlur={() => handleBlur("phone")}
