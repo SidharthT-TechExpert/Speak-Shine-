@@ -201,6 +201,34 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning) {
  */
 export function getVideoDuration(videoPath, isUrl = false) {
   return new Promise((resolve, reject) => {
+    // Try to find ffprobe in common locations
+    const ffprobePaths = [
+      'ffprobe', // Try PATH first
+      '/nix/store/*/bin/ffprobe', // Nix store (Railway/Nixpacks)
+      '/usr/bin/ffprobe', // Standard Linux
+      '/usr/local/bin/ffprobe', // Homebrew/custom installs
+    ];
+
+    // Find which ffprobe exists
+    let ffprobeCmd = 'ffprobe';
+    
+    // For Nix store, we need to use shell to expand the glob
+    if (process.env.NIX_STORE || process.env.NIXPACKS_METADATA) {
+      // Running in Nixpacks environment - use shell to find ffprobe
+      const { execSync } = require('child_process');
+      try {
+        ffprobeCmd = execSync('which ffprobe || find /nix/store -name ffprobe -type f 2>/dev/null | head -1', {
+          encoding: 'utf8',
+          timeout: 5000
+        }).trim();
+        if (ffprobeCmd) {
+          console.log('[ffprobe] Found at:', ffprobeCmd);
+        }
+      } catch (findErr) {
+        console.error('[ffprobe] Could not locate ffprobe binary:', findErr.message);
+      }
+    }
+
     // Build args array for ffprobe
     const args = [
       '-v', 'quiet',
@@ -211,7 +239,7 @@ export function getVideoDuration(videoPath, isUrl = false) {
       videoPath
     ];
 
-    execFile('ffprobe', args, { timeout: 30000 }, (err, stdout, stderr) => {
+    execFile(ffprobeCmd || 'ffprobe', args, { timeout: 30000 }, (err, stdout, stderr) => {
       if (err || !stdout?.trim()) {
         console.error("[ffprobe] failed:", stderr || err?.message);
         return reject(new Error("Could not read video duration. Please ensure the file is a valid video."));
