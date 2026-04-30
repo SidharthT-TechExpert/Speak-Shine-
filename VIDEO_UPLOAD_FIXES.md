@@ -133,7 +133,7 @@ Server logs now show:
 ---
 
 ## Issue 4: FFmpeg Missing in Railway Deployment ⚠️ IN PROGRESS
-**Status**: Investigating - Path Detection Added  
+**Status**: Docker Build Approach - Package Lock Fixed  
 **Date**: 2026-04-30
 
 ### Problem
@@ -144,61 +144,82 @@ Video processing fails with:
 ```
 
 ### Root Cause
-`ffprobe` (part of ffmpeg) is installed by Nixpacks but not found in the Node.js process PATH.
+`ffprobe` (part of ffmpeg) was not available in the Railway deployment environment.
 
 ### Attempted Solutions
-1. ✅ Updated `nixpacks.webapp.toml` to use `ffmpeg-full` instead of `ffmpeg`
-2. ✅ Removed invalid `aptPkgs` (Nixpacks doesn't support apt, only nix packages)
-3. ✅ Added verification commands to check ffmpeg installation during build
-4. ✅ **NEW**: Added runtime path detection in `ai/webVideoProcessor.js`
+1. ❌ Used `ffmpeg-full` in `nixpacks.webapp.toml` - Nixpacks didn't install it properly
+2. ❌ Used standard `ffmpeg` in `nixpacks.webapp.toml` - Still not available in PATH
+3. ✅ **Current approach**: Switched to Docker build with explicit ffmpeg installation
 
-### Current Solution (Latest)
-Modified `getVideoDuration()` function to detect ffprobe location at runtime:
+### Docker Build Solution
+Created `Dockerfile` in root directory with multi-stage build:
+
+**Stage 1 (deps)**: Install ffmpeg and all dependencies
+```dockerfile
+FROM node:22-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+```
+
+**Stage 2 (builder)**: Build frontend
+```dockerfile
+FROM deps AS builder
+COPY . .
+RUN cd frontend && NODE_ENV=production npm run build
+```
+
+**Stage 3 (runner)**: Final production image
+```dockerfile
+FROM node:22-slim AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+# Copy only production files
+```
+
+### Build Progress
+1. ✅ ffmpeg successfully installed via apt-get: `Setting up ffmpeg (7:5.1.8-0+deb12u1)`
+2. ❌ Initial build failed: `Missing: @types/dom-mediacapture-record@1.0.22 from lock file`
+3. ✅ **Fixed**: Regenerated `frontend/package-lock.json` with `npm install`
+4. ✅ **Committed and pushed** to trigger Railway rebuild
+
+### Runtime Path Detection
+Added automatic ffprobe detection in `ai/webVideoProcessor.js`:
 
 ```javascript
-// Detect Nixpacks environment
-if (process.env.NIX_STORE || process.env.NIXPACKS_METADATA) {
-  // Use shell to find ffprobe in Nix store
-  ffprobeCmd = execSync(
-    'which ffprobe || find /nix/store -name ffprobe -type f 2>/dev/null | head -1',
-    { encoding: 'utf8', timeout: 5000 }
-  ).trim();
-  console.log('[ffprobe] Found at:', ffprobeCmd);
+// Try to find ffprobe using which or find in nix store
+try {
+  const result = execSync('which ffprobe 2>/dev/null || find /nix/store -name ffprobe -type f 2>/dev/null | head -1', {
+    encoding: 'utf8',
+    timeout: 5000
+  }).trim();
+  
+  if (result) {
+    ffprobeCmd = result;
+    console.log('[ffprobe] Found at:', ffprobeCmd);
+  }
+} catch (findErr) {
+  console.log('[ffprobe] Search failed, using default "ffprobe":', findErr.message);
 }
 ```
 
 This searches for ffprobe in:
 1. System PATH (via `which ffprobe`)
-2. Nix store (`/nix/store/*/bin/ffprobe`)
-3. Standard Linux paths (`/usr/bin/ffprobe`, `/usr/local/bin/ffprobe`)
+2. Nix store (`/nix/store/*/bin/ffprobe`) - for Nixpacks fallback
+3. Falls back to default `ffprobe` command
 
-### Current Configuration (`nixpacks.webapp.toml`)
-```toml
-[phases.setup]
-nixPkgs = ["nodejs_22", "ffmpeg-full", "vips"]
-
-[phases.install]
-cmds = [
-  "echo '=== Verifying ffmpeg installation ==='",
-  "which ffmpeg || echo 'WARNING: ffmpeg not found in PATH'",
-  "which ffprobe || echo 'WARNING: ffprobe not found in PATH'",
-  "find /nix/store -name ffprobe -type f 2>/dev/null | head -5",
-  "ffmpeg -version 2>&1 | head -3",
-  "ffprobe -version 2>&1 | head -3",
-  # ... npm install commands
-]
-```
+With Docker build, ffprobe should be at `/usr/bin/ffprobe`.
 
 ### Next Steps
-1. ⏳ Wait for Railway rebuild to complete
-2. 🔍 Check build logs for ffprobe location output
-3. 🔍 Check runtime logs for `[ffprobe] Found at:` message
+1. ⏳ Wait for Railway rebuild to complete with Docker
+2. 🔍 Check build logs to verify:
+   - Frontend builds successfully
+   - ffmpeg installed in both deps and runner stages
+3. 🔍 Check runtime logs for `[ffprobe] Found at: /usr/bin/ffprobe`
 4. ✅ Test video upload to verify ffprobe works
 
-### Affected Code
-- `ai/webVideoProcessor.js` - `getVideoDuration()` function with path detection
-- `nixpacks.webapp.toml` - ffmpeg installation and verification
-- `api/routes/videoAnalysis.js` - Video upload route calls `getVideoDuration()`
+### Affected Files
+- `Dockerfile` - Multi-stage Docker build with ffmpeg
+- `frontend/package-lock.json` - Regenerated to fix sync issue
+- `ai/webVideoProcessor.js` - Runtime ffprobe path detection
+- `nixpacks.webapp.toml` - Kept for reference (Railway will use Dockerfile instead)
 
 ---
 
@@ -216,7 +237,10 @@ cmds = [
 - `api/middleware/auth.js` - Lazy JWT_SECRET getter
 - `api/routes/auth.js` - Lazy JWT_SECRET getter
 - `api/routes/users.js` - Lazy JWT_SECRET getter
-- `nixpacks.webapp.toml` - ffmpeg installation and verification
+- `Dockerfile` - Multi-stage Docker build with ffmpeg
+- `frontend/package-lock.json` - Regenerated to fix sync issue
+- `ai/webVideoProcessor.js` - Runtime ffprobe path detection
+- `nixpacks.webapp.toml` - Kept for reference (Railway uses Dockerfile)
 
 ## Environment Notes
 - **Railway**: Uses environment variables from dashboard, not `.env` file
