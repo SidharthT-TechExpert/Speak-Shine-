@@ -112,7 +112,7 @@ function Field({ label, type = "text", placeholder, value, onChange, onBlur, err
 }
 
 // ── Login page ────────────────────────────────────────────────────────────────
-export default function Login({ loginFor = "user", showRegister = false }) {
+export default function Login({ loginFor = "user" }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const meta = META[loginFor] || META.user;
@@ -253,9 +253,6 @@ export default function Login({ loginFor = "user", showRegister = false }) {
           </Link>
         </div>
 
-        {showRegister && (
-          <p className="auth-link">No account? <Link to="/register">Register</Link></p>
-        )}
         {loginFor === "user" && (
           <div className="auth-portals">
             <Link to="/admin/login">Admin Portal →</Link>
