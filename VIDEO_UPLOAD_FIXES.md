@@ -133,7 +133,7 @@ Server logs now show:
 ---
 
 ## Issue 4: FFmpeg Missing in Railway Deployment ⚠️ IN PROGRESS
-**Status**: Investigating  
+**Status**: Investigating - Path Detection Added  
 **Date**: 2026-04-30
 
 ### Problem
@@ -144,12 +144,33 @@ Video processing fails with:
 ```
 
 ### Root Cause
-`ffprobe` (part of ffmpeg) not found in Railway container PATH.
+`ffprobe` (part of ffmpeg) is installed by Nixpacks but not found in the Node.js process PATH.
 
 ### Attempted Solutions
 1. ✅ Updated `nixpacks.webapp.toml` to use `ffmpeg-full` instead of `ffmpeg`
 2. ✅ Removed invalid `aptPkgs` (Nixpacks doesn't support apt, only nix packages)
 3. ✅ Added verification commands to check ffmpeg installation during build
+4. ✅ **NEW**: Added runtime path detection in `ai/webVideoProcessor.js`
+
+### Current Solution (Latest)
+Modified `getVideoDuration()` function to detect ffprobe location at runtime:
+
+```javascript
+// Detect Nixpacks environment
+if (process.env.NIX_STORE || process.env.NIXPACKS_METADATA) {
+  // Use shell to find ffprobe in Nix store
+  ffprobeCmd = execSync(
+    'which ffprobe || find /nix/store -name ffprobe -type f 2>/dev/null | head -1',
+    { encoding: 'utf8', timeout: 5000 }
+  ).trim();
+  console.log('[ffprobe] Found at:', ffprobeCmd);
+}
+```
+
+This searches for ffprobe in:
+1. System PATH (via `which ffprobe`)
+2. Nix store (`/nix/store/*/bin/ffprobe`)
+3. Standard Linux paths (`/usr/bin/ffprobe`, `/usr/local/bin/ffprobe`)
 
 ### Current Configuration (`nixpacks.webapp.toml`)
 ```toml
@@ -161,22 +182,22 @@ cmds = [
   "echo '=== Verifying ffmpeg installation ==='",
   "which ffmpeg || echo 'WARNING: ffmpeg not found in PATH'",
   "which ffprobe || echo 'WARNING: ffprobe not found in PATH'",
-  "ffmpeg -version || echo 'WARNING: ffmpeg not executable'",
-  "ffprobe -version || echo 'WARNING: ffprobe not executable'",
+  "find /nix/store -name ffprobe -type f 2>/dev/null | head -5",
+  "ffmpeg -version 2>&1 | head -3",
+  "ffprobe -version 2>&1 | head -3",
   # ... npm install commands
 ]
 ```
 
 ### Next Steps
 1. ⏳ Wait for Railway rebuild to complete
-2. 🔍 Check build logs for ffmpeg verification output
-3. If ffmpeg is installed but not in PATH, may need to:
-   - Set PATH environment variable in Railway
-   - Use absolute path to ffmpeg in code
-   - Try different nixpkg package name (e.g., `ffmpeg_6-full`)
+2. 🔍 Check build logs for ffprobe location output
+3. 🔍 Check runtime logs for `[ffprobe] Found at:` message
+4. ✅ Test video upload to verify ffprobe works
 
 ### Affected Code
-- `ai/webVideoProcessor.js` - `getVideoDuration()` function uses `ffprobe`
+- `ai/webVideoProcessor.js` - `getVideoDuration()` function with path detection
+- `nixpacks.webapp.toml` - ffmpeg installation and verification
 - `api/routes/videoAnalysis.js` - Video upload route calls `getVideoDuration()`
 
 ---
