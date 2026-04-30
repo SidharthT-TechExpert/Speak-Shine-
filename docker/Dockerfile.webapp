@@ -36,7 +36,6 @@ COPY --from=builder /app/grammar ./grammar
 COPY --from=builder /app/db.js ./db.js
 COPY --from=builder /app/redis.js ./redis.js
 COPY --from=builder /app/r2.js ./r2.js
-COPY --from=builder /app/helpers.js ./helpers.js
 COPY --from=builder /app/package.json ./package.json
 
 # Copy built frontend only (no src, no node_modules)
