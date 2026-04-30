@@ -11,7 +11,6 @@ import User from "../models/userSchema.js";
 import DailyReport from "../models/dailyReportSchema.js";
 import VideoReport from "../models/videoReportSchema.js";
 import { generateAndInsertQuestions } from "../ai/questionGenerator.js";
-import { resetStatus } from "../resetStatus.js";
 import { deleteFromR2 } from "../r2.js";
 
 const TIMEZONE = "Asia/Kolkata";
@@ -305,7 +304,15 @@ async function dailyReset() {
     }
 
     // ── 8. Reset status flags ─────────────────────────────────────────────
-    await resetStatus();
+    await Status.updateOne({}, {
+      $set: {
+        questionSentToday: false,
+        dailyReportGenerated: false,
+        isMonthlyReflectionDay: false,
+        isMonthlyGoalsDay: false,
+        isWeeklyReflectionDay: false,
+      }
+    }, { upsert: true });
     console.log("[Scheduler] ✅ Status flags reset");
 
     console.log("[Scheduler] 🔄 Daily reset complete");
