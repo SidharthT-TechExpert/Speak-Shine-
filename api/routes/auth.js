@@ -2,22 +2,48 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import fetch from "node-fetch";
+import { randomInt } from "crypto";
+import rateLimit from "express-rate-limit";
 import Auth from "../../models/authSchema.js";
 import User from "../../models/userSchema.js";
 import { getRedisClient, isRedisAvailable } from "../../redis.js";
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || "speakshine_secret_2024";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("❌ FATAL: JWT_SECRET environment variable is not set. Refusing to start.");
+  process.exit(1);
+}
 const MAX_USERS = parseInt(process.env.MAX_USERS || "20", 10);
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
 const OTP_TTL = 300; // 5 minutes in seconds
+
+// ── Rate limiters ────────────────────────────────────────────────────────────
+// Login: max 10 attempts per 15 minutes per IP
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// OTP send: max 5 per hour per IP (prevent SMS spam)
+const otpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many OTP requests. Please try again in 1 hour." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── OTP helpers ─────────────────────────────────────────────────────────────
 
 function otpKey(phone) { return `otp:${phone}`; }
 
 function generateOTP() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // Cryptographically secure 6-digit OTP
+  return String(randomInt(100000, 1000000));
 }
 
 async function sendOTP(phone, otp) {
@@ -34,7 +60,7 @@ async function sendOTP(phone, otp) {
 }
 
 // POST /api/auth/send-otp — send OTP to phone before registration
-router.post("/send-otp", async (req, res) => {
+router.post("/send-otp", otpLimiter, async (req, res) => {
   try {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: "Phone is required" });
@@ -69,12 +95,13 @@ router.post("/send-otp", async (req, res) => {
 
     res.json({ success: true, message: `OTP sent to ${stripped.slice(0, 5)}XXXXX` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[SendOTP] Error:", err.message);
+    res.status(500).json({ error: "Failed to send OTP. Please try again." });
   }
 });
 
 // POST /api/auth/verify-otp — verify OTP (used before completing registration)
-router.post("/verify-otp", async (req, res) => {
+router.post("/verify-otp", otpLimiter, async (req, res) => {
   try {
     const { phone, otp } = req.body;
     if (!phone || !otp) return res.status(400).json({ error: "Phone and OTP are required" });
@@ -105,7 +132,8 @@ router.post("/verify-otp", async (req, res) => {
 
     res.json({ success: true, verifyToken });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[VerifyOTP] Error:", err.message);
+    res.status(500).json({ error: "Verification failed. Please try again." });
   }
 });
 
@@ -203,16 +231,23 @@ router.post("/register", async (req, res) => {
     const token = jwt.sign({ id: auth._id, phone, role, name }, JWT_SECRET, { expiresIn: "7d" });
     res.json({ token, role, name, phone, linked: !!waUser });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[Register] Error:", err.message);
+    res.status(500).json({ error: "Registration failed. Please try again." });
   }
 });
 
 // POST /api/auth/login
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { phone, password } = req.body;
     if (!phone || !password)
       return res.status(400).json({ error: "phone and password are required" });
+
+    // Sanitise inputs
+    if (typeof phone !== "string" || typeof password !== "string")
+      return res.status(400).json({ error: "Invalid input" });
+    if (password.length > 128)
+      return res.status(400).json({ error: "Invalid credentials" });
 
     const auth = await Auth.findOne({ phone });
     if (!auth) return res.status(401).json({ error: "Invalid credentials" });
@@ -231,7 +266,8 @@ router.post("/login", async (req, res) => {
     );
     res.json({ token, role: auth.role, name: auth.name, phone });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("[Login] Error:", err.message);
+    res.status(500).json({ error: "Login failed. Please try again." });
   }
 });
 

@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
@@ -37,7 +39,11 @@ if (redis) {
   console.log('[Redis] No REDIS_URL configured, using in-memory storage');
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "speakshine_secret_2024";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("❌ FATAL: JWT_SECRET environment variable is not set. Refusing to start.");
+  process.exit(1);
+}
 
 process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught Exception:", err);
@@ -240,8 +246,42 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-app.use(cors({ origin: "*", credentials: true }));
-app.use(express.json({ limit: "10mb" }));
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // disabled — frontend uses inline styles/scripts
+  crossOriginEmbedderPolicy: false,
+}));
+
+// CORS — restrict to known origins in production
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+  : ["*"];
+app.use(cors({
+  origin: isProd
+    ? (origin, cb) => {
+        if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+          cb(null, true);
+        } else {
+          cb(new Error("Not allowed by CORS"));
+        }
+      }
+    : "*",
+  credentials: true,
+}));
+
+// Limit JSON body size to prevent payload DoS
+app.use(express.json({ limit: "1mb" }));
+
+// General API rate limit: 200 requests per minute per IP
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  message: { error: "Too many requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === "/api/health", // don't rate-limit health checks
+});
+app.use("/api", apiLimiter);
 
 // ── Response time middleware ─────────────────────────────────────────────────
 app.use((req, res, next) => {
