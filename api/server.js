@@ -429,7 +429,8 @@ if (isProd) {
       },
     }));
     // SPA fallback — all non-API, non-asset routes serve index.html
-    app.get("*", (req, res) => {
+    // Express 5 compatible: use "/*" instead of "*"
+    app.get("/*", (req, res) => {
       // Don't serve index.html for asset requests that weren't found
       if (req.path.match(/\.(js|css|png|jpg|svg|ico|wasm|json)$/)) {
         return res.status(404).send("Not found");
