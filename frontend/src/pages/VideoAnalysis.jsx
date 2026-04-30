@@ -361,7 +361,7 @@ export default function VideoAnalysis() {
         </div>
 
         {mode === "upload"
-          ? <UploadCard onAnalysisStarted={onAnalysisStarted} />
+          ? <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isWeeklyReflection={isWeeklyReflection} />
           : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isWeeklyReflection={isWeeklyReflection} />
         }
 
@@ -502,7 +502,7 @@ export default function VideoAnalysis() {
 }
 
 // ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
-function UploadCard({ onAnalysisStarted }) {
+function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, isWeeklyReflection }) {
   const [file, setFile]           = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
@@ -569,7 +569,7 @@ function UploadCard({ onAnalysisStarted }) {
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max 5 minutes · Up to 110MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
+        Minimum 1 minute · Max {isMonthlyReflection || isMonthlyGoals ? "10" : isWeeklyReflection ? "7" : "5"} minutes · Up to 110MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"
@@ -643,7 +643,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const pendingBlobRef  = useRef(null); // holds blob until preview video mounts
   const mimeTypeRef     = useRef("video/webm"); // store the actual MIME type used
 
-  const MAX_SECONDS = 300; // 5 min hard cap
+  // Dynamic time limits based on question type
+  const MAX_SECONDS = isMonthlyReflection || isMonthlyGoals 
+    ? 600  // 10 minutes for monthly reflection/goals
+    : isWeeklyReflection 
+    ? 420  // 7 minutes for weekly reflection
+    : 300; // 5 minutes for regular daily questions
 
   // Enumerate devices on mount
   useEffect(() => {
@@ -876,7 +881,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       {step === "setup" && (
         <div>
           <p style={{ color: "var(--muted)", marginBottom: "1.25rem", fontSize: "0.9rem" }}>
-            Minimum 1 min · Max 5 min · Speak clearly to the camera
+            Minimum 1 min · Max {isMonthlyReflection || isMonthlyGoals ? "10" : isWeeklyReflection ? "7" : "5"} min · Speak clearly to the camera
           </p>
 
           {/* Monthly reflection reminder inside record card */}
