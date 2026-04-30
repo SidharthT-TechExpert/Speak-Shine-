@@ -461,6 +461,10 @@ if (isProd) {
     // SPA fallback — all non-API, non-asset routes serve index.html
     // Express 5 compatible: use app.use() instead of app.get() for catch-all
     app.use((req, res, next) => {
+      // Skip API routes - let them 404 properly
+      if (req.path.startsWith("/api/")) {
+        return next();
+      }
       // Don't serve index.html for asset requests that weren't found
       if (req.path.match(/\.(js|css|png|jpg|svg|ico|wasm|json)$/)) {
         return res.status(404).send("Not found");
