@@ -28,18 +28,17 @@ import { recoverStuckJobs } from "./videoQueue.js";
 import { startScheduler } from "./scheduler.js";
 import { startDailyReset } from "./scheduler.js";
 
-// Load environment variables from root .env file
+// Load environment variables from .env file (local development only)
+// In production (Railway), environment variables are set via dashboard
 const __filename_temp = fileURLToPath(import.meta.url);
 const __dirname_temp = path.dirname(__filename_temp);
 const envPath = path.join(__dirname_temp, '../.env');
-console.log('[ENV] Loading .env from:', envPath);
-console.log('[ENV] File exists:', fs.existsSync(envPath));
-const result = dotenv.config({ path: envPath });
-if (result.error) {
-  console.error('[ENV] Error loading .env:', result.error);
+
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+  console.log('[ENV] Loaded .env file');
 } else {
-  console.log('[ENV] Loaded successfully');
-  console.log('[ENV] JWT_SECRET exists:', !!process.env.JWT_SECRET);
+  console.log('[ENV] No .env file found - using environment variables from system');
 }
 
 // Initialize Redis client
@@ -278,7 +277,13 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // TODO: Remove unsafe-inline/eval gradually
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", process.env.R2_PUBLIC_URL || "https:", "wss:", "ws:"],
+      connectSrc: [
+        "'self'", 
+        process.env.R2_PUBLIC_URL || "https:", 
+        "https://*.r2.cloudflarestorage.com", // Allow R2 presigned upload URLs
+        "wss:", 
+        "ws:"
+      ],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'", "blob:", process.env.R2_PUBLIC_URL || "https:"],
