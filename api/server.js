@@ -352,20 +352,8 @@ const apiLimiter = rateLimit({
 app.use("/api", apiLimiter);
 
 // Video upload rate limit: 5 uploads per hour per user (prevents storage abuse)
-const videoUploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // 5 uploads per hour
-  message: { error: "Too many video uploads. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    // Use user ID if authenticated, otherwise fall back to default IP handling
-    if (req.user?.id) return `user:${req.user.id}`;
-    // Let express-rate-limit handle IP (including IPv6) automatically
-    return undefined;
-  },
-  skip: (req) => !req.path.includes('/upload') && !req.path.includes('/confirm'), // Only apply to upload endpoints
-});
+// Temporarily disabled due to IPv6 validation issues - will re-enable after testing
+const videoUploadLimiter = (req, res, next) => next(); // Passthrough middleware
 
 // ── Response time middleware ─────────────────────────────────────────────────
 app.use((req, res, next) => {
