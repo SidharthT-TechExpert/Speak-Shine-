@@ -16,6 +16,7 @@ const TrainerDashboard= lazy(() => import("./pages/TrainerDashboard.jsx"));
 const VideoAnalysis   = lazy(() => import("./pages/VideoAnalysis.jsx"));
 const CommunityFeed   = lazy(() => import("./pages/CommunityFeed.jsx"));
 const LiveSession     = lazy(() => import("./pages/LiveSession.jsx"));
+const NotFound        = lazy(() => import("./pages/NotFound.jsx"));
 
 function PageLoader() {
   return (
@@ -115,8 +116,8 @@ export default function App() {
               </ProtectedRoute>
             } />
 
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Catch-all - 404 Page */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
             </Suspense>
             <ChatLauncher />
