@@ -4,6 +4,7 @@
 
 import fetch from "node-fetch";
 import Question from "../../../models/questionSchema.js";
+import { getTextKey, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 
 export const CATEGORIES = [
   "Daily Life",
@@ -96,7 +97,7 @@ function getOpenerCounts(questions) {
 // ---------------------------------------------------------------------------
 // Rewrite a single question to sound human
 // ---------------------------------------------------------------------------
-async function rewriteAsHuman(q, apiKey) {
+async function rewriteAsHuman(q, retryCount = 0) {
   const prompt = `Rewrite this English speaking practice question to sound like a real person casually asking a friend — not a formal exam or AI-generated question.
 
 Original question: "${q.question}"
@@ -112,30 +113,41 @@ Rules:
 
 Return ONLY the rewritten question text, nothing else.`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 150,
-    }),
-  });
+  while (true) {
+    const apiKey = getTextKey();
+    if (!apiKey) throw new Error("All Groq API keys exhausted — question rewrite unavailable");
 
-  if (!res.ok) return null;
-  const data = await res.json();
-  const rewritten = data.choices?.[0]?.message?.content?.trim();
-  if (!rewritten || rewritten.length < 10) return null;
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 150,
+      }),
+    });
 
-  // Strip surrounding quotes if LLM added them
-  return rewritten.replace(/^["']|["']$/g, "").trim();
+    if (res.status === 429) {
+      const errText = await res.text();
+      markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+      continue; // try next key
+    }
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const rewritten = data.choices?.[0]?.message?.content?.trim();
+    if (!rewritten || rewritten.length < 10) return null;
+
+    // Strip surrounding quotes if LLM added them
+    return rewritten.replace(/^["']|["']$/g, "").trim();
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Humanize a batch — detect + rewrite flagged questions
 // ---------------------------------------------------------------------------
-async function humanizeBatch(questions, apiKey) {
+async function humanizeBatch(questions) {
   const openerCounts = getOpenerCounts(questions);
 
   // Identify which questions need rewriting up-front
@@ -150,7 +162,7 @@ async function humanizeBatch(questions, apiKey) {
   const rewritePromises = questions.map((q, i) => {
     if (!needsRewrite[i]) return Promise.resolve(null);
     console.log(`[Humanize] Rewriting: "${q.question.slice(0, 60)}..."`);
-    return rewriteAsHuman(q, apiKey);
+    return rewriteAsHuman(q);
   });
 
   const rewritten = await Promise.all(rewritePromises);
@@ -184,7 +196,7 @@ function isTooSimilar(newTopic, existingTopics, threshold = 0.4) {
 // ---------------------------------------------------------------------------
 // Generate questions via Groq Llama
 // ---------------------------------------------------------------------------
-async function generateWithAI(categories, existingTopics, countPerCategory, apiKey) {
+async function generateWithAI(categories, existingTopics, countPerCategory) {
   const existingList = existingTopics.length > 0
     ? `\nALREADY USED TOPICS (do NOT repeat or create similar ones):\n${existingTopics.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n`
     : "";
@@ -231,56 +243,64 @@ Return ONLY a valid JSON array, no markdown, no extra text:
   ...
 ]`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.9,
-      max_tokens: 3000,
-    }),
-  });
+  while (true) {
+    const apiKey = getTextKey();
+    if (!apiKey) throw new Error("All Groq API keys exhausted — question generation unavailable");
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Groq API error ${res.status}: ${err.slice(0, 200)}`);
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.9,
+        max_tokens: 3000,
+      }),
+    });
+
+    if (res.status === 429) {
+      const errText = await res.text();
+      markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+      continue; // try next key
+    }
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Groq API error ${res.status}: ${err.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const raw = data.choices[0].message.content.trim();
+
+    let jsonStr = raw;
+    const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) {
+      jsonStr = fence[1].trim();
+    } else {
+      const s = raw.indexOf("[");
+      const e = raw.lastIndexOf("]");
+      if (s !== -1 && e !== -1) jsonStr = raw.slice(s, e + 1);
+    }
+    jsonStr = jsonStr.replace(/,\s*([}\]])/g, "$1");
+
+    return JSON.parse(jsonStr);
   }
-
-  const data = await res.json();
-  const raw = data.choices[0].message.content.trim();
-
-  let jsonStr = raw;
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) {
-    jsonStr = fence[1].trim();
-  } else {
-    const s = raw.indexOf("[");
-    const e = raw.lastIndexOf("]");
-    if (s !== -1 && e !== -1) jsonStr = raw.slice(s, e + 1);
-  }
-  jsonStr = jsonStr.replace(/,\s*([}\]])/g, "$1");
-
-  return JSON.parse(jsonStr);
 }
 
 // ---------------------------------------------------------------------------
 // Main export — generate + humanize + insert
 // ---------------------------------------------------------------------------
 export async function generateAndInsertQuestions(totalCount = 7) {
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not set in .env");
-
   const countPerCategory = Math.ceil(totalCount / CATEGORIES.length);
 
   const existing = await Question.find({}, { topic: 1, _id: 0 }).lean();
   const existingTopics = existing.map(q => q.topic).filter(Boolean);
 
   // Generate
-  const generated = await generateWithAI(CATEGORIES, existingTopics, countPerCategory, GROQ_API_KEY);
+  const generated = await generateWithAI(CATEGORIES, existingTopics, countPerCategory);
 
   // Humanize — detect AI patterns and rewrite
-  const humanized = await humanizeBatch(generated, GROQ_API_KEY);
+  const humanized = await humanizeBatch(generated);
 
   // Validate and dedup
   const allTopics = [...existingTopics];
@@ -316,9 +336,6 @@ export async function generateAndInsertQuestions(totalCount = 7) {
 // Humanize all existing DB questions — called by /humanizedb command
 // ---------------------------------------------------------------------------
 export async function humanizeAllDbQuestions() {
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY not set in .env");
-
   const all = await Question.find().lean();
   if (!all.length) return { updated: 0, skipped: 0, total: 0 };
 
@@ -332,7 +349,7 @@ export async function humanizeAllDbQuestions() {
     }
 
     console.log(`[HumanizeDB] Rewriting: "${q.question.slice(0, 70)}"`);
-    const rewritten = await rewriteAsHuman(q, GROQ_API_KEY);
+    const rewritten = await rewriteAsHuman(q);
 
     if (rewritten && rewritten !== q.question) {
       await Question.updateOne({ _id: q._id }, { $set: { question: rewritten } });
