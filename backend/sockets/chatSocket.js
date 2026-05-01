@@ -53,12 +53,32 @@ function sanitizeReplyTo(replyTo) {
   }
 }
 
+// Module-level references so forceLogoutUser can be called from outside
+let _io = null;
+let _onlineUsers = null;
+
+/**
+ * Force-logout a user by phone number in real time.
+ * Emits `force:logout` to their socket if they are currently connected.
+ * Called by userService.toggleUserStatus when an account is disabled.
+ */
+export function forceLogoutUser(phone) {
+  if (!_io || !_onlineUsers) return;
+  const socketId = _onlineUsers.get(phone);
+  if (socketId) {
+    _io.to(socketId).emit("force:logout", { reason: "Account disabled by admin" });
+    console.log(`[Chat] force:logout sent to ${phone} (socket ${socketId})`);
+  }
+}
+
 /**
  * Initialize chat socket handlers
  * @param {SocketIO.Server} io - Socket.io server instance
  * @param {Map} onlineUsers - Map of online users (phone -> socketId)
  */
 export function initializeChatSocket(io, onlineUsers) {
+  _io = io;
+  _onlineUsers = onlineUsers;
   // ── Auth middleware ──────────────────────────────────────────────────────────
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;

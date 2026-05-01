@@ -174,7 +174,8 @@ export async function updateUserRole(phone, role) {
 
 /**
  * Toggle user active status
- * When disabling: revoke all refresh tokens so the user is forced out immediately.
+ * When disabling: revoke all refresh tokens so the user is forced out immediately,
+ * and push a real-time force:logout event via Socket.io if they are online.
  */
 export async function toggleUserStatus(phone) {
   const auth = await Auth.findOne({ phone });
@@ -186,10 +187,14 @@ export async function toggleUserStatus(phone) {
   
   auth.isActive = !auth.isActive;
 
-  // Revoke all refresh tokens when disabling so the next refresh attempt fails
   if (!auth.isActive) {
+    // Revoke all refresh tokens — next token refresh will fail
     auth.refreshTokens = [];
     console.log(`[UserService] Revoked all tokens for disabled user: ${phone}`);
+
+    // Push real-time logout to the user's active socket (if connected)
+    const { forceLogoutUser } = await import("../../sockets/chatSocket.js");
+    forceLogoutUser(phone);
   }
 
   await auth.save();
