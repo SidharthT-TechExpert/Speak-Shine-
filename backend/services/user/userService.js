@@ -116,7 +116,16 @@ export async function getUserProfile(userId) {
  * Get single user by phone
  */
 export async function getUserByPhone(phone) {
-  const user = await User.findOne({ phone }).lean();
+  // Try to find by phone field first
+  let user = await User.findOne({ phone }).lean();
+  
+  // If not found, try to find by userId pattern (WhatsApp format)
+  if (!user) {
+    user = await User.findOne({ 
+      userId: { $regex: `^${phone}(@|:)` } 
+    }).lean();
+  }
+  
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
@@ -171,7 +180,16 @@ export async function toggleUserStatus(phone) {
  * Toggle user's submission status for today
  */
 export async function toggleSubmissionStatus(phone) {
-  const user = await User.findOne({ phone });
+  // Try to find by phone field first
+  let user = await User.findOne({ phone });
+  
+  // If not found, try to find by userId pattern (WhatsApp format)
+  if (!user) {
+    user = await User.findOne({ 
+      userId: { $regex: `^${phone}(@|:)` } 
+    });
+  }
+  
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
@@ -196,17 +214,24 @@ export async function deleteUser(phone) {
  * Adjust user fine
  */
 export async function adjustUserFine(phone, amount) {
-  const user = await User.findOneAndUpdate(
-    { phone },
-    { $inc: { fine: amount } },
-    { new: true }
-  );
+  // Try to find by phone field first
+  let user = await User.findOne({ phone });
+  
+  // If not found, try to find by userId pattern (WhatsApp format)
+  if (!user) {
+    user = await User.findOne({ 
+      userId: { $regex: `^${phone}(@|:)` } 
+    });
+  }
   
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
     throw error;
   }
+  
+  user.fine = (user.fine || 0) + amount;
+  await user.save();
   
   return { success: true, fine: user.fine };
 }

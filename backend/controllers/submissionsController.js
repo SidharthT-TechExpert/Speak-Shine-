@@ -19,21 +19,34 @@ export const adjustMonthlySubmissions = async (req, res) => {
     }
 
     const user = await safeDB(async () => {
-      return await User.findOneAndUpdate(
-        { phone },
-        { $inc: { monthlySubmissions: delta } },
-        { new: true, runValidators: true }
-      );
+      // Try to find by phone field first
+      let user = await User.findOne({ phone });
+      
+      // If not found, try to find by userId pattern (WhatsApp format)
+      if (!user) {
+        user = await User.findOne({ 
+          userId: { $regex: `^${phone}(@|:)` } 
+        });
+      }
+      
+      if (!user) {
+        return null;
+      }
+
+      // Update the user
+      user.monthlySubmissions = (user.monthlySubmissions || 0) + delta;
+      
+      // Ensure submissions don't go below 0
+      if (user.monthlySubmissions < 0) {
+        user.monthlySubmissions = 0;
+      }
+      
+      await user.save();
+      return user;
     });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
-    }
-
-    // Ensure submissions don't go below 0
-    if (user.monthlySubmissions < 0) {
-      user.monthlySubmissions = 0;
-      await user.save();
     }
 
     res.json({
@@ -61,24 +74,36 @@ export const adjustWeeklySubmissions = async (req, res) => {
     }
 
     const user = await safeDB(async () => {
-      return await User.findOneAndUpdate(
-        { phone },
-        { $inc: { weeklySubmissions: delta } },
-        { new: true, runValidators: true }
-      );
+      // Try to find by phone field first
+      let user = await User.findOne({ phone });
+      
+      // If not found, try to find by userId pattern (WhatsApp format)
+      if (!user) {
+        user = await User.findOne({ 
+          userId: { $regex: `^${phone}(@|:)` } 
+        });
+      }
+      
+      if (!user) {
+        return null;
+      }
+
+      // Update the user
+      user.weeklySubmissions = (user.weeklySubmissions || 0) + delta;
+      
+      // Ensure submissions don't go below 0 or above 7
+      if (user.weeklySubmissions < 0) {
+        user.weeklySubmissions = 0;
+      } else if (user.weeklySubmissions > 7) {
+        user.weeklySubmissions = 7;
+      }
+      
+      await user.save();
+      return user;
     });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
-    }
-
-    // Ensure submissions don't go below 0 or above 7
-    if (user.weeklySubmissions < 0) {
-      user.weeklySubmissions = 0;
-      await user.save();
-    } else if (user.weeklySubmissions > 7) {
-      user.weeklySubmissions = 7;
-      await user.save();
     }
 
     res.json({
