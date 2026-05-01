@@ -90,7 +90,30 @@ export async function getProgress(req, res) {
     const VideoReport = (await import("../../models/videoReportSchema.js")).default;
     const report = await VideoReport.findById(reportId).lean();
     
-    if (!report || report.userId.toString() !== req.user.id) {
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+    
+    // Import Auth and User models for proper user lookup
+    const Auth = (await import("../../models/authSchema.js")).default;
+    const User = (await import("../../models/userSchema.js")).default;
+    
+    // Find the auth record by ID (JWT contains auth._id as 'id')
+    const auth = await Auth.findById(req.user.id);
+    if (!auth) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    // Find the user by phone to get the actual User._id
+    const stripped = auth.phone.replace(/^(\+91|91)/, "");
+    const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+    
+    if (!user) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    
+    // Check if this user owns the report
+    if (report.userId.toString() !== user._id.toString()) {
       return res.status(403).json({ error: "Access denied" });
     }
 
