@@ -29,9 +29,10 @@ const execFileAsync = promisify(execFile);
  * @param {string}   videoPath    - Absolute path to the uploaded video file
  * @param {string}   displayName  - User's display name
  * @param {Function} onProgress   - async (stage: string) => void
+ * @param {number}   knownDuration - Optional known duration from recording timer (seconds)
  * @returns {Promise<object>}     - { analysis, duration }
  */
-export async function processWebVideo(videoPath, displayName = "User", onProgress = () => {}) {
+export async function processWebVideo(videoPath, displayName = "User", onProgress = () => {}, knownDuration = null) {
   const id = Date.now();
   let audioPath = null;
   const isUrl = videoPath.startsWith("http");
@@ -39,7 +40,15 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
   try {
     if (!isUrl && !fs.existsSync(videoPath)) throw new Error("Video file not found");
 
-    const duration = await getVideoDuration(videoPath, isUrl);
+    // Use known duration from recording if available, otherwise detect from file
+    let duration;
+    if (knownDuration && typeof knownDuration === 'number' && knownDuration > 0) {
+      duration = Math.round(knownDuration);
+      console.log(`[VideoProcessor] Using known duration from recording: ${duration}s`);
+    } else {
+      duration = await getVideoDuration(videoPath, isUrl);
+      console.log(`[VideoProcessor] Detected duration from file: ${duration}s`);
+    }
 
     if (duration < 60) throw new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
     // Add 5-second tolerance to account for recording timer drift
@@ -276,13 +285,29 @@ export function getVideoDuration(videoPath, isUrl = false) {
           }
         }
 
-        // Fallback 3: Estimate from file size (very rough estimate for speech videos)
+        // Fallback 3: For browser-recorded videos, try frame count method
+        if (!dur || dur <= 0) {
+          const videoStream = info?.streams?.find(s => s.codec_type === "video");
+          if (videoStream) {
+            // Try to get duration from frame count and frame rate
+            const frameCount = parseInt(videoStream.nb_frames) || 0;
+            const frameRate = eval(videoStream.r_frame_rate || "0/1"); // e.g., "30/1" = 30fps
+            
+            if (frameCount > 0 && frameRate > 0) {
+              dur = frameCount / frameRate;
+              console.log("[ffprobe] Frame-based duration:", dur, "seconds (frames:", frameCount, "fps:", frameRate, ")");
+            }
+          }
+        }
+
+        // Fallback 4: Conservative file size estimate (much more conservative for recorded videos)
         if (!dur || dur <= 0) {
           if (!isUrl) {
             const fileSize = fs.statSync(videoPath).size;
-            // Rough estimate: 1MB per minute for speech videos (very conservative)
-            const estimatedDur = Math.max(60, (fileSize / (1024 * 1024)) * 60);
-            console.log("[ffprobe] File size estimate:", estimatedDur, "seconds (file size:", fileSize, "bytes)");
+            // Much more conservative: assume 200KB per second for browser recordings
+            // This gives us a maximum estimate rather than the previous wrong calculation
+            const estimatedDur = Math.min(600, Math.max(60, fileSize / (200 * 1024)));
+            console.log("[ffprobe] Conservative size estimate:", estimatedDur, "seconds (file size:", fileSize, "bytes)");
             dur = estimatedDur;
           }
         }

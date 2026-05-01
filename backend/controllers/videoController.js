@@ -31,14 +31,15 @@ export async function getPresignedUrl(req, res) {
  */
 export async function confirmUpload(req, res) {
   try {
-    const { key, publicUrl, mimeType = "video/webm", isPublic = true } = req.body;
+    const { key, publicUrl, mimeType = "video/webm", isPublic = true, recordedDuration } = req.body;
     
     const result = await videoService.confirmDirectUpload(
       key,
       publicUrl,
       mimeType,
       isPublic,
-      req.user
+      req.user,
+      recordedDuration
     );
     
     res.json(result);

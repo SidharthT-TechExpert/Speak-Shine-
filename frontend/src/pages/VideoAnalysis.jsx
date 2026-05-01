@@ -1011,6 +1011,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         publicUrl: presign.publicUrl,
         mimeType:  file.type,
         isPublic:  true,
+        recordedDuration: elapsed, // Pass the actual recorded duration from frontend timer
       });
 
       console.log(`[Upload] Analysis started with reportId: ${data.reportId}`);

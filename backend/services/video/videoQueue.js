@@ -99,7 +99,7 @@ async function processNext() {
     });
   });
 
-  const { reportId, videoPath, phone, displayName } = activeJob;
+  const { reportId, videoPath, phone, displayName, knownDuration } = activeJob;
   const startTime = Date.now();
 
   // 10-minute hard timeout
@@ -122,7 +122,7 @@ async function processNext() {
     const result = await processWebVideo(videoPath, displayName, async (stage) => {
       console.log(`[Queue] ${reportId}: ${stage}`);
       pushProgress(reportId, { status: "processing", stage });
-    });
+    }, knownDuration);
 
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "completed",

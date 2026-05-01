@@ -50,11 +50,16 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName) {
     
     console.log(`[VideoService] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
     
+    // Get the stored duration from the report if available
+    const report = await VideoReport.findById(reportId);
+    const storedDuration = report?.videoDuration;
+    
     enqueue({
       reportId,
       videoPath: tempPath,
       phone,
       displayName,
+      knownDuration: storedDuration, // Pass the known duration from recording
     });
   } catch (err) {
     console.error(`[VideoService] Download failed for ${reportId}:`, err.message);
@@ -93,7 +98,7 @@ export async function getPresignedUrl(filename, mimeType, userId) {
 /**
  * Confirm direct upload to R2 and start processing
  */
-export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, user) {
+export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, user, recordedDuration = null) {
   if (!key || !publicUrl) {
     const error = new Error("key and publicUrl are required");
     error.statusCode = 400;
@@ -150,8 +155,8 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     { completed: true }
   );
 
-  // Create report
-  const report = await VideoReport.create({
+  // Create report with recorded duration if provided
+  const reportData = {
     userId,
     phone,
     videoFileName: path.basename(key),
@@ -160,9 +165,17 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     videoKey: key,
     isPublic: isPublic === true || isPublic === "true",
     uploaderName: userDoc?.name || phone,
-  });
+  };
 
-  console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm}`);
+  // If we have the recorded duration from frontend, store it
+  if (recordedDuration && typeof recordedDuration === 'number' && recordedDuration > 0) {
+    reportData.videoDuration = recordedDuration;
+    console.log(`[VideoService] Using recorded duration from frontend: ${recordedDuration}s`);
+  }
+
+  const report = await VideoReport.create(reportData);
+
+  console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'}`);
 
   // Enqueue for processing
   downloadAndEnqueue(report._id, publicUrl, strippedPhone, userDoc?.name || strippedPhone);
