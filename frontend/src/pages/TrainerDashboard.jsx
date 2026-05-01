@@ -65,19 +65,26 @@ export default function TrainerDashboard() {
       .finally(()=>setLoading(false));
   },[]);
 
-  const loadAllScores = async () => {
-    if(Object.keys(allScores).length>0)return;
+  const loadAllScores = async (userList) => {
+    const list = userList || users;
+    if (!list.length) return;
+    if(Object.keys(allScores).length > 0) return;
     setScoresLoading(true);
     const res={};
-    await Promise.all(users.map(async u=>{try{const{data}=await api.get(`/dashboard/scores/${u.phone}`);res[u.phone]=data.feedbackScores||[];}catch{res[u.phone]=[];}}));
+    await Promise.all(list.map(async u=>{try{const{data}=await api.get(`/dashboard/scores/${u.phone}`);res[u.phone]=data.feedbackScores||[];}catch{res[u.phone]=[];}}));
     setAllScores(res);setScoresLoading(false);
   };
 
-  const handleTab = (t) => { setTab(t); if(t==="compare"||t==="improvement")loadAllScores(); };
+  const handleTab = (t) => { setTab(t); if(t==="compare"||t==="improvement")loadAllScores(users); };
 
   const selectUser = async (user) => {
     setSelected(user); setTab("detail");
-    if(!allScores[user.phone]){const{data}=await api.get(`/dashboard/scores/${user.phone}`);setAllScores(p=>({...p,[user.phone]:data.feedbackScores||[]}));}
+    if(!allScores[user.phone]){
+      try {
+        const{data}=await api.get(`/dashboard/scores/${user.phone}`);
+        setAllScores(p=>({...p,[user.phone]:data.feedbackScores||[]}));
+      } catch { setAllScores(p=>({...p,[user.phone]:[]})); }
+    }
   };
 
   const handleSubmissionUpdate = (type, newValue) => {
@@ -219,7 +226,12 @@ export default function TrainerDashboard() {
       {/* COMPARE */}
       {tab==="compare"&&(
         scoresLoading?<div className="spinner-wrap"><div className="spinner"/></div>
-        :compareData.length===0?<div className="card empty-state"><div className="empty-icon">📊</div><p>No feedback scores available yet.</p></div>
+        :compareData.length===0?
+          <div className="card empty-state">
+            <div className="empty-icon">📊</div>
+            <p>No feedback scores available yet.</p>
+            <button className="btn-ghost" style={{marginTop:"1rem"}} onClick={()=>{setAllScores({});loadAllScores(users);}}>🔄 Reload Scores</button>
+          </div>
         :<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
           {Object.entries(SCORES).map(([metric,color])=>(
             <div className="card" key={metric}>
@@ -243,7 +255,12 @@ export default function TrainerDashboard() {
       {/* IMPROVEMENT */}
       {tab==="improvement"&&(
         scoresLoading?<div className="spinner-wrap"><div className="spinner"/></div>
-        :improvementData.length===0?<div className="card empty-state"><div className="empty-icon">📈</div><p>No feedback scores available yet.</p></div>
+        :improvementData.length===0?
+          <div className="card empty-state">
+            <div className="empty-icon">📈</div>
+            <p>No feedback scores available yet.</p>
+            <button className="btn-ghost" style={{marginTop:"1rem"}} onClick={()=>{setAllScores({});loadAllScores(users);}}>🔄 Reload Scores</button>
+          </div>
         :<>
           <div className="card" style={{marginBottom:"1rem"}}>
             <div className="section-title">Score Improvement (First → Latest)</div>

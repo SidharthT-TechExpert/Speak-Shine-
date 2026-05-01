@@ -193,9 +193,14 @@ export async function getUserProfile(phone) {
 
 /**
  * Get feedback score history for a user
+ * Tries multiple phone formats to handle country code variations
  */
 export async function getUserScores(phone) {
-  const user = await User.findOne({ phone }).lean();
+  const stripped = phone.replace(/^(\+91|91)/, "");
+  const user = await User.findOne({
+    phone: { $in: [phone, stripped, `91${stripped}`, `+91${stripped}`] }
+  }).lean();
+
   if (!user) {
     const error = new Error("User not found");
     error.statusCode = 404;
