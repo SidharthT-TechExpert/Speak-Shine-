@@ -74,26 +74,39 @@ async function sendSmsOTP(phone, otp) {
 
 /**
  * Get all users with auth info (admin/trainer)
+ * Merges User collection (tracking data) with Auth collection (credentials/role).
+ * Handles both WhatsApp users (userId like "91xxx@s.whatsapp.net") and
+ * web-only users (userId like "web:STRIPPED_PHONE").
  */
 export async function getAllUsers() {
   const users = await User.find().lean();
   const auths = await Auth.find().lean();
-  
-  const authMap = {};
-  auths.forEach(a => { authMap[a.phone] = a; });
+
+  // Build lookup maps for fast joining
+  const authByPhone = {};
+  auths.forEach(a => { authByPhone[a.phone] = a; });
 
   const result = users.map(u => {
-    const phone = u.userId?.split("@")[0].split(":")[0];
-    const auth = authMap[phone] || {};
+    // Derive the canonical phone from the User document
+    let phone = u.phone;
+    if (!phone && u.userId) {
+      // WhatsApp format: "918848096746@s.whatsapp.net" or "918848096746:12@s.whatsapp.net"
+      phone = u.userId.split("@")[0].split(":")[0];
+    }
+    const stripped = phone ? phone.replace(/^(\+91|91)/, "") : null;
+
+    // Try to find auth by exact phone, then stripped
+    const auth = authByPhone[phone] || authByPhone[stripped] || {};
+
     return {
       ...u,
-      phone,
+      phone: stripped || phone,
       role: auth.role || "user",
       isActive: auth.isActive ?? true,
       registeredName: auth.name || u.name,
     };
   });
-  
+
   return result;
 }
 
@@ -417,6 +430,7 @@ export async function createUserAccount(phone, password, name, role, actionToken
     waUser = await User.findOne({ userId: { $regex: stripped } });
   }
 
+  // Create auth record
   await Auth.create({
     phone: stripped,
     password: hash,
@@ -424,6 +438,29 @@ export async function createUserAccount(phone, password, name, role, actionToken
     role,
     userId: waUser?.userId || null,
   });
+
+  // For "user" role: ensure a User document exists so they appear in
+  // the trainer dashboard, can have submissions tracked, scores stored, etc.
+  // Trainers and admins are staff — they don't need a User tracking record.
+  if (role === "user" && !waUser) {
+    await User.create({
+      userId: `web:${stripped}`,  // synthetic userId for web-only accounts
+      name,
+      phone: stripped,
+      fine: 0,
+      completed: false,
+      streak: 0,
+      weeklySubmissions: 0,
+      weeklyFine: 0,
+      monthlySubmissions: 0,
+      feedbackScores: [],
+    });
+  } else if (role === "user" && waUser) {
+    // Sync name to existing WhatsApp user if it's missing
+    if (!waUser.name) {
+      await User.updateOne({ _id: waUser._id }, { $set: { name, phone: stripped } });
+    }
+  }
 
   return { success: true, message: `Account created for ${name}` };
 }
