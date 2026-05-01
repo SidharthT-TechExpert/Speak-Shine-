@@ -131,3 +131,20 @@ export async function getQuestionTemplates(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * PATCH /api/questions/:id - Edit a question (admin)
+ */
+export async function editQuestion(req, res) {
+  try {
+    const { category, topic, question } = req.body;
+    const result = await questionsService.editQuestion(req.params.id, category, topic, question);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[Questions] Edit question error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
