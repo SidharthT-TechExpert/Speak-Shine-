@@ -211,32 +211,22 @@ export async function getUserScores(phone) {
 }
 
 /**
- * Manually set today's question (admin/trainer only)
- * Accepts optional special-day flags to set the correct mode.
+ * Manually set today's question (admin only)
  */
-export async function setTodayQuestion(topic, question, category, flags = {}) {
-  if (!question && question !== "") {
+export async function setTodayQuestion(topic, question, category) {
+  if (!question) {
     throw new Error("question is required");
   }
-
-  const {
-    isMonthlyReflectionDay = false,
-    isMonthlyGoalsDay      = false,
-    isWeeklyReflectionDay  = false,
-  } = flags;
-
+  
   await Status.updateOne({}, {
     $set: {
-      todayQuestion:          question || null,
-      todayTopic:             topic    || null,
-      todayCategory:          category || null,
-      questionSentToday:      !!question,
-      isMonthlyReflectionDay,
-      isMonthlyGoalsDay,
-      isWeeklyReflectionDay,
+      todayQuestion: question,
+      todayTopic: topic || null,
+      todayCategory: category || null,
+      questionSentToday: true,
     }
   }, { upsert: true });
-
+  
   return { success: true };
 }
 

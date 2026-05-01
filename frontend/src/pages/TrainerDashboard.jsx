@@ -13,7 +13,7 @@ const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, 
 const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
 const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
 const scoreColor = v => v>=7?"var(--success)":v>=5?"var(--warning)":"var(--danger)";
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"submissions",l:"📝 Submissions"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"submissions",l:"📝 Submissions"},{id:"manual-questions",l:"📝 Manual Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
 
 export default function TrainerDashboard() {
   const [dash, setDash] = useState(null);
@@ -411,13 +411,135 @@ export default function TrainerDashboard() {
         </>
       )}
 
-      {/* CONTROLS */}
-      {tab==="controls" && <ControlsPanel dash={dash} onRefresh={async()=>{ const [d,u]=await Promise.all([api.get("/dashboard"),api.get("/users")]); setDash(d.data); setUsers(u.data); }} msg={msg} />}
-
-      {/* MANUAL QUESTIONS — removed, replaced by Controls panel */}
-
       {/* LIVE SESSIONS */}
       {tab==="live" && <TrainerLivePanel />}
+
+      {/* MANUAL QUESTIONS */}
+      {tab==="manual-questions" && <ManualQuestionsPanel />}
+
+      {/* CONTROLS */}
+      {tab==="controls"&&(
+        <div className="card" style={{maxWidth:480}}>
+          <div className="section-title">🔄 Reset Controls</div>
+          <p style={{color:"var(--muted)",fontSize:"0.85rem",marginBottom:"1.5rem"}}>
+            Manually trigger resets. These are normally done automatically by the bot at midnight.
+          </p>
+          <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+            {[
+              { label:"🌅 Reset Day", desc:"Clears today's submissions & question status", key:"day", endpoint:"/users/reset/day" },
+              { label:"📅 Reset Weekly", desc:"Resets weekly submissions & weekly fines to 0", key:"weekly", endpoint:"/users/reset/weekly" },
+              { label:"📆 Reset Monthly", desc:"Resets monthly submission counts to 0", key:"monthly", endpoint:"/users/reset/monthly" },
+            ].map(({label,desc,key,endpoint})=>(
+              <div key={key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.75rem 1rem",background:"var(--bg-secondary)",borderRadius:10,border:"1px solid var(--border)"}}>
+                <div>
+                  <div style={{fontWeight:600,fontSize:"0.9rem"}}>{label}</div>
+                  <div style={{color:"var(--muted)",fontSize:"0.78rem"}}>{desc}</div>
+                </div>
+                <button
+                  className="btn-ghost danger"
+                  style={{fontSize:"0.82rem",whiteSpace:"nowrap"}}
+                  disabled={resetting===key}
+                  onClick={()=>setModal({
+                    type:"danger", title:label,
+                    message:`${desc}. This cannot be undone. Continue?`,
+                    confirmText:"Yes, Reset",
+                    onConfirm: async()=>{
+                      setModal(null); setResetting(key);
+                      try{ await api.post(endpoint); msg(`${label} done!`); const [d,u]=await Promise.all([api.get("/dashboard"),api.get("/users")]); setDash(d.data); setUsers(u.data); }
+                      catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                      finally{ setResetting(""); }
+                    },
+                  })}
+                >
+                  {resetting===key?"Resetting…":"Reset"}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Monthly Reflection Demo */}
+          <div style={{marginTop:"1.5rem"}}>
+            <div className="section-title" style={{fontSize:"0.95rem",marginBottom:"0.5rem"}}>🌟 Monthly Reflection Demo</div>
+            <p style={{color:"var(--muted)",fontSize:"0.82rem",marginBottom:"1rem"}}>
+              Preview how the monthly reflection looks for students. Toggle it on/off without affecting real data.
+            </p>
+            <div style={{display:"flex",gap:"0.75rem",marginBottom:"0.75rem"}}>
+              <button
+                className="btn-primary"
+                style={{flex:1,fontSize:"0.85rem"}}
+                disabled={resetting==="reflection-on"}
+                onClick={async()=>{
+                  setResetting("reflection-on");
+                  try{
+                    await api.post("/dashboard/demo-monthly-reflection");
+                    msg("✅ Monthly reflection mode ON — open User Dashboard to see it");
+                  } catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                  finally{ setResetting(""); }
+                }}
+              >
+                {resetting==="reflection-on" ? "Activating…" : "▶ Reflection ON"}
+              </button>
+              <button
+                className="btn-secondary"
+                style={{flex:1,fontSize:"0.85rem"}}
+                disabled={resetting==="reflection-off"}
+                onClick={async()=>{
+                  setResetting("reflection-off");
+                  try{
+                    await api.post("/dashboard/demo-monthly-reflection-off");
+                    msg("Monthly mode OFF");
+                  } catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                  finally{ setResetting(""); }
+                }}
+              >
+                {resetting==="reflection-off" ? "Turning off…" : "⏹ Turn OFF"}
+              </button>
+            </div>
+
+            {/* Monthly Goals Demo */}
+            <div className="section-title" style={{fontSize:"0.95rem",marginBottom:"0.5rem",marginTop:"1rem"}}>🎯 Monthly Goal Setting Demo</div>
+            <p style={{color:"var(--muted)",fontSize:"0.82rem",marginBottom:"1rem"}}>
+              Preview the 1st-of-month goal setting questions for students.
+            </p>
+            <button
+              className="btn-primary"
+              style={{width:"100%",fontSize:"0.85rem",background:"linear-gradient(135deg,#16a34a,#15803d)",marginBottom:"1rem"}}
+              disabled={resetting==="goals-on"}
+              onClick={async()=>{
+                setResetting("goals-on");
+                try{
+                  await api.post("/dashboard/demo-monthly-goals");
+                  msg("✅ Monthly goals mode ON — open User Dashboard to see it");
+                } catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                finally{ setResetting(""); }
+              }}
+            >
+              {resetting==="goals-on" ? "Activating…" : "▶ Goals ON (Demo)"}
+            </button>
+
+            {/* Weekly Reflection Demo */}
+            <div className="section-title" style={{fontSize:"0.95rem",marginBottom:"0.5rem",marginTop:"0.5rem"}}>📅 Weekly Reflection Demo (Sunday)</div>
+            <p style={{color:"var(--muted)",fontSize:"0.82rem",marginBottom:"1rem"}}>
+              Preview the Sunday weekly reflection questions for students.
+            </p>
+            <button
+              className="btn-primary"
+              style={{width:"100%",fontSize:"0.85rem",background:"linear-gradient(135deg,#0ea5e9,#0284c7)"}}
+              disabled={resetting==="weekly-on"}
+              onClick={async()=>{
+                setResetting("weekly-on");
+                try{
+                  await api.post("/dashboard/demo-weekly-reflection");
+                  msg("✅ Weekly reflection mode ON — open User Dashboard to see it");
+                } catch(e){ msg(e?.response?.data?.error||"Failed","danger"); }
+                finally{ setResetting(""); }
+              }}
+            >
+              {resetting==="weekly-on" ? "Activating…" : "▶ Weekly Reflection ON (Demo)"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* STUDENT DETAIL */}
       {tab==="detail"&&selected&&(
@@ -524,229 +646,6 @@ export default function TrainerDashboard() {
         </>
       )}
     </Layout>
-  );
-}
-
-// ── Controls Panel ────────────────────────────────────────────────────────────
-const QUESTION_TYPES = [
-  { value: "regular",             label: "📌 Regular Daily Question" },
-  { value: "weekly_reflection",   label: "📅 Weekly Reflection (Sunday)" },
-  { value: "monthly_goals",       label: "🎯 Monthly Goal Setting (1st of month)" },
-  { value: "monthly_reflection",  label: "🌟 Monthly Reflection (Last day of month)" },
-];
-
-const TYPE_DEFAULTS = {
-  weekly_reflection: {
-    topic: "Weekly Reflection",
-    category: "Weekly Reflection",
-    placeholder: "e.g. What was your best speaking moment this week?",
-  },
-  monthly_goals: {
-    topic: "Monthly Goal Setting",
-    category: "Monthly Goals",
-    placeholder: "e.g. What is your main communication goal for this month?",
-  },
-  monthly_reflection: {
-    topic: "Monthly Reflection",
-    category: "Monthly Reflection",
-    placeholder: "e.g. How many reviews did you attend this month?",
-  },
-  regular: {
-    topic: "",
-    category: "",
-    placeholder: "Enter today's speaking question…",
-  },
-};
-
-function ControlsPanel({ dash, onRefresh, msg }) {
-  const [resetting, setResetting] = useState("");
-  const [modal, setModal] = useState(null);
-
-  // Question form state
-  const [qType, setQType]         = useState("regular");
-  const [qTopic, setQTopic]       = useState("");
-  const [qCategory, setQCategory] = useState("");
-  const [qText, setQText]         = useState("");
-  const [qSaving, setQSaving]     = useState(false);
-
-  // Current question from DB
-  const today = dash?.today;
-
-  const handleTypeChange = (type) => {
-    setQType(type);
-    const def = TYPE_DEFAULTS[type];
-    setQTopic(def.topic);
-    setQCategory(def.category);
-    setQText("");
-  };
-
-  const publishQuestion = async (e) => {
-    e.preventDefault();
-    if (!qText.trim()) return;
-    setQSaving(true);
-    try {
-      // Map type to the right Status flags
-      const flagMap = {
-        weekly_reflection:  { isWeeklyReflectionDay: true,  isMonthlyReflectionDay: false, isMonthlyGoalsDay: false },
-        monthly_goals:      { isMonthlyGoalsDay: true,       isMonthlyReflectionDay: false, isWeeklyReflectionDay: false },
-        monthly_reflection: { isMonthlyReflectionDay: true,  isMonthlyGoalsDay: false,      isWeeklyReflectionDay: false },
-        regular:            { isMonthlyReflectionDay: false, isMonthlyGoalsDay: false,       isWeeklyReflectionDay: false },
-      };
-      await api.patch("/dashboard/today-question", {
-        topic:    qTopic.trim() || TYPE_DEFAULTS[qType].topic || null,
-        question: qText.trim(),
-        category: qCategory.trim() || TYPE_DEFAULTS[qType].category || null,
-        ...flagMap[qType],
-      });
-      msg("✅ Today's question published — students can see it now");
-      setQText("");
-      await onRefresh();
-    } catch (err) {
-      msg(err?.response?.data?.error || "Failed to publish question", "danger");
-    } finally {
-      setQSaving(false);
-    }
-  };
-
-  const clearQuestion = async () => {
-    setResetting("clear-q");
-    try {
-      await api.patch("/dashboard/today-question", {
-        topic: null, question: "", category: null,
-        isMonthlyReflectionDay: false, isMonthlyGoalsDay: false, isWeeklyReflectionDay: false,
-      });
-      // Also reset questionSentToday so scheduler can re-publish
-      await api.post("/dashboard/demo-monthly-reflection-off");
-      msg("Question cleared");
-      await onRefresh();
-    } catch (err) {
-      msg(err?.response?.data?.error || "Failed", "danger");
-    } finally {
-      setResetting("");
-    }
-  };
-
-  const def = TYPE_DEFAULTS[qType];
-
-  return (
-    <div style={{ maxWidth: 560 }}>
-      {modal && (
-        <Modal
-          type={modal.type} title={modal.title} message={modal.message}
-          confirmText={modal.confirmText} onConfirm={modal.onConfirm} onCancel={() => setModal(null)}
-        />
-      )}
-
-      {/* ── Today's Question ── */}
-      <div className="card" style={{ marginBottom: "1rem" }}>
-        <div className="section-title">📌 Today's Question</div>
-
-        {/* Current question status */}
-        {today?.question ? (
-          <div style={{
-            background: "rgba(74,222,128,0.07)", border: "1px solid rgba(74,222,128,0.25)",
-            borderRadius: 10, padding: "0.875rem 1rem", marginBottom: "1rem",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-              <div style={{ flex: 1 }}>
-                {today.topic && <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.3rem" }}>{today.topic}</div>}
-                <div style={{ fontSize: "0.88rem", color: "var(--text)", lineHeight: 1.5 }}>{today.question}</div>
-                {today.category && <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "0.3rem" }}>Category: {today.category}</div>}
-              </div>
-              <button
-                onClick={clearQuestion}
-                disabled={resetting === "clear-q"}
-                style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", color: "#f87171", borderRadius: 8, padding: "0.3rem 0.65rem", fontSize: "0.75rem", cursor: "pointer", flexShrink: 0 }}
-              >
-                {resetting === "clear-q" ? "…" : "✕ Clear"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 10, padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#fbbf24" }}>
-            ⚠️ No question set for today. Publish one below or wait for the scheduler at {dash?.posterSendTime || "08:00"}.
-          </div>
-        )}
-
-        {/* Publish form */}
-        <form onSubmit={publishQuestion}>
-          <div className="form-group">
-            <label className="form-label">Question Type</label>
-            <select className="form-input" value={qType} onChange={e => handleTypeChange(e.target.value)}>
-              {QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-
-          <div className="form-row" style={{ marginBottom: "0.75rem" }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Topic</label>
-              <input className="form-input" placeholder={def.topic || "e.g. Public Speaking"} value={qTopic} onChange={e => setQTopic(e.target.value)} />
-            </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Category</label>
-              <input className="form-input" placeholder={def.category || "e.g. Confidence"} value={qCategory} onChange={e => setQCategory(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Question *</label>
-            <textarea
-              className="form-input"
-              rows={3}
-              required
-              placeholder={def.placeholder}
-              value={qText}
-              onChange={e => setQText(e.target.value)}
-              style={{ resize: "vertical" }}
-            />
-          </div>
-
-          <button type="submit" className="btn-primary" disabled={qSaving || !qText.trim()} style={{ width: "100%" }}>
-            {qSaving ? "Publishing…" : "📤 Publish Question Now"}
-          </button>
-        </form>
-      </div>
-
-      {/* ── Reset Controls ── */}
-      <div className="card">
-        <div className="section-title">🔄 Reset Controls</div>
-        <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: "1.25rem" }}>
-          Manually trigger resets. These run automatically at midnight.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {[
-            { label: "🌅 Reset Day",     desc: "Clears today's submissions & question status", key: "day",     endpoint: "/users/reset/day" },
-            { label: "📅 Reset Weekly",  desc: "Resets weekly submissions & weekly fines to 0", key: "weekly",  endpoint: "/users/reset/weekly" },
-            { label: "📆 Reset Monthly", desc: "Resets monthly submission counts to 0",          key: "monthly", endpoint: "/users/reset/monthly" },
-          ].map(({ label, desc, key, endpoint }) => (
-            <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 1rem", background: "var(--bg2)", borderRadius: 10, border: "1px solid var(--border)" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{label}</div>
-                <div style={{ color: "var(--muted)", fontSize: "0.78rem" }}>{desc}</div>
-              </div>
-              <button
-                className="btn-ghost danger"
-                style={{ fontSize: "0.82rem", whiteSpace: "nowrap" }}
-                disabled={resetting === key}
-                onClick={() => setModal({
-                  type: "danger", title: label,
-                  message: `${desc}. This cannot be undone. Continue?`,
-                  confirmText: "Yes, Reset",
-                  onConfirm: async () => {
-                    setModal(null); setResetting(key);
-                    try { await api.post(endpoint); msg(`${label} done!`); await onRefresh(); }
-                    catch (e) { msg(e?.response?.data?.error || "Failed", "danger"); }
-                    finally { setResetting(""); }
-                  },
-                })}
-              >
-                {resetting === key ? "Resetting…" : "Reset"}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 

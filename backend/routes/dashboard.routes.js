@@ -17,7 +17,9 @@ router.get("/scores/:phone", authMiddleware, dashboardController.getUserScores);
 // Admin/Trainer routes
 router.get("/report/weekly", authMiddleware, requireRole("admin", "trainer"), dashboardController.getWeeklyReport);
 router.get("/report/monthly", authMiddleware, requireRole("admin", "trainer"), dashboardController.getMonthlyReport);
-router.patch("/today-question", authMiddleware, requireRole("admin", "trainer"), dashboardController.setTodayQuestion);
+
+// Admin-only routes
+router.patch("/today-question", authMiddleware, requireRole("admin"), dashboardController.setTodayQuestion);
 router.get("/settings", authMiddleware, requireRole("admin"), dashboardController.getSettings);
 router.patch("/settings", authMiddleware, requireRole("admin"), dashboardController.updateSettings);
 router.get("/debug-report", authMiddleware, requireRole("admin"), dashboardController.getDebugReport);

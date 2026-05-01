@@ -80,16 +80,12 @@ export async function getUserScores(req, res) {
 }
 
 /**
- * PATCH /api/dashboard/today-question - Manually set today's question (admin/trainer)
+ * PATCH /api/dashboard/today-question - Manually set today's question (admin)
  */
 export async function setTodayQuestion(req, res) {
   try {
-    const { topic, question, category, isMonthlyReflectionDay, isMonthlyGoalsDay, isWeeklyReflectionDay } = req.body;
-    const result = await dashboardService.setTodayQuestion(topic, question, category, {
-      isMonthlyReflectionDay: !!isMonthlyReflectionDay,
-      isMonthlyGoalsDay:      !!isMonthlyGoalsDay,
-      isWeeklyReflectionDay:  !!isWeeklyReflectionDay,
-    });
+    const { topic, question, category } = req.body;
+    const result = await dashboardService.setTodayQuestion(topic, question, category);
     res.json(result);
   } catch (error) {
     console.error("[Dashboard] Set today question error:", error.message);
