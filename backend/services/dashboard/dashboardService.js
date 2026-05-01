@@ -162,6 +162,7 @@ export async function getUserProfile(phone) {
       feedbackScores: user.feedbackScores || [],
       streak: user.streak || 0,
       fine: user.fine || 0,
+      weeklyFine: user.weeklyFine || 0,
       completed: user.completed || false,
       weeklySubmissions: user.weeklySubmissions || 0,
       monthlySubmissions: user.monthlySubmissions || 0,

@@ -829,16 +829,76 @@ export default function UserDashboard() {
 
       <div className="stat-grid">
         <StatCard icon="🔥" label="Current Streak"    value={`${profile?.streak || 0} days`}        color="#f97316" />
-        <StatCard icon="💸" label="Total Fine"         value={`₹${profile?.fine || 0}`}              color="#f87171" />
         <StatCard icon="📹" label="Total Sessions"     value={scores.length}                          color="#7c6fff" />
         <StatCard icon="📅" label="This Week"          value={`${profile?.weeklySubmissions || 0}/7`} color="#4ade80" />
+        <StatCard icon="📆" label="Monthly"            value={profile?.monthlySubmissions || 0}      color="#fbbf24" />
+      </div>
+
+      {/* Fine breakdown card */}
+      <div className="card" style={{
+        marginBottom: "1rem",
+        background: (profile?.fine || 0) > 0
+          ? "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(15,15,34,0) 100%)"
+          : "var(--card)",
+        border: (profile?.fine || 0) > 0
+          ? "1px solid rgba(239,68,68,0.25)"
+          : "1px solid var(--border)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+          <div className="section-title" style={{ margin: 0 }}>💸 Fine Summary</div>
+          {(profile?.fine || 0) === 0 && (
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.2rem 0.65rem", borderRadius: "99px", background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}>
+              ✅ No fines
+            </span>
+          )}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          {/* Total fine */}
+          <div style={{
+            background: (profile?.fine || 0) > 0 ? "rgba(239,68,68,0.1)" : "var(--bg2)",
+            border: `1px solid ${(profile?.fine || 0) > 0 ? "rgba(239,68,68,0.3)" : "var(--border)"}`,
+            borderRadius: "12px",
+            padding: "1rem",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: "1.5rem", marginBottom: "0.3rem" }}>💸</div>
+            <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.3rem" }}>Total Fine</div>
+            <div style={{ fontSize: "1.6rem", fontWeight: 800, color: (profile?.fine || 0) > 0 ? "#f87171" : "#4ade80" }}>
+              ₹{profile?.fine || 0}
+            </div>
+            {(profile?.fine || 0) > 0 && (
+              <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.25rem" }}>accumulated total</div>
+            )}
+          </div>
+          {/* Weekly fine */}
+          <div style={{
+            background: (profile?.weeklyFine || 0) > 0 ? "rgba(251,191,36,0.08)" : "var(--bg2)",
+            border: `1px solid ${(profile?.weeklyFine || 0) > 0 ? "rgba(251,191,36,0.3)" : "var(--border)"}`,
+            borderRadius: "12px",
+            padding: "1rem",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: "1.5rem", marginBottom: "0.3rem" }}>📊</div>
+            <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.3rem" }}>This Week</div>
+            <div style={{ fontSize: "1.6rem", fontWeight: 800, color: (profile?.weeklyFine || 0) > 0 ? "#fbbf24" : "#4ade80" }}>
+              ₹{profile?.weeklyFine || 0}
+            </div>
+            {(profile?.weeklyFine || 0) > 0 && (
+              <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.25rem" }}>resets every Sunday</div>
+            )}
+          </div>
+        </div>
+        {(profile?.fine || 0) > 0 && (
+          <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.75rem", textAlign: "center", lineHeight: 1.5 }}>
+            💡 Submit your video every day to avoid fines. Fines are added at midnight for missed days.
+          </p>
+        )}
       </div>
 
       <div className="stat-grid">
         <StatCard icon="👥" label="Group Members"      value={data?.stats?.total || 0}               color="#7c6fff" />
         <StatCard icon="✅" label="Submitted Today"    value={data?.stats?.completed || 0}           color="#4ade80" />
         <StatCard icon="⏳" label="Pending Today"      value={data?.stats?.pending || 0}             color="#f87171" />
-        <StatCard icon="📆" label="Monthly"            value={profile?.monthlySubmissions || 0}      color="#fbbf24" />
       </div>
 
       {scores.length > 0 ? (
