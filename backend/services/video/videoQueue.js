@@ -1,15 +1,15 @@
 /**
- * videoQueue.js — Simple in-memory video processing queue.
- * Processes videos one at a time (FIFO). Emits SSE progress updates.
- * Tracks stats for the monitoring dashboard.
+ * Video Queue Service
+ * Manages video processing queue (FIFO)
+ * Processes videos one at a time to prevent OOM
  */
 
-import VideoReport from "../models/videoReportSchema.js";
-import User from "../models/userSchema.js";
-import { processWebVideo } from "../backend/services/ai/videoProcessor.js";
+import VideoReport from "../../../models/videoReportSchema.js";
+import User from "../../../models/userSchema.js";
+import { processWebVideo } from "../ai/videoProcessor.js";
 import fs from "fs";
 
-// ── Queue state ──────────────────────────────────────────────────────────────
+// ── Queue State ──────────────────────────────────────────────────────────────
 const queue = [];           // [{ reportId, videoPath, phone, displayName, addedAt }]
 let activeJob = null;       // currently processing job
 let isProcessing = false;
@@ -22,30 +22,48 @@ const stats = {
   errorsToday: [],          // [{ reportId, error, at }]
 };
 
-// ── SSE clients: reportId → res ──────────────────────────────────────────────
+// ── SSE Clients: reportId → res ──────────────────────────────────────────────
 const sseClients = new Map();
 
+/**
+ * Register SSE client for progress updates
+ */
 export function registerSseClient(reportId, res) {
   sseClients.set(String(reportId), res);
 }
 
+/**
+ * Unregister SSE client
+ */
 export function unregisterSseClient(reportId) {
   sseClients.delete(String(reportId));
 }
 
+/**
+ * Push progress update to SSE client
+ */
 function pushProgress(reportId, data) {
   const client = sseClients.get(String(reportId));
   if (client) client.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
+/**
+ * Close SSE connection
+ */
 function closeSse(reportId) {
   const client = sseClients.get(String(reportId));
-  if (client) { client.end(); sseClients.delete(String(reportId)); }
+  if (client) { 
+    client.end(); 
+    sseClients.delete(String(reportId)); 
+  }
 }
 
-// ── Enqueue ──────────────────────────────────────────────────────────────────
+/**
+ * Enqueue video for processing
+ * @param {object} job - { reportId, videoPath, phone, displayName }
+ * @returns {object} - { position, estimatedWait }
+ */
 export function enqueue(job) {
-  // job: { reportId, videoPath, phone, displayName }
   queue.push({ ...job, addedAt: Date.now() });
   const position = queue.length;
   const estimatedWait = estimateWait(position);
@@ -62,7 +80,9 @@ export function enqueue(job) {
   return { position, estimatedWait };
 }
 
-// ── Process next job ─────────────────────────────────────────────────────────
+/**
+ * Process next job in queue
+ */
 async function processNext() {
   if (isProcessing || queue.length === 0) return;
 
@@ -158,6 +178,9 @@ async function processNext() {
   }
 }
 
+/**
+ * Finish job and process next
+ */
 function finishJob(reportId, startTime, outcome) {
   const elapsed = Date.now() - startTime;
   if (outcome === "success") {
@@ -170,7 +193,9 @@ function finishJob(reportId, startTime, outcome) {
   processNext();
 }
 
-// ── Retry (re-enqueue from R2 URL) ──────────────────────────────────────────
+/**
+ * Retry processing by re-enqueuing from R2 URL
+ */
 export async function enqueueRetry(reportId, videoUrl, phone, displayName) {
   const tempPath = `./tmp/retry-${reportId}-${Date.now()}.mp4`;
 
@@ -178,7 +203,6 @@ export async function enqueueRetry(reportId, videoUrl, phone, displayName) {
     console.log(`[Queue] Retrying ${reportId} - downloading from R2: ${videoUrl}`);
     
     // Download video from R2 to temp file
-    // ffprobe cannot read from HTTPS URLs directly in Railway environment
     const response = await fetch(videoUrl);
     if (!response.ok) {
       throw new Error(`Failed to download video from R2: ${response.status} ${response.statusText}`);
@@ -191,7 +215,7 @@ export async function enqueueRetry(reportId, videoUrl, phone, displayName) {
     
     return enqueue({ 
       reportId, 
-      videoPath: tempPath,  // Use local temp file
+      videoPath: tempPath,
       phone, 
       displayName
     });
@@ -213,13 +237,15 @@ export async function enqueueRetry(reportId, videoUrl, phone, displayName) {
   }
 }
 
-// ── Monitoring helpers ───────────────────────────────────────────────────────
+/**
+ * Get queue statistics
+ */
 export function getQueueStats() {
   const avgMs = stats.processingTimes.length
     ? stats.processingTimes.reduce((a, b) => a + b, 0) / stats.processingTimes.length
     : null;
 
-  // Reset errorsToday at midnight (simple check)
+  // Reset errorsToday at midnight
   const now = new Date();
   stats.errorsToday = stats.errorsToday.filter(e => {
     const d = new Date(e.at);
@@ -239,6 +265,9 @@ export function getQueueStats() {
   };
 }
 
+/**
+ * Estimate wait time in minutes
+ */
 export function estimateWait(position) {
   const avgMs = stats.processingTimes.length
     ? stats.processingTimes.reduce((a, b) => a + b, 0) / stats.processingTimes.length
@@ -247,7 +276,9 @@ export function estimateWait(position) {
   return Math.ceil(totalMs / 60000); // minutes
 }
 
-// ── Startup recovery ─────────────────────────────────────────────────────────
+/**
+ * Recover stuck jobs on startup
+ */
 export async function recoverStuckJobs() {
   try {
     const stuck = await VideoReport.find({ status: "processing" }).lean();
@@ -261,7 +292,7 @@ export async function recoverStuckJobs() {
     for (const report of stuck) {
       const retries = report.retryCount || 0;
 
-      // Give up after 3 attempts — this job is causing crashes
+      // Give up after 3 attempts
       if (retries >= 3) {
         await VideoReport.findByIdAndUpdate(report._id, {
           status: "failed",

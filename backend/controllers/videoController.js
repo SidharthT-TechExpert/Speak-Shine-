@@ -1,0 +1,206 @@
+/**
+ * Video Controller
+ * Handles HTTP requests for video endpoints
+ */
+
+import * as videoService from "../services/video/videoService.js";
+import * as videoQueue from "../services/video/videoQueue.js";
+
+/**
+ * GET /api/video/presign
+ * Generate presigned upload URL for direct browser upload to R2
+ */
+export async function getPresignedUrl(req, res) {
+  try {
+    const { filename = "video.webm", mimeType = "video/webm" } = req.query;
+    
+    const result = await videoService.getPresignedUrl(filename, mimeType, req.user.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[Presign] Error:", error.message);
+    res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+}
+
+/**
+ * POST /api/video/confirm
+ * Confirm direct upload to R2 and start processing
+ */
+export async function confirmUpload(req, res) {
+  try {
+    const { key, publicUrl, mimeType = "video/webm", isPublic = true } = req.body;
+    
+    const result = await videoService.confirmDirectUpload(
+      key,
+      publicUrl,
+      mimeType,
+      isPublic,
+      req.user
+    );
+    
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[VideoConfirm] Error:", error.message);
+    res.status(500).json({ error: error.message || "Failed to start analysis" });
+  }
+}
+
+/**
+ * POST /api/video/upload
+ * Upload video file directly
+ */
+export async function uploadVideo(req, res) {
+  try {
+    const isPublic = req.body.isPublic;
+    const ipAddress = req.ip;
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    const result = await videoService.uploadVideo(
+      req.file,
+      req.user,
+      isPublic,
+      ipAddress,
+      userAgent
+    );
+    
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[VideoUpload] Error:", error.message);
+    res.status(500).json({ error: error.message || "Failed to upload video" });
+  }
+}
+
+/**
+ * GET /api/video/progress/:reportId
+ * SSE progress stream for video processing
+ */
+export async function getProgress(req, res) {
+  try {
+    const { reportId } = req.params;
+    
+    const VideoReport = (await import("../../models/videoReportSchema.js")).default;
+    const report = await VideoReport.findById(reportId).lean();
+    
+    if (!report || report.userId.toString() !== req.user.id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // If already done, return immediately
+    if (report.status === "completed" || report.status === "failed") {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.write(`data: ${JSON.stringify({ status: report.status })}\n\n`);
+      return res.end();
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    videoQueue.registerSseClient(reportId, res);
+
+    const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15000);
+
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      videoQueue.unregisterSseClient(reportId);
+    });
+  } catch (error) {
+    console.error("[Progress] Error:", error.message);
+    res.status(500).json({ error: "Failed to stream progress" });
+  }
+}
+
+/**
+ * GET /api/video/report/:reportId
+ * Get video report
+ */
+export async function getReport(req, res) {
+  try {
+    const { reportId } = req.params;
+    
+    const result = await videoService.getVideoReport(reportId, req.user.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[GetReport] Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch report" });
+  }
+}
+
+/**
+ * GET /api/video/community-feed
+ * Get community feed (public videos from last 24h)
+ */
+export async function getCommunityFeed(req, res) {
+  try {
+    const result = await videoService.getCommunityFeed();
+    res.json(result);
+  } catch (error) {
+    console.error("[CommunityFeed] Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch community feed" });
+  }
+}
+
+/**
+ * PATCH /api/video/report/:reportId/visibility
+ * Toggle video visibility (public/private)
+ */
+export async function toggleVisibility(req, res) {
+  try {
+    const { reportId } = req.params;
+    
+    const result = await videoService.toggleVideoVisibility(reportId, req.user.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[ToggleVisibility] Error:", error.message);
+    res.status(500).json({ error: "Failed to update visibility" });
+  }
+}
+
+/**
+ * GET /api/video/my-reports
+ * Get user's reports
+ */
+export async function getMyReports(req, res) {
+  try {
+    const result = await videoService.getUserReports(req.user.id);
+    res.json(result);
+  } catch (error) {
+    console.error("[MyReports] Error:", error.message);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+}
+
+/**
+ * DELETE /api/video/report/:reportId
+ * Delete video report
+ */
+export async function deleteReport(req, res) {
+  try {
+    const { reportId } = req.params;
+    
+    const result = await videoService.deleteVideoReport(reportId, req.user.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[DeleteReport] Error:", error.message);
+    res.status(500).json({ error: "Failed to delete report" });
+  }
+}

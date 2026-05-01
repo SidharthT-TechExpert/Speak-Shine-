@@ -30,9 +30,9 @@ WORKDIR /app
 # Copy backend deps + source
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/api ./api
+COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/models ./models
-COPY --from=builder /app/ai ./ai
-COPY --from=builder /app/grammar ./grammar
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/db.js ./db.js
 COPY --from=builder /app/redis.js ./redis.js
 COPY --from=builder /app/r2.js ./r2.js
