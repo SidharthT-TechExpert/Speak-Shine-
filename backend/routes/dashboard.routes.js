@@ -14,9 +14,9 @@ router.get("/", authMiddleware, dashboardController.getTodayOverview);
 router.get("/me", authMiddleware, dashboardController.getUserProfile);
 router.get("/scores/:phone", authMiddleware, dashboardController.getUserScores);
 
-// Admin/Trainer routes
-router.get("/report/weekly", authMiddleware, requireRole("admin", "trainer"), dashboardController.getWeeklyReport);
-router.get("/report/monthly", authMiddleware, requireRole("admin", "trainer"), dashboardController.getMonthlyReport);
+// Admin/Trainer routes — viewer can read these too
+router.get("/report/weekly", authMiddleware, requireRole("admin", "trainer", "viewer"), dashboardController.getWeeklyReport);
+router.get("/report/monthly", authMiddleware, requireRole("admin", "trainer", "viewer"), dashboardController.getMonthlyReport);
 
 // Admin-only routes
 router.patch("/today-question", authMiddleware, requireRole("admin"), dashboardController.setTodayQuestion);

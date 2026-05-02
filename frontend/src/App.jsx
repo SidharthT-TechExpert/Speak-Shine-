@@ -30,10 +30,11 @@ function PageLoader() {
 function GuestRoute({ children, loginFor }) {
   const { user } = useAuth();
   if (!user) return children;
-  if (loginFor === "admin"   && user.role === "admin")                              return <Navigate to="/admin"     replace />;
-  if (loginFor === "trainer" && ["trainer","admin"].includes(user.role))            return <Navigate to="/trainer"   replace />;
+  if (loginFor === "admin"   && user.role === "admin")                                    return <Navigate to="/admin"     replace />;
+  if (loginFor === "trainer" && ["trainer","admin"].includes(user.role))                  return <Navigate to="/trainer"   replace />;
   if (user.role === "admin")   return <Navigate to="/admin"     replace />;
   if (user.role === "trainer") return <Navigate to="/trainer"   replace />;
+  if (user.role === "viewer")  return <Navigate to="/admin"     replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -51,6 +52,7 @@ function HomeRedirect() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === "admin")   return <Navigate to="/admin"     replace />;
   if (user.role === "trainer") return <Navigate to="/trainer"   replace />;
+  if (user.role === "viewer")  return <Navigate to="/admin"     replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -106,12 +108,12 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="/admin" element={
-              <ProtectedRoute roles={["admin"]} loginPath="/admin/login">
+              <ProtectedRoute roles={["admin", "viewer"]} loginPath="/admin/login">
                 <AdminDashboard />
               </ProtectedRoute>
             } />
             <Route path="/trainer" element={
-              <ProtectedRoute roles={["trainer","admin"]} loginPath="/trainer/login">
+              <ProtectedRoute roles={["trainer","admin","viewer"]} loginPath="/trainer/login">
                 <TrainerDashboard />
               </ProtectedRoute>
             } />

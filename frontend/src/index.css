@@ -104,6 +104,7 @@ input, select, textarea { font-family: inherit; outline: none; -webkit-appearanc
 .role-badge.admin   { background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.35); }
 .role-badge.trainer { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
 .role-badge.user    { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+.role-badge.viewer  { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
 .header-name { font-size: 0.8rem; color: var(--text2); white-space: nowrap; }
 .logout-btn { font-size: 0.72rem; color: var(--text2); border: 1px solid var(--border2); padding: 0.3rem 0.75rem; border-radius: 8px; transition: all 0.2s; white-space: nowrap; background: transparent; }
 .logout-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,0.08); }

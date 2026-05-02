@@ -10,9 +10,9 @@ import { authMiddleware, requireRole } from "../middleware/auth.js";
 const router = express.Router();
 
 // ── User List & Profile ──────────────────────────────────────────────────────
-router.get("/", authMiddleware, requireRole("admin", "trainer"), userController.getAllUsers);
+router.get("/", authMiddleware, requireRole("admin", "trainer", "viewer"), userController.getAllUsers);
 router.get("/me", authMiddleware, userController.getMyProfile);
-router.get("/:phone", authMiddleware, requireRole("admin", "trainer"), userController.getUserByPhone);
+router.get("/:phone", authMiddleware, requireRole("admin", "trainer", "viewer"), userController.getUserByPhone);
 
 // ── User Management (Admin) ──────────────────────────────────────────────────
 router.patch("/:phone/role", authMiddleware, requireRole("admin"), userController.updateUserRole);

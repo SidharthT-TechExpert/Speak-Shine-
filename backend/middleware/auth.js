@@ -83,3 +83,15 @@ export function requireRole(...roles) {
     next();
   };
 }
+
+/**
+ * Block write operations for viewer accounts.
+ * Viewers can call any GET endpoint but all POST/PATCH/PUT/DELETE return 403.
+ * Apply this after authMiddleware on any route group that has mutations.
+ */
+export function blockViewer(req, res, next) {
+  if (req.user?.role === "viewer" && req.method !== "GET") {
+    return res.status(403).json({ error: "Read-only account — this action is not allowed", code: "VIEWER_READONLY" });
+  }
+  next();
+}

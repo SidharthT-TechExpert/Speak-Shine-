@@ -43,6 +43,7 @@ export default function RoleSelector({ phone, currentRole, onRoleChange }) {
       <option value="user">User</option>
       <option value="trainer">Trainer</option>
       <option value="admin">Admin</option>
+      <option value="viewer">Viewer</option>
     </select>
   );
 }

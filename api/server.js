@@ -11,6 +11,7 @@ import { Server as SocketIO } from "socket.io";
 import { connectDB } from "../db.js";
 import { getRedisClient } from "../redis.js";
 import { initializeChatSocket } from "../backend/sockets/chatSocket.js";
+import { blockViewer } from "../backend/middleware/auth.js";
 
 // Monitoring service (for tracking metrics)
 import { setOnlineUsersRef, recordResponseTime } from "../backend/services/monitoring/monitoringService.js";
@@ -250,6 +251,8 @@ if (!isProd) {
 }
 
 app.use("/api/auth",         authRoutes);
+// Block all write operations for viewer accounts across every route
+app.use("/api", blockViewer);
 app.use("/api/users",        userRoutes);
 app.use("/api/dashboard",    dashboardRoutes);
 console.log("[Routes] Dashboard routes mounted at /api/dashboard");

@@ -12,10 +12,10 @@ const router = express.Router();
 // Public authenticated routes (all roles)
 router.get("/random", authMiddleware, questionsController.getRandomQuestion);
 
-// Admin/Trainer routes
-router.get("/", authMiddleware, requireRole("admin", "trainer"), questionsController.listQuestions);
-router.get("/manual", authMiddleware, requireRole("admin", "trainer"), questionsController.listManualQuestions);
-router.get("/templates", authMiddleware, requireRole("admin", "trainer"), questionsController.getQuestionTemplates);
+// Admin/Trainer routes — viewer can read
+router.get("/", authMiddleware, requireRole("admin", "trainer", "viewer"), questionsController.listQuestions);
+router.get("/manual", authMiddleware, requireRole("admin", "trainer", "viewer"), questionsController.listManualQuestions);
+router.get("/templates", authMiddleware, requireRole("admin", "trainer", "viewer"), questionsController.getQuestionTemplates);
 router.post("/manual", authMiddleware, requireRole("admin", "trainer"), questionsController.setupManualQuestion);
 router.delete("/manual/:id", authMiddleware, requireRole("admin", "trainer"), questionsController.deleteManualQuestion);
 

@@ -505,6 +505,7 @@ export default function AdminDashboard() {
                       <option value="user">User</option>
                       <option value="trainer">Trainer</option>
                       <option value="admin">Admin</option>
+                      <option value="viewer">Viewer (read-only)</option>
                     </select>
                   </div>
                 </div>

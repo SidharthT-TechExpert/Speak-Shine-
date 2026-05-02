@@ -123,6 +123,13 @@ export default function Layout({ children, title }) {
       { to: "/video-analysis", label: "📹 Video Analysis" },
       { to: "/community", label: "👥 Community" },
     ];
+    if (user?.role === "viewer") return [
+      { to: "/admin",     label: "🛡️ Admin" },
+      { to: "/trainer",   label: "🎓 Trainer" },
+      { to: "/dashboard", label: "👤 User View" },
+      { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/community", label: "👥 Community" },
+    ];
     if (user?.role === "trainer") return [
       { to: "/trainer",   label: "🎓 Dashboard" },
       { to: "/dashboard", label: "👤 User View" },
@@ -373,6 +380,25 @@ export default function Layout({ children, title }) {
       )}
 
       <main className="app-main">
+        {/* Read-only banner for viewer accounts */}
+        {user?.role === "viewer" && (
+          <div style={{
+            background: "rgba(251,191,36,0.1)",
+            border: "1px solid rgba(251,191,36,0.3)",
+            borderRadius: "10px",
+            padding: "0.6rem 1rem",
+            marginBottom: "1rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.6rem",
+            fontSize: "0.82rem",
+            color: "#fbbf24",
+            fontWeight: 500,
+          }}>
+            <span style={{ fontSize: "1rem" }}>👁️</span>
+            <span><strong>Read-only mode</strong> — You can view all pages but cannot make any changes.</span>
+          </div>
+        )}
         {title && <h1 className="page-title">{title}</h1>}
         {children}
       </main>

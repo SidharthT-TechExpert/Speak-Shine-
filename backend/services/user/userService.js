@@ -151,7 +151,7 @@ export async function getUserByPhone(phone) {
  * Update user role
  */
 export async function updateUserRole(phone, role) {
-  if (!["user", "trainer", "admin"].includes(role)) {
+  if (!["user", "trainer", "admin", "viewer"].includes(role)) {
     const error = new Error("Invalid role");
     error.statusCode = 400;
     throw error;
@@ -413,7 +413,7 @@ export async function createUserAccount(phone, password, name, role, actionToken
     throw error;
   }
   
-  if (!["user", "trainer", "admin"].includes(role)) {
+  if (!["user", "trainer", "admin", "viewer"].includes(role)) {
     const error = new Error("Invalid role");
     error.statusCode = 400;
     throw error;
@@ -462,7 +462,7 @@ export async function createUserAccount(phone, password, name, role, actionToken
 
   // For "user" role: ensure a User document exists so they appear in
   // the trainer dashboard, can have submissions tracked, scores stored, etc.
-  // Trainers and admins are staff — they don't need a User tracking record.
+  // Trainers, admins, and viewers are staff — they don't need a User tracking record.
   if (role === "user" && !waUser) {
     await User.create({
       userId: `web:${stripped}`,  // synthetic userId for web-only accounts
