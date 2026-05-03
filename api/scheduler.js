@@ -243,6 +243,17 @@ export function startScheduler() {
 }
 
 /**
+ * Returns today's date string in IST as "YYYY-MM-DD"
+ */
+function getTodayIST() {
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
+  const y = nowIST.getFullYear();
+  const m = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Daily reset at 12:05 AM IST
  * Resets daily flags, increments counters, handles weekly/monthly resets
  */
@@ -346,6 +357,7 @@ async function dailyReset() {
         isMonthlyReflectionDay: false,
         isMonthlyGoalsDay: false,
         isWeeklyReflectionDay: false,
+        lastResetDate: getTodayIST(),   // ← stamp today so we can detect missed resets
       }
     }, { upsert: true });
     console.log("[Scheduler] ✅ Status flags reset");
@@ -490,11 +502,31 @@ export function startDailyReset() {
   // Single midnight job: generate reports → apply fines/streaks → reset flags
   cron.schedule("0 0 * * *", midnightJob, { timezone: TIMEZONE });
 
+  // ── Safety fallback at 12:05 AM ──────────────────────────────────────────
+  // If the midnight job failed or was skipped (e.g. server was down at 00:00),
+  // this catches it 5 minutes later by checking lastResetDate.
+  cron.schedule("5 0 * * *", async () => {
+    try {
+      const s = await Status.findOne().lean();
+      const today = getTodayIST();
+
+      if (s?.lastResetDate === today) {
+        // Reset already ran successfully at midnight — nothing to do
+        return;
+      }
+
+      console.log("[Scheduler] ⚠️  Midnight reset missed — running safety fallback at 00:05...");
+      await midnightJob();
+    } catch (err) {
+      console.error("[Scheduler] ❌ Safety fallback error:", err);
+    }
+  }, { timezone: TIMEZONE });
+
   // Clean up expired R2 videos every hour
   cron.schedule("0 * * * *", cleanExpiredVideos, { timezone: TIMEZONE });
 
   // Run once on startup to catch any orphaned videos from previous sessions
   setTimeout(cleanExpiredVideos, 5000);
   
-  console.log("[Scheduler] ✅ Daily reset scheduler running (00:00 midnight job)");
+  console.log("[Scheduler] ✅ Daily reset scheduler running (00:00 midnight + 00:05 safety fallback)");
 }

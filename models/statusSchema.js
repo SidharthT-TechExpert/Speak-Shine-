@@ -21,6 +21,8 @@ const statusSchema = new mongoose.Schema({
   // Configurable schedule times (HH:MM, 24h, IST)
   posterSendTime: { type: String, default: "08:00" },
   questionGenerateTime: { type: String, default: "07:00" },
+  // Track last successful daily reset (YYYY-MM-DD in IST) to detect missed resets
+  lastResetDate: { type: String, default: null },
 }, { timestamps: true });
 
 export default mongoose.model("Status", statusSchema);
