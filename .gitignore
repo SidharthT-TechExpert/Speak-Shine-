@@ -2,7 +2,7 @@ node_modules/
 .env
 .kiro/ 
 frontend/.env.local
-# frontend/dist/ — committed so Railway doesn't need to rebuild
+frontend/dist/
 # Video upload temporary files
 tmp/uploads/*
 !tmp/uploads/.gitkeep
