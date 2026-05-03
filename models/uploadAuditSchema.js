@@ -60,6 +60,7 @@ const uploadAuditSchema = new mongoose.Schema({
       'mime_mismatch',
       'magic_byte_fail',
       'codec_invalid',
+      'virus_detected',
       'rate_limited',
       'suspicious_metadata',
       'file_too_large',
@@ -78,10 +79,11 @@ const uploadAuditSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
-    index: true,
+    // index defined below via schema.index() with TTL — don't declare index: true here too
   },
 }, {
-  timestamps: true,
+  // Don't use { timestamps: true } — we have a manual 'timestamp' field above
+  // that serves the same purpose and has a TTL index on it
 });
 
 // Index for querying recent uploads by user

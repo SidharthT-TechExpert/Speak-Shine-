@@ -220,14 +220,16 @@ const apiLimiter = rateLimit({
 });
 app.use("/api", apiLimiter);
 
-// Video upload rate limit: 5 uploads per hour per IP (prevents storage abuse)
+// Video upload rate limit: 5 uploads per hour per user (prevents storage abuse)
+// Auth middleware runs before this on /api/video routes, so req.user is always set.
+// Keying by user ID avoids IPv6 validation issues entirely.
 const videoUploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
   message: { error: "Upload limit reached. You can upload up to 5 videos per hour." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip, // rate-limit per user ID when authenticated
+  keyGenerator: (req) => String(req.user?.id || "anon"),
 });
 
 // ── Response time middleware ─────────────────────────────────────────────────
