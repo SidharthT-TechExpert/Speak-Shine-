@@ -10,6 +10,7 @@ import User from "../../../models/userSchema.js";
 import Auth from "../../../models/authSchema.js";
 import Status from "../../../models/statusSchema.js";
 import { getRedisClient, isRedisAvailable } from "../../../redis.js";
+import { escapeRegex } from "../../utils/phoneUtils.js";
 
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
 const OTP_TTL = 300; // 5 minutes
@@ -135,7 +136,7 @@ export async function getUserByPhone(phone) {
   // If not found, try to find by userId pattern (WhatsApp format)
   if (!user) {
     user = await User.findOne({ 
-      userId: { $regex: `^${phone}(@|:)` } 
+      userId: { $regex: `^${escapeRegex(phone)}(@|:)` } 
     }).lean();
   }
   
@@ -220,7 +221,7 @@ export async function toggleSubmissionStatus(phone) {
   // If not found, try to find by userId pattern (WhatsApp format)
   if (!user) {
     user = await User.findOne({ 
-      userId: { $regex: `^${phone}(@|:)` } 
+      userId: { $regex: `^${escapeRegex(phone)}(@|:)` } 
     });
   }
   
@@ -254,7 +255,7 @@ export async function adjustUserFine(phone, amount) {
   // If not found, try to find by userId pattern (WhatsApp format)
   if (!user) {
     user = await User.findOne({ 
-      userId: { $regex: `^${phone}(@|:)` } 
+      userId: { $regex: `^${escapeRegex(phone)}(@|:)` } 
     });
   }
   
@@ -448,7 +449,7 @@ export async function createUserAccount(phone, password, name, role, actionToken
   // Try to auto-link to existing WhatsApp user
   let waUser = await User.findOne({ phone: { $in: [phone, stripped] } });
   if (!waUser) {
-    waUser = await User.findOne({ userId: { $regex: stripped } });
+    waUser = await User.findOne({ userId: { $regex: escapeRegex(stripped) } });
   }
 
   // Create auth record

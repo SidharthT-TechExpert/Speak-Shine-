@@ -375,26 +375,11 @@ export default function VideoAnalysis() {
               {report.status === "failed"     && "❌ Analysis Failed"}
             </div>
             {(report.status === "loading" || report.status === "processing") && (
-              <div className="spinner-wrap">
-                <div className="spinner" />
-                {queueInfo && queueInfo.position > 1 ? (
-                  <>
-                    <p style={{ color: "var(--warning)", fontWeight: 600, marginTop: "0.75rem" }}>
-                      🚦 Position #{queueInfo.position} in queue
-                    </p>
-                    <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.25rem" }}>
-                      ~{queueInfo.estimatedWait} min estimated wait
-                    </p>
-                  </>
-                ) : (
-                  <p style={{ color: "var(--muted)" }}>
-                    {report.status === "loading" ? "Loading report…" : (progressStage || "Starting analysis…")}
-                  </p>
-                )}
-                {report.status === "processing" && !queueInfo && (
-                  <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginTop: "0.5rem" }}>Usually takes 2–3 minutes</p>
-                )}
-              </div>
+              <ProcessingProgress
+                stage={progressStage}
+                queueInfo={queueInfo}
+                isLoading={report.status === "loading"}
+              />
             )}
             {report.status === "failed" && (
               <div className="error-box">
@@ -498,6 +483,115 @@ export default function VideoAnalysis() {
         )}
       </div>
     </Layout>
+  );
+}
+
+// ── Processing Progress Component ────────────────────────────────────────────
+// Maps SSE stage strings to ordered pipeline steps with icons and labels.
+
+const PIPELINE_STEPS = [
+  { key: "download",   match: /downloading/i,        icon: "⬇️", label: "Downloading video" },
+  { key: "virus",      match: /virus|scanning/i,     icon: "🔍", label: "Virus scan" },
+  { key: "codec",      match: /codec|validating/i,   icon: "🎬", label: "Codec validation" },
+  { key: "moderation", match: /content|safety/i,     icon: "🛡️", label: "Content safety check" },
+  { key: "queuing",    match: /queuing|queue/i,       icon: "⏳", label: "Queued for AI" },
+  { key: "audio",      match: /audio|extract/i,       icon: "🎵", label: "Extracting audio" },
+  { key: "analysis",   match: /analys|video/i,        icon: "🎥", label: "Analysing video" },
+  { key: "speech",     match: /speech|scoring/i,      icon: "🗣️", label: "Scoring speech" },
+  { key: "feedback",   match: /feedback|generating/i, icon: "📝", label: "Generating feedback" },
+];
+
+function ProcessingProgress({ stage, queueInfo, isLoading }) {
+  // Determine which step is currently active
+  const activeIdx = stage
+    ? PIPELINE_STEPS.findIndex(s => s.match.test(stage))
+    : -1;
+
+  if (isLoading) {
+    return (
+      <div className="spinner-wrap">
+        <div className="spinner" />
+        <p style={{ color: "var(--muted)", marginTop: "0.75rem" }}>Loading report…</p>
+      </div>
+    );
+  }
+
+  if (queueInfo && queueInfo.position > 1) {
+    return (
+      <div style={{ padding: "1.5rem 0", textAlign: "center" }}>
+        <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>🚦</div>
+        <p style={{ color: "var(--warning)", fontWeight: 700, fontSize: "1.1rem", marginBottom: "0.25rem" }}>
+          Position #{queueInfo.position} in queue
+        </p>
+        <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+          ~{queueInfo.estimatedWait} min estimated wait
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "1rem 0" }}>
+      {/* Spinner + current stage label */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
+        <div className="spinner" style={{ flexShrink: 0 }} />
+        <span style={{ color: "var(--text)", fontWeight: 600, fontSize: "0.95rem" }}>
+          {stage || "Starting…"}
+        </span>
+      </div>
+
+      {/* Step pipeline */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        {PIPELINE_STEPS.map((step, i) => {
+          const isDone    = activeIdx > i;
+          const isActive  = activeIdx === i;
+          const isPending = activeIdx < i;
+          return (
+            <div key={step.key} style={{
+              display: "flex", alignItems: "center", gap: "0.75rem",
+              padding: "0.5rem 0.75rem", borderRadius: 10,
+              background: isActive  ? "rgba(99,102,241,0.12)"
+                        : isDone    ? "rgba(34,197,94,0.08)"
+                        : "transparent",
+              border: isActive  ? "1px solid rgba(99,102,241,0.3)"
+                    : isDone    ? "1px solid rgba(34,197,94,0.2)"
+                    : "1px solid transparent",
+              transition: "all 0.3s ease",
+              opacity: isPending ? 0.4 : 1,
+            }}>
+              {/* Status icon */}
+              <span style={{ fontSize: "1rem", minWidth: "1.25rem", textAlign: "center" }}>
+                {isDone   ? "✅"
+               : isActive ? step.icon
+               : "○"}
+              </span>
+              <span style={{
+                fontSize: "0.85rem",
+                fontWeight: isActive ? 700 : 400,
+                color: isActive ? "var(--text)" : isDone ? "var(--success)" : "var(--muted)",
+              }}>
+                {step.label}
+              </span>
+              {isActive && (
+                <span style={{
+                  marginLeft: "auto", fontSize: "0.72rem",
+                  color: "var(--primary)", fontWeight: 600,
+                  animation: "pulse 1.5s infinite",
+                }}>
+                  IN PROGRESS
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: "1rem", textAlign: "center" }}>
+        Usually takes 2–3 minutes · Don't close this tab
+      </p>
+
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+    </div>
   );
 }
 

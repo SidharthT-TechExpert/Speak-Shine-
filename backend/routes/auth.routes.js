@@ -26,9 +26,17 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // generous but bounded — normal clients refresh every 15 min
+  message: { error: "Too many token refresh requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ── Authentication Routes ────────────────────────────────────────────────────
 router.post("/login", loginLimiter, authController.login);
-router.post("/refresh", authController.refresh);
+router.post("/refresh", refreshLimiter, authController.refresh);
 router.post("/logout", authController.logout);
 
 // ── Password Reset Routes ────────────────────────────────────────────────────

@@ -48,6 +48,17 @@ export function isValidIndianPhone(phone) {
 }
 
 /**
+ * Escape a string for safe use inside a MongoDB $regex query.
+ * Prevents regex injection when phone numbers contain special characters.
+ * @param {string} str - Raw string to escape
+ * @returns {string} - Regex-safe string
+ */
+export function escapeRegex(str) {
+  if (!str) return "";
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Format phone number for display
  * @param {string} phone - Phone number
  * @returns {string} - Formatted phone number (e.g., +91 98765 43210)

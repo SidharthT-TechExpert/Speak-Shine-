@@ -109,8 +109,27 @@ if (isProd) {
 }
 
 // ── Socket.io ───────────────────────────────────────────────────────────────
+const socketAllowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+  : [];
+
 const io = new SocketIO(httpServer, {
-  cors: { origin: "*", credentials: true },
+  cors: {
+    origin: isProd
+      ? (origin, cb) => {
+          if (!origin || socketAllowedOrigins.length === 0 || socketAllowedOrigins.includes("*")) {
+            return cb(null, true);
+          }
+          if (socketAllowedOrigins.includes(origin)) {
+            cb(null, true);
+          } else {
+            console.error(`[Socket.io CORS] Blocked origin: ${origin}`);
+            cb(new Error("Not allowed by CORS"));
+          }
+        }
+      : "*",
+    credentials: true,
+  },
 });
 
 // Track online users: phone → socketId
@@ -201,9 +220,15 @@ const apiLimiter = rateLimit({
 });
 app.use("/api", apiLimiter);
 
-// Video upload rate limit: 5 uploads per hour per user (prevents storage abuse)
-// Temporarily disabled due to IPv6 validation issues - will re-enable after testing
-const videoUploadLimiter = (req, res, next) => next(); // Passthrough middleware
+// Video upload rate limit: 5 uploads per hour per IP (prevents storage abuse)
+const videoUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { error: "Upload limit reached. You can upload up to 5 videos per hour." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip, // rate-limit per user ID when authenticated
+});
 
 // ── Response time middleware ─────────────────────────────────────────────────
 app.use((req, res, next) => {

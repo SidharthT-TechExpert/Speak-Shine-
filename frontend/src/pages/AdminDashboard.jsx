@@ -1401,7 +1401,7 @@ function MonitoringPanel() {
         </div>
       </div>
 
-      {/* Queue + Errors side by side on wide screens */}
+      {/* Queue + Errors — errors full width when there are security events */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
 
         {/* Queue */}
@@ -1439,13 +1439,47 @@ function MonitoringPanel() {
               <span style={{fontSize:"1.1rem"}}>✅</span> No errors today
             </div>
           ) : (
-            <div style={{display:"grid",gap:"0.5rem",maxHeight:160,overflowY:"auto"}}>
+            <div style={{display:"grid",gap:"0.5rem",maxHeight:320,overflowY:"auto"}}>
               {(queue?.recentErrors || []).map((e, i) => (
-                <div key={i} style={{background:"rgba(248,113,113,0.07)",border:"1px solid rgba(248,113,113,0.18)",borderRadius:8,padding:"0.5rem 0.75rem"}}>
-                  <div style={{color:"#f87171",fontWeight:600,fontSize:"0.78rem",marginBottom:"0.2rem"}}>
-                    {String(e.reportId).slice(-8)} · {new Date(e.at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
+                <div key={i} style={{
+                  background: e.type?.includes("Virus") || e.type?.includes("Content") || e.type?.includes("Codec")
+                    ? "rgba(251,146,60,0.07)" : "rgba(248,113,113,0.07)",
+                  border: `1px solid ${e.type?.includes("Virus") || e.type?.includes("Content") || e.type?.includes("Codec")
+                    ? "rgba(251,146,60,0.25)" : "rgba(248,113,113,0.18)"}`,
+                  borderRadius: 10,
+                  padding: "0.65rem 0.85rem",
+                }}>
+                  {/* Top row: type badge + time */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.35rem",gap:"0.5rem",flexWrap:"wrap"}}>
+                    <span style={{
+                      fontSize:"0.72rem", fontWeight:700, padding:"0.15rem 0.5rem",
+                      borderRadius:99,
+                      background: e.type?.includes("Virus") || e.type?.includes("Content") || e.type?.includes("Codec")
+                        ? "rgba(251,146,60,0.18)" : "rgba(248,113,113,0.15)",
+                      color: e.type?.includes("Virus") || e.type?.includes("Content") || e.type?.includes("Codec")
+                        ? "#fb923c" : "#f87171",
+                    }}>
+                      {e.type || "⚙️ Processing"}
+                    </span>
+                    <span style={{color:"var(--muted)",fontSize:"0.72rem",whiteSpace:"nowrap"}}>
+                      {new Date(e.at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+                    </span>
                   </div>
-                  <div style={{color:"var(--muted)",fontSize:"0.78rem",lineHeight:1.4}}>{e.error}</div>
+                  {/* User info */}
+                  <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.3rem"}}>
+                    <span style={{fontSize:"0.8rem",fontWeight:600,color:"var(--text)"}}>
+                      👤 {e.userName || "Unknown"}
+                    </span>
+                    {e.phone && e.phone !== "—" && (
+                      <span style={{fontSize:"0.75rem",color:"var(--muted)"}}>· {e.phone}</span>
+                    )}
+                  </div>
+                  {/* Error message */}
+                  <div style={{color:"var(--muted)",fontSize:"0.78rem",lineHeight:1.5}}>{e.error}</div>
+                  {/* Report ID */}
+                  <div style={{color:"rgba(255,255,255,0.2)",fontSize:"0.68rem",marginTop:"0.25rem"}}>
+                    ID: {String(e.reportId).slice(-8)}
+                  </div>
                 </div>
               ))}
             </div>

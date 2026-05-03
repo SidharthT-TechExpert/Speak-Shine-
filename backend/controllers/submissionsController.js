@@ -5,6 +5,7 @@
 
 import User from "../../models/userSchema.js";
 import { safeDB } from "../../db.js";
+import { escapeRegex } from "../utils/phoneUtils.js";
 
 /**
  * Adjust monthly submissions count
@@ -25,7 +26,7 @@ export const adjustMonthlySubmissions = async (req, res) => {
       // If not found, try to find by userId pattern (WhatsApp format)
       if (!user) {
         user = await User.findOne({ 
-          userId: { $regex: `^${phone}(@|:)` } 
+          userId: { $regex: `^${escapeRegex(phone)}(@|:)` } 
         });
       }
       
@@ -80,7 +81,7 @@ export const adjustWeeklySubmissions = async (req, res) => {
       // If not found, try to find by userId pattern (WhatsApp format)
       if (!user) {
         user = await User.findOne({ 
-          userId: { $regex: `^${phone}(@|:)` } 
+          userId: { $regex: `^${escapeRegex(phone)}(@|:)` } 
         });
       }
       

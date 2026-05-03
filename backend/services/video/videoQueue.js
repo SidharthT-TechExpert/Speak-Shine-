@@ -19,11 +19,35 @@ const stats = {
   totalProcessed: 0,
   totalFailed: 0,
   processingTimes: [],      // last 20 durations in ms
-  errorsToday: [],          // [{ reportId, error, at }]
+  errorsToday: [],          // [{ reportId, error, userName, phone, type, at }]
+  securityEvents: [],       // [{ reportId, error, userName, phone, type, at }] — scan/moderation rejections
 };
 
 // ── SSE Clients: reportId → res ──────────────────────────────────────────────
 const sseClients = new Map();
+
+/**
+ * Push progress update to SSE client by reportId (called from videoService pre-processing)
+ */
+export function pushProgressById(reportId, data) {
+  pushProgress(reportId, data);
+}
+
+/**
+ * Record a security rejection event (virus, codec, content moderation)
+ * Called from videoService when a scan fails before the job enters the queue.
+ */
+export function recordSecurityEvent({ reportId, error, userName, phone, type }) {
+  stats.securityEvents.push({
+    reportId: String(reportId),
+    error,
+    userName: userName || "Unknown",
+    phone: phone || "—",
+    type: type || "🔒 Security",
+    at: new Date(),
+  });
+  if (stats.securityEvents.length > 50) stats.securityEvents.shift();
+}
 
 /**
  * Register SSE client for progress updates
@@ -123,7 +147,6 @@ async function processNext() {
       console.log(`[Queue] ${reportId}: ${stage}`);
       pushProgress(reportId, { status: "processing", stage });
     }, knownDuration);
-
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "completed",
       analysis: result.analysis,
@@ -152,6 +175,15 @@ async function processNext() {
   } catch (err) {
     console.error(`[Queue] ${reportId} failed:`, err.message);
 
+    // Fetch user info for the error log
+    let userName = "Unknown";
+    let userPhone = phone || "—";
+    try {
+      const User = (await import("../../../models/userSchema.js")).default;
+      const userDoc = await User.findOne({ phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } }).lean();
+      if (userDoc) userName = userDoc.name || userDoc.userId || phone;
+    } catch {}
+
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "failed",
       errorMessage: err.message || "Analysis failed",
@@ -161,7 +193,14 @@ async function processNext() {
     closeSse(reportId);
 
     stats.totalFailed++;
-    stats.errorsToday.push({ reportId: String(reportId), error: err.message, at: new Date() });
+    stats.errorsToday.push({
+      reportId: String(reportId),
+      error: err.message,
+      userName,
+      phone: userPhone,
+      type: classifyError(err.message),
+      at: new Date(),
+    });
     // Keep only last 50 errors
     if (stats.errorsToday.length > 50) stats.errorsToday.shift();
 
@@ -176,6 +215,22 @@ async function processNext() {
     // Hint to GC to free memory after heavy video processing
     if (global.gc) global.gc();
   }
+}
+
+/**
+ * Classify error message into a category for the monitoring panel
+ */
+function classifyError(message = "") {
+  const m = message.toLowerCase();
+  if (m.includes("virus") || m.includes("malware") || m.includes("threat"))   return "🦠 Virus / Malware";
+  if (m.includes("codec") || m.includes("unsupported"))                        return "🎬 Invalid Codec";
+  if (m.includes("content") || m.includes("inappropriate") || m.includes("moderat")) return "🛡️ Content Violation";
+  if (m.includes("timeout"))                                                   return "⏱️ Timeout";
+  if (m.includes("transcri"))                                                  return "🎙️ Transcription";
+  if (m.includes("speech") || m.includes("scoring"))                          return "🗣️ Speech Analysis";
+  if (m.includes("download") || m.includes("fetch") || m.includes("network")) return "🌐 Network";
+  if (m.includes("too short") || m.includes("too long") || m.includes("duration")) return "⏱️ Duration";
+  return "⚙️ Processing";
 }
 
 /**
@@ -257,6 +312,10 @@ export function getQueueStats() {
     const d = new Date(e.at);
     return d.getDate() === now.getDate() && d.getMonth() === now.getMonth();
   });
+  stats.securityEvents = stats.securityEvents.filter(e => {
+    const d = new Date(e.at);
+    return d.getDate() === now.getDate() && d.getMonth() === now.getMonth();
+  });
 
   return {
     queueLength: queue.length,
@@ -266,8 +325,11 @@ export function getQueueStats() {
     totalFailed: stats.totalFailed,
     avgProcessingMs: avgMs ? Math.round(avgMs) : null,
     avgProcessingMin: avgMs ? (avgMs / 60000).toFixed(1) : null,
-    errorsToday: stats.errorsToday.length,
-    recentErrors: stats.errorsToday.slice(-5),
+    errorsToday: stats.errorsToday.length + stats.securityEvents.length,
+    recentErrors: [
+      ...stats.errorsToday,
+      ...stats.securityEvents,
+    ].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 10),
   };
 }
 

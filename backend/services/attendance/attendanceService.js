@@ -5,6 +5,7 @@
 
 import Attendance from "../../../models/attendanceSchema.js";
 import User from "../../../models/userSchema.js";
+import { escapeRegex } from "../../utils/phoneUtils.js";
 
 /**
  * Normalize date to UTC midnight for consistent day boundaries
@@ -25,7 +26,7 @@ async function findUserByPhone(phone) {
   if (user) return user;
   
   // Fallback: userId contains the phone digits
-  user = await User.findOne({ userId: { $regex: stripped } });
+  user = await User.findOne({ userId: { $regex: escapeRegex(stripped) } });
   return user || null;
 }
 
