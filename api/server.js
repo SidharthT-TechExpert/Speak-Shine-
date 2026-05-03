@@ -221,18 +221,6 @@ const apiLimiter = rateLimit({
 });
 app.use("/api", apiLimiter);
 
-// Video upload rate limit: 5 uploads per hour per user (prevents storage abuse)
-// Auth middleware runs before this on /api/video routes, so req.user is always set.
-// Keying by user ID avoids IPv6 validation issues entirely.
-const videoUploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5,
-  message: { error: "Upload limit reached. You can upload up to 5 videos per hour." },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => String(req.user?.id || "anon"),
-});
-
 // ── Response time middleware ─────────────────────────────────────────────────
 app.use((req, res, next) => {
   const start = Date.now();
@@ -285,7 +273,7 @@ app.use("/api/users",        userRoutes);
 app.use("/api/dashboard",    dashboardRoutes);
 console.log("[Routes] Dashboard routes mounted at /api/dashboard");
 app.use("/api/questions",    questionRoutes);
-app.use("/api/video",        videoUploadLimiter, videoAnalysisRoutes); // Apply video rate limiter
+app.use("/api/video",        videoAnalysisRoutes); // Rate limiting applied per-route inside video.routes.js
 app.use("/api/attendance",   attendanceRoutes);
 app.use("/api/chat",         chatRoutes);
 app.use("/api/live-sessions", liveSessionRoutes);

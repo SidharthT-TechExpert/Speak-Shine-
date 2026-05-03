@@ -5,8 +5,22 @@
 
 import express from "express";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import * as videoController from "../controllers/videoController.js";
 import { authMiddleware } from "../middleware/auth.js";
+
+const router = express.Router();
+
+// Rate limit: 5 actual submissions per hour per user ID
+// Applied only to /confirm and /upload — not /presign (URL generation doesn't count)
+const videoUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: "Upload limit reached. You can upload up to 5 videos per hour." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.user?.id || "anon"),
+});
 
 const router = express.Router();
 
@@ -31,13 +45,16 @@ function handleMulterError(err, req, res, next) {
 }
 
 // ── Presigned Upload Routes ──────────────────────────────────────────────────
+// /presign just generates a URL — doesn't count against upload limit
 router.get("/presign", authMiddleware, videoController.getPresignedUrl);
-router.post("/confirm", authMiddleware, videoController.confirmUpload);
+// /confirm is the real submission — apply rate limit here
+router.post("/confirm", authMiddleware, videoUploadLimiter, videoController.confirmUpload);
 
 // ── Direct Upload Route ──────────────────────────────────────────────────────
 router.post(
   "/upload",
   authMiddleware,
+  videoUploadLimiter,
   (req, res, next) => upload.single("video")(req, res, (err) => handleMulterError(err, req, res, next)),
   videoController.uploadVideo
 );
