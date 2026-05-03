@@ -153,14 +153,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // TODO: Remove unsafe-inline/eval gradually
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"], // TODO: Remove unsafe-inline/eval gradually
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
-        "'self'", 
-        process.env.R2_PUBLIC_URL || "https:", 
-        "https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com", // Allow R2 presigned upload URLs (bucket.account-id.r2.cloudflarestorage.com)
-        "wss:", 
+        "'self'",
+        process.env.R2_PUBLIC_URL || "https:",
+        "https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com",
+        "https://cloudflareinsights.com", // Cloudflare Web Analytics beacon
+        "wss:",
         "ws:"
       ],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
