@@ -545,6 +545,12 @@ export default function AdminDashboard() {
                     <button className="btn-ghost" style={{marginRight:3}} onClick={()=>adjustFine(u.phone,u.fine)}>±Fine</button>
                     <button className="btn-ghost" style={{marginRight:3}} onClick={()=>resetFine(u.phone)}>Reset</button>
                     <button className="btn-ghost" style={{marginRight:3}} onClick={()=>toggleUser(u.phone)}>{u.isActive?"Disable":"Enable"}</button>
+                    <button className="btn-ghost" style={{marginRight:3}} onClick={async()=>{
+                      try {
+                        await api.post(`/video/admin/reset-limit/${u._id || u.userId}`);
+                        msg(`Upload limit reset for ${u.registeredName||u.name||u.phone}`);
+                      } catch(e) { msg(e?.response?.data?.error||"Reset failed","danger"); }
+                    }}>🔄 Limit</button>
                     <button className="btn-ghost danger" onClick={()=>deleteUser(u.phone)}>Remove</button>
                   </td>
                 </tr>

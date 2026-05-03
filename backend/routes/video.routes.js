@@ -7,13 +7,13 @@ import express from "express";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
 import * as videoController from "../controllers/videoController.js";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // Rate limit: 5 actual submissions per hour per user ID
 // Applied only to /confirm and /upload — not /presign (URL generation doesn't count)
-const videoUploadLimiter = rateLimit({
+export const videoUploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { error: "Upload limit reached. You can upload up to 5 videos per hour." },
@@ -21,8 +21,6 @@ const videoUploadLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => String(req.user?.id || "anon"),
 });
-
-const router = express.Router();
 
 // Configure multer for video uploads (max 110MB)
 const upload = multer({
@@ -57,6 +55,26 @@ router.post(
   videoUploadLimiter,
   (req, res, next) => upload.single("video")(req, res, (err) => handleMulterError(err, req, res, next)),
   videoController.uploadVideo
+);
+
+// ── Admin: reset upload rate limit for a specific user ───────────────────────
+// POST /api/video/admin/reset-limit/:userId
+router.post(
+  "/admin/reset-limit/:userId",
+  authMiddleware,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      // express-rate-limit's default MemoryStore exposes resetKey()
+      await videoUploadLimiter.resetKey(userId);
+      console.log(`[RateLimit] Admin ${req.user.phone} reset upload limit for user ${userId}`);
+      res.json({ success: true, message: `Upload limit reset for user ${userId}` });
+    } catch (err) {
+      console.error("[RateLimit] Reset failed:", err.message);
+      res.status(500).json({ error: "Failed to reset rate limit" });
+    }
+  }
 );
 
 // ── Progress Stream ──────────────────────────────────────────────────────────
