@@ -289,9 +289,11 @@ export function getVideoDuration(videoPath, isUrl = false) {
         if (!dur || dur <= 0) {
           const videoStream = info?.streams?.find(s => s.codec_type === "video");
           if (videoStream) {
-            // Try to get duration from frame count and frame rate
+            // Safely parse frame rate fraction (e.g. "30/1", "24000/1001")
             const frameCount = parseInt(videoStream.nb_frames) || 0;
-            const frameRate = eval(videoStream.r_frame_rate || "0/1"); // e.g., "30/1" = 30fps
+            const rawFps = videoStream.r_frame_rate || "0/1";
+            const [num, den] = rawFps.split("/").map(Number);
+            const frameRate = (den && den !== 0) ? num / den : 0;
             
             if (frameCount > 0 && frameRate > 0) {
               dur = frameCount / frameRate;

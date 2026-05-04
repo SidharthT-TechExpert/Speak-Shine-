@@ -168,6 +168,30 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
   const isWebm = baseType.includes("webm") || key.endsWith(".webm");
   const strippedPhone = phone.replace(/^(\+91|91)/, "");
 
+  // Validate publicUrl is from our R2 bucket (prevent SSRF)
+  const r2Endpoint = process.env.R2_ENDPOINT || "";
+  const r2PublicUrl = process.env.R2_PUBLIC_URL || "";
+  const allowedR2Hosts = [
+    new URL(r2Endpoint).hostname,
+    new URL(r2PublicUrl).hostname,
+  ].filter(Boolean);
+
+  let parsedPublicUrl;
+  try {
+    parsedPublicUrl = new URL(publicUrl);
+  } catch {
+    const error = new Error("Invalid upload URL");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!allowedR2Hosts.some(h => parsedPublicUrl.hostname.endsWith(h))) {
+    console.error(`[ConfirmUpload] SSRF attempt blocked — URL hostname: ${parsedPublicUrl.hostname}`);
+    const error = new Error("Invalid upload URL");
+    error.statusCode = 400;
+    throw error;
+  }
+
   // Check file size
   try {
     const headRes = await fetch(publicUrl, { method: "HEAD" });
