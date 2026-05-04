@@ -19,6 +19,11 @@ export const adjustMonthlySubmissions = async (req, res) => {
       return res.status(400).json({ error: "Delta must be a number" });
     }
 
+    // Bound delta to prevent abuse (max ±31 — one month's worth)
+    if (delta < -31 || delta > 31) {
+      return res.status(400).json({ error: "Delta must be between -31 and 31" });
+    }
+
     const user = await safeDB(async () => {
       // Try to find by phone field first
       let user = await User.findOne({ phone });
@@ -72,6 +77,11 @@ export const adjustWeeklySubmissions = async (req, res) => {
 
     if (!delta || typeof delta !== 'number') {
       return res.status(400).json({ error: "Delta must be a number" });
+    }
+
+    // Bound delta to ±7 (one week's worth)
+    if (delta < -7 || delta > 7) {
+      return res.status(400).json({ error: "Delta must be between -7 and 7" });
     }
 
     const user = await safeDB(async () => {
@@ -129,6 +139,11 @@ export const adjustDailySubmissions = async (req, res) => {
 
     if (!delta || typeof delta !== 'number') {
       return res.status(400).json({ error: "Delta must be a number" });
+    }
+
+    // Bound delta to ±3 (reasonable daily adjustment)
+    if (delta < -3 || delta > 3) {
+      return res.status(400).json({ error: "Delta must be between -3 and 3" });
     }
 
     const user = await safeDB(async () => {

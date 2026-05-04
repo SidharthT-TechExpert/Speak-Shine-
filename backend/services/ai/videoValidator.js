@@ -171,7 +171,7 @@ export async function getVideoMetadata(videoPath) {
       audioCodec: audioStream?.codec_name,
       width: parseInt(videoStream?.width) || 0,
       height: parseInt(videoStream?.height) || 0,
-      fps: eval(videoStream?.r_frame_rate || '0/1'),
+      fps: (() => { const [n, d] = (videoStream?.r_frame_rate || "0/1").split("/").map(Number); return d ? n / d : 0; })(),
       format: info.format?.format_name,
     };
   } catch (err) {
