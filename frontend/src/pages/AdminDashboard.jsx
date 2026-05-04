@@ -495,8 +495,11 @@ export default function AdminDashboard() {
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Password</label>
-                    <input className="form-input" placeholder="Min 6 characters" type="password" value={newMember.password}
-                      onChange={e=>setNewMember(p=>({...p,password:e.target.value}))} required minLength={6}/>
+                    <input className="form-input" placeholder="Min 8 chars, upper+lower+number+symbol" type="password" value={newMember.password}
+                      onChange={e=>setNewMember(p=>({...p,password:e.target.value}))} required minLength={8}/>
+                    <div style={{fontSize:"0.72rem",color:"var(--muted)",marginTop:"0.3rem"}}>
+                      Must contain: uppercase, lowercase, number, special character (!@#$%^&*)
+                    </div>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Role</label>

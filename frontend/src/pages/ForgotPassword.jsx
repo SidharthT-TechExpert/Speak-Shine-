@@ -14,8 +14,8 @@ function validatePhone(raw) {
 function passwordStrength(val) {
   if (!val) return 0;
   let s = 0;
-  if (val.length >= 6)  s++;
-  if (val.length >= 10) s++;
+  if (val.length >= 8)  s++;
+  if (val.length >= 12) s++;
   if (/[A-Z]/.test(val)) s++;
   if (/[0-9]/.test(val)) s++;
   if (/[^A-Za-z0-9]/.test(val)) s++;
@@ -109,7 +109,11 @@ export default function ForgotPassword() {
   // Step 3 → reset password
   const resetPassword = async (e) => {
     e.preventDefault();
-    if (newPassword.length < 6) { setPassError("Password must be at least 6 characters"); return; }
+    if (newPassword.length < 8) { setPassError("Password must be at least 8 characters"); return; }
+    if (!/[A-Z]/.test(newPassword)) { setPassError("Password must contain at least one uppercase letter"); return; }
+    if (!/[a-z]/.test(newPassword)) { setPassError("Password must contain at least one lowercase letter"); return; }
+    if (!/[0-9]/.test(newPassword)) { setPassError("Password must contain at least one number"); return; }
+    if (!/[^A-Za-z0-9]/.test(newPassword)) { setPassError("Password must contain at least one special character (!@#$%^&* etc.)"); return; }
     setPassError("");
     setStepError("");
     setLoading(true);
@@ -236,7 +240,7 @@ export default function ForgotPassword() {
                 <input
                   className="form-input"
                   type={showPass ? "text" : "password"}
-                  placeholder="Min 6 characters"
+                  placeholder="Min 8 chars, upper+lower+number+symbol"
                   value={newPassword}
                   onChange={e => { setNewPassword(e.target.value); if (passError) setPassError(""); }}
                   style={{ paddingRight: "2.5rem" }}

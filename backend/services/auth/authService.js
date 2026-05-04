@@ -10,6 +10,7 @@ import { randomInt } from "crypto";
 import Auth from "../../../models/authSchema.js";
 import User from "../../../models/userSchema.js";
 import { getRedisClient, isRedisAvailable } from "../../../redis.js";
+import { validatePassword } from "../../utils/validationUtils.js";
 
 const OTP_TTL = 300; // 5 minutes
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
@@ -424,6 +425,12 @@ export async function resetPassword(resetToken, newPassword) {
   }
   if (newPassword.length > 128) {
     throw new Error("Password too long");
+  }
+
+  // Full strength validation
+  const pwCheck = validatePassword(newPassword);
+  if (!pwCheck.valid) {
+    throw new Error(pwCheck.errors.join(". "));
   }
 
   let decoded;

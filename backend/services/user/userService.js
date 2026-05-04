@@ -11,6 +11,7 @@ import Auth from "../../../models/authSchema.js";
 import Status from "../../../models/statusSchema.js";
 import { getRedisClient, isRedisAvailable } from "../../../redis.js";
 import { escapeRegex } from "../../utils/phoneUtils.js";
+import { validatePassword } from "../../utils/validationUtils.js";
 
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
 const OTP_TTL = 300; // 5 minutes
@@ -429,6 +430,14 @@ export async function createUserAccount(phone, password, name, role, actionToken
   
   if (password.length < 6) {
     const error = new Error("Password must be at least 6 characters");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Full strength validation
+  const pwCheck = validatePassword(password);
+  if (!pwCheck.valid) {
+    const error = new Error(pwCheck.errors.join(". "));
     error.statusCode = 400;
     throw error;
   }

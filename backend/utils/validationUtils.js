@@ -16,6 +16,7 @@ export function isValidEmail(email) {
 
 /**
  * Validate password strength
+ * Requirements: 8+ chars, uppercase, lowercase, number, special character
  * @param {string} password - Password
  * @returns {Object} - { valid: boolean, errors: string[] }
  */
@@ -41,6 +42,10 @@ export function validatePassword(password) {
   
   if (!/[0-9]/.test(password)) {
     errors.push("Password must contain at least one number");
+  }
+
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+    errors.push("Password must contain at least one special character (!@#$%^&* etc.)");
   }
   
   return {
