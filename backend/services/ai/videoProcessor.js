@@ -82,6 +82,9 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
       throw err;
     }
 
+    // Hint GC to free memory before the heavy parallel phase
+    if (global.gc) global.gc();
+
     await onProgress("Analysing your video…");
 
     // Stage 2: Visual + transcription in parallel

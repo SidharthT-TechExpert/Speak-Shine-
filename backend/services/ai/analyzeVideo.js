@@ -5,8 +5,9 @@ import { getVisionKey, markKeyExhausted, parseRetryAfter, keyStatus } from "./gr
 
 const execFileAsync = promisify(execFile);
 
-const FRAME_COUNT = 16;
+const FRAME_COUNT = 8;   // reduced from 16 — fewer frames = less memory
 const GROQ_BATCH_LIMIT = 4;
+const FRAME_CONCURRENCY = 4; // max parallel ffmpeg frame extractions
 
 /** Formats seconds as m:ss (e.g. 75 → "1:15") */
 function formatSec(s) {
@@ -38,13 +39,13 @@ async function extractFrame(videoPath, timestamp, frameIndex) {
     "-ss", String(timestamp),
     "-i", videoPath,
     "-frames:v", "1",
-    "-q:v", "3",
-    "-vf", "scale=640:-1",
+    "-q:v", "5",           // lower quality = smaller buffer (was 3)
+    "-vf", "scale=480:-1", // smaller resolution = less memory (was 640)
     "-f", "image2",
     "pipe:1",
-  ], { encoding: "buffer", maxBuffer: 5 * 1024 * 1024, timeout: 15000 })
+  ], { encoding: "buffer", maxBuffer: 2 * 1024 * 1024, timeout: 15000 }) // 2MB max (was 5MB)
     .then(({ stdout }) => {
-      if (!stdout || stdout.length < 1000) return null;
+      if (!stdout || stdout.length < 500) return null;
       return { base64: stdout.toString("base64"), timestamp, frameIndex };
     })
     .catch(() => null);
@@ -371,14 +372,14 @@ export async function analyzeVideo(videoPath) {
       (batchIdx + 1) * GROQ_BATCH_LIMIT
     );
 
-    // Extract all frames in this batch in parallel (was sequential before)
-    const frameResults = await Promise.all(
-      batchTimestamps.map((ts, i) => {
-        const globalIdx = batchIdx * GROQ_BATCH_LIMIT + i;
-        return extractFrame(videoPath, ts, globalIdx);
-      })
-    );
-    const frames = frameResults.filter(Boolean);
+    // Extract frames sequentially within each batch to limit memory usage
+    // (parallel across batches is fine since batches run concurrently anyway)
+    const frames = [];
+    for (let i = 0; i < batchTimestamps.length; i++) {
+      const globalIdx = batchIdx * GROQ_BATCH_LIMIT + i;
+      const frame = await extractFrame(videoPath, batchTimestamps[i], globalIdx);
+      if (frame) frames.push(frame);
+    }
 
     if (frames.length === 0) return null;
 
