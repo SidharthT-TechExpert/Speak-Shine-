@@ -357,6 +357,11 @@ async function dailyReset() {
         isMonthlyReflectionDay: false,
         isMonthlyGoalsDay: false,
         isWeeklyReflectionDay: false,
+        // Clear today's question so stale question doesn't show after midnight
+        todayQuestion: null,
+        todayTopic: null,
+        todayCategory: null,
+        todayPosterImage: null,
         lastResetDate: getTodayIST(),   // ← stamp today so we can detect missed resets
       }
     }, { upsert: true });

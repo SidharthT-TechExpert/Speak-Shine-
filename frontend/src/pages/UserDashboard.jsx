@@ -167,9 +167,10 @@ function SubmitNudge({ name, streak, navigate, specialDay }) {
     const now = new Date();
     const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     
-    // Calculate time until midnight IST
+    // Calculate time until next midnight IST (00:00:00 tomorrow)
     const midnight = new Date(nowIST);
-    midnight.setHours(23, 59, 59, 999);
+    midnight.setDate(midnight.getDate() + 1);
+    midnight.setHours(0, 0, 0, 0);
     
     const diffMs = midnight - nowIST;
     const totalSec = Math.floor(diffMs / 1000);
