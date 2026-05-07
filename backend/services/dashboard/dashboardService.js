@@ -7,11 +7,6 @@ import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import DailyReport from "../../../models/dailyReportSchema.js";
 import { generateSVGPoster } from "../../../api/posterGenerator.js";
-import {
-  cached,
-  userProfileKey, OVERVIEW_KEY, WEEKLY_KEY, MONTHLY_KEY,
-  TTL_18H,
-} from "../cache/cacheService.js";
 
 /**
  * Get poster image - use bot's stored PNG if available, else generate SVG fallback
@@ -31,171 +26,170 @@ function getPosterImage(status) {
 }
 
 /**
- * Get today's dashboard overview (all roles) — cached 18h
+ * Get today's dashboard overview (all roles)
  */
 export async function getTodayOverview() {
-  return cached(OVERVIEW_KEY, TTL_18H, async () => {
-    const status = await Status.findOne().lean();
-    const users = await User.find().lean();
+  const status = await Status.findOne().lean();
+  const users = await User.find().lean();
 
-    const completed = users.filter(u => u.completed);
-    const pending = users.filter(u => !u.completed);
-    const totalFines = users.reduce((s, u) => s + (u.fine || 0), 0);
-    const topStreak = [...users]
-      .sort((a, b) => (b.streak || 0) - (a.streak || 0))
-      .slice(0, 5)
-      .map(u => ({
-        name: u.name,
-        userId: u.userId,
-        streak: u.streak || 0,
-        weeklySubmissions: u.weeklySubmissions || 0,
-        completed: u.completed || false,
-      }));
+  const completed = users.filter(u => u.completed);
+  const pending = users.filter(u => !u.completed);
+  const totalFines = users.reduce((s, u) => s + (u.fine || 0), 0);
+  const topStreak = [...users]
+    .sort((a, b) => (b.streak || 0) - (a.streak || 0))
+    .slice(0, 5)
+    .map(u => ({
+      name: u.name,
+      userId: u.userId,
+      streak: u.streak || 0,
+      weeklySubmissions: u.weeklySubmissions || 0,
+      completed: u.completed || false,
+    }));
 
-    return {
-      today: {
-        questionSent: status?.questionSentToday || false,
-        topic: status?.todayTopic || null,
-        question: status?.todayQuestion || null,
-        category: status?.todayCategory || null,
-        posterImage: getPosterImage(status),
-      },
-      stats: {
-        total: users.length,
-        completed: completed.length,
-        pending: pending.length,
-        totalFines,
-      },
-      topStreak,
-    };
-  });
+  return {
+    today: {
+      questionSent: status?.questionSentToday || false,
+      topic: status?.todayTopic || null,
+      question: status?.todayQuestion || null,
+      category: status?.todayCategory || null,
+      posterImage: getPosterImage(status),
+    },
+    stats: {
+      total: users.length,
+      completed: completed.length,
+      pending: pending.length,
+      totalFines,
+    },
+    topStreak,
+  };
 }
 
 /**
- * Get weekly report summary (admin/trainer only) — cached 18h
+ * Get weekly report summary (admin/trainer only)
  */
 export async function getWeeklyReport() {
-  return cached(WEEKLY_KEY, TTL_18H, async () => {
-    const users = await User.find().lean();
-    const sorted = [...users].sort((a, b) => (b.weeklySubmissions || 0) - (a.weeklySubmissions || 0));
-    return sorted.map(u => ({
-      name: u.name,
-      userId: u.userId,
-      weeklySubmissions: u.weeklySubmissions || 0,
-      weeklyFine: u.weeklyFine || 0,
-      streak: u.streak || 0,
-    }));
-  });
+  const users = await User.find().lean();
+  const sorted = [...users].sort((a, b) => (b.weeklySubmissions || 0) - (a.weeklySubmissions || 0));
+  
+  return sorted.map(u => ({
+    name: u.name,
+    userId: u.userId,
+    weeklySubmissions: u.weeklySubmissions || 0,
+    weeklyFine: u.weeklyFine || 0,
+    streak: u.streak || 0,
+  }));
 }
 
 /**
- * Get monthly report summary (admin/trainer only) — cached 18h
+ * Get monthly report summary (admin/trainer only)
  */
 export async function getMonthlyReport() {
-  return cached(MONTHLY_KEY, TTL_18H, async () => {
-    const users = await User.find().lean();
-    const sorted = [...users].sort((a, b) => (b.monthlySubmissions || 0) - (a.monthlySubmissions || 0));
-    return sorted.map(u => ({
-      name: u.name,
-      userId: u.userId,
-      monthlySubmissions: u.monthlySubmissions || 0,
-      fine: u.fine || 0,
-      streak: u.streak || 0,
-    }));
-  });
+  const users = await User.find().lean();
+  const sorted = [...users].sort((a, b) => (b.monthlySubmissions || 0) - (a.monthlySubmissions || 0));
+  
+  return sorted.map(u => ({
+    name: u.name,
+    userId: u.userId,
+    monthlySubmissions: u.monthlySubmissions || 0,
+    fine: u.fine || 0,
+    streak: u.streak || 0,
+  }));
 }
 
 /**
- * Get full profile for logged-in user — cached 18h, invalidated on video upload
+ * Get full profile for logged-in user
  */
 export async function getUserProfile(phone) {
-  return cached(userProfileKey(phone), TTL_18H, async () => {
-    let user = await User.findOne({ 
-      phone: { $in: [phone, phone.replace(/^91/, ""), `91${phone}`] } 
-    }).lean();
+  // Match by phone field only (most reliable)
+  // Try with and without country code prefix
+  let user = await User.findOne({ 
+    phone: { $in: [phone, phone.replace(/^91/, ""), `91${phone}`] } 
+  }).lean();
 
-    if (!user) {
-      user = {
-        name: "User",
-        phone: phone,
-        feedbackScores: [],
-        streak: 0,
-        fine: 0,
-        completed: false,
-        weeklySubmissions: 0,
-        monthlySubmissions: 0,
-      };
-    }
+  // If no WhatsApp user found, create a basic profile from auth data
+  if (!user) {
+    user = {
+      name: "User",
+      phone: phone,
+      feedbackScores: [],
+      streak: 0,
+      fine: 0,
+      completed: false,
+      weeklySubmissions: 0,
+      monthlySubmissions: 0,
+    };
+  }
 
-    const status = await Status.findOne().lean();
-    const allUsers = await User.find().lean();
-    const completed = allUsers.filter(u => u.completed).length;
-    const totalFines = allUsers.reduce((s, u) => s + (u.fine || 0), 0);
-    const topStreak = [...allUsers]
-      .sort((a, b) => (b.streak || 0) - (a.streak || 0))
-      .slice(0, 5)
-      .map(u => ({ 
-        name: u.name, 
-        userId: u.userId, 
-        streak: u.streak || 0, 
-        weeklySubmissions: u.weeklySubmissions || 0, 
-        completed: u.completed || false 
-      }));
+  const status = await Status.findOne().lean();
+  const allUsers = await User.find().lean();
+  const completed = allUsers.filter(u => u.completed).length;
+  const totalFines = allUsers.reduce((s, u) => s + (u.fine || 0), 0);
+  const topStreak = [...allUsers]
+    .sort((a, b) => (b.streak || 0) - (a.streak || 0))
+    .slice(0, 5)
+    .map(u => ({ 
+      name: u.name, 
+      userId: u.userId, 
+      streak: u.streak || 0, 
+      weeklySubmissions: u.weeklySubmissions || 0, 
+      completed: u.completed || false 
+    }));
 
-    let dailyReport = null;
-    let showReport = false;
-    
-    if (status?.dailyReportGenerated && status?.reportExpiresAt) {
-      const now = new Date();
-      if (now < new Date(status.reportExpiresAt)) {
-        showReport = true;
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        
-        if (user && user._id) {
-          dailyReport = await DailyReport.findOne({
-            userId: user._id,
-            date: todayStart,
-          }).lean();
-        }
+  // Check if we should show daily report (12 AM - 8 AM)
+  let dailyReport = null;
+  let showReport = false;
+  
+  if (status?.dailyReportGenerated && status?.reportExpiresAt) {
+    const now = new Date();
+    if (now < new Date(status.reportExpiresAt)) {
+      // We're in the report window
+      showReport = true;
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      
+      if (user && user._id) {
+        dailyReport = await DailyReport.findOne({
+          userId: user._id,
+          date: todayStart,
+        }).lean();
       }
     }
+  }
 
-    return {
-      profile: {
-        name: user.name,
-        feedbackScores: user.feedbackScores || [],
-        streak: user.streak || 0,
-        fine: user.fine || 0,
-        weeklyFine: user.weeklyFine || 0,
-        completed: user.completed || false,
-        weeklySubmissions: user.weeklySubmissions || 0,
-        monthlySubmissions: user.monthlySubmissions || 0,
-        linkedPhone: user.phone || null,
-      },
-      today: {
-        questionSent: status?.questionSentToday || false,
-        topic: status?.todayTopic || null,
-        question: status?.todayQuestion || null,
-        category: status?.todayCategory || null,
-        posterImage: getPosterImage(status),
-        isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-        isMonthlyGoals: status?.isMonthlyGoalsDay || false,
-        isWeeklyReflection: status?.isWeeklyReflectionDay || false,
-      },
-      dailyReport: showReport ? dailyReport : null,
-      showReport,
-      reportExpiresAt: showReport ? status.reportExpiresAt : null,
-      posterSendTime: status?.posterSendTime || "08:00",
-      stats: {
-        total: allUsers.length,
-        completed,
-        pending: allUsers.length - completed,
-        totalFines,
-      },
-      topStreak,
-    };
-  });
+  return {
+    profile: {
+      name: user.name,
+      feedbackScores: user.feedbackScores || [],
+      streak: user.streak || 0,
+      fine: user.fine || 0,
+      weeklyFine: user.weeklyFine || 0,
+      completed: user.completed || false,
+      weeklySubmissions: user.weeklySubmissions || 0,
+      monthlySubmissions: user.monthlySubmissions || 0,
+      linkedPhone: user.phone || null,
+    },
+    today: {
+      questionSent: status?.questionSentToday || false,
+      topic: status?.todayTopic || null,
+      question: status?.todayQuestion || null,
+      category: status?.todayCategory || null,
+      posterImage: getPosterImage(status),
+      isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+      isMonthlyGoals: status?.isMonthlyGoalsDay || false,
+      isWeeklyReflection: status?.isWeeklyReflectionDay || false,
+    },
+    dailyReport: showReport ? dailyReport : null,
+    showReport,
+    reportExpiresAt: showReport ? status.reportExpiresAt : null,
+    posterSendTime: status?.posterSendTime || "08:00",
+    stats: {
+      total: allUsers.length,
+      completed,
+      pending: allUsers.length - completed,
+      totalFines,
+    },
+    topStreak,
+  };
 }
 
 /**

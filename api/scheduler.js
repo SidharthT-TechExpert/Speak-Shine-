@@ -12,7 +12,6 @@ import DailyReport from "../models/dailyReportSchema.js";
 import VideoReport from "../models/videoReportSchema.js";
 import { generateAndInsertQuestions } from "../backend/services/ai/questionGenerator.js";
 import { deleteFromR2 } from "../r2.js";
-import { invalidateAll } from "../backend/services/cache/cacheService.js";
 
 const TIMEZONE = "Asia/Kolkata";
 
@@ -369,9 +368,6 @@ async function dailyReset() {
     console.log("[Scheduler] ✅ Status flags reset");
 
     console.log("[Scheduler] 🔄 Daily reset complete");
-
-    // Invalidate all dashboard caches so everyone gets fresh data on next request
-    await invalidateAll();
   } catch (err) {
     console.error("[Scheduler] ❌ Daily reset error:", err);
   }
