@@ -7,6 +7,7 @@
 import VideoReport from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import { processWebVideo } from "../ai/videoProcessor.js";
+import { invalidateOnUpload, COMMUNITY_KEY } from "../cache/cacheService.js";
 import fs from "fs";
 
 // ── Queue State ──────────────────────────────────────────────────────────────
@@ -151,6 +152,9 @@ async function processNext() {
       status: "completed",
       analysis: result.analysis,
     });
+
+    // Refresh user's dashboard cache (completed=true) + community feed (new video available)
+    invalidateOnUpload(phone).catch(() => {});
 
     const { fluency, grammar, confidence, vocabulary } = result.analysis;
     if (fluency != null || grammar != null) {

@@ -13,6 +13,7 @@ import { getVideoDuration } from "../ai/videoProcessor.js";
 import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
 import { moderateVideo } from "../ai/contentModerator.js";
+import { invalidateOnUpload } from "../cache/cacheService.js";
 import { fileTypeFromFile } from "file-type";
 import fs from "fs";
 import path from "path";
@@ -249,6 +250,9 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
   const report = await VideoReport.create(reportData);
 
   console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'}`);
+
+  // Invalidate dashboard cache for this user so they see updated completed status
+  invalidateOnUpload(strippedPhone).catch(() => {});
 
   // Enqueue for processing (security scans run inside downloadAndEnqueue on the local file)
   downloadAndEnqueue(report._id, publicUrl, strippedPhone, userDoc?.name || strippedPhone);
@@ -519,6 +523,9 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       r2Key: videoKey,
       securityFlags,
     });
+
+    // Invalidate dashboard cache for this user
+    invalidateOnUpload(strippedPhone).catch(() => {});
 
     // Enqueue for processing
     const { position, estimatedWait } = enqueue({
