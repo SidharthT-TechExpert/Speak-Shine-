@@ -24,11 +24,39 @@
     <link rel="icon" type="image/png" href="/icons/icon-192.png?v=2" />
 
     <title>Speak &amp; Shine 🗣️</title>
+
+    <!-- Preconnect to external origins to reduce DNS/TLS latency -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Non-blocking font load: display=swap shows system font immediately,
+         swaps to Inter once loaded — eliminates render-blocking -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet" media="print" onload="this.media='all'" />
+    <!-- Fallback for no-JS -->
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    </noscript>
+
+    <!-- Inline critical CSS: background + text color so the page isn't blank white during load -->
+    <style>
+      body { background: #05050f; color: #f0f0ff; margin: 0; }
+      #root { min-height: 100vh; }
+      /* Skeleton spinner shown before React mounts */
+      .initial-loader {
+        display: flex; align-items: center; justify-content: center;
+        height: 100vh; background: #05050f;
+      }
+      .initial-loader::after {
+        content: ""; width: 36px; height: 36px; border-radius: 50%;
+        border: 3px solid #1c1c3e; border-top-color: #8b5cf6;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="initial-loader"></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

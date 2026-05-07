@@ -54,6 +54,10 @@ export default defineConfig({
           if (id.includes("node_modules/axios")) {
             return "vendor-axios";
           }
+          // LiveKit — only needed on live session page
+          if (id.includes("node_modules/@livekit") || id.includes("node_modules/livekit")) {
+            return "vendor-livekit";
+          }
         },
       },
     },
