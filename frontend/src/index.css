@@ -1290,13 +1290,20 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 
 /* ── LiveKit full-screen ── */
-.lk-room-container,
-.lk-video-conference {
+.lk-room-container {
   background: #07071a !important;
   height: 100vh !important;
   width: 100vw !important;
   position: fixed !important;
   inset: 0 !important;
+  z-index: 400 !important;
+}
+.lk-video-conference {
+  background: #07071a !important;
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Hide the built-in chat toggle button and chat panel */
@@ -1334,6 +1341,9 @@ button[aria-label="Toggle Chat"] {
   padding: 0.65rem 1.5rem !important;
   gap: 0.5rem !important;
   justify-content: center !important;
+  z-index: 500 !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
 }
 .lk-button {
   background: rgba(255,255,255,0.07) !important;

@@ -223,11 +223,13 @@ function SessionInfoBar({ session }) {
 }
 
 // ── Inner Room (needs LiveKit context) ────────────────────────────────────────
-function InnerRoom({ sessionId, userRole, session }) {
+function InnerRoom({ sessionId, userRole, session, onLeave }) {
   return (
     <>
       {/* VideoConference handles audio + video + layout + controls */}
-      <VideoConference />
+      <VideoConference
+        style={{ height: "100vh", width: "100vw" }}
+      />
 
       {/* Our overlays on top */}
       <SessionInfoBar session={session} />
