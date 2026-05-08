@@ -1,10 +1,9 @@
 /**
  * LiveRoom.jsx
- * Uses RoomAudioRenderer (audio) + GridLayout (video) + custom ControlBar (fixed bottom).
- * This avoids VideoConference's internal layout fighting with our CSS.
+ * RoomAudioRenderer + GridLayout + custom fixed ControlBar with device pickers.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   LiveKitRoom,
   GridLayout,
@@ -15,104 +14,142 @@ import {
   useTracks,
   TrackToggle,
   DisconnectButton,
+  useMediaDeviceSelect,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import "@livekit/components-styles";
 import api from "../api/client.js";
 import { useToast } from "./Toast.jsx";
 
+// ── Device Picker Popup ───────────────────────────────────────────────────────
+function DevicePicker({ kind, onClose }) {
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind });
+  return (
+    <div style={{
+      position: "absolute", bottom: "calc(100% + 8px)", left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(10,10,26,0.98)", backdropFilter: "blur(20px)",
+      border: "1px solid rgba(124,111,255,0.25)", borderRadius: 12,
+      padding: "0.5rem", minWidth: 220, zIndex: 100000,
+      boxShadow: "0 -8px 32px rgba(0,0,0,0.7)",
+    }}>
+      <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.08em", padding: "0.3rem 0.5rem 0.5rem" }}>
+        {kind === "audioinput" ? "🎤 Microphone" : "📹 Camera"}
+      </div>
+      {devices.map(d => (
+        <button key={d.deviceId} onClick={() => { setActiveMediaDevice(d.deviceId); onClose(); }}
+          style={{
+            display: "flex", alignItems: "center", gap: "0.5rem",
+            width: "100%", padding: "0.5rem 0.6rem", borderRadius: 8,
+            border: "none", cursor: "pointer", textAlign: "left",
+            background: d.deviceId === activeDeviceId ? "rgba(124,111,255,0.2)" : "transparent",
+            color: d.deviceId === activeDeviceId ? "#a78bfa" : "#e2e8f0",
+            fontSize: "0.78rem", fontWeight: d.deviceId === activeDeviceId ? 700 : 400,
+          }}>
+          <span style={{ fontSize: "0.7rem", flexShrink: 0 }}>{d.deviceId === activeDeviceId ? "✅" : "○"}</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Custom Control Bar ────────────────────────────────────────────────────────
 function CustomControls({ onLeave }) {
   const { localParticipant } = useLocalParticipant();
   const [micOn,  setMicOn]  = useState(true);
   const [camOn,  setCamOn]  = useState(true);
+  const [picker, setPicker] = useState(null); // "audioinput" | "videoinput" | null
+  const barRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (barRef.current && !barRef.current.contains(e.target)) setPicker(null); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const toggleMic = async () => {
     try { await localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); }
-    catch (e) { console.error("Mic toggle:", e); }
+    catch (e) { console.error("Mic:", e); }
   };
-
   const toggleCam = async () => {
     try { await localParticipant.setCameraEnabled(!camOn); setCamOn(v => !v); }
-    catch (e) { console.error("Cam toggle:", e); }
+    catch (e) { console.error("Cam:", e); }
   };
 
-  const btn = (active, onClick, icon, label, danger = false) => ({
-    onClick,
-    style: {
-      display: "flex", flexDirection: "column", alignItems: "center",
-      gap: "0.25rem", padding: "0.55rem 1.1rem", borderRadius: 12,
-      border: active
-        ? "1px solid rgba(255,255,255,0.12)"
-        : danger
-          ? "none"
-          : "1px solid rgba(248,113,113,0.35)",
-      background: danger
-        ? "linear-gradient(135deg,#ef4444,#dc2626)"
-        : active
-          ? "rgba(255,255,255,0.08)"
-          : "rgba(248,113,113,0.15)",
-      color: danger ? "#fff" : active ? "#e2e8f0" : "#f87171",
-      cursor: "pointer", fontSize: "0.65rem", fontWeight: 700,
-      letterSpacing: "0.02em", minWidth: 60,
-      transition: "all 0.15s",
-    },
+  const mainBtnStyle = (active, danger) => ({
+    display: "flex", flexDirection: "column", alignItems: "center",
+    gap: "0.2rem", padding: "0.55rem 0.9rem",
+    borderRadius: danger ? 12 : "12px 0 0 12px",
+    border: danger ? "none" : active ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(248,113,113,0.3)",
+    background: danger ? "linear-gradient(135deg,#ef4444,#dc2626)" : active ? "rgba(255,255,255,0.07)" : "rgba(248,113,113,0.12)",
+    color: danger ? "#fff" : active ? "#e2e8f0" : "#f87171",
+    cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 52,
+    transition: "all 0.15s",
+  });
+
+  const chevronStyle = (active) => ({
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "0 0.4rem", borderRadius: "0 12px 12px 0",
+    border: active ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(248,113,113,0.3)",
+    borderLeft: "1px solid rgba(255,255,255,0.06)",
+    background: active ? "rgba(255,255,255,0.05)" : "rgba(248,113,113,0.08)",
+    color: "#9494b8", cursor: "pointer", fontSize: "0.55rem",
+    transition: "all 0.15s",
   });
 
   return (
-    <div style={{
-      position: "fixed", bottom: 0, left: 0, right: 0,
-      zIndex: 99999,
-      background: "rgba(6,6,18,0.98)",
-      backdropFilter: "blur(24px)",
+    <div ref={barRef} style={{
+      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 99999,
+      background: "rgba(6,6,18,0.98)", backdropFilter: "blur(24px)",
       WebkitBackdropFilter: "blur(24px)",
-      borderTop: "1px solid rgba(255,255,255,0.08)",
-      padding: "0.7rem 1.5rem",
+      borderTop: "1px solid rgba(255,255,255,0.07)",
+      padding: "0.65rem 1.5rem",
       display: "flex", alignItems: "center", justifyContent: "center",
-      gap: "0.6rem",
-      height: 76,
+      gap: "0.5rem", height: 76,
     }}>
-      {/* Mic */}
-      <button {...btn(micOn, toggleMic, micOn ? "🎤" : "🔇", micOn ? "Mute" : "Unmute")}>
-        <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>{micOn ? "🎤" : "🔇"}</span>
-        <span>{micOn ? "Mute" : "Unmute"}</span>
-      </button>
 
-      {/* Camera */}
-      <button {...btn(camOn, toggleCam, camOn ? "📹" : "🚫", camOn ? "Camera" : "No Cam")}>
-        <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>{camOn ? "📹" : "🚫"}</span>
-        <span>{camOn ? "Camera" : "No Cam"}</span>
-      </button>
+      {/* Mic button + chevron */}
+      <div style={{ position: "relative", display: "flex" }}>
+        <button style={mainBtnStyle(micOn, false)} onClick={toggleMic}>
+          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>{micOn ? "🎤" : "🔇"}</span>
+          <span>{micOn ? "Mute" : "Unmute"}</span>
+        </button>
+        <button style={chevronStyle(micOn)} onClick={() => setPicker(p => p === "audioinput" ? null : "audioinput")}>▲</button>
+        {picker === "audioinput" && <DevicePicker kind="audioinput" onClose={() => setPicker(null)} />}
+      </div>
 
-      {/* Screen share via TrackToggle */}
-      <TrackToggle
-        source={Track.Source.ScreenShare}
-        style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          gap: "0.25rem", padding: "0.55rem 1.1rem", borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.12)",
-          background: "rgba(255,255,255,0.08)",
-          color: "#e2e8f0", cursor: "pointer",
-          fontSize: "0.65rem", fontWeight: 700, minWidth: 60,
-        }}
-      >
-        <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>🖥️</span>
+      {/* Camera button + chevron */}
+      <div style={{ position: "relative", display: "flex" }}>
+        <button style={mainBtnStyle(camOn, false)} onClick={toggleCam}>
+          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>{camOn ? "📹" : "🚫"}</span>
+          <span>{camOn ? "Camera" : "No Cam"}</span>
+        </button>
+        <button style={chevronStyle(camOn)} onClick={() => setPicker(p => p === "videoinput" ? null : "videoinput")}>▲</button>
+        {picker === "videoinput" && <DevicePicker kind="videoinput" onClose={() => setPicker(null)} />}
+      </div>
+
+      {/* Screen share */}
+      <TrackToggle source={Track.Source.ScreenShare} style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        gap: "0.2rem", padding: "0.55rem 0.9rem", borderRadius: 12,
+        border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.07)",
+        color: "#e2e8f0", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 52,
+      }}>
+        <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>🖥️</span>
         <span>Share</span>
       </TrackToggle>
 
       {/* Leave */}
-      <DisconnectButton
-        onClick={onLeave}
-        style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          gap: "0.25rem", padding: "0.55rem 1.4rem", borderRadius: 12,
-          border: "none",
-          background: "linear-gradient(135deg,#ef4444,#dc2626)",
-          color: "#fff", cursor: "pointer",
-          fontSize: "0.65rem", fontWeight: 700, minWidth: 70,
-        }}
-      >
-        <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>📞</span>
+      <DisconnectButton onClick={onLeave} style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        gap: "0.2rem", padding: "0.55rem 1.2rem", borderRadius: 12,
+        border: "none", background: "linear-gradient(135deg,#ef4444,#dc2626)",
+        color: "#fff", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 60,
+      }}>
+        <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>📞</span>
         <span>Leave</span>
       </DisconnectButton>
     </div>
@@ -141,30 +178,19 @@ function ParticipantsPanel({ sessionId }) {
   return (
     <div style={{
       position: "fixed", top: 12, right: 12, zIndex: 99998,
-      background: "rgba(8,8,20,0.97)",
-      backdropFilter: "blur(20px)",
-      border: "1px solid rgba(124,111,255,0.2)",
-      borderRadius: 14, width: collapsed ? "auto" : 250,
-      boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
+      background: "rgba(8,8,20,0.97)", backdropFilter: "blur(20px)",
+      border: "1px solid rgba(124,111,255,0.2)", borderRadius: 14,
+      width: collapsed ? "auto" : 250, boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
       overflow: "hidden", transition: "width 0.2s ease",
     }}>
-      <div
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0.6rem 0.85rem",
-          borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.05)",
-          cursor: "pointer", userSelect: "none",
-        }}
-        onClick={() => setCollapsed(v => !v)}
-      >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0.85rem", borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.05)", cursor: "pointer", userSelect: "none" }}
+        onClick={() => setCollapsed(v => !v)}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
           <span>🛡️</span>
           {!collapsed && <span style={{ fontWeight: 700, fontSize: "0.8rem", color: "#e2e8f0" }}>Participants</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          <span style={{ background: "rgba(124,111,255,0.2)", color: "#a78bfa", borderRadius: 20, padding: "0.1rem 0.4rem", fontSize: "0.68rem", fontWeight: 700 }}>
-            {participants.length}
-          </span>
+          <span style={{ background: "rgba(124,111,255,0.2)", color: "#a78bfa", borderRadius: 20, padding: "0.1rem 0.4rem", fontSize: "0.68rem", fontWeight: 700 }}>{participants.length}</span>
           <span style={{ color: "#55557a", fontSize: "0.68rem" }}>{collapsed ? "▶" : "▼"}</span>
         </div>
       </div>
@@ -212,25 +238,11 @@ function ParticipantsPanel({ sessionId }) {
 function SessionInfoBar({ session }) {
   const participants = useParticipants();
   const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setElapsed(e => e + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const fmt = s => {
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    return h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
-  };
+  useEffect(() => { const t = setInterval(() => setElapsed(e => e + 1), 1000); return () => clearInterval(t); }, []);
+  const fmt = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`; };
 
   return (
-    <div style={{
-      position: "fixed", top: 12, left: 12, zIndex: 99998,
-      background: "rgba(8,8,20,0.92)", backdropFilter: "blur(16px)",
-      border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10,
-      padding: "0.45rem 0.85rem", display: "flex", alignItems: "center", gap: "0.6rem",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.6)", maxWidth: "calc(100vw - 280px)",
-    }}>
+    <div style={{ position: "fixed", top: 12, left: 12, zIndex: 99998, background: "rgba(8,8,20,0.92)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "0.45rem 0.85rem", display: "flex", alignItems: "center", gap: "0.6rem", boxShadow: "0 4px 20px rgba(0,0,0,0.6)", maxWidth: "calc(100vw - 280px)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
         <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#f87171", animation: "speakDot 1s ease-in-out infinite alternate" }} />
         <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.06em" }}>LIVE</span>
@@ -247,18 +259,11 @@ function SessionInfoBar({ session }) {
 // ── Video Grid ────────────────────────────────────────────────────────────────
 function VideoGrid() {
   const tracks = useTracks(
-    [
-      { source: Track.Source.Camera,      withPlaceholder: true },
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ],
+    [{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false }
   );
-
   return (
-    <GridLayout
-      tracks={tracks}
-      style={{ height: "100%", width: "100%", background: "#07071a" }}
-    >
+    <GridLayout tracks={tracks} style={{ height: "100%", width: "100%", background: "#07071a" }}>
       <ParticipantTile />
     </GridLayout>
   );
@@ -267,30 +272,13 @@ function VideoGrid() {
 // ── Inner Room ────────────────────────────────────────────────────────────────
 function InnerRoom({ sessionId, userRole, onLeave, session }) {
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 400,
-      background: "#07071a",
-      display: "flex", flexDirection: "column",
-    }}>
-      {/* Audio — MUST be present for remote audio */}
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, background: "#07071a", display: "flex", flexDirection: "column" }}>
       <RoomAudioRenderer />
-
-      {/* Overlays */}
       <SessionInfoBar session={session} />
-      {(userRole === "admin" || userRole === "trainer") && (
-        <ParticipantsPanel sessionId={sessionId} />
-      )}
-
-      {/* Video grid — padded so it doesn't go under the control bar */}
-      <div style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0,
-        bottom: 76, // height of control bar
-      }}>
+      {(userRole === "admin" || userRole === "trainer") && <ParticipantsPanel sessionId={sessionId} />}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 76 }}>
         <VideoGrid />
       </div>
-
-      {/* Custom control bar — always on top, always visible */}
       <CustomControls onLeave={onLeave} />
     </div>
   );
@@ -298,34 +286,26 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
 
 // ── Main LiveRoom ─────────────────────────────────────────────────────────────
 export default function LiveRoom({ sessionId, userRole, onLeave }) {
-  const [token,   setToken]   = useState(null);
-  const [lkUrl,   setLkUrl]   = useState(null);
-  const [error,   setError]   = useState(null);
+  const [token, setToken]     = useState(null);
+  const [lkUrl, setLkUrl]     = useState(null);
+  const [error, setError]     = useState(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [sRes, tRes] = await Promise.all([
-          api.get(`/live-sessions/${sessionId}`),
-          api.post(`/live-sessions/${sessionId}/token`),
-        ]);
-        setSession(sRes.data);
-        setToken(tRes.data.token);
+        const [sRes, tRes] = await Promise.all([api.get(`/live-sessions/${sessionId}`), api.post(`/live-sessions/${sessionId}/token`)]);
+        setSession(sRes.data); setToken(tRes.data.token);
         setLkUrl(tRes.data.livekitUrl || import.meta.env.VITE_LIVEKIT_URL);
-      } catch (e) {
-        setError(e.response?.data?.error || "Failed to join session");
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { setError(e.response?.data?.error || "Failed to join session"); }
+      finally { setLoading(false); }
     })();
   }, [sessionId]);
 
   if (loading) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: "1rem", background: "#07071a" }}>
-      <div className="spinner" />
-      <p style={{ color: "#55557a", fontSize: "0.9rem" }}>Joining session…</p>
+      <div className="spinner" /><p style={{ color: "#55557a", fontSize: "0.9rem" }}>Joining session…</p>
     </div>
   );
 
@@ -338,21 +318,8 @@ export default function LiveRoom({ sessionId, userRole, onLeave }) {
   );
 
   return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={lkUrl}
-      connect={true}
-      video={true}
-      audio={true}
-      onDisconnected={onLeave}
-      style={{ height: "100vh", width: "100vw" }}
-    >
-      <InnerRoom
-        sessionId={sessionId}
-        userRole={userRole}
-        onLeave={onLeave}
-        session={session}
-      />
+    <LiveKitRoom token={token} serverUrl={lkUrl} connect={true} video={true} audio={true} onDisconnected={onLeave} style={{ height: "100vh", width: "100vw" }}>
+      <InnerRoom sessionId={sessionId} userRole={userRole} onLeave={onLeave} session={session} />
     </LiveKitRoom>
   );
 }
