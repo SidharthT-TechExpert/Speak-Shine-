@@ -124,20 +124,12 @@ export default function LiveSession() {
 
   return (
     <Layout title={session.title}>
-      <div className="card" style={{ padding: "0.75rem" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-          <h3 style={{ margin: 0, fontSize: "1rem" }}>{session.title}</h3>
-          <button className="btn-danger" onClick={handleLeave} style={{ fontSize: "0.85rem", padding: "0.5rem 1rem" }}>
-            🚪 Leave
-          </button>
-        </div>
-        <LiveRoom
-          sessionId={id}
-          userRole={user.role}
-          onLeave={handleLeave}
-          onSessionEnded={handleLeave}
-        />
-      </div>
+      <LiveRoom
+        sessionId={id}
+        userRole={user.role}
+        onLeave={handleLeave}
+        onSessionEnded={handleLeave}
+      />
     </Layout>
   );
 }

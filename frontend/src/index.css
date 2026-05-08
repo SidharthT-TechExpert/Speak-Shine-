@@ -1274,3 +1274,26 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 @media (max-width: 480px) {
   .install-label { display: none; }
 }
+
+/* ── Live Room Animations ── */
+@keyframes speakPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.01); }
+}
+@keyframes speakDot {
+  from { opacity: 0.4; transform: scale(0.85); }
+  to   { opacity: 1;   transform: scale(1.15); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* ── Live Room: hide default LiveKit UI chrome ── */
+.lk-room-container,
+.lk-video-conference {
+  background: transparent !important;
+  height: 100% !important;
+}
+/* Hide LiveKit's built-in control bar — we use our own */
+.lk-control-bar { display: none !important; }
