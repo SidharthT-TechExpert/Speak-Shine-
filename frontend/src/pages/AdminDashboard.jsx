@@ -398,49 +398,204 @@ export default function AdminDashboard() {
       {/* OVERVIEW */}
       {tab==="overview" && (
         <>
-          <div className="grid-2" style={{marginBottom:"1rem"}}>
-            <div className="card">
-              <div className="section-title">📊 Today's Submission Rate</div>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart><Pie data={pieSub} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} label={({name,value})=>`${name}: ${value}`}>
-                  {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
-                </Pie><Tooltip contentStyle={tt}/></PieChart>
-              </ResponsiveContainer>
+          {/* ── Today's question banner ── */}
+          {dash?.today?.question ? (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(124,111,255,0.12), rgba(79,70,229,0.06))",
+              border: "1px solid rgba(124,111,255,0.25)",
+              borderRadius: 16, padding: "1rem 1.25rem",
+              marginBottom: "1rem",
+              display: "flex", alignItems: "flex-start", gap: "0.75rem",
+            }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                background: "rgba(124,111,255,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.1rem",
+              }}>📌</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.3rem" }}>
+                  Today's Question · {dash.today.category || dash.today.topic || "General"}
+                </div>
+                <div style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.45 }}>
+                  {dash.today.question}
+                </div>
+              </div>
+              <div style={{
+                flexShrink: 0, fontSize: "0.72rem", fontWeight: 700,
+                padding: "0.25rem 0.65rem", borderRadius: 20,
+                background: "rgba(74,222,128,0.15)", color: "#4ade80",
+                border: "1px solid rgba(74,222,128,0.3)",
+              }}>✅ Live</div>
             </div>
-            <div className="card">
-              <div className="section-title">🏆 Top Streaks</div>
-              <div className="streak-list">
-                {(dash?.topStreak||[]).map((u,i)=>(
-                  <div className="streak-row" key={i}>
-                    <span className="streak-rank">{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
-                    <span className="streak-name">{u.name||u.userId?.split("@")[0]}</span>
-                    <span className="streak-val">🔥 {u.streak}</span>
-                    <span className="streak-sub">{u.weeklySubmissions}/7</span>
+          ) : (
+            <div style={{
+              background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)",
+              borderRadius: 16, padding: "0.85rem 1.25rem",
+              marginBottom: "1rem", fontSize: "0.85rem", color: "#fbbf24",
+              display: "flex", alignItems: "center", gap: "0.5rem",
+            }}>
+              ⏳ No question published yet today
+            </div>
+          )}
+
+          {/* ── Row 1: Submission donut + Streak leaderboard ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: "1rem", marginBottom: "1rem" }}>
+
+            {/* Submission donut — redesigned */}
+            <div className="card" style={{ display: "flex", flexDirection: "column" }}>
+              <div className="section-title" style={{ marginBottom: "0.5rem" }}>📊 Today's Submissions</div>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
+                  <ResponsiveContainer width={120} height={120}>
+                    <PieChart>
+                      <Pie data={pieSub} dataKey="value" cx="50%" cy="50%" innerRadius={38} outerRadius={56} paddingAngle={3} startAngle={90} endAngle={-270}>
+                        {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center label */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
+                      {dash?.stats?.total ? Math.round((dash.stats.completed / dash.stats.total) * 100) : 0}%
+                    </div>
+                    <div style={{ fontSize: "0.6rem", color: "var(--muted)", fontWeight: 600 }}>done</div>
                   </div>
-                ))}
+                </div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  {[
+                    { label: "Submitted", value: dash?.stats?.completed || 0, color: "#4ade80" },
+                    { label: "Pending",   value: dash?.stats?.pending   || 0, color: "#f87171" },
+                    { label: "Total",     value: dash?.stats?.total     || 0, color: "#7c6fff" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", flex: 1 }}>{label}</span>
+                      <span style={{ fontSize: "0.9rem", fontWeight: 700, color }}>{value}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: "0.25rem" }}>
+                    <div style={{ height: 6, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", borderRadius: 99,
+                        background: "linear-gradient(90deg, #4ade80, #22c55e)",
+                        width: `${dash?.stats?.total ? (dash.stats.completed / dash.stats.total) * 100 : 0}%`,
+                        transition: "width 0.6s ease",
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Streak leaderboard — redesigned */}
+            <div className="card">
+              <div className="section-title" style={{ marginBottom: "0.75rem" }}>🏆 Top Streaks</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {(dash?.topStreak || []).map((u, i) => {
+                  const medals = ["🥇","🥈","🥉"];
+                  const pct = dash.topStreak[0]?.streak ? Math.round((u.streak / dash.topStreak[0].streak) * 100) : 0;
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: "0.75rem",
+                      padding: "0.5rem 0.75rem",
+                      background: i === 0 ? "rgba(251,191,36,0.06)" : "rgba(255,255,255,0.02)",
+                      borderRadius: 10,
+                      border: i === 0 ? "1px solid rgba(251,191,36,0.15)" : "1px solid transparent",
+                    }}>
+                      <span style={{ fontSize: i < 3 ? "1.1rem" : "0.8rem", fontWeight: 700, color: "var(--muted)", width: 24, textAlign: "center", flexShrink: 0 }}>
+                        {medals[i] || `${i+1}`}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {u.name || u.userId?.split("@")[0]}
+                        </div>
+                        <div style={{ height: 3, background: "var(--border)", borderRadius: 99, marginTop: "0.3rem", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 99, background: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#7c6fff", width: `${pct}%` }} />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#f97316" }}>🔥 {u.streak}</span>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted)", background: "var(--bg-secondary)", padding: "0.15rem 0.4rem", borderRadius: 6 }}>{u.weeklySubmissions}/7</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!dash?.topStreak || dash.topStreak.length === 0) && (
+                  <div style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.82rem", padding: "1rem" }}>No streak data yet</div>
+                )}
               </div>
             </div>
           </div>
-          <div className="grid-2">
+
+          {/* ── Row 2: Weekly bar + Fine bar + Category pie ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+
+            {/* Weekly submissions bar */}
             <div className="card">
               <div className="section-title">📅 Weekly Submissions</div>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={weekly.slice(0,10).map(u=>({name:(u.name||"?").slice(0,8),days:u.weeklySubmissions||0}))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e1e40"/>
-                  <XAxis dataKey="name" stroke="#606080" fontSize={11}/>
-                  <YAxis domain={[0,7]} stroke="#606080" fontSize={11}/>
-                  <Tooltip contentStyle={tt}/>
-                  <Bar dataKey="days" fill="#7c6fff" radius={[6,6,0,0]}/>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weekly.slice(0,8).map(u=>({name:(u.name||"?").slice(0,7),days:u.weeklySubmissions||0}))} margin={{top:4,right:4,left:-20,bottom:0}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false}/>
+                  <XAxis dataKey="name" stroke="#55557a" fontSize={10} tickLine={false} axisLine={false}/>
+                  <YAxis domain={[0,7]} stroke="#55557a" fontSize={10} tickLine={false} axisLine={false}/>
+                  <Tooltip contentStyle={tt} cursor={{fill:"rgba(124,111,255,0.06)"}}/>
+                  <Bar dataKey="days" radius={[6,6,0,0]}>
+                    {weekly.slice(0,8).map((u,i)=>(
+                      <Cell key={i} fill={(u.weeklySubmissions||0)>=5?"#4ade80":(u.weeklySubmissions||0)>=3?"#7c6fff":"#f87171"}/>
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Fine leaderboard */}
             <div className="card">
-              <div className="section-title">❓ Questions by Category</div>
-              <ResponsiveContainer width="100%" height={240}>
-                <PieChart><Pie data={catPie} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({value})=>value}>
-                  {catPie.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
-                </Pie><Tooltip contentStyle={tt}/><Legend iconSize={10} wrapperStyle={{fontSize:"0.72rem"}}/></PieChart>
-              </ResponsiveContainer>
+              <div className="section-title">💸 Top Fines</div>
+              {fineBar.length === 0 ? (
+                <div style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.82rem", padding: "2rem 0" }}>🎉 No fines yet!</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                  {fineBar.slice(0,6).map((u,i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.72rem", color: "var(--muted)", width: 16, flexShrink: 0 }}>{i+1}</span>
+                      <span style={{ flex: 1, fontSize: "0.8rem", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
+                      <div style={{ width: 60, height: 4, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 99, background: "#f87171", width: `${Math.round((u.fine / fineBar[0].fine) * 100)}%` }} />
+                      </div>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#f87171", flexShrink: 0 }}>₹{u.fine}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Questions by category */}
+            <div className="card">
+              <div className="section-title">❓ Question Bank</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {CATS.map((cat, i) => {
+                  const count = questions.length > 0
+                    ? questions.filter(q => q.category === cat).length
+                    : (catPie.find(c => c.name === cat)?.value || 0);
+                  const maxCat = Math.max(...CATS.map(c => questions.filter(q => q.category === c).length), 1);
+                  const pct = Math.round((count / maxCat) * 100);
+                  const color = count === 0 ? "#f87171" : count <= 1 ? "#fbbf24" : PIE_COLORS[i % PIE_COLORS.length];
+                  return (
+                    <div key={cat} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: "0.72rem", color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</span>
+                      <div style={{ width: 50, height: 4, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 99, background: color, width: `${pct}%` }} />
+                      </div>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color, width: 16, textAlign: "right", flexShrink: 0 }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </>
