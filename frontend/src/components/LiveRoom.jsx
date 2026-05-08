@@ -187,22 +187,33 @@ function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount }) {
       <div style={{ position: "relative" }}>
         <CtrlBtn
           icon="💬"
-          label="Chat"
+          label={unreadCount > 0 && !chatOpen ? `Chat (${unreadCount > 99 ? "99+" : unreadCount})` : "Chat"}
           active={!chatOpen}
           onClick={onChatToggle}
-          style={chatOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+          style={
+            chatOpen
+              ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" }
+              : unreadCount > 0
+                ? { border: "1px solid rgba(239,68,68,0.5)", background: "rgba(239,68,68,0.1)", color: "#fca5a5", animation: "badgePulse 1.5s ease-in-out infinite" }
+                : {}
+          }
         />
+        {/* Unread badge — prominent, pulsing */}
         {unreadCount > 0 && !chatOpen && (
           <div style={{
-            position: "absolute", top: -4, right: -4,
-            width: 18, height: 18, borderRadius: "50%",
-            background: "#ef4444", color: "#fff",
-            fontSize: "0.58rem", fontWeight: 800,
+            position: "absolute", top: -6, right: -6,
+            minWidth: 20, height: 20, borderRadius: 10,
+            background: "linear-gradient(135deg,#ef4444,#dc2626)",
+            color: "#fff",
+            fontSize: "0.65rem", fontWeight: 800,
             display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "0 4px",
             border: "2px solid rgba(6,6,18,0.98)",
             pointerEvents: "none",
+            boxShadow: "0 0 8px rgba(239,68,68,0.6)",
+            animation: "badgePulse 1.5s ease-in-out infinite",
           }}>
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {unreadCount > 99 ? "99+" : unreadCount}
           </div>
         )}
       </div>

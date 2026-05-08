@@ -1288,6 +1288,10 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   0%   { background-position: -200% center; }
   100% { background-position:  200% center; }
 }
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+  50%       { transform: scale(1.15); box-shadow: 0 0 14px rgba(239,68,68,0.8); }
+}
 
 /* ── LiveKit container ── */
 .lk-room-container {
