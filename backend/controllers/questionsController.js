@@ -148,3 +148,33 @@ export async function editQuestion(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * POST /api/questions/generate-now - Manually trigger AI question generation (admin)
+ */
+export async function generateQuestionsNow(req, res) {
+  try {
+    const { count = 14 } = req.body;
+    const safeCount = Math.min(Math.max(parseInt(count) || 14, 7), 28);
+
+    // Run async — respond immediately so the request doesn't time out
+    const { generateAndInsertQuestions } = await import("../services/ai/questionGenerator.js");
+
+    // Fire and forget — client polls the question list to see new ones
+    generateAndInsertQuestions(safeCount)
+      .then(({ inserted, totalInDb }) =>
+        console.log(`[Questions] Manual generate: +${inserted.length} questions. Bank total: ${totalInDb}`)
+      )
+      .catch(err =>
+        console.error("[Questions] Manual generate failed:", err.message)
+      );
+
+    res.json({
+      success: true,
+      message: `Generating ${safeCount} questions in the background. Refresh the question bank in ~30 seconds.`,
+    });
+  } catch (error) {
+    console.error("[Questions] Generate now error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
