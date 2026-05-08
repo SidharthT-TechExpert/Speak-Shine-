@@ -842,30 +842,20 @@ export default function AdminDashboard() {
                 disabled={!!qActionBusy}
                 onClick={async () => {
                   setQActionBusy("generating");
-                  msg("🤖 Generating questions… this takes ~30 seconds");
+                  msg("🤖 Generating questions… please wait (30–60s)");
                   try {
-                    await api.post("/questions/generate-now", { count: 14 });
-                    const before = questions.length;
-                    let attempts = 0;
-                    const poll = setInterval(async () => {
-                      attempts++;
-                      await refreshQuestions();
-                      setQuestions(prev => {
-                        if (prev.length > before || attempts >= 12) {
-                          clearInterval(poll);
-                          setQActionBusy("");
-                          if (prev.length > before) {
-                            msg(`✅ Added ${prev.length - before} new question${prev.length - before !== 1 ? "s" : ""}! Bank now has ${prev.length}`);
-                          } else {
-                            msg("⚠️ Generation may still be running — refresh in a moment");
-                          }
-                        }
-                        return prev;
-                      });
-                    }, 5000);
+                    const res = await api.post("/questions/generate-now", { count: 14 }, { timeout: 95000 });
+                    await refreshQuestions();
+                    setQActionBusy("");
+                    msg(`✅ ${res.data.message}`);
                   } catch (e) {
                     setQActionBusy("");
-                    msg(e?.response?.data?.error || "Generate failed", "danger");
+                    await refreshQuestions(); // still refresh — some may have been inserted
+                    if (e?.code === "ECONNABORTED" || e?.message?.includes("timeout")) {
+                      msg("⚠️ Request timed out — questions may still be generating. Check the bank in a moment.", "danger");
+                    } else {
+                      msg(e?.response?.data?.error || "Generation failed", "danger");
+                    }
                   }
                 }}
               >
@@ -911,30 +901,20 @@ export default function AdminDashboard() {
                   disabled={!!qActionBusy}
                   onClick={async () => {
                     setQActionBusy("generating");
-                    msg("🤖 Generating questions… this takes ~30 seconds");
+                    msg("🤖 Generating questions… please wait (30–60s)");
                     try {
-                      await api.post("/questions/generate-now", { count: 14 });
-                      const before = questions.length;
-                      let attempts = 0;
-                      const poll = setInterval(async () => {
-                        attempts++;
-                        await refreshQuestions();
-                        setQuestions(prev => {
-                          if (prev.length > before || attempts >= 12) {
-                            clearInterval(poll);
-                            setQActionBusy("");
-                            if (prev.length > before) {
-                              msg(`✅ Added ${prev.length - before} new question${prev.length - before !== 1 ? "s" : ""}! Bank now has ${prev.length}`);
-                            } else {
-                              msg("⚠️ Generation may still be running — refresh in a moment");
-                            }
-                          }
-                          return prev;
-                        });
-                      }, 5000);
+                      const res = await api.post("/questions/generate-now", { count: 14 }, { timeout: 95000 });
+                      await refreshQuestions();
+                      setQActionBusy("");
+                      msg(`✅ ${res.data.message}`);
                     } catch (e) {
                       setQActionBusy("");
-                      msg(e?.response?.data?.error || "Generate failed", "danger");
+                      await refreshQuestions(); // still refresh — some may have been inserted
+                      if (e?.code === "ECONNABORTED" || e?.message?.includes("timeout")) {
+                        msg("⚠️ Request timed out — questions may still be generating. Check the bank in a moment.", "danger");
+                      } else {
+                        msg(e?.response?.data?.error || "Generation failed", "danger");
+                      }
                     }
                   }}
                 >

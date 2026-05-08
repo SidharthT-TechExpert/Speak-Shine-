@@ -151,27 +151,32 @@ export async function editQuestion(req, res) {
 
 /**
  * POST /api/questions/generate-now - Manually trigger AI question generation (admin)
+ * Waits for completion (up to 90s) and returns the result.
  */
 export async function generateQuestionsNow(req, res) {
   try {
     const { count = 14 } = req.body;
     const safeCount = Math.min(Math.max(parseInt(count) || 14, 7), 28);
 
-    // Run async — respond immediately so the request doesn't time out
     const { generateAndInsertQuestions } = await import("../services/ai/questionGenerator.js");
 
-    // Fire and forget — client polls the question list to see new ones
-    generateAndInsertQuestions(safeCount)
-      .then(({ inserted, totalInDb }) =>
-        console.log(`[Questions] Manual generate: +${inserted.length} questions. Bank total: ${totalInDb}`)
-      )
-      .catch(err =>
-        console.error("[Questions] Manual generate failed:", err.message)
-      );
+    // Set a generous timeout — generation takes 20-60s
+    const timeoutMs = 90_000;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Generation timed out after 90s")), timeoutMs)
+    );
+
+    const result = await Promise.race([
+      generateAndInsertQuestions(safeCount),
+      timeoutPromise,
+    ]);
 
     res.json({
       success: true,
-      message: `Generating ${safeCount} questions in the background. Refresh the question bank in ~30 seconds.`,
+      inserted: result.inserted.length,
+      skipped: result.skipped.length,
+      totalInDb: result.totalInDb,
+      message: `Added ${result.inserted.length} new questions. Bank total: ${result.totalInDb}`,
     });
   } catch (error) {
     console.error("[Questions] Generate now error:", error.message);
