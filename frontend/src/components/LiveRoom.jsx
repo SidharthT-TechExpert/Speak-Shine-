@@ -97,12 +97,14 @@ function CtrlBtn({ icon, label, active = true, muted = false, danger = false, on
 
 // ── Custom Control Bar ────────────────────────────────────────────────────────
 function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount, ncOn, onNcToggle, ncLoading }) {
-  const { localParticipant } = useLocalParticipant();
-  const [micOn,    setMicOn]    = useState(true);
-  const [camOn,    setCamOn]    = useState(true);
+  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
   const [shareOn,  setShareOn]  = useState(false);
   const [picker,   setPicker]   = useState(null);
   const barRef = useRef(null);
+
+  // Derive truth from LiveKit track state, not local booleans
+  const micOn = isMicrophoneEnabled;
+  const camOn = isCameraEnabled;
 
   useEffect(() => {
     const handler = (e) => { if (barRef.current && !barRef.current.contains(e.target)) setPicker(null); };
@@ -111,11 +113,11 @@ function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount, ncOn, on
   }, []);
 
   const toggleMic = async () => {
-    try { await localParticipant.setMicrophoneEnabled(!micOn); setMicOn(v => !v); }
+    try { await localParticipant.setMicrophoneEnabled(!micOn); }
     catch (e) { console.error("Mic:", e); }
   };
   const toggleCam = async () => {
-    try { await localParticipant.setCameraEnabled(!camOn); setCamOn(v => !v); }
+    try { await localParticipant.setCameraEnabled(!camOn); }
     catch (e) { console.error("Cam:", e); }
   };
   const toggleShare = async () => {
