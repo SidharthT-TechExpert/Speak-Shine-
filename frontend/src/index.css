@@ -1289,11 +1289,73 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   100% { background-position:  200% center; }
 }
 
-/* ── Live Room: hide default LiveKit UI chrome ── */
-.lk-room-container,
-.lk-video-conference {
-  background: transparent !important;
-  height: 100% !important;
+/* ── LiveKit VideoConference — full screen, dark theme ── */
+.lk-room-container {
+  background: #07071a !important;
+  height: 100vh !important;
+  width: 100vw !important;
 }
-/* Hide LiveKit's built-in control bar — we use our own */
-.lk-control-bar { display: none !important; }
+.lk-video-conference {
+  background: #07071a !important;
+  height: 100vh !important;
+  width: 100vw !important;
+}
+/* Participant tiles */
+.lk-participant-tile {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 2px solid rgba(255,255,255,0.07) !important;
+}
+.lk-participant-tile[data-lk-speaking="true"] {
+  border-color: #4ade80 !important;
+  box-shadow: 0 0 0 3px rgba(74,222,128,0.2) !important;
+}
+/* Control bar — dark glassmorphism */
+.lk-control-bar {
+  background: rgba(10,10,26,0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-top: 1px solid rgba(255,255,255,0.08) !important;
+  padding: 0.75rem 1.5rem !important;
+}
+.lk-button {
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e2e8f0 !important;
+  border-radius: 12px !important;
+  transition: all 0.2s !important;
+}
+.lk-button:hover {
+  background: rgba(255,255,255,0.14) !important;
+  border-color: rgba(255,255,255,0.2) !important;
+}
+.lk-button[aria-pressed="true"],
+.lk-button[data-lk-active="true"] {
+  background: rgba(248,113,113,0.15) !important;
+  border-color: rgba(248,113,113,0.35) !important;
+  color: #f87171 !important;
+}
+/* Leave button */
+.lk-disconnect-button {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  border: none !important;
+  color: #fff !important;
+}
+.lk-disconnect-button:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+}
+/* Participant name label */
+.lk-participant-name {
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 0.78rem !important;
+}
+/* Focus layout (when someone is speaking) */
+.lk-focus-layout {
+  background: #07071a !important;
+}
+/* Grid layout */
+.lk-grid-layout {
+  background: #07071a !important;
+  padding: 0.75rem !important;
+  gap: 0.75rem !important;
+}
