@@ -1072,6 +1072,7 @@ export default function UserDashboard() {
           <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
             {liveSessions.map(s => {
               const isLive = s.status === "live";
+              const alreadyIn = isLive && s.participants?.includes(data?.profile?.linkedPhone);
               return (
                 <div key={s._id} style={{
                   background: isLive ? "rgba(74,222,128,0.05)" : "var(--bg-secondary)",
@@ -1084,10 +1085,7 @@ export default function UserDashboard() {
                   {isLive && (
                     <div style={{
                       position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 3,
+                      top: 0, left: 0, right: 0, height: 3,
                       background: "linear-gradient(90deg, #4ade80, #22c55e)",
                     }} />
                   )}
@@ -1096,16 +1094,24 @@ export default function UserDashboard() {
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
                         <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>{s.title}</span>
                         <span style={{
-                          fontSize: "0.65rem",
-                          fontWeight: 700,
-                          padding: "0.15rem 0.5rem",
-                          borderRadius: 20,
-                          textTransform: "uppercase",
+                          fontSize: "0.65rem", fontWeight: 700,
+                          padding: "0.15rem 0.5rem", borderRadius: 20, textTransform: "uppercase",
                           background: isLive ? "rgba(74,222,128,0.15)" : "rgba(96,165,250,0.15)",
                           color: isLive ? "#4ade80" : "#60a5fa",
                         }}>
                           {isLive ? "🔴 Live Now" : "Scheduled"}
                         </span>
+                        {/* "You're inside" badge */}
+                        {alreadyIn && (
+                          <span style={{
+                            fontSize: "0.65rem", fontWeight: 700,
+                            padding: "0.15rem 0.5rem", borderRadius: 20,
+                            background: "rgba(124,111,255,0.15)",
+                            color: "#a78bfa",
+                          }}>
+                            ✅ You're in
+                          </span>
+                        )}
                       </div>
                       {s.description && (
                         <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: "0.4rem" }}>
@@ -1117,22 +1123,24 @@ export default function UserDashboard() {
                         {s.participantCount > 0 && ` · 👥 ${s.participantCount} joined`}
                       </div>
                     </div>
+
+                    {/* Join / Rejoin button — only for live sessions */}
                     {isLive && (
                       <button
-                        onClick={() => window.open(`/live/${s._id}`, "_blank")}
+                        onClick={() => navigate(`/live/${s._id}`)}
                         style={{
-                          background: "linear-gradient(135deg,#4ade80,#22c55e)",
-                          color: "#065f46",
-                          border: "none",
+                          background: alreadyIn
+                            ? "rgba(124,111,255,0.15)"
+                            : "linear-gradient(135deg,#4ade80,#22c55e)",
+                          color: alreadyIn ? "#a78bfa" : "#065f46",
+                          border: alreadyIn ? "1px solid rgba(124,111,255,0.35)" : "none",
                           borderRadius: 10,
                           padding: "0.5rem 1rem",
-                          fontWeight: 700,
-                          fontSize: "0.82rem",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
+                          fontWeight: 700, fontSize: "0.82rem",
+                          cursor: "pointer", whiteSpace: "nowrap",
                         }}
                       >
-                        📹 Join Now
+                        {alreadyIn ? "🔄 Rejoin" : "📹 Join Now"}
                       </button>
                     )}
                   </div>
