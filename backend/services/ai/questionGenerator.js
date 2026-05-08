@@ -421,31 +421,76 @@ function validateAndDedup(candidates, existingTopics, existingQuestions) {
 
 export async function generateAndInsertQuestions(totalCount = 14) {
   // Load ALL existing topics AND question texts for dedup
-  const existing = await Question.find({}, { topic: 1, question: 1, _id: 0 }).lean();
+  const existing = await Question.find({}, { topic: 1, question: 1, category: 1, _id: 0 }).lean();
   const existingTopics    = existing.map(q => q.topic).filter(Boolean);
   const existingQuestions = existing.map(q => q.question).filter(Boolean);
+
+  // ── Count per category and figure out how many each needs ────────────────
+  const countByCategory = {};
+  for (const cat of CATEGORIES) countByCategory[cat] = 0;
+  for (const q of existing) {
+    if (q.category && countByCategory[q.category] !== undefined) {
+      countByCategory[q.category]++;
+    }
+  }
+
+  // Target: bring every category up to the same level
+  // Target level = max(current max, 2) + Math.ceil(totalCount / CATEGORIES.length)
+  const currentMax = Math.max(...Object.values(countByCategory));
+  const targetPerCategory = Math.max(currentMax, 2) + Math.ceil(totalCount / CATEGORIES.length);
+
+  // How many each category still needs
+  const neededByCategory = {};
+  let totalNeeded = 0;
+  for (const cat of CATEGORIES) {
+    const need = Math.max(0, targetPerCategory - countByCategory[cat]);
+    neededByCategory[cat] = need;
+    totalNeeded += need;
+  }
+
+  // Cap at totalCount — don't generate more than requested
+  // Scale down proportionally if totalNeeded > totalCount
+  if (totalNeeded > totalCount) {
+    const scale = totalCount / totalNeeded;
+    for (const cat of CATEGORIES) {
+      neededByCategory[cat] = Math.max(1, Math.round(neededByCategory[cat] * scale));
+    }
+  }
+
+  console.log("[QuestionGen] Category balance plan:");
+  for (const cat of CATEGORIES) {
+    console.log(`  ${cat}: has ${countByCategory[cat]}, needs ${neededByCategory[cat]} more → target ${countByCategory[cat] + neededByCategory[cat]}`);
+  }
 
   const allInserted = [];
   const allSkipped  = [];
 
-  // Running sets — grow as we insert, so retry rounds don't duplicate each other
+  // Running sets — grow as we insert
   const runningTopics    = [...existingTopics];
   const runningQuestions = [...existingQuestions];
 
-  let remaining = totalCount;
+  // Track remaining per category
+  const remainingByCategory = { ...neededByCategory };
   const MAX_ROUNDS = 3;
 
-  for (let round = 1; round <= MAX_ROUNDS && remaining > 0; round++) {
-    // Ask for slightly more than needed to account for expected skips
-    const askFor = Math.min(remaining + Math.ceil(remaining * 0.5), remaining + 7);
-    // Distribute evenly across categories
-    const countPerCategory = Math.max(1, Math.ceil(askFor / CATEGORIES.length));
+  for (let round = 1; round <= MAX_ROUNDS; round++) {
+    // Only include categories that still need questions
+    const catsNeeded = CATEGORIES.filter(c => remainingByCategory[c] > 0);
+    if (catsNeeded.length === 0) break;
 
-    console.log(`[QuestionGen] Round ${round}: need ${remaining} more, asking AI for ${countPerCategory * CATEGORIES.length}…`);
+    const totalRemaining = catsNeeded.reduce((s, c) => s + remainingByCategory[c], 0);
+
+    // Build a weighted category list: repeat each category proportionally + buffer
+    const categoryList = catsNeeded.flatMap(cat => {
+      const ask = Math.max(1, Math.ceil(remainingByCategory[cat] * 1.5)); // 50% buffer
+      return Array(ask).fill(cat);
+    });
+
+    console.log(`[QuestionGen] Round ${round}: need ${totalRemaining} more across ${catsNeeded.length} categories, asking AI for ${categoryList.length}…`);
 
     let generated;
     try {
-      generated = await generateWithAI(CATEGORIES, runningTopics, countPerCategory);
+      generated = await generateWithAI(catsNeeded, runningTopics, Math.max(2, Math.ceil(categoryList.length / catsNeeded.length)));
     } catch (err) {
       console.error(`[QuestionGen] Round ${round} AI call failed:`, err.message);
       break;
@@ -456,47 +501,64 @@ export async function generateAndInsertQuestions(totalCount = 14) {
 
     // Validate + dedup
     const { toInsert, skipped } = validateAndDedup(humanized, runningTopics, runningQuestions);
-
     allSkipped.push(...skipped);
 
     if (toInsert.length === 0) {
-      console.warn(`[QuestionGen] Round ${round}: all ${humanized.length} candidates were duplicates — stopping`);
+      console.warn(`[QuestionGen] Round ${round}: all candidates were duplicates/generic — stopping`);
       break;
     }
 
-    // Only take what we still need
-    const taking = toInsert.slice(0, remaining);
+    // Take only what each category still needs
+    const taking = [];
+    for (const q of toInsert) {
+      if ((remainingByCategory[q.category] || 0) > 0) {
+        taking.push(q);
+        remainingByCategory[q.category]--;
+      }
+    }
 
-    // insertMany with ordered:false so a single duplicate doesn't abort the whole batch
+    if (taking.length === 0) {
+      console.warn(`[QuestionGen] Round ${round}: no questions matched needed categories`);
+      break;
+    }
+
+    // Insert with ordered:false so one duplicate doesn't abort the batch
     try {
       await Question.insertMany(taking, { ordered: false });
     } catch (err) {
-      // E11000 = duplicate key — some were inserted, some weren't
       if (err.code !== 11000 && err.name !== "BulkWriteError") throw err;
       console.warn(`[QuestionGen] Round ${round}: some duplicates hit DB index, continuing…`);
     }
-    allInserted.push(...taking);
 
-    // Update running sets
+    allInserted.push(...taking);
     for (const q of taking) {
       runningTopics.push(q.topic);
       runningQuestions.push(q.question);
     }
 
-    remaining -= taking.length;
+    const stillNeeded = Object.values(remainingByCategory).reduce((s, v) => s + v, 0);
+    console.log(`[QuestionGen] Round ${round}: inserted ${taking.length}, skipped ${skipped.length}, still need ${stillNeeded}`);
 
-    console.log(`[QuestionGen] Round ${round}: inserted ${taking.length}, skipped ${skipped.length}, still need ${remaining}`);
+    if (stillNeeded === 0) break;
   }
 
   const totalInDb = await Question.countDocuments();
 
+  // Final balance report
+  const finalCounts = await Question.aggregate([
+    { $group: { _id: "$category", count: { $sum: 1 } } }
+  ]);
+  console.log("[QuestionGen] Final category balance:");
+  for (const { _id, count } of finalCounts.sort((a, b) => a._id.localeCompare(b._id))) {
+    console.log(`  ${_id}: ${count}`);
+  }
+
   if (allSkipped.length > 0) {
-    console.log(`[QuestionGen] Skipped ${allSkipped.length} duplicates:`);
+    console.log(`[QuestionGen] Skipped ${allSkipped.length} total:`);
     allSkipped.forEach(s => console.log(`  - [${s.reason}] ${s.q?.topic || "?"}`));
   }
 
-  console.log(`[QuestionGen] ✅ Done — inserted ${allInserted.length}/${totalCount} requested. Bank total: ${totalInDb}`);
-
+  console.log(`[QuestionGen] ✅ Done — inserted ${allInserted.length}. Bank total: ${totalInDb}`);
   return { inserted: allInserted, skipped: allSkipped, totalInDb };
 }
 

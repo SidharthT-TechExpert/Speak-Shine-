@@ -911,10 +911,9 @@ export default function AdminDashboard() {
                   disabled={!!qActionBusy}
                   onClick={async () => {
                     setQActionBusy("generating");
-                    msg("🤖 Generating 14 questions… this takes ~30 seconds");
+                    msg("🤖 Generating questions… this takes ~30 seconds");
                     try {
                       await api.post("/questions/generate-now", { count: 14 });
-                      // Poll every 5s for up to 60s until count increases
                       const before = questions.length;
                       let attempts = 0;
                       const poll = setInterval(async () => {
@@ -975,6 +974,47 @@ export default function AdminDashboard() {
                 <input className="form-input" style={{width:180}} placeholder="Search…" value={qSearch} onChange={e=>setQSearch(e.target.value)}/>
               </div>
             </div>
+
+            {/* Category balance bars */}
+            {(() => {
+              const maxCount = Math.max(...CATS.map(c => questions.filter(q => q.category === c).length), 1);
+              return (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: "0.5rem",
+                  marginBottom: "1rem",
+                  padding: "0.75rem",
+                  background: "var(--bg-secondary)",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                }}>
+                  {CATS.map(cat => {
+                    const count = questions.filter(q => q.category === cat).length;
+                    const pct = Math.round((count / maxCount) * 100);
+                    const color = count === 0 ? "#f87171" : count <= 1 ? "#fbbf24" : "#4ade80";
+                    return (
+                      <div key={cat} style={{ fontSize: "0.72rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
+                          <span style={{ color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>{cat}</span>
+                          <span style={{ fontWeight: 700, color, flexShrink: 0 }}>{count}</span>
+                        </div>
+                        <div style={{ height: 4, background: "var(--border)", borderRadius: 99 }}>
+                          <div style={{
+                            height: "100%", borderRadius: 99,
+                            width: `${pct}%`,
+                            background: color,
+                            transition: "width 0.4s ease",
+                            minWidth: count > 0 ? 4 : 0,
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             <div className="table-wrap">
               <table className="data-table">
                 <thead><tr><th>Category</th><th>Topic</th><th>Question</th><th>Actions</th></tr></thead>
