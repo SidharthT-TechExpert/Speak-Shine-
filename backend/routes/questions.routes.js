@@ -20,6 +20,7 @@ router.post("/manual", authMiddleware, requireRole("admin", "trainer"), question
 router.delete("/manual/:id", authMiddleware, requireRole("admin", "trainer"), questionsController.deleteManualQuestion);
 
 // Admin-only routes
+router.post("/generate-now", authMiddleware, requireRole("admin"), questionsController.generateQuestionsNow);
 router.post("/", authMiddleware, requireRole("admin"), questionsController.addQuestion);
 router.delete("/:id", authMiddleware, requireRole("admin"), questionsController.deleteQuestion);
 router.patch("/:id", authMiddleware, requireRole("admin"), questionsController.editQuestion);

@@ -806,6 +806,45 @@ export default function AdminDashboard() {
       {/* QUESTIONS */}
       {tab==="questions" && (
         <>
+          {/* Low stock warning + Generate Now */}
+          {questions.length <= 14 && (
+            <div style={{
+              background: questions.length <= 7 ? "rgba(248,113,113,0.08)" : "rgba(251,191,36,0.08)",
+              border: `1px solid ${questions.length <= 7 ? "rgba(248,113,113,0.3)" : "rgba(251,191,36,0.3)"}`,
+              borderRadius: 12, padding: "0.85rem 1.1rem",
+              marginBottom: "1rem",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap",
+            }}>
+              <div>
+                <span style={{ fontWeight: 700, color: questions.length <= 7 ? "#f87171" : "#fbbf24", fontSize: "0.9rem" }}>
+                  {questions.length <= 7 ? "⚠️ Question bank is critically low!" : "ℹ️ Question bank is running low"}
+                </span>
+                <div style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: "0.2rem" }}>
+                  {questions.length} question{questions.length !== 1 ? "s" : ""} remaining — auto-generate runs at the scheduled time, or generate now.
+                </div>
+              </div>
+              <button
+                className="btn-primary"
+                style={{ whiteSpace: "nowrap", fontSize: "0.85rem", padding: "0.5rem 1rem" }}
+                onClick={async () => {
+                  try {
+                    msg("🤖 Generating questions in background… refresh in ~30s");
+                    await api.post("/questions/generate-now", { count: 14 });
+                    // Reload questions after a delay
+                    setTimeout(() => {
+                      setDataLoaded(prev => ({ ...prev, questions: false }));
+                      loadQuestions();
+                    }, 30000);
+                  } catch (e) {
+                    msg(e?.response?.data?.error || "Generate failed", "danger");
+                  }
+                }}
+              >
+                🤖 Generate Now
+              </button>
+            </div>
+          )}
+
           <div className="card" style={{marginBottom:"1rem"}}>
             <div className="section-title">{editQ?"✏️ Edit Question":"➕ Add Question"}</div>
             <form onSubmit={saveQ}>
@@ -834,7 +873,27 @@ export default function AdminDashboard() {
           </div>
           <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:"0.5rem"}}>
-              <div className="section-title" style={{margin:0}}>Question Bank ({filteredQ.length}/{questions.length})</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div className="section-title" style={{margin:0}}>Question Bank ({filteredQ.length}/{questions.length})</div>
+                <button
+                  className="btn-ghost"
+                  style={{ fontSize: "0.78rem", padding: "0.3rem 0.7rem" }}
+                  onClick={async () => {
+                    try {
+                      msg("🤖 Generating 14 questions in background…");
+                      await api.post("/questions/generate-now", { count: 14 });
+                      setTimeout(() => {
+                        setDataLoaded(prev => ({ ...prev, questions: false }));
+                        loadQuestions();
+                      }, 30000);
+                    } catch (e) {
+                      msg(e?.response?.data?.error || "Generate failed", "danger");
+                    }
+                  }}
+                >
+                  🤖 Generate
+                </button>
+              </div>
               <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                 <select className="form-input" style={{width:"auto"}} value={qCat} onChange={e=>setQCat(e.target.value)}>
                   <option value="">All Categories</option>

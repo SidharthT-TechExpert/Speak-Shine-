@@ -139,18 +139,23 @@ async function publishDailyQuestion() {
     if (count === 0) {
       console.log("[Scheduler] Question bank empty — auto-generating 14...");
       try {
-        const { totalInDb } = await generateAndInsertQuestions(14);
+        const { inserted, totalInDb } = await generateAndInsertQuestions(14);
         count = totalInDb;
-        console.log(`[Scheduler] Generated questions. Total: ${count}`);
+        console.log(`[Scheduler] Generated ${inserted.length} questions. Total: ${count}`);
       } catch (err) {
         console.log("[Scheduler] Auto-generate failed:", err.message);
         return;
       }
-    } else if (count <= 7) {
-      // Refill in background
+    } else if (count <= 14) {
+      // Refill in background — bank is getting low
+      console.log(`[Scheduler] ⚠️  Bank low (${count}) — triggering background refill…`);
       generateAndInsertQuestions(14)
-        .then(({ inserted, totalInDb }) => console.log(`[Scheduler] Auto-refill: +${inserted.length} questions. Total: ${totalInDb}`))
-        .catch(err => console.log("[Scheduler] Background refill failed:", err.message));
+        .then(({ inserted, totalInDb }) =>
+          console.log(`[Scheduler] ✅ Background refill: +${inserted.length} questions. Total: ${totalInDb}`)
+        )
+        .catch(err =>
+          console.error("[Scheduler] ❌ Background refill failed:", err.message)
+        );
     }
 
     // Pick a question avoiding recent categories
@@ -207,32 +212,73 @@ export function startScheduler() {
       const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
       const nowTime = `${String(nowIST.getHours()).padStart(2,"0")}:${String(nowIST.getMinutes()).padStart(2,"0")}`;
 
+      // ── 1. Publish daily question at posterSendTime ──────────────────────
       const sendTime = s.posterSendTime || "08:00";
       if (nowTime === sendTime && !s.questionSentToday) {
         console.log(`[Scheduler] ⏰ Time matched: ${nowTime} — publishing question`);
         await publishDailyQuestion();
+      }
+
+      // ── 2. Auto-generate questions at questionGenerateTime ───────────────
+      const genTime = s.questionGenerateTime || "07:00";
+      if (nowTime === genTime) {
+        const count = await Question.countDocuments();
+        if (count <= 14) {
+          console.log(`[Scheduler] 🤖 Auto-generate time (${genTime}) — bank has ${count} questions, generating 14 more…`);
+          generateAndInsertQuestions(14)
+            .then(({ inserted, totalInDb }) =>
+              console.log(`[Scheduler] ✅ Auto-generated ${inserted.length} questions. Bank total: ${totalInDb}`)
+            )
+            .catch(err =>
+              console.error("[Scheduler] ❌ Auto-generate failed:", err.message)
+            );
+        } else {
+          console.log(`[Scheduler] ℹ️  Auto-generate time (${genTime}) — bank has ${count} questions, no refill needed`);
+        }
       }
     } catch (err) {
       console.log("[Scheduler] Cron error:", err.message);
     }
   }, { timezone: TIMEZONE });
 
-  // Catch-up: if scheduled time already passed today and question not sent yet
+  // Catch-up on startup: if scheduled times already passed today
   setTimeout(async () => {
     try {
       const s = await Status.findOne().lean();
-      if (!s || s.questionSentToday) return;
+      if (!s) return;
 
-      const sendTime = s.posterSendTime || "08:00";
       const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
       const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
-      const [sh, sm] = sendTime.split(":").map(Number);
-      const sendMins = sh * 60 + sm;
 
-      // If within 4-hour window after scheduled time
-      if (nowMins >= sendMins && nowMins <= sendMins + 240) {
-        console.log(`[Scheduler] Catch-up: ${sendTime} already passed, publishing now...`);
-        await publishDailyQuestion();
+      // ── Catch-up: publish question if posterSendTime passed ──────────────
+      if (!s.questionSentToday) {
+        const sendTime = s.posterSendTime || "08:00";
+        const [sh, sm] = sendTime.split(":").map(Number);
+        const sendMins = sh * 60 + sm;
+        // If within 4-hour window after scheduled time
+        if (nowMins >= sendMins && nowMins <= sendMins + 240) {
+          console.log(`[Scheduler] Catch-up: ${sendTime} already passed, publishing now...`);
+          await publishDailyQuestion();
+        }
+      }
+
+      // ── Catch-up: auto-generate if questionGenerateTime passed and bank is low ──
+      const genTime = s.questionGenerateTime || "07:00";
+      const [gh, gm] = genTime.split(":").map(Number);
+      const genMins = gh * 60 + gm;
+      // If generate time passed today (within 12h window) and bank is low
+      if (nowMins >= genMins && nowMins <= genMins + 720) {
+        const count = await Question.countDocuments();
+        if (count <= 14) {
+          console.log(`[Scheduler] Catch-up: generate time ${genTime} passed, bank has ${count} — generating now…`);
+          generateAndInsertQuestions(14)
+            .then(({ inserted, totalInDb }) =>
+              console.log(`[Scheduler] ✅ Catch-up generated ${inserted.length} questions. Bank total: ${totalInDb}`)
+            )
+            .catch(err =>
+              console.error("[Scheduler] ❌ Catch-up generate failed:", err.message)
+            );
+        }
       }
     } catch (err) {
       console.log("[Scheduler] Catch-up error:", err.message);
