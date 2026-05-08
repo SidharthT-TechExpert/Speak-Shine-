@@ -194,24 +194,45 @@ export async function cleanGenericQuestions(req, res) {
       "work", "school", "daily life", "morning routine", "free time",
       "technology", "social media", "health", "exercise", "sleep",
       "money", "shopping", "weather", "pets", "books",
+      "hidden talents", "secret talent", "binge-worthy shows", "dream job",
+      "guilty pleasures", "morning coffee", "daily commute", "study spots",
+      "weeknight dinners", "childhood memories", "favorite game",
+      "best gift", "biggest mistake", "dream vacation",
+      "book formats", "language exchange", "vocabulary building",
+      "english media", "language learning tips", "personal challenges",
     ];
 
     const GENERIC_PATTERNS = [
-      /^what (is|are) your (favorite|hobby|hobbies)/i,
-      /^do you (like|enjoy|love) /i,
+      /^what (is|are) your (favorite|hobby|hobbies|dream|go-to|quickest)/i,
+      /^do you (like|enjoy|love|have|watch|read|listen|use)/i,
       /^how (was|is) your (day|week|weekend)/i,
       /^tell me about yourself/i,
-      /^what do you (do|think) (for fun|in your free time|to relax)/i,
+      /^what do you (do|think) (for fun|in your free time|to relax|usually)/i,
       /^what are you doing (this|next) (weekend|week)/i,
-      /^(do|did) you (watch|read|listen)/i,
+      /^(do|did) you (watch|read|listen|ever)/i,
+      /^what('s| is) your (name|job|age|go-to|dream job|quickest|favorite)/i,
+      /^how (do|did|often|long) you (usually|learn|get|watch|practice|study)/i,
+      /^are (audiobooks|beach|city|ebooks|e-books)/i,
+      /^(are|is) .{0,30} better than/i,
+      /^what('s| is) (the best|your best|your favorite|a secret|the biggest|the best gift)/i,
+      /^what('s| is) (your|the) (biggest|best|worst|most) (mistake|gift|memory|fear|challenge)/i,
+      /^what show (have|did) you/i,
+      /^what('s| is) (your|a) (guilty pleasure|secret talent|dream job|go-to)/i,
+      /^have you ever had a language/i,
+      /^what('s| is) your (favorite way|quickest|go-to|usual)/i,
+      /^where do you usually/i,
+      /^how do you usually get to/i,
     ];
 
     const toDelete = all.filter(q => {
       const topicLower = (q.topic || "").toLowerCase().trim();
       const questionLower = (q.question || "").toLowerCase().trim();
+
       if (GENERIC_TOPICS.some(t => topicLower === t || topicLower.includes(t))) return true;
       if (GENERIC_PATTERNS.some(p => p.test(questionLower))) return true;
-      if (q.question.trim().length < 30) return true;
+      if (q.question.trim().length < 40) return true;
+      // Short yes/no questions
+      if (/^(are|is|do|did|have|can|would|could)\s/i.test(questionLower) && q.question.trim().length < 80) return true;
       return false;
     });
 

@@ -131,18 +131,35 @@ const GENERIC_TOPICS = [
   "work", "school", "daily life", "morning routine", "free time",
   "technology", "social media", "health", "exercise", "sleep",
   "money", "shopping", "weather", "pets", "books",
+  "hidden talents", "secret talent", "binge-worthy shows", "dream job",
+  "guilty pleasures", "morning coffee", "daily commute", "study spots",
+  "weeknight dinners", "childhood memories", "favorite game",
+  "best gift", "biggest mistake", "dream vacation",
+  "book formats", "language exchange", "vocabulary building",
+  "english media", "language learning tips", "personal challenges",
 ];
 
-// Question patterns that are too simple/generic
+// Question patterns that are too simple/generic — yes/no, factual, or shallow
 const GENERIC_QUESTION_PATTERNS = [
-  /^what (is|are) your (favorite|hobby|hobbies)/i,
-  /^do you (like|enjoy|love) /i,
+  /^what (is|are) your (favorite|hobby|hobbies|dream|go-to|quickest)/i,
+  /^do you (like|enjoy|love|have|watch|read|listen|use)/i,
   /^how (was|is) your (day|week|weekend)/i,
   /^tell me about yourself/i,
-  /^what do you (do|think) (for fun|in your free time|to relax)/i,
+  /^what do you (do|think) (for fun|in your free time|to relax|usually)/i,
   /^what are you doing (this|next) (weekend|week)/i,
-  /^(do|did) you (watch|read|listen)/i,
-  /^what('s| is) your (name|job|age)/i,
+  /^(do|did) you (watch|read|listen|ever)/i,
+  /^what('s| is) your (name|job|age|go-to|dream job|quickest|favorite)/i,
+  /^how (do|did|often|long) you (usually|learn|get|watch|practice|study)/i,
+  /^are (audiobooks|beach|city|ebooks|e-books)/i,
+  /^(are|is) .{0,30} better than/i,
+  /^what('s| is) (the best|your best|your favorite|a secret|the biggest|the best gift)/i,
+  /^what('s| is) (your|the) (biggest|best|worst|most) (mistake|gift|memory|fear|challenge)/i,
+  /^what show (have|did) you/i,
+  /^what('s| is) (your|a) (guilty pleasure|secret talent|dream job|go-to)/i,
+  /^have you ever had a language/i,
+  /^what('s| is) your (favorite way|quickest|go-to|usual)/i,
+  /^where do you usually/i,
+  /^how do you usually get to/i,
 ];
 
 function isGenericQuestion(q) {
@@ -155,8 +172,12 @@ function isGenericQuestion(q) {
   // Reject if question matches generic patterns
   if (GENERIC_QUESTION_PATTERNS.some(p => p.test(questionLower))) return true;
 
-  // Reject if question is too short (under 30 chars — not enough depth)
-  if (q.question.trim().length < 30) return true;
+  // Reject if question is too short (under 40 chars — not enough depth)
+  if (q.question.trim().length < 40) return true;
+
+  // Reject yes/no questions that start with "Are", "Is", "Do", "Did", "Have", "Can"
+  // unless they have enough follow-up context (over 80 chars)
+  if (/^(are|is|do|did|have|can|would|could)\s/i.test(questionLower) && q.question.trim().length < 80) return true;
 
   return false;
 }
@@ -277,16 +298,31 @@ STYLE RULES — questions must sound like a real person asking a friend, NOT a f
 - "What do you think about technology?" ← too broad
 - "How was your day?" ← not a practice question
 - "What's your favorite movie?" ← too simple
+- "What's a secret talent you have?" ← shallow, no story
+- "What show have you binge-watched recently?" ← too casual
+- "What's your favorite childhood game?" ← too basic
+- "What's the best gift you've ever received?" ← generic
+- "Are audiobooks better than e-books?" ← yes/no, no depth
+- "Are beach or city vacations better?" ← yes/no, no depth
+- "What's your go-to morning coffee order?" ← trivial
+- "How do you usually get to work?" ← factual, no story
+- "How do you learn new vocabulary?" ← too direct
+- "How often do you watch English TV shows?" ← frequency question, no depth
+- "What's your dream job in 10 years?" ← overused, generic
+- "What's your guilty pleasure TV show?" ← too casual
 
 HARD RULES:
 - NO phrases: "share your thoughts", "elaborate", "reflect on", "in what ways", "to what extent", "in today's world/society", "what are your thoughts on", "explain your reasoning", "why or why not"
 - NO questions ending with "and why?" or "explain your answer"
 - Keep questions under 140 characters
+- Minimum 40 characters — questions must have enough context to spark a real story
 - Vary the openers — don't start more than 2 questions with the same word
 - topic: a SPECIFIC 3-6 word title (NOT generic like "Hobbies" or "Food" — be specific like "Embarrassing Cooking Fails" or "Unexpected Travel Moments")
-- question: the actual question — must be SPECIFIC and INTERESTING, not something a 5-year-old would ask
+- question: the actual question — must be SPECIFIC and INTERESTING, require a personal story or opinion with context, not something a 5-year-old would ask
 - Every question MUST be completely unique — no two questions should be about the same thing
 - Questions should make the speaker think and share a real personal story or opinion
+- NEVER ask yes/no questions unless they have a strong follow-up built in (e.g. "Have you ever done X — what happened?")
+- NEVER ask "what is your favorite X" or "do you like X" — these are too shallow
 
 Return ONLY a valid JSON array, no markdown, no extra text:
 [
