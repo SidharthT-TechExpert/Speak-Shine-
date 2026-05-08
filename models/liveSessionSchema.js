@@ -1,16 +1,17 @@
 import mongoose from "mongoose";
 
 const liveSessionSchema = new mongoose.Schema({
-  title:        { type: String, required: true, trim: true },
-  description:  { type: String, default: "" },
-  scheduledAt:  { type: Date, required: true },
-  status:       { type: String, enum: ["scheduled", "live", "ended"], default: "scheduled" },
-  roomName:     { type: String, unique: true, sparse: true },
-  createdBy:    { type: String, required: true },
-  participants: [{ type: String }],
-  startedAt:    { type: Date, default: null },
-  endedAt:      { type: Date, default: null },
-  createdAt:    { type: Date, default: Date.now },
+  title:           { type: String, required: true, trim: true },
+  description:     { type: String, default: "" },
+  scheduledAt:     { type: Date, required: true },
+  status:          { type: String, enum: ["scheduled", "live", "ended"], default: "scheduled" },
+  roomName:        { type: String, unique: true, sparse: true },
+  createdBy:       { type: String, required: true },
+  participants:    [{ type: String }],
+  maxParticipants: { type: Number, default: 20, min: 2, max: 100 },
+  startedAt:       { type: Date, default: null },
+  endedAt:         { type: Date, default: null },
+  createdAt:       { type: Date, default: Date.now },
 });
 
 liveSessionSchema.virtual("participantCount").get(function () {

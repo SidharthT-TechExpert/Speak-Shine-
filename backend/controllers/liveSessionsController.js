@@ -40,10 +40,12 @@ export async function getSessionById(req, res) {
  */
 export async function createSession(req, res) {
   try {
-    const { title, scheduledAt, description } = req.body;
+    const { title, scheduledAt, description, maxParticipants } = req.body;
     const createdBy = req.user.phone;
-    
-    const result = await liveSessionsService.createSession(title, scheduledAt, description, createdBy);
+
+    const result = await liveSessionsService.createSession(
+      title, scheduledAt, description, createdBy, maxParticipants
+    );
     res.status(201).json(result);
   } catch (error) {
     console.error("[LiveSessions] Create session error:", error.message);

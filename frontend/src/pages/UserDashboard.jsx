@@ -1120,7 +1120,8 @@ export default function UserDashboard() {
                       )}
                       <div style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
                         📅 {new Date(s.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
-                        {s.participantCount > 0 && ` · 👥 ${s.participantCount} joined`}
+                        {s.participantCount > 0 && ` · 👥 ${s.participantCount}/${s.maxParticipants || 20}`}
+                        {s.participantCount >= (s.maxParticipants || 20) && " 🔴 Full"}
                       </div>
                     </div>
 

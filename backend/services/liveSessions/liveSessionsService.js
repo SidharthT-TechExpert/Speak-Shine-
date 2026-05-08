@@ -64,58 +64,78 @@ export async function getSessionById(sessionId) {
 /**
  * Create a new session (admin/trainer only)
  */
-export async function createSession(title, scheduledAt, description, createdBy) {
+export async function createSession(title, scheduledAt, description, createdBy, maxParticipants = 20) {
   if (!title?.trim()) {
     throw new Error("Title is required");
   }
-  
   if (!scheduledAt) {
     throw new Error("scheduledAt is required");
   }
-  
+
+  const safeMax = Math.min(Math.max(parseInt(maxParticipants) || 20, 2), 100);
+
   const session = await LiveSession.create({
     title: title.trim(),
     description: description || "",
     scheduledAt: new Date(scheduledAt),
+    maxParticipants: safeMax,
     createdBy,
   });
-  
+
   return session;
 }
 
 /**
  * Start a session (admin/trainer only)
+ * Pre-creates the LiveKit room with maxParticipants limit.
  */
 export async function startSession(sessionId, io) {
+  checkLiveKitConfigured();
+
   const session = await LiveSession.findById(sessionId);
-  
+
   if (!session) {
     const error = new Error("Session not found");
     error.statusCode = 404;
     throw error;
   }
-  
+
   if (session.status !== "scheduled") {
     const error = new Error("Session is not in scheduled state");
     error.statusCode = 409;
     throw error;
   }
-  
+
   const roomName = `session-${session._id}`;
+
+  // Pre-create the LiveKit room with participant limit
+  try {
+    const svc = getRoomService();
+    await svc.createRoom({
+      name: roomName,
+      maxParticipants: session.maxParticipants || 20,
+      emptyTimeout: 300,      // auto-delete after 5 min if empty
+      departureTimeout: 20,   // 20s grace period for reconnects
+    });
+    console.log(`[LiveKit] Room created: ${roomName} (max ${session.maxParticipants} participants)`);
+  } catch (e) {
+    // Non-fatal — LiveKit auto-creates the room on first join, just without the limit
+    console.warn("[LiveKit] Room pre-create failed (will auto-create without limit):", e.message);
+  }
+
   session.status = "live";
   session.startedAt = new Date();
   session.roomName = roomName;
   await session.save();
-  
-  // Emit socket event if io is available
+
   if (io) {
-    io.emit("session:live", { 
-      sessionId: session._id, 
-      title: session.title, 
-      roomName 
+    io.emit("session:live", {
+      sessionId: session._id,
+      title: session.title,
+      roomName,
     });
   }
-  
+
   return session;
 }
 
@@ -124,27 +144,41 @@ export async function startSession(sessionId, io) {
  */
 export async function generateSessionToken(sessionId, identity, name, isAdmin) {
   checkLiveKitConfigured();
-  
+
   const session = await LiveSession.findById(sessionId);
-  
+
   if (!session) {
     const error = new Error("Session not found");
     error.statusCode = 404;
     throw error;
   }
-  
+
   if (session.status !== "live") {
     const error = new Error("Session is not live");
     error.statusCode = 409;
     throw error;
   }
-  
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { 
-    identity, 
-    name, 
-    ttl: "4h" 
+
+  // Check participant limit (admins/trainers bypass the limit)
+  if (!isAdmin) {
+    const currentCount = session.participants.length;
+    const maxAllowed = session.maxParticipants || 20;
+    // Only block if they're not already in the session
+    if (!session.participants.includes(identity) && currentCount >= maxAllowed) {
+      const error = new Error(
+        `Session is full (${currentCount}/${maxAllowed} participants). Please try again later.`
+      );
+      error.statusCode = 409;
+      throw error;
+    }
+  }
+
+  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    identity,
+    name,
+    ttl: "4h",
   });
-  
+
   at.addGrant({
     roomJoin: true,
     room: session.roomName,
@@ -152,19 +186,21 @@ export async function generateSessionToken(sessionId, identity, name, isAdmin) {
     canSubscribe: true,
     roomAdmin: isAdmin,
   });
-  
+
   const token = await at.toJwt();
-  
+
   // Add participant to session if not already present
   if (!session.participants.includes(identity)) {
     session.participants.push(identity);
     await session.save();
   }
-  
-  return { 
-    token, 
-    roomName: session.roomName, 
-    livekitUrl: LIVEKIT_URL 
+
+  return {
+    token,
+    roomName: session.roomName,
+    livekitUrl: LIVEKIT_URL,
+    maxParticipants: session.maxParticipants || 20,
+    currentParticipants: session.participants.length,
   };
 }
 

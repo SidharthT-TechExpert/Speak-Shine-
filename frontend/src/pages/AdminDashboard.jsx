@@ -1493,7 +1493,7 @@ function LiveSessionsPanel() {
   const [sessions, setSessions]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showForm, setShowForm]     = useState(false);
-  const [form, setForm]             = useState({ title: "", scheduledAt: "", description: "" });
+  const [form, setForm]             = useState({ title: "", scheduledAt: "", description: "", maxParticipants: 20 });
   const [saving, setSaving]         = useState(false);
   const [busy, setBusy]             = useState({});
   const [toast, setToast]           = useState(null);
@@ -1517,7 +1517,7 @@ function LiveSessionsPanel() {
     setSaving(true);
     try {
       await api.post("/live-sessions", form);
-      setForm({ title: "", scheduledAt: "", description: "" });
+      setForm({ title: "", scheduledAt: "", description: "", maxParticipants: 20 });
       setShowForm(false);
       notify("Session scheduled!");
       load();
@@ -1627,6 +1627,42 @@ function LiveSessionsPanel() {
               <input className="form-input" placeholder="What will be covered in this session…"
                 value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label className="form-label">
+                Max Participants
+                <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: "0.75rem", marginLeft: "0.5rem" }}>
+                  (2–100, default 20)
+                </span>
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={2} max={100}
+                  style={{ width: 100 }}
+                  value={form.maxParticipants}
+                  onChange={e => setForm(f => ({ ...f, maxParticipants: Math.min(100, Math.max(2, parseInt(e.target.value) || 20)) }))}
+                />
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                  {[5, 10, 20, 30, 50].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, maxParticipants: n }))}
+                      style={{
+                        padding: "0.25rem 0.6rem", borderRadius: 8, fontSize: "0.75rem",
+                        border: form.maxParticipants === n ? "1px solid #7c6fff" : "1px solid var(--border)",
+                        background: form.maxParticipants === n ? "rgba(124,111,255,0.2)" : "var(--bg-secondary)",
+                        color: form.maxParticipants === n ? "#a78bfa" : "var(--muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <button type="submit" className="btn-primary" disabled={saving} style={{ minWidth: 160 }}>
               {saving ? "Scheduling…" : "📅 Schedule Session"}
             </button>
@@ -1723,7 +1759,15 @@ function SessionCard({ s, onStart, onEnd, onCancel, busy, navigate }) {
 
           <div style={{ display: "flex", gap: "1rem", fontSize: "0.78rem", color: "var(--muted)", flexWrap: "wrap" }}>
             <span>📅 {new Date(s.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
-            {s.participantCount > 0 && <span>👥 {s.participantCount} joined</span>}
+            {s.participantCount > 0 && (
+              <span style={{ color: s.participantCount >= (s.maxParticipants || 20) ? "#f87171" : "var(--muted)" }}>
+                👥 {s.participantCount}/{s.maxParticipants || 20}
+                {s.participantCount >= (s.maxParticipants || 20) && " 🔴 Full"}
+              </span>
+            )}
+            {s.participantCount === 0 && (
+              <span>👥 0/{s.maxParticipants || 20} max</span>
+            )}
             {s.durationMinutes && <span>⏱️ {s.durationMinutes} min</span>}
           </div>
         </div>
