@@ -13,8 +13,6 @@ import {
   useParticipants,
   useLocalParticipant,
   useTracks,
-  TrackToggle,
-  DisconnectButton,
   useMediaDeviceSelect,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
@@ -58,12 +56,48 @@ function DevicePicker({ kind, onClose }) {
   );
 }
 
+// ── Single control button (icon + label, no dual icons) ───────────────────────
+function CtrlBtn({ icon, label, active = true, muted = false, danger = false, onClick, style: extraStyle }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: "0.22rem",
+        padding: "0.5rem 0.85rem", borderRadius: 14,
+        border: danger
+          ? "none"
+          : muted
+            ? "1px solid rgba(248,113,113,0.35)"
+            : active
+              ? "1px solid rgba(255,255,255,0.12)"
+              : "1px solid rgba(124,111,255,0.4)",
+        background: danger
+          ? "linear-gradient(135deg,#ef4444,#dc2626)"
+          : muted
+            ? "rgba(248,113,113,0.12)"
+            : active
+              ? "rgba(255,255,255,0.07)"
+              : "rgba(124,111,255,0.18)",
+        color: danger ? "#fff" : muted ? "#f87171" : active ? "#e2e8f0" : "#a78bfa",
+        cursor: "pointer", minWidth: 58,
+        transition: "all 0.15s",
+        ...extraStyle,
+      }}
+    >
+      <span style={{ fontSize: "1.3rem", lineHeight: 1, display: "block" }}>{icon}</span>
+      <span style={{ fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.03em", lineHeight: 1 }}>{label}</span>
+    </button>
+  );
+}
+
 // ── Custom Control Bar ────────────────────────────────────────────────────────
 function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount }) {
   const { localParticipant } = useLocalParticipant();
-  const [micOn,  setMicOn]  = useState(true);
-  const [camOn,  setCamOn]  = useState(true);
-  const [picker, setPicker] = useState(null); // "audioinput" | "videoinput" | null
+  const [micOn,    setMicOn]    = useState(true);
+  const [camOn,    setCamOn]    = useState(true);
+  const [shareOn,  setShareOn]  = useState(false);
+  const [picker,   setPicker]   = useState(null);
   const barRef = useRef(null);
 
   useEffect(() => {
@@ -80,25 +114,23 @@ function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount }) {
     try { await localParticipant.setCameraEnabled(!camOn); setCamOn(v => !v); }
     catch (e) { console.error("Cam:", e); }
   };
+  const toggleShare = async () => {
+    try { await localParticipant.setScreenShareEnabled(!shareOn); setShareOn(v => !v); }
+    catch (e) { console.error("Share:", e); }
+  };
+  const handleLeave = () => {
+    localParticipant.room?.disconnect();
+    onLeave();
+  };
 
-  const mainBtnStyle = (active, danger) => ({
-    display: "flex", flexDirection: "column", alignItems: "center",
-    gap: "0.2rem", padding: "0.55rem 0.9rem",
-    borderRadius: danger ? 12 : "12px 0 0 12px",
-    border: danger ? "none" : active ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(248,113,113,0.3)",
-    background: danger ? "linear-gradient(135deg,#ef4444,#dc2626)" : active ? "rgba(255,255,255,0.07)" : "rgba(248,113,113,0.12)",
-    color: danger ? "#fff" : active ? "#e2e8f0" : "#f87171",
-    cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 52,
-    transition: "all 0.15s",
-  });
-
-  const chevronStyle = (active) => ({
+  const chevronStyle = (muted) => ({
     display: "flex", alignItems: "center", justifyContent: "center",
-    padding: "0 0.4rem", borderRadius: "0 12px 12px 0",
-    border: active ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(248,113,113,0.3)",
-    borderLeft: "1px solid rgba(255,255,255,0.06)",
-    background: active ? "rgba(255,255,255,0.05)" : "rgba(248,113,113,0.08)",
-    color: "#9494b8", cursor: "pointer", fontSize: "0.55rem",
+    padding: "0 0.35rem", borderRadius: "0 10px 10px 0",
+    border: muted ? "1px solid rgba(248,113,113,0.3)" : "1px solid rgba(255,255,255,0.1)",
+    borderLeft: "1px solid rgba(255,255,255,0.05)",
+    background: muted ? "rgba(248,113,113,0.07)" : "rgba(255,255,255,0.04)",
+    color: "#55557a", cursor: "pointer", fontSize: "0.5rem",
+    alignSelf: "stretch",
     transition: "all 0.15s",
   });
 
@@ -108,68 +140,64 @@ function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount }) {
       background: "rgba(6,6,18,0.98)", backdropFilter: "blur(24px)",
       WebkitBackdropFilter: "blur(24px)",
       borderTop: "1px solid rgba(255,255,255,0.07)",
-      padding: "0.65rem 1.5rem",
+      padding: "0.6rem 1.5rem",
       display: "flex", alignItems: "center", justifyContent: "center",
-      gap: "0.5rem", height: 76,
+      gap: "0.45rem", height: 76,
     }}>
 
-      {/* Mic button + chevron */}
-      <div style={{ position: "relative", display: "flex" }}>
-        <button style={mainBtnStyle(micOn, false)} onClick={toggleMic}>
-          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>{micOn ? "🎤" : "🔇"}</span>
-          <span>{micOn ? "Mute" : "Unmute"}</span>
-        </button>
-        <button style={chevronStyle(micOn)} onClick={() => setPicker(p => p === "audioinput" ? null : "audioinput")}>▲</button>
+      {/* Mic + device picker */}
+      <div style={{ position: "relative", display: "flex", alignItems: "stretch" }}>
+        <CtrlBtn
+          icon={micOn ? "🎤" : "🔇"}
+          label={micOn ? "Mute" : "Unmute"}
+          active={micOn} muted={!micOn}
+          onClick={toggleMic}
+          style={{ borderRadius: "14px 0 0 14px" }}
+        />
+        <button style={chevronStyle(!micOn)} onClick={() => setPicker(p => p === "audioinput" ? null : "audioinput")}>▲</button>
         {picker === "audioinput" && <DevicePicker kind="audioinput" onClose={() => setPicker(null)} />}
       </div>
 
-      {/* Camera button + chevron */}
-      <div style={{ position: "relative", display: "flex" }}>
-        <button style={mainBtnStyle(camOn, false)} onClick={toggleCam}>
-          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>{camOn ? "📹" : "🚫"}</span>
-          <span>{camOn ? "Camera" : "No Cam"}</span>
-        </button>
-        <button style={chevronStyle(camOn)} onClick={() => setPicker(p => p === "videoinput" ? null : "videoinput")}>▲</button>
+      {/* Camera + device picker */}
+      <div style={{ position: "relative", display: "flex", alignItems: "stretch" }}>
+        <CtrlBtn
+          icon={camOn ? "📹" : "🚫"}
+          label={camOn ? "Camera" : "No Cam"}
+          active={camOn} muted={!camOn}
+          onClick={toggleCam}
+          style={{ borderRadius: "14px 0 0 14px" }}
+        />
+        <button style={chevronStyle(!camOn)} onClick={() => setPicker(p => p === "videoinput" ? null : "videoinput")}>▲</button>
         {picker === "videoinput" && <DevicePicker kind="videoinput" onClose={() => setPicker(null)} />}
       </div>
 
       {/* Screen share */}
-      <TrackToggle source={Track.Source.ScreenShare} style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        gap: "0.2rem", padding: "0.55rem 0.9rem", borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.07)",
-        color: "#e2e8f0", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 52,
-      }}>
-        <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>🖥️</span>
-        <span>Share</span>
-      </TrackToggle>
+      <CtrlBtn
+        icon="🖥️"
+        label={shareOn ? "Sharing" : "Share"}
+        active={!shareOn}
+        onClick={toggleShare}
+        style={shareOn ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+      />
 
-      {/* Chat toggle */}
+      {/* Chat */}
       <div style={{ position: "relative" }}>
-        <button
+        <CtrlBtn
+          icon="💬"
+          label="Chat"
+          active={!chatOpen}
           onClick={onChatToggle}
-          style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            gap: "0.2rem", padding: "0.55rem 0.9rem", borderRadius: 12,
-            border: chatOpen ? "1px solid rgba(124,111,255,0.5)" : "1px solid rgba(255,255,255,0.1)",
-            background: chatOpen ? "rgba(124,111,255,0.2)" : "rgba(255,255,255,0.07)",
-            color: chatOpen ? "#a78bfa" : "#e2e8f0",
-            cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 52,
-            transition: "all 0.15s",
-          }}
-        >
-          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>💬</span>
-          <span>Chat</span>
-        </button>
-        {/* Unread badge */}
+          style={chatOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+        />
         {unreadCount > 0 && !chatOpen && (
           <div style={{
             position: "absolute", top: -4, right: -4,
             width: 18, height: 18, borderRadius: "50%",
             background: "#ef4444", color: "#fff",
-            fontSize: "0.6rem", fontWeight: 800,
+            fontSize: "0.58rem", fontWeight: 800,
             display: "flex", alignItems: "center", justifyContent: "center",
             border: "2px solid rgba(6,6,18,0.98)",
+            pointerEvents: "none",
           }}>
             {unreadCount > 9 ? "9+" : unreadCount}
           </div>
@@ -177,15 +205,7 @@ function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount }) {
       </div>
 
       {/* Leave */}
-      <DisconnectButton onClick={onLeave} style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        gap: "0.2rem", padding: "0.55rem 1.2rem", borderRadius: 12,
-        border: "none", background: "linear-gradient(135deg,#ef4444,#dc2626)",
-        color: "#fff", cursor: "pointer", fontSize: "0.62rem", fontWeight: 700, minWidth: 60,
-      }}>
-        <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>📞</span>
-        <span>Leave</span>
-      </DisconnectButton>
+      <CtrlBtn icon="📞" label="Leave" danger onClick={handleLeave} />
     </div>
   );
 }
