@@ -932,6 +932,55 @@ export default function UserDashboard() {
           {data?.topStreak?.length > 0 && (
             <div className="card" style={{ marginBottom: "1rem" }}>
               <div className="section-title">🏆 Top Streaks</div>
+
+              {/* ── My Streak Banner (always shown above the list) ── */}
+              {data?.myStreakEntry && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "0.6rem",
+                  background: data.myStreakEntry.inTop5
+                    ? "rgba(124,111,255,0.08)"
+                    : "rgba(251,191,36,0.07)",
+                  border: `1px solid ${data.myStreakEntry.inTop5 ? "rgba(124,111,255,0.3)" : "rgba(251,191,36,0.25)"}`,
+                  borderRadius: 12,
+                  padding: "0.65rem 0.85rem",
+                  marginBottom: "0.85rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}>
+                  <span style={{ fontSize: "1.1rem" }}>
+                    {data.myStreakEntry.rank === 1 ? "🥇" : data.myStreakEntry.rank === 2 ? "🥈" : data.myStreakEntry.rank === 3 ? "🥉" : "🔥"}
+                  </span>
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#e2e8f0", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    You — {data.myStreakEntry.name || "Me"}
+                  </span>
+                  <span style={{ fontSize: "0.78rem", color: "#f97316", fontWeight: 700, whiteSpace: "nowrap" }}>
+                    🔥 {data.myStreakEntry.streak} days
+                  </span>
+                  <span style={{ fontSize: "0.72rem", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                    {data.myStreakEntry.weeklySubmissions}/7
+                  </span>
+                  <span style={{
+                    fontSize: "0.72rem", fontWeight: 700,
+                    padding: "0.18rem 0.55rem", borderRadius: 20,
+                    background: data.myStreakEntry.completed ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
+                    color: data.myStreakEntry.completed ? "#4ade80" : "#f87171",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {data.myStreakEntry.completed ? "✅ Done" : "⏳ Pending"}
+                  </span>
+                  <span style={{
+                    fontSize: "0.7rem", fontWeight: 800,
+                    padding: "0.18rem 0.6rem", borderRadius: 20,
+                    background: data.myStreakEntry.inTop5 ? "rgba(124,111,255,0.2)" : "rgba(251,191,36,0.15)",
+                    color: data.myStreakEntry.inTop5 ? "#a78bfa" : "#fbbf24",
+                    whiteSpace: "nowrap",
+                  }}>
+                    #{data.myStreakEntry.rank}
+                  </span>
+                </div>
+              )}
+
+              {/* ── Top 5 list ── */}
               <div className="streak-list">
                 {data.topStreak.map((u, i) => (
                   <div className="streak-row" key={i}>
@@ -954,6 +1003,43 @@ export default function UserDashboard() {
                   </div>
                 ))}
               </div>
+
+              {/* ── My position row (only if NOT in top 5) ── */}
+              {data?.myStreakEntry && !data.myStreakEntry.inTop5 && (
+                <>
+                  <div style={{ borderTop: "1px dashed rgba(255,255,255,0.07)", margin: "0.5rem 0", position: "relative" }}>
+                    <span style={{
+                      position: "absolute", top: "50%", left: "50%",
+                      transform: "translate(-50%,-50%)",
+                      background: "var(--card)", padding: "0 0.5rem",
+                      fontSize: "0.6rem", color: "var(--muted)", whiteSpace: "nowrap",
+                    }}>· · ·</span>
+                  </div>
+                  <div className="streak-row" style={{
+                    background: "rgba(124,111,255,0.07)",
+                    border: "1px solid rgba(124,111,255,0.2)",
+                    borderRadius: 10,
+                    padding: "0.5rem 0.75rem",
+                  }}>
+                    <span className="streak-rank" style={{ color: "#a78bfa", minWidth: 28 }}>#{data.myStreakEntry.rank}</span>
+                    <span className="streak-name" style={{ color: "#a78bfa", fontWeight: 700 }}>
+                      {data.myStreakEntry.name || "You"} <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>(you)</span>
+                    </span>
+                    <span className="streak-val">🔥 {data.myStreakEntry.streak} days</span>
+                    <span className="streak-sub">{data.myStreakEntry.weeklySubmissions}/7</span>
+                    <span style={{
+                      marginLeft: "auto",
+                      fontSize: "0.75rem", fontWeight: 600,
+                      padding: "0.2rem 0.6rem", borderRadius: 20,
+                      background: data.myStreakEntry.completed ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
+                      color: data.myStreakEntry.completed ? "#4ade80" : "#f87171",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {data.myStreakEntry.completed ? "✅ Done" : "⏳ Pending"}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

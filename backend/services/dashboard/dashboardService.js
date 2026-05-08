@@ -124,8 +124,8 @@ export async function getUserProfile(phone) {
   const allUsers = await User.find().lean();
   const completed = allUsers.filter(u => u.completed).length;
   const totalFines = allUsers.reduce((s, u) => s + (u.fine || 0), 0);
-  const topStreak = [...allUsers]
-    .sort((a, b) => (b.streak || 0) - (a.streak || 0))
+  const sortedByStreak = [...allUsers].sort((a, b) => (b.streak || 0) - (a.streak || 0));
+  const topStreak = sortedByStreak
     .slice(0, 5)
     .map(u => ({ 
       name: u.name, 
@@ -134,6 +134,22 @@ export async function getUserProfile(phone) {
       weeklySubmissions: u.weeklySubmissions || 0, 
       completed: u.completed || false 
     }));
+
+  // Find the current user's rank in the full leaderboard
+  const myRankIdx = sortedByStreak.findIndex(u =>
+    u.phone === phone ||
+    u.phone === phone.replace(/^91/, "") ||
+    u.phone === `91${phone}`
+  );
+  const myStreakEntry = myRankIdx >= 0 ? {
+    rank: myRankIdx + 1,
+    name: sortedByStreak[myRankIdx].name,
+    userId: sortedByStreak[myRankIdx].userId,
+    streak: sortedByStreak[myRankIdx].streak || 0,
+    weeklySubmissions: sortedByStreak[myRankIdx].weeklySubmissions || 0,
+    completed: sortedByStreak[myRankIdx].completed || false,
+    inTop5: myRankIdx < 5,
+  } : null;
 
   // Check if we should show daily report (12 AM - 8 AM)
   let dailyReport = null;
@@ -189,11 +205,8 @@ export async function getUserProfile(phone) {
       totalFines,
     },
     topStreak,
+    myStreakEntry,
   };
-}
-
-/**
- * Get feedback score history for a user
  * Tries multiple phone formats to handle country code variations
  */
 export async function getUserScores(phone) {
