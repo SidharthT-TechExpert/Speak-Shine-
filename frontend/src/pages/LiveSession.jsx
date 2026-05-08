@@ -23,10 +23,12 @@ export default function LiveSession() {
         if (res.data.status !== "live") {
           setError("Session is not live");
         } else {
-          // Check if user has already joined this session
           const userPhone = user?.phone;
-          if (userPhone && res.data.participants?.includes(userPhone)) {
+          const alreadyIn = userPhone && res.data.participants?.includes(userPhone);
+          if (alreadyIn) {
+            // Already a participant — skip the lobby and go straight in
             setHasJoined(true);
+            setInRoom(true);
           }
         }
       } catch (e) {
@@ -65,58 +67,75 @@ export default function LiveSession() {
   if (!inRoom) {
     return (
       <Layout title="Live Session">
-        <div className="card" style={{ maxWidth: 500, margin: "0 auto", textAlign: "center" }}>
-          <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🎥</div>
-          <h2 style={{ marginBottom: "0.5rem" }}>{session.title}</h2>
-          {session.description && <p style={{ color: "var(--muted)", marginBottom: "1.5rem" }}>{session.description}</p>}
-          
-          {/* Show participant count */}
-          {session.participants?.length > 0 && (
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              gap: "0.5rem", 
-              marginBottom: "1rem",
-              color: "var(--muted)",
-              fontSize: "0.9rem"
+        <div style={{
+          minHeight: "calc(100vh - 60px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "1rem",
+        }}>
+          <div className="card" style={{ maxWidth: 460, width: "100%", textAlign: "center", padding: "2.5rem 2rem" }}>
+            {/* Live badge */}
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.4rem",
+              background: "rgba(248,113,113,0.12)",
+              border: "1px solid rgba(248,113,113,0.3)",
+              borderRadius: 20, padding: "0.3rem 0.85rem",
+              marginBottom: "1.25rem",
             }}>
-              <span>👥</span>
-              <span>{session.participants.length} participant{session.participants.length !== 1 ? 's' : ''} joined</span>
+              <div style={{
+                width: 7, height: 7, borderRadius: "50%",
+                background: "#f87171",
+                animation: "speakDot 1s ease-in-out infinite alternate",
+              }} />
+              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.06em" }}>
+                LIVE NOW
+              </span>
             </div>
-          )}
 
-          {/* Show different UI based on join status */}
-          {hasJoined ? (
-            <div>
-              <div style={{ 
-                background: "rgba(74,222,128,0.1)", 
-                border: "1px solid rgba(74,222,128,0.3)",
-                borderRadius: "12px",
-                padding: "1rem",
-                marginBottom: "1rem",
-                color: "#4ade80"
+            <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🎥</div>
+            <h2 style={{ marginBottom: "0.5rem", fontSize: "1.3rem" }}>{session.title}</h2>
+            {session.description && (
+              <p style={{ color: "var(--muted)", marginBottom: "1.25rem", fontSize: "0.9rem" }}>
+                {session.description}
+              </p>
+            )}
+
+            {/* Participant count */}
+            {session.participants?.length > 0 && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                background: "rgba(124,111,255,0.1)",
+                border: "1px solid rgba(124,111,255,0.2)",
+                borderRadius: 20, padding: "0.3rem 0.85rem",
+                marginBottom: "1.5rem",
+                fontSize: "0.82rem", color: "#a78bfa",
               }}>
-                <div style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>✅ You're already in this session</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.8 }}>Click below to rejoin the room</div>
+                <span>👥</span>
+                <span>
+                  {session.participants.length} participant{session.participants.length !== 1 ? "s" : ""} inside
+                </span>
               </div>
-              <button 
-                className="btn-primary" 
-                onClick={handleJoin} 
-                style={{ width: "100%", fontSize: "1.05rem", padding: "1rem" }}
-              >
-                🔄 Rejoin Session
-              </button>
-            </div>
-          ) : (
-            <button 
-              className="btn-primary" 
-              onClick={handleJoin} 
-              style={{ width: "100%", fontSize: "1.05rem", padding: "1rem" }}
+            )}
+
+            <button
+              className="btn-primary"
+              onClick={handleJoin}
+              style={{ width: "100%", fontSize: "1rem", padding: "0.9rem", borderRadius: 12 }}
             >
               🚀 Join Now
             </button>
-          )}
+
+            <button
+              onClick={() => navigate("/dashboard")}
+              style={{
+                marginTop: "0.75rem", width: "100%",
+                background: "none", border: "none",
+                color: "var(--muted)", fontSize: "0.85rem",
+                cursor: "pointer", padding: "0.5rem",
+              }}
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
         </div>
       </Layout>
     );
