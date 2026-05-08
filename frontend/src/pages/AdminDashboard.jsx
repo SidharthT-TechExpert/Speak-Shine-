@@ -60,11 +60,27 @@ export default function AdminDashboard() {
   const loadInitial = async () => {
     setLoading(true);
     try {
-      const d = await api.get("/dashboard");
+      // Load dashboard + questions + weekly together for a complete overview
+      const [d, q, w] = await Promise.all([
+        api.get("/dashboard"),
+        api.get("/questions?limit=200"),
+        api.get("/dashboard/report/weekly"),
+      ]);
       setDash(d.data);
       setDataLoaded(prev => ({ ...prev, dashboard: true }));
+      if (q.data.questions) {
+        setQuestions(q.data.questions);
+        setDataLoaded(prev => ({ ...prev, questions: true }));
+      }
+      setWeekly(w.data);
+      setDataLoaded(prev => ({ ...prev, reports: true }));
     } catch (err) {
       console.error("Failed to load dashboard:", err);
+      try {
+        const d = await api.get("/dashboard");
+        setDash(d.data);
+        setDataLoaded(prev => ({ ...prev, dashboard: true }));
+      } catch {}
       msg(err?.response?.data?.error || "Failed to load dashboard", "danger");
     } finally {
       setLoading(false);
@@ -575,12 +591,20 @@ export default function AdminDashboard() {
 
             {/* Questions by category */}
             <div className="card">
-              <div className="section-title">❓ Question Bank</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div className="section-title" style={{ margin: 0 }}>❓ Question Bank</div>
+                <span style={{
+                  fontSize: "0.72rem", fontWeight: 700,
+                  padding: "0.15rem 0.5rem", borderRadius: 20,
+                  background: questions.length <= 7 ? "rgba(248,113,113,0.15)" : questions.length <= 14 ? "rgba(251,191,36,0.15)" : "rgba(74,222,128,0.15)",
+                  color: questions.length <= 7 ? "#f87171" : questions.length <= 14 ? "#fbbf24" : "#4ade80",
+                }}>
+                  {questions.length} total
+                </span>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
                 {CATS.map((cat, i) => {
-                  const count = questions.length > 0
-                    ? questions.filter(q => q.category === cat).length
-                    : (catPie.find(c => c.name === cat)?.value || 0);
+                  const count = questions.filter(q => q.category === cat).length;
                   const maxCat = Math.max(...CATS.map(c => questions.filter(q => q.category === c).length), 1);
                   const pct = Math.round((count / maxCat) * 100);
                   const color = count === 0 ? "#f87171" : count <= 1 ? "#fbbf24" : PIE_COLORS[i % PIE_COLORS.length];
