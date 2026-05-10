@@ -469,6 +469,91 @@ function CommentSection({ item, onAddComment, onDeleteComment }) {
   );
 }
 
+// ── Protected Video Player with YouTube-style buffering ────────────────────────
+function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemId, containerRef, onToggleFullscreen }) {
+  const [buffering, setBuffering] = useState(true);
+  const videoRef = useRef(null);
+
+  return (
+    <div
+      ref={containerRef}
+      className="community-video-wrap"
+      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000" }}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        controls controlsList="nodownload nofullscreen noremoteplayback"
+        autoPlay playsInline preload="auto"
+        disablePictureInPicture
+        onContextMenu={e => e.preventDefault()}
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => setBuffering(false)}
+        onCanPlay={() => setBuffering(false)}
+        onLoadedData={() => setBuffering(false)}
+        onStalled={() => setBuffering(true)}
+        style={{
+          width: "100%", display: "block",
+          maxHeight: fullscreenId === itemId ? "100vh" : "400px",
+          height: fullscreenId === itemId ? "100%" : "auto",
+        }}
+      />
+
+      {/* ── YouTube-style buffering spinner ── */}
+      {buffering && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.35)",
+          pointerEvents: "none",
+        }}>
+          <div className="yt-buffer-ring" />
+        </div>
+      )}
+
+      {/* Subtle tiled watermark */}
+      <div style={{
+        position: "absolute", inset: 0,
+        pointerEvents: "none", zIndex: 10,
+        backgroundImage: `url("${watermarkUrl}")`,
+        backgroundRepeat: "repeat",
+        backgroundSize: "320px 160px",
+      }} />
+
+      {/* Tiny identity badge — top right */}
+      <div style={{
+        position: "absolute", top: 8, right: 48, zIndex: 20,
+        pointerEvents: "none",
+        background: "rgba(0,0,0,0.35)",
+        borderRadius: 4, padding: "2px 7px",
+        color: "rgba(255,255,255,0.3)",
+        fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.02em",
+      }}>{identity}</div>
+
+      {/* Custom fullscreen button */}
+      <button
+        type="button"
+        onClick={onToggleFullscreen}
+        title={fullscreenId === itemId ? "Exit Fullscreen" : "Fullscreen"}
+        style={{
+          position: "absolute", top: 6, right: 8, zIndex: 30,
+          background: "rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 6, color: "rgba(255,255,255,0.75)",
+          width: 30, height: 24,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", fontSize: "0.75rem",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.7)"}
+        onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
+      >
+        {fullscreenId === itemId ? "⧄" : "⛶"}
+      </button>
+    </div>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function CommunityFeed() {
   const { user } = useAuth();
@@ -640,76 +725,22 @@ export default function CommunityFeed() {
 
               {/* Video player */}
               {playing === item._id ? (
-                <div
-                  ref={el => containerRefs.current[item._id] = el}
-                  className="community-video-wrap"
-                  style={{
-                    position: "relative", borderRadius: "10px", overflow: "hidden",
-                    background: "#000",
-                  }}
-                >
-                  <video
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <ProtectedVideoPlayer
                     src={item.videoUrl}
-                    controls controlsList="nodownload nofullscreen noremoteplayback" autoPlay playsInline preload="metadata"
-                    disablePictureInPicture
-                    onContextMenu={e => e.preventDefault()}
-                    style={{ width: "100%", display: "block",
-                      maxHeight: fullscreenId === item._id ? "100vh" : "400px",
-                      height: fullscreenId === item._id ? "100%" : "auto",
-                    }}
+                    identity={identity}
+                    watermarkUrl={watermarkUrl}
+                    fullscreenId={fullscreenId}
+                    itemId={item._id}
+                    containerRef={el => containerRefs.current[item._id] = el}
+                    onToggleFullscreen={() => toggleFullscreen(item._id)}
                   />
-
-                  {/* Subtle tiled watermark — barely visible, persists in fullscreen */}
-                  <div style={{
-                    position: "absolute", inset: 0,
-                    pointerEvents: "none", zIndex: 10,
-                    backgroundImage: `url("${watermarkUrl}")`,
-                    backgroundRepeat: "repeat",
-                    backgroundSize: "320px 160px",
-                  }} />
-
-                  {/* Tiny identity badge — top right, unobtrusive */}
-                  <div style={{
-                    position: "absolute", top: 8, right: 48, zIndex: 20,
-                    pointerEvents: "none",
-                    background: "rgba(0,0,0,0.35)",
-                    borderRadius: 4,
-                    padding: "2px 7px",
-                    color: "rgba(255,255,255,0.3)",
-                    fontSize: "0.58rem", fontWeight: 600,
-                    letterSpacing: "0.02em",
-                  }}>{identity}</div>
-
-                  {/* Custom fullscreen button — top right */}
-                  <button
-                    type="button"
-                    onClick={() => toggleFullscreen(item._id)}
-                    title={fullscreenId === item._id ? "Exit Fullscreen" : "Fullscreen"}
-                    style={{
-                      position: "absolute", top: 6, right: 8, zIndex: 30,
-                      background: "rgba(0,0,0,0.4)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      borderRadius: 6,
-                      color: "rgba(255,255,255,0.75)",
-                      width: 30, height: 24,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", fontSize: "0.75rem",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.7)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
-                  >
-                    {fullscreenId === item._id ? "⊠" : "⛶"}
-                  </button>
-
-                  {/* Close button — only when not fullscreen */}
                   {fullscreenId !== item._id && (
                     <button onClick={() => setPlaying(null)}
                       style={{
-                        display: "block", marginTop: "0.5rem",
-                        fontSize: "0.78rem", color: "var(--muted)",
-                        background: "none", border: "none", cursor: "pointer",
-                        position: "absolute", bottom: -28, left: 0,
+                        marginTop: "0.5rem", fontSize: "0.78rem",
+                        color: "var(--muted)", background: "none",
+                        border: "none", cursor: "pointer",
                       }}>✕ Close video</button>
                   )}
                 </div>
