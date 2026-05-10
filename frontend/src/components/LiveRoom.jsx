@@ -485,27 +485,29 @@ function SessionInfoBar({ session }) {
   );
 }
 
-// ── Participant Custom Overlay ──────────────────────────────────────────────
-function CustomParticipantOverlay({ raisedHands }) {
-  const participant = useParticipantContext();
-  if (!participant) return null;
-  const isHandRaised = raisedHands.some(h => h.from === participant.identity);
-
-  if (!isHandRaised) return null;
+// ── Custom Participant Wrapper ──────────────────────────────────────────────
+function MyParticipantTile({ raisedHands, trackRef, ...props }) {
+  const isHandRaised = trackRef?.participant && raisedHands.some(h => h.from === trackRef.participant.identity);
 
   return (
-    <div style={{
-      position: "absolute", top: "12px", right: "12px", zIndex: 50,
-      background: "rgba(251,191,36,0.95)", backdropFilter: "blur(8px)",
-      border: "2px solid #fbbf24",
-      borderRadius: "12px",
-      padding: "0.3rem 0.7rem",
-      fontSize: "1.5rem",
-      boxShadow: "0 4px 16px rgba(251,191,36,0.6)",
-      animation: "handPulse 1s ease-in-out infinite",
-      display: "flex", alignItems: "center", gap: "0.5rem"
-    }}>
-      ✋ <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#78350f", letterSpacing: "0.02em" }}>Hand Raised</span>
+    <div style={{ position: "relative", width: "100%", height: "100%" }} className={props.className}>
+      <ParticipantTile trackRef={trackRef} {...props} />
+      
+      {isHandRaised && (
+        <div style={{
+          position: "absolute", top: "12px", right: "12px", zIndex: 50,
+          background: "rgba(251,191,36,0.95)", backdropFilter: "blur(8px)",
+          border: "2px solid #fbbf24",
+          borderRadius: "12px",
+          padding: "0.3rem 0.7rem",
+          fontSize: "1.5rem",
+          boxShadow: "0 4px 16px rgba(251,191,36,0.6)",
+          animation: "handPulse 1s ease-in-out infinite",
+          display: "flex", alignItems: "center", gap: "0.5rem"
+        }}>
+          ✋ <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#78350f", letterSpacing: "0.02em" }}>Hand Raised</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -518,9 +520,7 @@ function VideoGrid({ raisedHands }) {
   );
   return (
     <GridLayout tracks={tracks} style={{ height: "100%", width: "100%", background: "#07071a" }}>
-      <ParticipantTile>
-        <CustomParticipantOverlay raisedHands={raisedHands} />
-      </ParticipantTile>
+      <MyParticipantTile raisedHands={raisedHands} />
     </GridLayout>
   );
 }
