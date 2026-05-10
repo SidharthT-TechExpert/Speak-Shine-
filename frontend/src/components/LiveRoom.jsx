@@ -78,43 +78,34 @@ function DevicePicker({ kind, onClose, onSelectDevice }) {
   );
 }
 
-// ── Single control button (icon + label, no dual icons) ───────────────────────
+// ── Single control button ────────────────────────────────────────────────────────────
 function CtrlBtn({ icon, label, active = true, muted = false, danger = false, pending = false, onClick, style: extraStyle }) {
   return (
     <button
       type="button"
       onClick={(e) => { e.preventDefault(); onClick(e); }}
       disabled={pending}
-      style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", gap: "0.25rem",
-        padding: "0.5rem 0.9rem", borderRadius: 16,
-        border: danger
-          ? "none"
-          : muted
-            ? "1px solid rgba(248,113,113,0.35)"
-            : active
-              ? "1px solid rgba(255,255,255,0.12)"
-              : "1px solid rgba(124,111,255,0.4)",
-        background: danger
-          ? "linear-gradient(135deg,#ef4444,#dc2626)"
-          : muted
-            ? "rgba(248,113,113,0.12)"
-            : active
-              ? "rgba(255,255,255,0.07)"
-              : "rgba(124,111,255,0.18)",
-        color: danger ? "#fff" : muted ? "#f87171" : active ? "#e2e8f0" : "#a78bfa",
-        cursor: pending ? "wait" : "pointer", minWidth: 64,
-        opacity: pending ? 0.6 : 1,
-        transition: "all 0.2s cubic-bezier(0.34,1.56,0.64,1)",
-        boxShadow: active && !danger && !muted ? "0 4px 12px rgba(0,0,0,0.3)" : "none",
-        ...extraStyle,
-      }}
-      onMouseEnter={e => { if(!pending && !danger) e.currentTarget.style.transform = "translateY(-2px)"; }}
-      onMouseLeave={e => { if(!pending && !danger) e.currentTarget.style.transform = "none"; }}
+      className="ctrl-btn"
+      style={{ opacity: pending ? 0.6 : 1, ...extraStyle }}
+      onMouseEnter={e => { const b = e.currentTarget.querySelector(".ctrl-icon-box"); if(b && !pending) b.style.transform="translateY(-3px) scale(1.08)"; }}
+      onMouseLeave={e => { const b = e.currentTarget.querySelector(".ctrl-icon-box"); if(b) b.style.transform=""; }}
     >
-      <span style={{ fontSize: "1.35rem", lineHeight: 1, display: "block", filter: pending ? "grayscale(1)" : "none", animation: pending ? "badgePulse 1s infinite" : "none" }}>{icon}</span>
-      <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1 }}>{pending ? "..." : label}</span>
+      <div className="ctrl-icon-box" style={{
+        background: danger ? "linear-gradient(135deg,#ef4444,#dc2626)"
+          : muted  ? "rgba(248,113,113,0.15)"
+          : active ? "rgba(255,255,255,0.09)"
+          : "rgba(124,111,255,0.2)",
+        border: danger ? "none"
+          : muted  ? "1px solid rgba(248,113,113,0.4)"
+          : active ? "1px solid rgba(255,255,255,0.12)"
+          : "1px solid rgba(124,111,255,0.45)",
+        boxShadow: danger ? "0 4px 16px rgba(239,68,68,0.4)" : "none",
+      }}>
+        <span style={{ fontSize: "1.3rem", lineHeight: 1 }}>{pending ? "⏳" : icon}</span>
+      </div>
+      <span className="ctrl-label" style={{
+        color: danger ? "#f87171" : muted ? "#f87171" : active ? "#94a3b8" : "#a78bfa",
+      }}>{pending ? "…" : label}</span>
     </button>
   );
 }
@@ -341,15 +332,86 @@ function CustomControls({ onLeave, chatOpen, onChatToggle, unreadCount, ncOn, on
   });
 
   return (
-    <div ref={barRef} style={{
-      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 99999,
-      background: "rgba(6,6,18,0.98)", backdropFilter: "blur(24px)",
-      WebkitBackdropFilter: "blur(24px)",
-      borderTop: "1px solid rgba(255,255,255,0.07)",
-      padding: "0.6rem 1.5rem",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      gap: "0.45rem", height: 76,
-    }}>
+    <div ref={barRef} className="lr-controls-bar">
+      {/* LEFT GROUP — Mic + Cam */}
+      <div className="lr-ctrl-group">
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex" }}>
+            <CtrlBtn icon={micOn ? "🎤" : "🔇"} label={micOn ? "Mute" : "Unmute"}
+              active={micOn} muted={!micOn} pending={micPending}
+              onClick={async () => { try { await toggleMic(); } catch(e) { console.error(e); } }}
+              style={{ borderRadius: "14px 0 0 14px" }}
+            />
+            <button type="button" className="lr-chevron" data-muted={!micOn}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPicker(p => p === "audioinput" ? null : "audioinput"); }}
+            >▴</button>
+          </div>
+          {picker === "audioinput" && <DevicePicker kind="audioinput" onClose={() => setPicker(null)} onSelectDevice={async () => { if (!micOn) { try { await toggleMic(); } catch(e){} } }} />}
+        </div>
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex" }}>
+            <CtrlBtn icon={camOn ? "📹" : "🚫"} label={camOn ? "Camera" : "No Cam"}
+              active={camOn} muted={!camOn} pending={camPending}
+              onClick={async () => { try { await toggleCam(); } catch(e) { console.error(e); } }}
+              style={{ borderRadius: "14px 0 0 14px" }}
+            />
+            <button type="button" className="lr-chevron" data-muted={!camOn}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPicker(p => p === "videoinput" ? null : "videoinput"); }}
+            >▴</button>
+          </div>
+          {picker === "videoinput" && <DevicePicker kind="videoinput" onClose={() => setPicker(null)} onSelectDevice={async () => { if (!camOn) { try { await toggleCam(); } catch(e){} } }} />}
+        </div>
+      </div>
+
+      {/* DIVIDER */}
+      <div className="lr-ctrl-divider" />
+
+      {/* CENTER GROUP — Share, NC, Hand, React */}
+      <div className="lr-ctrl-group">
+        <CtrlBtn icon="🖥️" label={shareOn ? "Sharing" : "Share"} active={!shareOn} pending={sharePending}
+          onClick={async () => { try { await toggleShare(); } catch(e) { console.error(e); } }}
+          style={shareOn ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+        />
+        <CtrlBtn
+          icon={ncLoading ? "⏳" : ncOn ? "🎤" : "🔊"}
+          label={ncLoading ? "Loading…" : ncOn ? "NC On" : "NC Off"}
+          active={!ncOn} onClick={onNcToggle}
+          style={ncOn ? { border: "1px solid rgba(74,222,128,0.5)", background: "rgba(74,222,128,0.12)", color: "#4ade80" } : {}}
+        />
+        <CtrlBtn
+          icon={handRaised ? "✋" : "🖐️"} label={handRaised ? "Lower Hand" : "Raise Hand"}
+          active={!handRaised} onClick={onHandToggle}
+          style={handRaised ? { border: "1.5px solid rgba(251,191,36,0.7)", background: "rgba(251,191,36,0.18)", color: "#fde68a", boxShadow: "0 0 0 3px rgba(251,191,36,0.2)", animation: "handPulse 1.2s ease-in-out infinite" } : {}}
+        />
+        <div style={{ position: "relative" }}>
+          <CtrlBtn icon="😀" label="React" active
+            onClick={() => setPicker(p => p === "emoji" ? null : "emoji")}
+            style={picker === "emoji" ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+          />
+          {picker === "emoji" && <EmojiPickerBar onPick={onReaction} onClose={() => setPicker(null)} />}
+        </div>
+      </div>
+
+      {/* DIVIDER */}
+      <div className="lr-ctrl-divider" />
+
+      {/* RIGHT GROUP — Chat + Leave */}
+      <div className="lr-ctrl-group">
+        <div style={{ position: "relative" }}>
+          <CtrlBtn icon="💬"
+            label={unreadCount > 0 && !chatOpen ? `Chat (${unreadCount > 99 ? "99+" : unreadCount})` : "Chat"}
+            active={!chatOpen} onClick={onChatToggle}
+            style={chatOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" }
+              : unreadCount > 0 ? { border: "1px solid rgba(239,68,68,0.5)", background: "rgba(239,68,68,0.1)", color: "#fca5a5", animation: "badgePulse 1.5s ease-in-out infinite" } : {}}
+          />
+          {unreadCount > 0 && !chatOpen && (
+            <div className="lr-unread-badge">{unreadCount > 99 ? "99+" : unreadCount}</div>
+          )}
+        </div>
+        <CtrlBtn icon="📞" label="Leave" danger onClick={handleLeave} />
+      </div>
+    </div>
+  );
 
       {/* Mic + device picker */}
       <div style={{ position: "relative", display: "flex", alignItems: "stretch" }}>
@@ -496,22 +558,16 @@ function ParticipantsPanel({ sessionId, onKicked }) {
   });
 
   return (
-    <div style={{
-      position: "fixed", top: 12, right: 12, zIndex: 99998,
-      background: "rgba(8,8,20,0.97)", backdropFilter: "blur(20px)",
-      border: "1px solid rgba(124,111,255,0.2)", borderRadius: 14,
-      width: collapsed ? "auto" : 280, boxShadow: "0 8px 40px rgba(0,0,0,0.8)",
-      overflow: "hidden", transition: "width 0.2s ease",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0.85rem", borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.05)", cursor: "pointer", userSelect: "none" }}
-        onClick={() => setCollapsed(v => !v)}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <span>🛡️</span>
-          {!collapsed && <span style={{ fontWeight: 700, fontSize: "0.8rem", color: "#e2e8f0" }}>Participants</span>}
+    <div className="lr-participants-panel">
+      {/* Header */}
+      <div className="lr-panel-header" onClick={() => setCollapsed(v => !v)}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ fontSize: "1rem" }}>🛡️</span>
+          {!collapsed && <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "#e2e8f0" }}>Participants</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          <span style={{ background: "rgba(124,111,255,0.2)", color: "#a78bfa", borderRadius: 20, padding: "0.1rem 0.4rem", fontSize: "0.68rem", fontWeight: 700 }}>{participants.length}</span>
-          <span style={{ color: "#55557a", fontSize: "0.68rem" }}>{collapsed ? "▶" : "▼"}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <span className="lr-count-badge">{participants.length}</span>
+          <span style={{ color: "#55557a", fontSize: "0.7rem" }}>{collapsed ? "▶" : "◀"}</span>
         </div>
       </div>
       {!collapsed && (
@@ -588,24 +644,37 @@ function ParticipantsPanel({ sessionId, onKicked }) {
   );
 }
 
-// ── Session Info Bar ──────────────────────────────────────────────────────────
+// ── Session Info Bar (full-width top bar) ────────────────────────────────────
 function SessionInfoBar({ session }) {
   const participants = useParticipants();
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => { const t = setInterval(() => setElapsed(e => e + 1), 1000); return () => clearInterval(t); }, []);
-  const fmt = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`; };
+  const fmt = s => { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60; return h > 0 ? `${h}:${String(m).padStart(2,"00")}:${String(sec).padStart(2,"00")}` : `${String(m).padStart(2,"00")}:${String(sec).padStart(2,"00")}`; };
 
   return (
-    <div style={{ position: "fixed", top: 12, left: 12, zIndex: 99998, background: "rgba(8,8,20,0.92)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "0.45rem 0.85rem", display: "flex", alignItems: "center", gap: "0.6rem", boxShadow: "0 4px 20px rgba(0,0,0,0.6)", maxWidth: "calc(100vw - 280px)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
-        <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#f87171", animation: "speakDot 1s ease-in-out infinite alternate" }} />
-        <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#f87171", letterSpacing: "0.06em" }}>LIVE</span>
+    <div className="lr-topbar">
+      {/* Left: LIVE badge + title */}
+      <div className="lr-topbar-left">
+        <div className="lr-live-badge">
+          <div className="lr-live-dot" />
+          <span>LIVE</span>
+        </div>
+        <span className="lr-session-title">{session?.title || "Live Session"}</span>
       </div>
-      <div style={{ width: 1, height: 12, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.title}</span>
-      <div style={{ width: 1, height: 12, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-      <span style={{ fontSize: "0.68rem", color: "#55557a", flexShrink: 0 }}>👥 {participants.length}</span>
-      <span style={{ fontSize: "0.68rem", color: "#55557a", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>⏱ {fmt(elapsed)}</span>
+      {/* Center: participant count */}
+      <div className="lr-topbar-center">
+        <div className="lr-stat-pill">
+          <span style={{ fontSize: "0.9rem" }}>👥</span>
+          <span>{participants.length} participant{participants.length !== 1 ? "s" : ""}</span>
+        </div>
+      </div>
+      {/* Right: timer */}
+      <div className="lr-topbar-right">
+        <div className="lr-stat-pill">
+          <span style={{ fontSize: "0.85rem" }}>⏱</span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -852,42 +921,51 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
   const dismissAllHands = ()     => setRaisedHands([]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 400, background: "#07071a", display: "flex", flexDirection: "column" }}>
+    <div className="lr-shell">
       <RoomAudioRenderer />
+
+      {/* Top bar */}
       <SessionInfoBar session={session} />
-      {(userRole === "admin" || userRole === "trainer") && <ParticipantsPanel sessionId={sessionId} />}
-      {(userRole === "admin" || userRole === "trainer") && <HandRaiseQueue raisedHands={raisedHands} onDismiss={dismissHand} onDismissAll={dismissAllHands} />}
 
-      <FloatingReactions reactions={reactions} />
-
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 76 }}>
-        <VideoGrid raisedHands={raisedHands} />
-      </div>
-
-      {chatOpen && (
-        <div style={{
-          position: "fixed", bottom: 84, right: 12,
-          width: 320, height: 460, zIndex: 99997,
-          background: "rgba(8,8,20,0.97)", backdropFilter: "blur(20px)",
-          border: "1px solid rgba(124,111,255,0.2)", borderRadius: 16,
-          boxShadow: "0 -8px 40px rgba(0,0,0,0.7)",
-          display: "flex", flexDirection: "column", overflow: "hidden",
-          animation: "slideUpIn 0.2s ease",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.6rem 0.85rem", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span>🗣️</span>
-              <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "#e2e8f0" }}>Session Chat</span>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80" }} />
-            </div>
-            <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "#55557a", cursor: "pointer", fontSize: "1rem" }}>✕</button>
-          </div>
-          <div className="live-room-chat" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <LiveChat sessionId={sessionId} />
-          </div>
-        </div>
+      {/* Hand raise queue — centered below top bar */}
+      {(userRole === "admin" || userRole === "trainer") && (
+        <HandRaiseQueue raisedHands={raisedHands} onDismiss={dismissHand} onDismissAll={dismissAllHands} />
       )}
 
+      {/* Floating emoji reactions */}
+      <FloatingReactions reactions={reactions} />
+
+      {/* Main area: participants sidebar + video + chat sidebar */}
+      <div className="lr-main">
+
+        {/* Host participants panel — left sidebar */}
+        {(userRole === "admin" || userRole === "trainer") && (
+          <ParticipantsPanel sessionId={sessionId} />
+        )}
+
+        {/* Video grid — fills remaining space */}
+        <div className="lr-video-area">
+          <VideoGrid raisedHands={raisedHands} />
+        </div>
+
+        {/* Chat sidebar — slides in from right */}
+        {chatOpen && (
+          <div className="lr-chat-sidebar">
+            <div className="lr-chat-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80" }} />
+                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#e2e8f0" }}>Session Chat</span>
+              </div>
+              <button type="button" onClick={() => setChatOpen(false)} className="lr-chat-close">✕</button>
+            </div>
+            <div className="lr-chat-body live-room-chat">
+              <LiveChat sessionId={sessionId} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom control bar */}
       <CustomControls
         onLeave={onLeave}
         chatOpen={chatOpen}
