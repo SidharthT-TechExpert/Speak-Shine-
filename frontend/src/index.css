@@ -1445,7 +1445,10 @@ button[aria-label="Toggle Chat"] {
   animation: speakDot 0.9s ease-in-out infinite alternate;
 }
 .lr-session-title {
-  font-size: 0.9rem; font-weight: 700; color: #f1f5f9;
+  font-size: 0.95rem; font-weight: 800;
+  background: linear-gradient(135deg, #f1f5f9 0%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   letter-spacing: -0.01em;
 }

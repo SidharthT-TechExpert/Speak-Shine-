@@ -31,49 +31,65 @@ function DevicePicker({ kind, onClose, onSelectDevice }) {
   const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind, requestPermissions: true });
   return (
     <div style={{
-      position: "absolute", bottom: "calc(100% + 12px)", left: "50%",
+      position: "absolute", bottom: "calc(100% + 16px)", left: "50%",
       transform: "translateX(-50%)",
-      background: "rgba(10,10,26,0.98)", backdropFilter: "blur(20px)",
-      border: "1px solid rgba(124,111,255,0.25)", borderRadius: 12,
-      padding: "0.5rem", minWidth: 220, zIndex: 100000,
-      boxShadow: "0 -8px 32px rgba(0,0,0,0.7)",
+      background: "rgba(10,10,24,0.95)", backdropFilter: "blur(32px)",
+      border: "1px solid rgba(124,111,255,0.25)", borderRadius: 16,
+      padding: "0.8rem", minWidth: 260, zIndex: 100000,
+      boxShadow: "0 -12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)",
+      animation: "slideUpIn 0.2s cubic-bezier(0.34,1.56,0.64,1)",
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-        <div style={{ fontSize: "0.62rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+        <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           {kind === "audioinput" ? "🎤 Microphone" : "📹 Camera"}
         </div>
-        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", fontSize: "0.9rem", padding: "0 0.2rem" }}>✕</button>
-      </div>
-      {(!devices || devices.length === 0) && (
-        <div style={{ padding: "0.5rem", color: "#94a3b8", fontSize: "0.75rem", textAlign: "center" }}>
-          No devices found.
-        </div>
-      )}
-      {devices?.map(d => (
-        <button type="button" key={d.deviceId} onClick={async (e) => { 
-          e.preventDefault();
-          try {
-            await setActiveMediaDevice(d.deviceId); 
-          } catch(err) {
-            console.error("Device swap failed:", err);
-          }
-          if (onSelectDevice) onSelectDevice(d.deviceId);
-          onClose(); 
+        <button type="button" onClick={onClose} style={{ 
+          background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+          color: "#a78bfa", cursor: "pointer", borderRadius: 8,
+          width: 24, height: 24, fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.15s"
         }}
-          style={{
-            display: "flex", alignItems: "center", gap: "0.5rem",
-            width: "100%", padding: "0.5rem 0.6rem", borderRadius: 8,
-            border: "none", cursor: "pointer", textAlign: "left",
-            background: d.deviceId === activeDeviceId ? "rgba(124,111,255,0.2)" : "transparent",
-            color: d.deviceId === activeDeviceId ? "#a78bfa" : "#e2e8f0",
-            fontSize: "0.78rem", fontWeight: d.deviceId === activeDeviceId ? 700 : 400,
-          }}>
-          <span style={{ fontSize: "0.7rem", flexShrink: 0 }}>{d.deviceId === activeDeviceId ? "✅" : "○"}</span>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {d.label || `Device ${d.deviceId.slice(0, 8)}`}
-          </span>
-        </button>
-      ))}
+        onMouseEnter={e => { e.currentTarget.style.background = "rgba(248,113,113,0.15)"; e.currentTarget.style.color = "#f87171"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#a78bfa"; }}
+        >✕</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        {(!devices || devices.length === 0) && (
+          <div style={{ padding: "1rem", color: "#64748b", fontSize: "0.8rem", textAlign: "center" }}>
+            No devices found
+          </div>
+        )}
+        {devices?.map(d => (
+          <button type="button" key={d.deviceId} onClick={async (e) => { 
+            e.preventDefault();
+            try { await setActiveMediaDevice(d.deviceId); } catch(err) {}
+            if (onSelectDevice) onSelectDevice(d.deviceId);
+            onClose(); 
+          }}
+            style={{
+              display: "flex", alignItems: "center", gap: "0.6rem",
+              width: "100%", padding: "0.6rem 0.8rem", borderRadius: 10,
+              border: "1px solid transparent", cursor: "pointer", textAlign: "left",
+              background: d.deviceId === activeDeviceId ? "rgba(124,111,255,0.15)" : "transparent",
+              color: d.deviceId === activeDeviceId ? "#c4b5fd" : "#94a3b8",
+              transition: "all 0.15s"
+            }}
+            onMouseEnter={e => {
+               if(d.deviceId !== activeDeviceId) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+               e.currentTarget.style.borderColor = d.deviceId === activeDeviceId ? "rgba(124,111,255,0.3)" : "rgba(255,255,255,0.1)";
+            }}
+            onMouseLeave={e => {
+               e.currentTarget.style.background = d.deviceId === activeDeviceId ? "rgba(124,111,255,0.15)" : "transparent";
+               e.currentTarget.style.borderColor = "transparent";
+            }}
+          >
+            <span style={{ fontSize: "0.85rem", flexShrink: 0 }}>{d.deviceId === activeDeviceId ? "✨" : "○"}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.8rem", fontWeight: d.deviceId === activeDeviceId ? 600 : 400 }}>
+              {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -359,8 +375,8 @@ function CustomControls({ userRole, onLeave, chatOpen, onChatToggle, unreadCount
           iconBoxStyle={shareOn ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
         />
         <CtrlBtn
-          icon={ncLoading ? "⏳" : ncOn ? "✨" : "🎙️"}
-          label={ncLoading ? "Loading…" : ncOn ? "AI Clear" : "Raw Mic"}
+          icon={ncLoading ? "⏳" : ncOn ? "🎧" : "🎙️"}
+          label={ncLoading ? "Loading…" : ncOn ? "Clear Audio" : "Normal Audio"}
           active={!ncOn} onClick={onNcToggle}
           iconBoxStyle={ncOn ? { border: "1px solid rgba(168,85,247,0.5)", background: "rgba(168,85,247,0.15)", color: "#d8b4fe", boxShadow: "0 0 16px rgba(168,85,247,0.3)" } : {}}
         />
