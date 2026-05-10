@@ -31,15 +31,15 @@ function DevicePicker({ kind, onClose, onSelectDevice }) {
   const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind, requestPermissions: true });
   return (
     <div style={{
-      position: "absolute", bottom: "calc(100% + 16px)", left: "50%",
-      transform: "translateX(-50%)",
+      position: "absolute", bottom: "calc(100% + 16px)", left: 0,
       background: "rgba(10,10,24,0.95)", backdropFilter: "blur(32px)",
       border: "1px solid rgba(124,111,255,0.25)", borderRadius: 16,
-      padding: "0.8rem", minWidth: 260, zIndex: 100000,
+      padding: "0.8rem", width: 340, zIndex: 100000,
       boxShadow: "0 -12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)",
       animation: "slideUpIn 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+      maxHeight: "65vh", display: "flex", flexDirection: "column"
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem", flexShrink: 0 }}>
         <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           {kind === "audioinput" ? "🎤 Microphone" : "📹 Camera"}
         </div>
@@ -53,7 +53,7 @@ function DevicePicker({ kind, onClose, onSelectDevice }) {
         onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#a78bfa"; }}
         >✕</button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+      <div className="custom-scrollbar" style={{ display: "flex", flexDirection: "column", gap: "0.3rem", overflowY: "auto", paddingRight: "0.4rem" }}>
         {(!devices || devices.length === 0) && (
           <div style={{ padding: "1rem", color: "#64748b", fontSize: "0.8rem", textAlign: "center" }}>
             No devices found

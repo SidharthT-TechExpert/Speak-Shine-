@@ -1657,6 +1657,12 @@ button[aria-label="Toggle Chat"] {
   display: flex; flex-direction: column; gap: 0.4rem;
 }
 
+/* ── Custom Scrollbar ── */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(124,111,255,0.3); border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(124,111,255,0.5); }
+
 /* ── Mobile ── */
 @media (max-width: 640px) {
   .lr-topbar-center    { display: none; }
