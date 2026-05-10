@@ -165,6 +165,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"], // TODO: Remove unsafe-inline/eval gradually
+      "script-src-attr": ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
@@ -172,6 +173,7 @@ app.use(helmet({
         process.env.R2_PUBLIC_URL || "https:",
         "https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com",
         "https://cloudflareinsights.com", // Cloudflare Web Analytics beacon
+        "https://*.livekit.cloud",
         "wss:",
         "ws:"
       ],
