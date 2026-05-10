@@ -609,13 +609,25 @@ export default function CommunityFeed() {
 
               {/* Video player */}
               {playing === item._id ? (
-                <div>
+                <div style={{ position: "relative" }}>
                   <video
                     src={item.videoUrl}
                     controls controlsList="nodownload" autoPlay playsInline preload="metadata"
+                    disablePictureInPicture
                     onContextMenu={e => e.preventDefault()}
                     style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px", pointerEvents: "auto" }}
                   />
+                  {/* Anti-piracy Watermark */}
+                  <div style={{
+                    position: "absolute", top: "20%", left: "10%",
+                    pointerEvents: "none", zIndex: 10,
+                    color: "rgba(255,255,255,0.35)", fontSize: "1.2rem", fontWeight: 800,
+                    transform: "rotate(-15deg)", textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
+                    opacity: 0.6
+                  }}>
+                    {user?.name || "User"} • {user?.phone || ""}
+                  </div>
+
                   <button onClick={() => setPlaying(null)}
                     style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
                     ✕ Close video
