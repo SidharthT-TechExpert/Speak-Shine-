@@ -650,7 +650,7 @@ export default function CommunityFeed() {
                 >
                   <video
                     src={item.videoUrl}
-                    controls controlsList="nodownload noremoteplayback" autoPlay playsInline preload="metadata"
+                    controls controlsList="nodownload nofullscreen noremoteplayback" autoPlay playsInline preload="metadata"
                     disablePictureInPicture
                     onContextMenu={e => e.preventDefault()}
                     style={{ width: "100%", display: "block",
