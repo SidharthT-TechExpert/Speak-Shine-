@@ -477,6 +477,9 @@ export default function CommunityFeed() {
   const [showComments, setShowComments] = useState({}); // id → bool
   const isObscured = useContentProtection();
 
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="140"><text x="50%" y="50%" transform="rotate(-25 140 70)" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="900" fill="rgba(255,255,255,0.15)" stroke="rgba(0,0,0,0.6)" stroke-width="0.5" letter-spacing="1">${user?.name || "User"} • ${user?.phone || ""}</text></svg>`;
+  const watermarkUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
+
   useEffect(() => {
     api.get("/video/community-feed")
       .then(r => setFeed(r.data.feed || []))
@@ -619,14 +622,12 @@ export default function CommunityFeed() {
                   />
                   {/* Anti-piracy Watermark */}
                   <div style={{
-                    position: "absolute", top: "20%", left: "10%",
+                    position: "absolute", inset: 0,
                     pointerEvents: "none", zIndex: 10,
-                    color: "rgba(255,255,255,0.35)", fontSize: "1.2rem", fontWeight: 800,
-                    transform: "rotate(-15deg)", textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
-                    opacity: 0.6
-                  }}>
-                    {user?.name || "User"} • {user?.phone || ""}
-                  </div>
+                    backgroundImage: `url("${watermarkUrl}")`,
+                    backgroundRepeat: "repeat",
+                    opacity: 0.8
+                  }} />
 
                   <button onClick={() => setPlaying(null)}
                     style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
