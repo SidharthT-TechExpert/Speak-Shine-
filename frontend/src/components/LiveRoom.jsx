@@ -626,46 +626,6 @@ function VideoGrid({ raisedHands }) {
   );
 }
 
-// ── Content Protection Hook ──────────────────────────────────────────────────
-function useContentProtection() {
-  const [isObscured, setIsObscured] = useState(false);
-
-  useEffect(() => {
-    const handleContextMenu = (e) => e.preventDefault();
-    const handleKeyDown = (e) => {
-      if (e.key === "PrintScreen") {
-        try { navigator.clipboard.writeText(""); } catch(err){}
-        setIsObscured(true); setTimeout(() => setIsObscured(false), 2000);
-        e.preventDefault();
-      }
-      if (
-        (e.metaKey && e.shiftKey && ["s", "S", "3", "4", "5"].includes(e.key)) ||
-        (e.ctrlKey && e.shiftKey && ["s", "S"].includes(e.key)) ||
-        (e.ctrlKey && ["p", "P", "s", "S"].includes(e.key))
-      ) {
-        try { navigator.clipboard.writeText(""); } catch(err){}
-        setIsObscured(true); setTimeout(() => setIsObscured(false), 2000);
-        e.preventDefault();
-      }
-    };
-    const handleBlur = () => setIsObscured(true);
-    const handleFocus = () => setIsObscured(false);
-
-    window.addEventListener("contextmenu", handleContextMenu);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      window.removeEventListener("contextmenu", handleContextMenu);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, []);
-
-  return isObscured;
-}
-
 // ── Inner Room ────────────────────────────────────────────────────────────────
 function InnerRoom({ sessionId, userRole, onLeave, session }) {
   const [chatOpen,         setChatOpen]         = useState(false);
@@ -681,7 +641,6 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
   const myPhone = user?.phone;
   const { localParticipant } = useLocalParticipant();
   const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
-  const isObscured = useContentProtection();
   const rawStreamRef = useRef(null);
   const socketRef    = useRef(null);
 
@@ -856,14 +815,7 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
   const dismissAllHands = ()     => setRaisedHands([]);
 
   return (
-    <div className="lr-shell" style={{ userSelect: "none", WebkitUserSelect: "none" }}>
-      {isObscured && (
-        <div className="lr-obscure-overlay">
-          <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🛡️</div>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "0.5rem" }}>Content Protected</h2>
-          <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Screenshots and recording are disabled for privacy.</p>
-        </div>
-      )}
+    <div className="lr-shell">
       <RoomAudioRenderer />
 
       {/* Top bar */}

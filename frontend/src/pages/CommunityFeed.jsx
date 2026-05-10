@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -64,6 +64,52 @@ function Section({ title, children }) {
       {children}
     </div>
   );
+}
+
+// ── Content Protection Hook ──────────────────────────────────────────────────
+function useContentProtection() {
+  const [isObscured, setIsObscured] = useState(false);
+
+  useEffect(() => {
+    const handleContextMenu = (e) => {
+      // Allow right-clicking textareas, inputs, but block globally elsewhere just to be safe
+      if (e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+      }
+    };
+    
+    const handleKeyDown = (e) => {
+      if (e.key === "PrintScreen") {
+        try { navigator.clipboard.writeText(""); } catch(err){}
+        setIsObscured(true); setTimeout(() => setIsObscured(false), 2000);
+        e.preventDefault();
+      }
+      if (
+        (e.metaKey && e.shiftKey && ["s", "S", "3", "4", "5"].includes(e.key)) ||
+        (e.ctrlKey && e.shiftKey && ["s", "S"].includes(e.key)) ||
+        (e.ctrlKey && ["p", "P", "s", "S"].includes(e.key))
+      ) {
+        try { navigator.clipboard.writeText(""); } catch(err){}
+        setIsObscured(true); setTimeout(() => setIsObscured(false), 2000);
+        e.preventDefault();
+      }
+    };
+    const handleBlur = () => setIsObscured(true);
+    const handleFocus = () => setIsObscured(false);
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
+  return isObscured;
 }
 
 // ── Short Feedback Panel — scores + one-liner only ───────────────────────────
@@ -429,6 +475,7 @@ export default function CommunityFeed() {
   const [playing, setPlaying]   = useState(null);
   const [view, setView]         = useState({});       // id → "feedback" | "report" | null
   const [showComments, setShowComments] = useState({}); // id → bool
+  const isObscured = useContentProtection();
 
   useEffect(() => {
     api.get("/video/community-feed")
@@ -485,7 +532,19 @@ export default function CommunityFeed() {
 
   return (
     <Layout title="Community Feed">
-      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      {isObscured && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999999, background: "rgba(10,10,24,0.98)",
+          backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          textAlign: "center", color: "#fff"
+        }}>
+          <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🛡️</div>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "0.5rem" }}>Content Protected</h2>
+          <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Screenshots and recording are disabled for privacy.</p>
+        </div>
+      )}
+      <div style={{ maxWidth: "900px", margin: "0 auto", userSelect: "none", WebkitUserSelect: "none" }}>
 
         <div style={{ marginBottom: "1.5rem" }}>
           <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.4rem" }}>
@@ -553,8 +612,9 @@ export default function CommunityFeed() {
                 <div>
                   <video
                     src={item.videoUrl}
-                    controls autoPlay playsInline preload="metadata"
-                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px" }}
+                    controls controlsList="nodownload" autoPlay playsInline preload="metadata"
+                    onContextMenu={e => e.preventDefault()}
+                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px", pointerEvents: "auto" }}
                   />
                   <button onClick={() => setPlaying(null)}
                     style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
@@ -569,6 +629,7 @@ export default function CommunityFeed() {
                   aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <video src={`${item.videoUrl}#t=2`} preload="metadata" muted playsInline
+                    onContextMenu={e => e.preventDefault()}
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(6px) brightness(0.45)", borderRadius: "10px", pointerEvents: "none" }}
                   />
                   <div style={{ position: "relative", zIndex: 1, width: 52, height: 52, borderRadius: "50%", background: "rgba(124,111,255,0.85)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(124,111,255,0.5)" }}>

@@ -1683,21 +1683,6 @@ button[aria-label="Toggle Chat"] {
   overflow: hidden;
 }
 
-/* ── Content Protection ── */
-.lr-video-area video {
-  pointer-events: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
-}
-
-.lr-obscure-overlay {
-  position: fixed; inset: 0; z-index: 999999;
-  background: rgba(10,10,24,0.98);
-  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; color: #fff;
-}
-
 /* Top Bar */
 .lr-topbar {
   height: 52px; flex-shrink: 0;
