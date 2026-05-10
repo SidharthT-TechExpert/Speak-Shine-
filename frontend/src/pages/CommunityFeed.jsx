@@ -481,9 +481,9 @@ export default function CommunityFeed() {
   const isObscured = useContentProtection();
 
   const identity = `${user?.name || "User"} • ${user?.phone || ""}`;
-  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="120">
-    <text x="150" y="45" transform="rotate(-20 150 60)" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="900" fill="rgba(255,255,255,0.5)" stroke="rgba(0,0,0,0.9)" stroke-width="1" letter-spacing="2">${identity}</text>
-    <text x="150" y="90" transform="rotate(-20 150 60)" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="rgba(255,255,255,0.3)" stroke="rgba(0,0,0,0.7)" stroke-width="0.5" letter-spacing="1">🔒 CONFIDENTIAL</text>
+  // Subtle watermark — barely visible, single diagonal text per tile
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160">
+    <text x="160" y="80" transform="rotate(-20 160 80)" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="600" fill="rgba(255,255,255,0.12)" letter-spacing="1">${identity}</text>
   </svg>`;
   const watermarkUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
 
@@ -628,42 +628,26 @@ export default function CommunityFeed() {
                     style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px", display: "block" }}
                   />
 
-                  {/* Tiled repeating diagonal watermark */}
+                  {/* Subtle tiled watermark — barely visible */}
                   <div style={{
                     position: "absolute", inset: 0,
                     pointerEvents: "none", zIndex: 10,
                     backgroundImage: `url("${watermarkUrl}")`,
                     backgroundRepeat: "repeat",
-                    backgroundSize: "300px 120px",
+                    backgroundSize: "320px 160px",
                   }} />
 
-                  {/* Top-left corner stamp */}
+                  {/* Tiny identity badge — top right, unobtrusive */}
                   <div style={{
-                    position: "absolute", top: 10, left: 10, zIndex: 20,
+                    position: "absolute", top: 8, right: 8, zIndex: 20,
                     pointerEvents: "none",
-                    background: "rgba(0,0,0,0.65)",
-                    borderRadius: 6,
-                    padding: "4px 10px",
-                    color: "rgba(255,255,255,0.85)",
-                    fontSize: "0.72rem", fontWeight: 800,
-                    letterSpacing: "0.05em",
-                    backdropFilter: "blur(4px)",
-                    border: "1px solid rgba(255,255,255,0.15)"
-                  }}>🔒 {identity}</div>
-
-                  {/* Bottom-right corner stamp */}
-                  <div style={{
-                    position: "absolute", bottom: 46, right: 10, zIndex: 20,
-                    pointerEvents: "none",
-                    background: "rgba(0,0,0,0.65)",
-                    borderRadius: 6,
-                    padding: "4px 10px",
-                    color: "rgba(255,180,0,0.9)",
-                    fontSize: "0.7rem", fontWeight: 800,
-                    letterSpacing: "0.04em",
-                    backdropFilter: "blur(4px)",
-                    border: "1px solid rgba(255,180,0,0.3)"
-                  }}>CONFIDENTIAL • {identity}</div>
+                    background: "rgba(0,0,0,0.4)",
+                    borderRadius: 4,
+                    padding: "2px 8px",
+                    color: "rgba(255,255,255,0.35)",
+                    fontSize: "0.6rem", fontWeight: 600,
+                    letterSpacing: "0.03em",
+                  }}>{identity}</div>
 
                   <button onClick={() => setPlaying(null)}
                     style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
