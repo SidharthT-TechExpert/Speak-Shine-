@@ -165,55 +165,40 @@ function FloatingReactions({ reactions }) {
 }
 
 // ── Emoji Picker Panel ────────────────────────────────────────────────────────
+function EmojiBtn({ e, onPick, onClose }) {
+  return (
+    <button type="button"
+      onClick={() => { onPick(e); onClose(); }}
+      style={{
+        background: "none", border: "none",
+        fontSize: "1.6rem", cursor: "pointer",
+        borderRadius: "50%", width: 44, height: 44,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "transform 0.15s, background 0.15s, box-shadow 0.15s",
+        lineHeight: 1,
+      }}
+      onMouseEnter={ev => {
+        ev.currentTarget.style.background = "rgba(124,111,255,0.25)";
+        ev.currentTarget.style.boxShadow = "0 0 12px rgba(124,111,255,0.4)";
+        ev.currentTarget.style.transform = "scale(1.25) translateY(-3px)";
+      }}
+      onMouseLeave={ev => {
+        ev.currentTarget.style.background = "none";
+        ev.currentTarget.style.boxShadow = "none";
+        ev.currentTarget.style.transform = "scale(1)";
+      }}
+    >{e}</button>
+  );
+}
+
 function EmojiPickerBar({ onPick, onClose }) {
   return (
-    <div style={{
-      position:"absolute", bottom:"calc(100% + 12px)", left:"50%",
-      transform:"translateX(-50%)",
-      background:"rgba(8,8,22,0.98)", backdropFilter:"blur(24px)",
-      border:"1px solid rgba(124,111,255,0.3)",
-      borderRadius:20,
-      padding:"0.75rem 0.7rem 0.6rem",
-      width: 262, zIndex:100000,
-      boxShadow:"0 -12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)",
-      animation:"slideUpIn 0.18s cubic-bezier(0.34,1.56,0.64,1)",
-    }}>
-      {/* Header */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.5rem" }}>
-        <span style={{ fontSize:"0.62rem", fontWeight:800, color:"#a78bfa", textTransform:"uppercase", letterSpacing:"0.1em" }}>
-          😀 Send Reaction
-        </span>
-        <button type="button" onClick={onClose} style={{
-          background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)",
-          color:"#a78bfa", cursor:"pointer", borderRadius:6,
-          width:20, height:20, fontSize:"0.7rem",
-          display:"flex", alignItems:"center", justifyContent:"center",
-        }}>✕</button>
+    <div className="lr-emoji-picker">
+      <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
+         {EMOJI_LIST.slice(0, 9).map(e => <EmojiBtn key={e} e={e} onPick={onPick} onClose={onClose} />)}
       </div>
-      {/* Grid */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"0.3rem" }}>
-        {EMOJI_LIST.map(e => (
-          <button type="button" key={e}
-            onClick={() => { onPick(e); onClose(); }}
-            style={{
-              background:"none", border:"1px solid transparent",
-              fontSize:"1.55rem", cursor:"pointer",
-              borderRadius:10, padding:"0.3rem",
-              transition:"transform 0.12s, background 0.12s, border-color 0.12s",
-              lineHeight:1, textAlign:"center",
-            }}
-            onMouseEnter={ev => {
-              ev.currentTarget.style.background="rgba(124,111,255,0.2)";
-              ev.currentTarget.style.borderColor="rgba(124,111,255,0.4)";
-              ev.currentTarget.style.transform="scale(1.35) translateY(-2px)";
-            }}
-            onMouseLeave={ev => {
-              ev.currentTarget.style.background="none";
-              ev.currentTarget.style.borderColor="transparent";
-              ev.currentTarget.style.transform="scale(1)";
-            }}
-          >{e}</button>
-        ))}
+      <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
+         {EMOJI_LIST.slice(9, 18).map(e => <EmojiBtn key={e} e={e} onPick={onPick} onClose={onClose} />)}
       </div>
     </div>
   );
@@ -374,10 +359,10 @@ function CustomControls({ userRole, onLeave, chatOpen, onChatToggle, unreadCount
           iconBoxStyle={shareOn ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
         />
         <CtrlBtn
-          icon={ncLoading ? "⏳" : ncOn ? "🎤" : "🔊"}
-          label={ncLoading ? "Loading…" : ncOn ? "NC On" : "NC Off"}
+          icon={ncLoading ? "⏳" : ncOn ? "✨" : "🎙️"}
+          label={ncLoading ? "Loading…" : ncOn ? "AI Clear" : "Raw Mic"}
           active={!ncOn} onClick={onNcToggle}
-          iconBoxStyle={ncOn ? { border: "1px solid rgba(74,222,128,0.5)", background: "rgba(74,222,128,0.12)", color: "#4ade80" } : {}}
+          iconBoxStyle={ncOn ? { border: "1px solid rgba(168,85,247,0.5)", background: "rgba(168,85,247,0.15)", color: "#d8b4fe", boxShadow: "0 0 16px rgba(168,85,247,0.3)" } : {}}
         />
         <CtrlBtn
           icon={handRaised ? "✋" : "🖐️"} label={handRaised ? "Lower Hand" : "Raise Hand"}
