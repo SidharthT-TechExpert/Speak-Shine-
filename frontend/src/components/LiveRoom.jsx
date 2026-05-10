@@ -14,6 +14,7 @@ import {
   useLocalParticipant,
   useTracks,
   useMediaDeviceSelect,
+  useParticipantContext,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import "@livekit/components-styles";
@@ -130,15 +131,15 @@ function EmojiPickerBar({ onPick, onClose }) {
       background:"rgba(10,10,26,0.98)", backdropFilter:"blur(20px)",
       border:"1px solid rgba(124,111,255,0.25)", borderRadius:16,
       padding:"0.5rem 0.6rem",
-      display:"flex", gap:"0.3rem", flexWrap:"wrap",
-      maxWidth:260, zIndex:100000,
+      display:"flex", gap:"0.4rem", flexWrap:"nowrap",
+      width: "max-content", zIndex:100000,
       boxShadow:"0 -8px 32px rgba(0,0,0,0.7)",
       animation:"slideUpIn 0.15s ease",
     }}>
       {EMOJI_LIST.map(e => (
         <button key={e} onClick={() => { onPick(e); onClose(); }} style={{
-          background:"none", border:"none", fontSize:"1.5rem",
-          cursor:"pointer", borderRadius:8, padding:"0.25rem",
+          background:"none", border:"none", fontSize:"1.6rem",
+          cursor:"pointer", borderRadius:8, padding:"0.3rem",
           transition:"transform 0.12s, background 0.12s",
           lineHeight:1,
         }}
@@ -487,15 +488,42 @@ function SessionInfoBar({ session }) {
   );
 }
 
+// ── Participant Custom Overlay ──────────────────────────────────────────────
+function CustomParticipantOverlay({ raisedHands }) {
+  const participant = useParticipantContext();
+  if (!participant) return null;
+  const isHandRaised = raisedHands.some(h => h.from === participant.identity);
+
+  if (!isHandRaised) return null;
+
+  return (
+    <div style={{
+      position: "absolute", top: "12px", right: "12px", zIndex: 50,
+      background: "rgba(251,191,36,0.95)", backdropFilter: "blur(8px)",
+      border: "2px solid #fbbf24",
+      borderRadius: "12px",
+      padding: "0.3rem 0.7rem",
+      fontSize: "1.5rem",
+      boxShadow: "0 4px 16px rgba(251,191,36,0.6)",
+      animation: "handPulse 1s ease-in-out infinite",
+      display: "flex", alignItems: "center", gap: "0.5rem"
+    }}>
+      ✋ <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#78350f", letterSpacing: "0.02em" }}>Hand Raised</span>
+    </div>
+  );
+}
+
 // ── Video Grid ────────────────────────────────────────────────────────────────
-function VideoGrid() {
+function VideoGrid({ raisedHands }) {
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }, { source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false }
   );
   return (
     <GridLayout tracks={tracks} style={{ height: "100%", width: "100%", background: "#07071a" }}>
-      <ParticipantTile />
+      <ParticipantTile>
+        <CustomParticipantOverlay raisedHands={raisedHands} />
+      </ParticipantTile>
     </GridLayout>
   );
 }
@@ -607,9 +635,30 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
       }
     };
 
+    const playHandRaiseSound = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      } catch (e) { console.error("Audio error:", e); }
+    };
+
     const onHandRaised = ({ from, fromName, ts }) => {
       setRaisedHands(prev => {
         if (prev.some(h => h.from === from)) return prev;
+        if (from !== myPhone) playHandRaiseSound();
         return [...prev, { from, fromName, ts }];
       });
     };
@@ -675,7 +724,7 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
       <FloatingReactions reactions={reactions} />
 
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 76 }}>
-        <VideoGrid />
+        <VideoGrid raisedHands={raisedHands} />
       </div>
 
       {chatOpen && (
