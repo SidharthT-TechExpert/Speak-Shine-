@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -479,6 +479,27 @@ export default function CommunityFeed() {
   const [view, setView]         = useState({});       // id → "feedback" | "report" | null
   const [showComments, setShowComments] = useState({}); // id → bool
   const isObscured = useContentProtection();
+  const containerRefs = useRef({});
+  const [fullscreenId, setFullscreenId] = useState(null);
+
+  // Listen for native fullscreen exit (Escape key)
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setFullscreenId(null);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback((id) => {
+    const el = containerRefs.current[id];
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().then(() => setFullscreenId(id)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setFullscreenId(null)).catch(() => {});
+    }
+  }, []);
 
   const identity = `${user?.name || "User"} • ${user?.phone || ""}`;
   // Subtle watermark — barely visible, single diagonal text per tile
@@ -619,16 +640,25 @@ export default function CommunityFeed() {
 
               {/* Video player */}
               {playing === item._id ? (
-                <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden" }}>
+                <div
+                  ref={el => containerRefs.current[item._id] = el}
+                  style={{
+                    position: "relative", borderRadius: "10px", overflow: "hidden",
+                    background: "#000",
+                  }}
+                >
                   <video
                     src={item.videoUrl}
-                    controls controlsList="nodownload nofullscreen noremoteplayback" autoPlay playsInline preload="metadata"
+                    controls controlsList="nodownload noremoteplayback" autoPlay playsInline preload="metadata"
                     disablePictureInPicture
                     onContextMenu={e => e.preventDefault()}
-                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px", display: "block" }}
+                    style={{ width: "100%", display: "block",
+                      maxHeight: fullscreenId === item._id ? "100vh" : "400px",
+                      height: fullscreenId === item._id ? "100%" : "auto",
+                    }}
                   />
 
-                  {/* Subtle tiled watermark — barely visible */}
+                  {/* Subtle tiled watermark — barely visible, persists in fullscreen */}
                   <div style={{
                     position: "absolute", inset: 0,
                     pointerEvents: "none", zIndex: 10,
@@ -639,20 +669,48 @@ export default function CommunityFeed() {
 
                   {/* Tiny identity badge — top right, unobtrusive */}
                   <div style={{
-                    position: "absolute", top: 8, right: 8, zIndex: 20,
+                    position: "absolute", top: 8, right: 48, zIndex: 20,
                     pointerEvents: "none",
-                    background: "rgba(0,0,0,0.4)",
+                    background: "rgba(0,0,0,0.35)",
                     borderRadius: 4,
-                    padding: "2px 8px",
-                    color: "rgba(255,255,255,0.35)",
-                    fontSize: "0.6rem", fontWeight: 600,
-                    letterSpacing: "0.03em",
+                    padding: "2px 7px",
+                    color: "rgba(255,255,255,0.3)",
+                    fontSize: "0.58rem", fontWeight: 600,
+                    letterSpacing: "0.02em",
                   }}>{identity}</div>
 
-                  <button onClick={() => setPlaying(null)}
-                    style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
-                    ✕ Close video
+                  {/* Custom fullscreen button — top right */}
+                  <button
+                    type="button"
+                    onClick={() => toggleFullscreen(item._id)}
+                    title={fullscreenId === item._id ? "Exit Fullscreen" : "Fullscreen"}
+                    style={{
+                      position: "absolute", top: 6, right: 8, zIndex: 30,
+                      background: "rgba(0,0,0,0.4)",
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: 6,
+                      color: "rgba(255,255,255,0.75)",
+                      width: 30, height: 24,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: "pointer", fontSize: "0.85rem",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.7)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
+                  >
+                    {fullscreenId === item._id ? "⛶" : "⛶"}
                   </button>
+
+                  {/* Close button — only when not fullscreen */}
+                  {fullscreenId !== item._id && (
+                    <button onClick={() => setPlaying(null)}
+                      style={{
+                        display: "block", marginTop: "0.5rem",
+                        fontSize: "0.78rem", color: "var(--muted)",
+                        background: "none", border: "none", cursor: "pointer",
+                        position: "absolute", bottom: -28, left: 0,
+                      }}>✕ Close video</button>
+                  )}
                 </div>
               ) : (
                 <button onClick={() => setPlaying(item._id)} style={{
