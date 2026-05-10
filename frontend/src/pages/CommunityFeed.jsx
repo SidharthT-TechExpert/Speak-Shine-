@@ -642,6 +642,7 @@ export default function CommunityFeed() {
               {playing === item._id ? (
                 <div
                   ref={el => containerRefs.current[item._id] = el}
+                  className="community-video-wrap"
                   style={{
                     position: "relative", borderRadius: "10px", overflow: "hidden",
                     background: "#000",
@@ -692,13 +693,13 @@ export default function CommunityFeed() {
                       color: "rgba(255,255,255,0.75)",
                       width: 30, height: 24,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", fontSize: "0.85rem",
+                      cursor: "pointer", fontSize: "0.75rem",
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.7)"}
                     onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
                   >
-                    {fullscreenId === item._id ? "⛶" : "⛶"}
+                    {fullscreenId === item._id ? "⊠" : "⛶"}
                   </button>
 
                   {/* Close button — only when not fullscreen */}
