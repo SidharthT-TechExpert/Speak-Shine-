@@ -4,7 +4,7 @@
  */
 
 import jwt from "jsonwebtoken";
-import { roomKey, getMessages, saveMessages, MAX_MESSAGES, GROUP_ROOM } from "../services/chat/chatService.js";
+import { roomKey, liveSessionRoom, getMessages, saveMessages, MAX_MESSAGES, GROUP_ROOM } from "../services/chat/chatService.js";
 import { isRedisAvailable, getRedisClient } from "../../redis.js";
 import { sanitizeText, isValidPhone, SanitizeError, LIMITS } from "../utils/textSanitizer.js";
 
@@ -311,6 +311,157 @@ export function initializeChatSocket(io, onlineUsers) {
       if (!isValidPhone(peerPhone)) return;
       const room = roomKey(phone, peerPhone);
       socket.to(room).emit("chat:typing", { from: phone, isTyping: !!isTyping });
+    });
+
+    // ── Live Session Chat ────────────────────────────────────────────────────
+    // Each live session has its own isolated chat room: chat:live:{sessionId}
+    // Messages deleted immediately when admin ends the session.
+
+    // Validate sessionId is a valid MongoDB ObjectId (24 hex chars)
+    function isValidSessionId(id) {
+      return typeof id === "string" && /^[a-f0-9]{24}$/i.test(id);
+    }
+
+    // Verify user is a participant in the session (or admin/trainer)
+    async function verifySessionParticipant(sessionId) {
+      if (role === "admin" || role === "trainer") return true;
+      try {
+        const LiveSession = (await import("../../models/liveSessionSchema.js")).default;
+        const session = await LiveSession.findById(sessionId).select("participants status").lean();
+        if (!session) return false;
+        if (session.status !== "live") return false;
+        return session.participants.includes(phone);
+      } catch {
+        return false;
+      }
+    }
+
+    socket.on("live:join", async ({ sessionId }) => {
+      // Security: validate sessionId format
+      if (!isValidSessionId(sessionId)) {
+        socket.emit("chat:error", { message: "Invalid session" });
+        return;
+      }
+
+      // Security: verify user is a participant
+      const allowed = await verifySessionParticipant(sessionId);
+      if (!allowed) {
+        socket.emit("chat:error", { message: "You are not a participant in this session" });
+        return;
+      }
+
+      const liveRoom = liveSessionRoom(sessionId);
+      socket.join(liveRoom);
+
+      try {
+        if (isRedisAvailable()) {
+          const redis = getRedisClient();
+          const messages = await getMessages(redis, liveRoom);
+          socket.emit("live:history", { sessionId, messages });
+        } else {
+          socket.emit("live:history", { sessionId, messages: [] });
+        }
+      } catch (err) {
+        console.error(`[Chat] live:join error for ${name}:`, err);
+        socket.emit("live:history", { sessionId, messages: [] });
+      }
+    });
+
+    socket.on("live:send", async ({ sessionId, text }) => {
+      // Security: validate sessionId format
+      if (!isValidSessionId(sessionId)) {
+        socket.emit("chat:error", { message: "Invalid session" });
+        return;
+      }
+
+      // Security: rate limit
+      if (!checkRateLimit(phone)) {
+        socket.emit("chat:error", { message: "Sending too fast. Please slow down." });
+        return;
+      }
+
+      // Security: sanitize text
+      let cleanText;
+      try {
+        cleanText = sanitizeText(text, LIMITS.CHAT_MESSAGE, "Message");
+      } catch (err) {
+        socket.emit("chat:error", { message: err instanceof SanitizeError ? err.message : "Invalid message" });
+        return;
+      }
+
+      // Security: verify user is still a participant
+      const allowed = await verifySessionParticipant(sessionId);
+      if (!allowed) {
+        socket.emit("chat:error", { message: "Session has ended or you are not a participant" });
+        return;
+      }
+
+      const liveRoom = liveSessionRoom(sessionId);
+      const message = {
+        id:       `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        from:     phone,
+        fromName: name,
+        role,
+        text:     cleanText,
+        ts:       Date.now(),
+      };
+
+      try {
+        if (isRedisAvailable()) {
+          const redis = getRedisClient();
+          const messages = await getMessages(redis, liveRoom);
+          messages.push(message);
+          if (messages.length > MAX_MESSAGES) messages.splice(0, messages.length - MAX_MESSAGES);
+          await saveMessages(redis, liveRoom, messages, 86400);
+        }
+        io.to(liveRoom).emit("live:message", { sessionId, message });
+      } catch (err) {
+        console.error(`[Chat] live:send error for ${name}:`, err);
+        socket.emit("chat:error", { message: "Failed to send message" });
+      }
+    });
+
+    socket.on("live:typing", ({ sessionId, isTyping }) => {
+      // Security: validate sessionId format only (typing is low-risk)
+      if (!isValidSessionId(sessionId)) return;
+      const liveRoom = liveSessionRoom(sessionId);
+      socket.to(liveRoom).emit("live:typing", { from: phone, fromName: name, isTyping: !!isTyping });
+    });
+
+    // ── Live: Hand Raise ─────────────────────────────────────────────────────
+    socket.on("live:raise-hand", ({ sessionId }) => {
+      if (!isValidSessionId(sessionId)) return;
+      const liveRoom = liveSessionRoom(sessionId);
+      io.to(liveRoom).emit("live:hand-raised", {
+        from: phone,
+        fromName: name,
+        role,
+        ts: Date.now(),
+      });
+      console.log(`[Chat] ✋ Hand raised: ${name} in session ${sessionId}`);
+    });
+
+    socket.on("live:lower-hand", ({ sessionId }) => {
+      if (!isValidSessionId(sessionId)) return;
+      const liveRoom = liveSessionRoom(sessionId);
+      io.to(liveRoom).emit("live:hand-lowered", { from: phone });
+      console.log(`[Chat] ✋ Hand lowered: ${name} in session ${sessionId}`);
+    });
+
+    // ── Live: Emoji Reaction ─────────────────────────────────────────────────
+    // Ephemeral — not stored, just broadcast to all in the session room
+    socket.on("live:reaction", ({ sessionId, emoji }) => {
+      if (!isValidSessionId(sessionId)) return;
+      // Whitelist allowed emojis to prevent abuse
+      const ALLOWED_EMOJIS = ["👍","❤️","😂","😮","👏","🎉","🔥","😍","🙌","💯","🤔","😢","💪","🚀","⭐"];
+      if (!ALLOWED_EMOJIS.includes(emoji)) return;
+      const liveRoom = liveSessionRoom(sessionId);
+      io.to(liveRoom).emit("live:reaction", {
+        from: phone,
+        fromName: name,
+        emoji,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      });
     });
 
     socket.on("disconnect", () => {

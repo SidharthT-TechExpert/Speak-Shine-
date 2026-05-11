@@ -101,6 +101,8 @@ app.set('trust proxy', 1);
 // Force HTTPS in production
 if (isProd) {
   app.use((req, res, next) => {
+    // Skip WebSocket upgrade requests — they handle their own protocol
+    if (req.headers.upgrade === "websocket") return next();
     if (req.header('x-forwarded-proto') !== 'https') {
       return res.redirect(301, `https://${req.header('host')}${req.url}`);
     }
@@ -117,19 +119,28 @@ const io = new SocketIO(httpServer, {
   cors: {
     origin: isProd
       ? (origin, cb) => {
-          if (!origin || socketAllowedOrigins.length === 0 || socketAllowedOrigins.includes("*")) {
+          // Allow same-origin requests (origin is undefined/null for same-origin)
+          if (!origin) return cb(null, true);
+          // Allow all if no origins configured
+          if (socketAllowedOrigins.length === 0 || socketAllowedOrigins.includes("*")) {
             return cb(null, true);
           }
           if (socketAllowedOrigins.includes(origin)) {
-            cb(null, true);
-          } else {
-            console.error(`[Socket.io CORS] Blocked origin: ${origin}`);
-            cb(new Error("Not allowed by CORS"));
+            return cb(null, true);
           }
+          // Also allow any *.railway.app origin as a safety net
+          if (origin.endsWith(".railway.app") || origin.endsWith(".up.railway.app")) {
+            return cb(null, true);
+          }
+          console.error(`[Socket.io CORS] Blocked origin: ${origin}`);
+          cb(new Error("Not allowed by CORS"));
         }
       : "*",
     credentials: true,
   },
+  // Increase ping timeout for slow connections
+  pingTimeout: 30000,
+  pingInterval: 10000,
 });
 
 // Track online users: phone → socketId
@@ -154,6 +165,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"], // TODO: Remove unsafe-inline/eval gradually
+      "script-src-attr": ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
@@ -161,6 +173,7 @@ app.use(helmet({
         process.env.R2_PUBLIC_URL || "https:",
         "https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com",
         "https://cloudflareinsights.com", // Cloudflare Web Analytics beacon
+        "https://*.livekit.cloud",
         "wss:",
         "ws:"
       ],

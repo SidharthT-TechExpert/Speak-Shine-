@@ -55,10 +55,6 @@ export const adjustMonthlySubmissions = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Invalidate dashboard caches after submission adjustment
-    const { invalidateOnSubmissionChange } = await import("../services/cache/cacheService.js");
-    invalidateOnSubmissionChange().catch(() => {});
-
     res.json({
       success: true,
       monthlySubmissions: user.monthlySubmissions,
@@ -120,10 +116,6 @@ export const adjustWeeklySubmissions = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-
-    // Invalidate dashboard caches after submission adjustment
-    const { invalidateOnSubmissionChange } = await import("../services/cache/cacheService.js");
-    invalidateOnSubmissionChange().catch(() => {});
 
     res.json({
       success: true,

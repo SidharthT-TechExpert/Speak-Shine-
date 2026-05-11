@@ -28,6 +28,7 @@ export default function AdminDashboard() {
   const [flash, setFlash] = useState(null);
   const [search, setSearch] = useState("");
   const [qSearch, setQSearch] = useState("");
+  const [qActionBusy, setQActionBusy] = useState(""); // "generating" | "cleaning" | ""
   const [qCat, setQCat] = useState("");
   const [modal, setModal] = useState(null);
   const [fineInput, setFineInput] = useState("");
@@ -46,37 +47,178 @@ export default function AdminDashboard() {
   const [adminOtpError, setAdminOtpError] = useState("");
   const [adminActionToken, setAdminActionToken] = useState("");
 
-  const load = async () => {
+  // Lazy loading flags to track what's been loaded
+  const [dataLoaded, setDataLoaded] = useState({
+    dashboard: false,
+    users: false,
+    questions: false,
+    reports: false,
+    settings: false,
+  });
+
+  // Load only essential data on mount (dashboard overview)
+  const loadInitial = async () => {
     setLoading(true);
     try {
-      const [d,u,q,w,m,s] = await Promise.all([
+      // Load dashboard + questions + weekly + users together for a complete overview
+      const [d, q, w, u] = await Promise.all([
         api.get("/dashboard"),
-        api.get("/users"),
         api.get("/questions?limit=200"),
         api.get("/dashboard/report/weekly"),
-        api.get("/dashboard/report/monthly"),
-        api.get("/dashboard/settings")
+        api.get("/users"),
       ]);
-      setDash(d.data); 
-      setUsers(u.data); 
-      setQuestions(q.data.questions); 
-      setWeekly(w.data); 
-      setMonthly(m.data);
-      setSettings({ 
-        posterSendTime: s.data.posterSendTime || "08:00", 
-        questionGenerateTime: s.data.questionGenerateTime || "07:00" 
-      });
+      setDash(d.data);
+      setDataLoaded(prev => ({ ...prev, dashboard: true }));
+      if (q.data.questions) {
+        setQuestions(q.data.questions);
+        setDataLoaded(prev => ({ ...prev, questions: true }));
+      }
+      setWeekly(w.data);
+      setUsers(u.data);
+      setDataLoaded(prev => ({ ...prev, reports: true, users: true }));
     } catch (err) {
-      console.error("Failed to load dashboard data:", err);
-      msg(err?.response?.data?.error || "Failed to load dashboard data", "danger");
-    } finally { 
-      setLoading(false); 
+      console.error("Failed to load dashboard:", err);
+      try {
+        const d = await api.get("/dashboard");
+        setDash(d.data);
+        setDataLoaded(prev => ({ ...prev, dashboard: true }));
+      } catch {}
+      msg(err?.response?.data?.error || "Failed to load dashboard", "danger");
+    } finally {
+      setLoading(false);
     }
   };
-  useEffect(()=>{load();},[]);
+
+  // Load users data (for Users, Today, Submissions tabs)
+  const loadUsers = async () => {
+    if (dataLoaded.users) return; // Already loaded
+    try {
+      const u = await api.get("/users");
+      setUsers(u.data);
+      setDataLoaded(prev => ({ ...prev, users: true }));
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      msg("Failed to load users", "danger");
+    }
+  };
+
+  // Load questions data (for Questions tab)
+  const loadQuestions = async () => {
+    if (dataLoaded.questions) return; // Already loaded
+    try {
+      const q = await api.get("/questions?limit=50"); // Reduced from 200 to 50
+      setQuestions(q.data.questions);
+      setDataLoaded(prev => ({ ...prev, questions: true }));
+    } catch (err) {
+      console.error("Failed to load questions:", err);
+      msg("Failed to load questions", "danger");
+    }
+  };
+
+  // Force-refresh questions regardless of dataLoaded flag
+  const refreshQuestions = async () => {
+    try {
+      const q = await api.get("/questions?limit=50");
+      setQuestions(q.data.questions);
+      setDataLoaded(prev => ({ ...prev, questions: true }));
+    } catch (err) {
+      console.error("Failed to refresh questions:", err);
+      msg("Failed to refresh questions", "danger");
+    }
+  };
+
+  // Load reports data (for Reports tab)
+  const loadReports = async () => {
+    if (dataLoaded.reports) return; // Already loaded
+    try {
+      const [w, m] = await Promise.all([
+        api.get("/dashboard/report/weekly"),
+        api.get("/dashboard/report/monthly"),
+      ]);
+      setWeekly(w.data);
+      setMonthly(m.data);
+      setDataLoaded(prev => ({ ...prev, reports: true }));
+    } catch (err) {
+      console.error("Failed to load reports:", err);
+      msg("Failed to load reports", "danger");
+    }
+  };
+
+  // Load settings data (for Settings tab)
+  const loadSettings = async () => {
+    if (dataLoaded.settings) return; // Already loaded
+    try {
+      const s = await api.get("/dashboard/settings");
+      setSettings({
+        posterSendTime: s.data.posterSendTime || "08:00",
+        questionGenerateTime: s.data.questionGenerateTime || "07:00",
+      });
+      setDataLoaded(prev => ({ ...prev, settings: true }));
+    } catch (err) {
+      console.error("Failed to load settings:", err);
+      msg("Failed to load settings", "danger");
+    }
+  };
+
+  // Load initial data on mount
+  useEffect(() => {
+    loadInitial();
+  }, []);
+
+  // Load data based on active tab
+  useEffect(() => {
+    if (tab === "overview") {
+      // Overview needs dashboard data (already loaded)
+    } else if (tab === "today" || tab === "users" || tab === "submissions" || tab === "fines") {
+      loadUsers();
+    } else if (tab === "questions" || tab === "manual-questions") {
+      loadQuestions();
+    } else if (tab === "reports") {
+      loadReports();
+    } else if (tab === "settings") {
+      loadSettings();
+    }
+  }, [tab]);
 
   const msg = (text, type="success") => { setFlash({text,type}); setTimeout(()=>setFlash(null),3000); };
-  const toggleUser = async (phone) => { await api.patch(`/users/${phone}/toggle`); msg("Status toggled"); load(); };
+  
+  // Smart reload - only reload what's currently visible/needed
+  const reload = async (dataTypes = []) => {
+    const promises = [];
+    
+    if (dataTypes.includes('dashboard') || dataTypes.length === 0) {
+      promises.push(api.get("/dashboard").then(d => setDash(d.data)));
+    }
+    if (dataTypes.includes('users') || dataTypes.length === 0) {
+      promises.push(api.get("/users").then(u => setUsers(u.data)));
+    }
+    if (dataTypes.includes('questions')) {
+      promises.push(api.get("/questions?limit=50").then(q => setQuestions(q.data.questions)));
+    }
+    if (dataTypes.includes('reports')) {
+      promises.push(
+        Promise.all([
+          api.get("/dashboard/report/weekly"),
+          api.get("/dashboard/report/monthly"),
+        ]).then(([w, m]) => {
+          setWeekly(w.data);
+          setMonthly(m.data);
+        })
+      );
+    }
+    
+    if (promises.length > 0) {
+      await Promise.all(promises).catch(err => {
+        console.error("Reload failed:", err);
+      });
+    }
+  };
+  
+  const toggleUser = async (phone) => { 
+    await api.patch(`/users/${phone}/toggle`); 
+    msg("Status toggled"); 
+    reload(['users']); // Only reload users
+  };
   
   const viewStudentDetail = (user) => {
     setSelectedStudent(user);
@@ -103,7 +245,12 @@ export default function AdminDashboard() {
       type: "danger", title: "Remove User",
       message: "This user will be permanently removed. Are you sure?",
       confirmText: "Remove",
-      onConfirm: async () => { setModal(null); await api.delete(`/users/${phone}`); msg("Removed","danger"); load(); },
+      onConfirm: async () => { 
+        setModal(null); 
+        await api.delete(`/users/${phone}`); 
+        msg("Removed","danger"); 
+        reload(['users', 'dashboard']); // Reload users and dashboard stats
+      },
     });
   };
   const adjustFine = (phone, cur) => {
@@ -126,17 +273,35 @@ export default function AdminDashboard() {
         const u = users.find(x=>x.phone===phone);
         if (!u) return;
         await api.patch(`/users/${phone}/fine`,{amount:-(u.fine||0)});
-        msg("Fine reset"); load();
+        msg("Fine reset"); 
+        reload(['users', 'dashboard']); // Reload users and dashboard stats
       },
     });
   };
-  const saveQ = async (e) => { e.preventDefault(); if(editQ){await api.patch(`/questions/${editQ._id}`,qForm);setEditQ(null);msg("Updated!");}else{await api.post("/questions",qForm);msg("Added!");} setQForm({category:"",topic:"",question:""}); load(); };
+  const saveQ = async (e) => { 
+    e.preventDefault(); 
+    if(editQ){
+      await api.patch(`/questions/${editQ._id}`,qForm);
+      setEditQ(null);
+      msg("Updated!");
+    }else{
+      await api.post("/questions",qForm);
+      msg("Added!");
+    } 
+    setQForm({category:"",topic:"",question:""}); 
+    reload(['questions']); // Only reload questions
+  };
   const deleteQ = async (id) => {
     setModal({
       type: "danger", title: "Delete Question",
       message: "This question will be permanently deleted.",
       confirmText: "Delete",
-      onConfirm: async () => { setModal(null); await api.delete(`/questions/${id}`); msg("Deleted","danger"); load(); },
+      onConfirm: async () => { 
+        setModal(null); 
+        await api.delete(`/questions/${id}`); 
+        msg("Deleted","danger"); 
+        reload(['questions']); // Only reload questions
+      },
     });
   };
   const startEdit = (q) => { setEditQ(q); setQForm({category:q.category,topic:q.topic,question:q.question}); window.scrollTo({top:0,behavior:"smooth"}); };
@@ -165,7 +330,7 @@ export default function AdminDashboard() {
         try {
           await api.post("/users/reset/weekly");
           msg("Weekly submissions + fines reset for all users");
-          load();
+          reload(['users', 'dashboard', 'reports']); // Reload affected data
         } catch (err) {
           msg(err?.response?.data?.error || "Reset failed", "danger");
         } finally { setResetting(""); }
@@ -184,7 +349,7 @@ export default function AdminDashboard() {
         try {
           await api.post("/users/reset/monthly");
           msg("Monthly submissions reset for all users");
-          load();
+          reload(['users', 'dashboard', 'reports']); // Reload affected data
         } catch (err) {
           msg(err?.response?.data?.error || "Reset failed", "danger");
         } finally { setResetting(""); }
@@ -228,7 +393,8 @@ export default function AdminDashboard() {
             if (isNaN(+fineInput)) return;
             setModal(null);
             await api.patch(`/users/${modal.phone}/fine`, { amount: +fineInput });
-            msg(`Fine adjusted ₹${fineInput}`); load();
+            msg(`Fine adjusted ₹${fineInput}`); 
+            reload(['users', 'dashboard']); // Reload users and dashboard stats
           } : modal.onConfirm}
           onCancel={() => setModal(null)}
         />
@@ -250,49 +416,241 @@ export default function AdminDashboard() {
       {/* OVERVIEW */}
       {tab==="overview" && (
         <>
-          <div className="grid-2" style={{marginBottom:"1rem"}}>
-            <div className="card">
-              <div className="section-title">📊 Today's Submission Rate</div>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart><Pie data={pieSub} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} label={({name,value})=>`${name}: ${value}`}>
-                  {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
-                </Pie><Tooltip contentStyle={tt}/></PieChart>
-              </ResponsiveContainer>
+          {/* ── Today's question banner ── */}
+          {dash?.today?.question ? (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(124,111,255,0.12), rgba(79,70,229,0.06))",
+              border: "1px solid rgba(124,111,255,0.25)",
+              borderRadius: 16, padding: "1rem 1.25rem",
+              marginBottom: "1rem",
+              display: "flex", alignItems: "flex-start", gap: "0.75rem",
+            }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                background: "rgba(124,111,255,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.1rem",
+              }}>📌</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.3rem" }}>
+                  Today's Question · {dash.today.category || dash.today.topic || "General"}
+                </div>
+                <div style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--text)", lineHeight: 1.45 }}>
+                  {dash.today.question}
+                </div>
+              </div>
+              <div style={{
+                flexShrink: 0, fontSize: "0.72rem", fontWeight: 700,
+                padding: "0.25rem 0.65rem", borderRadius: 20,
+                background: "rgba(74,222,128,0.15)", color: "#4ade80",
+                border: "1px solid rgba(74,222,128,0.3)",
+              }}>✅ Live</div>
             </div>
-            <div className="card">
-              <div className="section-title">🏆 Top Streaks</div>
-              <div className="streak-list">
-                {(dash?.topStreak||[]).map((u,i)=>(
-                  <div className="streak-row" key={i}>
-                    <span className="streak-rank">{["🥇","🥈","🥉"][i]||`${i+1}.`}</span>
-                    <span className="streak-name">{u.name||u.userId?.split("@")[0]}</span>
-                    <span className="streak-val">🔥 {u.streak}</span>
-                    <span className="streak-sub">{u.weeklySubmissions}/7</span>
+          ) : (
+            <div style={{
+              background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)",
+              borderRadius: 16, padding: "0.85rem 1.25rem",
+              marginBottom: "1rem", fontSize: "0.85rem", color: "#fbbf24",
+              display: "flex", alignItems: "center", gap: "0.5rem",
+            }}>
+              ⏳ No question published yet today
+            </div>
+          )}
+
+          {/* ── Row 1: Submission donut + Streak leaderboard ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: "1rem", marginBottom: "1rem" }}>
+
+            {/* Submission donut — redesigned */}
+            <div className="card" style={{ display: "flex", flexDirection: "column" }}>
+              <div className="section-title" style={{ marginBottom: "0.5rem" }}>📊 Today's Submissions</div>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
+                  <ResponsiveContainer width={120} height={120}>
+                    <PieChart>
+                      <Pie data={pieSub} dataKey="value" cx="50%" cy="50%" innerRadius={38} outerRadius={56} paddingAngle={3} startAngle={90} endAngle={-270}>
+                        {pieSub.map((e,i)=><Cell key={i} fill={e.color}/>)}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center label */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>
+                      {dash?.stats?.total ? Math.round((dash.stats.completed / dash.stats.total) * 100) : 0}%
+                    </div>
+                    <div style={{ fontSize: "0.6rem", color: "var(--muted)", fontWeight: 600 }}>done</div>
                   </div>
-                ))}
+                </div>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  {[
+                    { label: "Submitted", value: dash?.stats?.completed || 0, color: "#4ade80" },
+                    { label: "Pending",   value: dash?.stats?.pending   || 0, color: "#f87171" },
+                    { label: "Total",     value: dash?.stats?.total     || 0, color: "#7c6fff" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", flex: 1 }}>{label}</span>
+                      <span style={{ fontSize: "0.9rem", fontWeight: 700, color }}>{value}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginTop: "0.25rem" }}>
+                    <div style={{ height: 6, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", borderRadius: 99,
+                        background: "linear-gradient(90deg, #4ade80, #22c55e)",
+                        width: `${dash?.stats?.total ? (dash.stats.completed / dash.stats.total) * 100 : 0}%`,
+                        transition: "width 0.6s ease",
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Streak leaderboard — redesigned */}
+            <div className="card">
+              <div className="section-title" style={{ marginBottom: "0.75rem" }}>🏆 Top Streaks</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {(dash?.topStreak || []).map((u, i) => {
+                  const medals = ["🥇","🥈","🥉"];
+                  const pct = dash.topStreak[0]?.streak ? Math.round((u.streak / dash.topStreak[0].streak) * 100) : 0;
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: "0.75rem",
+                      padding: "0.5rem 0.75rem",
+                      background: i === 0 ? "rgba(251,191,36,0.06)" : "rgba(255,255,255,0.02)",
+                      borderRadius: 10,
+                      border: i === 0 ? "1px solid rgba(251,191,36,0.15)" : "1px solid transparent",
+                    }}>
+                      <span style={{ fontSize: i < 3 ? "1.1rem" : "0.8rem", fontWeight: 700, color: "var(--muted)", width: 24, textAlign: "center", flexShrink: 0 }}>
+                        {medals[i] || `${i+1}`}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                          {u.name || u.userId?.split("@")[0]}
+                        </div>
+                        <div style={{ height: 3, background: "var(--border)", borderRadius: 99, marginTop: "0.3rem", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 99, background: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#7c6fff", width: `${pct}%` }} />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#f97316" }}>🔥 {u.streak}</span>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted)", background: "var(--bg-secondary)", padding: "0.15rem 0.4rem", borderRadius: 6 }}>{u.weeklySubmissions}/7</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!dash?.topStreak || dash.topStreak.length === 0) && (
+                  <div style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.82rem", padding: "1rem" }}>No streak data yet</div>
+                )}
               </div>
             </div>
           </div>
-          <div className="grid-2">
+
+          {/* ── Row 2: Weekly bar + Fine bar + Category pie ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+
+            {/* Weekly submissions bar */}
             <div className="card">
               <div className="section-title">📅 Weekly Submissions</div>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={weekly.slice(0,10).map(u=>({name:(u.name||"?").slice(0,8),days:u.weeklySubmissions||0}))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e1e40"/>
-                  <XAxis dataKey="name" stroke="#606080" fontSize={11}/>
-                  <YAxis domain={[0,7]} stroke="#606080" fontSize={11}/>
-                  <Tooltip contentStyle={tt}/>
-                  <Bar dataKey="days" fill="#7c6fff" radius={[6,6,0,0]}/>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weekly.slice(0,8).map(u=>({name:(u.name||"?").slice(0,6),days:u.weeklySubmissions||0}))} margin={{top:4,right:4,left:-20,bottom:20}}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false}/>
+                  <XAxis dataKey="name" stroke="#55557a" fontSize={9} tickLine={false} axisLine={false} angle={-30} textAnchor="end" interval={0}/>
+                  <YAxis domain={[0,7]} stroke="#55557a" fontSize={10} tickLine={false} axisLine={false}/>
+                  <Tooltip contentStyle={tt} cursor={{fill:"rgba(124,111,255,0.06)"}}/>
+                  <Bar dataKey="days" radius={[6,6,0,0]}>
+                    {weekly.slice(0,8).map((u,i)=>(
+                      <Cell key={i} fill={(u.weeklySubmissions||0)>=5?"#4ade80":(u.weeklySubmissions||0)>=3?"#7c6fff":"#f87171"}/>
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
+
+            {/* Pending Submissions */}
             <div className="card">
-              <div className="section-title">❓ Questions by Category</div>
-              <ResponsiveContainer width="100%" height={240}>
-                <PieChart><Pie data={catPie} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} label={({value})=>value}>
-                  {catPie.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
-                </Pie><Tooltip contentStyle={tt}/><Legend iconSize={10} wrapperStyle={{fontSize:"0.72rem"}}/></PieChart>
-              </ResponsiveContainer>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div className="section-title" style={{ margin: 0 }}>⏳ Pending Today</div>
+                <span style={{
+                  fontSize: "0.72rem", fontWeight: 700,
+                  padding: "0.15rem 0.5rem", borderRadius: 20,
+                  background: "rgba(248,113,113,0.12)",
+                  color: "#f87171",
+                }}>
+                  {users.filter(u => !u.completed).length} left
+                </span>
+              </div>
+              {users.filter(u => !u.completed).length === 0 ? (
+                <div style={{ textAlign: "center", color: "var(--muted)", fontSize: "0.82rem", padding: "1.5rem 0" }}>
+                  🎉 Everyone submitted today!
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", maxHeight: 200, overflowY: "auto" }}>
+                  {users.filter(u => !u.completed).map((u, i) => (
+                    <div key={u.userId || u.phone} style={{
+                      display: "flex", alignItems: "center", gap: "0.5rem",
+                      padding: "0.35rem 0.5rem", borderRadius: 8,
+                      background: "rgba(248,113,113,0.05)",
+                      border: "1px solid rgba(248,113,113,0.1)",
+                    }}>
+                      <div style={{
+                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                        background: "rgba(248,113,113,0.15)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.65rem", fontWeight: 700, color: "#f87171",
+                      }}>
+                        {(u.registeredName || u.name || "?")[0]?.toUpperCase()}
+                      </div>
+                      <span style={{
+                        flex: 1, fontSize: "0.78rem", color: "var(--text)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        minWidth: 0,
+                      }}>
+                        {u.registeredName || u.name || u.phone}
+                      </span>
+                      <span style={{ fontSize: "0.68rem", color: "#f97316", flexShrink: 0 }}>
+                        🔥{u.streak || 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Questions by category */}
+            <div className="card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div className="section-title" style={{ margin: 0 }}>❓ Question Bank</div>
+                <span style={{
+                  fontSize: "0.72rem", fontWeight: 700,
+                  padding: "0.15rem 0.5rem", borderRadius: 20,
+                  background: questions.length <= 7 ? "rgba(248,113,113,0.15)" : questions.length <= 14 ? "rgba(251,191,36,0.15)" : "rgba(74,222,128,0.15)",
+                  color: questions.length <= 7 ? "#f87171" : questions.length <= 14 ? "#fbbf24" : "#4ade80",
+                }}>
+                  {questions.length} total
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                {CATS.map((cat, i) => {
+                  const count = questions.filter(q => q.category === cat).length;
+                  const maxCat = Math.max(...CATS.map(c => questions.filter(q => q.category === c).length), 1);
+                  const pct = Math.round((count / maxCat) * 100);
+                  const color = count === 0 ? "#f87171" : count <= 1 ? "#fbbf24" : PIE_COLORS[i % PIE_COLORS.length];
+                  return (
+                    <div key={cat} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: "0.72rem", color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</span>
+                      <div style={{ width: 50, height: 4, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 99, background: color, width: `${pct}%` }} />
+                      </div>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, color, width: 16, textAlign: "right", flexShrink: 0 }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </>
@@ -358,7 +716,7 @@ export default function AdminDashboard() {
                 msg("✅ Question published! Users can now see it.");
                 setPublishQ(null);
                 setPublishCustom({topic:"",question:"",category:""});
-                load();
+                reload(['dashboard']); // Reload dashboard to show new question
               }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
             }}>📢 Publish to Webapp</button>
           </div>
@@ -458,7 +816,7 @@ export default function AdminDashboard() {
                   setNewMember({ name:"", phone:"", password:"", role:"user" });
                   setAdminOtpStep("idle");
                   setAdminActionToken("");
-                  load();
+                  reload(['users', 'dashboard']); // Reload users and dashboard stats
                 } catch (err) {
                   const errMsg = err?.response?.data?.error || "Failed to create account";
                   // If token expired, reset to idle
@@ -535,7 +893,7 @@ export default function AdminDashboard() {
                     <RoleSelector 
                       phone={u.phone} 
                       currentRole={u.role || "user"}
-                      onRoleChange={() => load()}
+                      onRoleChange={() => reload(['users'])} // Only reload users
                     />
                   </td>
                   <td>🔥 {u.streak||0}</td>
@@ -671,6 +1029,51 @@ export default function AdminDashboard() {
       {/* QUESTIONS */}
       {tab==="questions" && (
         <>
+          {/* Low stock warning + Generate Now */}
+          {questions.length <= 14 && (
+            <div style={{
+              background: questions.length <= 7 ? "rgba(248,113,113,0.08)" : "rgba(251,191,36,0.08)",
+              border: `1px solid ${questions.length <= 7 ? "rgba(248,113,113,0.3)" : "rgba(251,191,36,0.3)"}`,
+              borderRadius: 12, padding: "0.85rem 1.1rem",
+              marginBottom: "1rem",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap",
+            }}>
+              <div>
+                <span style={{ fontWeight: 700, color: questions.length <= 7 ? "#f87171" : "#fbbf24", fontSize: "0.9rem" }}>
+                  {questions.length <= 7 ? "⚠️ Question bank is critically low!" : "ℹ️ Question bank is running low"}
+                </span>
+                <div style={{ color: "var(--muted)", fontSize: "0.78rem", marginTop: "0.2rem" }}>
+                  {questions.length} question{questions.length !== 1 ? "s" : ""} remaining — auto-generate runs at the scheduled time, or generate now.
+                </div>
+              </div>
+              <button
+                className="btn-primary"
+                style={{ whiteSpace: "nowrap", fontSize: "0.85rem", padding: "0.5rem 1rem", opacity: qActionBusy ? 0.6 : 1 }}
+                disabled={!!qActionBusy}
+                onClick={async () => {
+                  setQActionBusy("generating");
+                  msg("🤖 Generating questions… please wait (30–60s)");
+                  try {
+                    const res = await api.post("/questions/generate-now", { count: 14 }, { timeout: 95000 });
+                    await refreshQuestions();
+                    setQActionBusy("");
+                    msg(`✅ ${res.data.message}`);
+                  } catch (e) {
+                    setQActionBusy("");
+                    await refreshQuestions(); // still refresh — some may have been inserted
+                    if (e?.code === "ECONNABORTED" || e?.message?.includes("timeout")) {
+                      msg("⚠️ Request timed out — questions may still be generating. Check the bank in a moment.", "danger");
+                    } else {
+                      msg(e?.response?.data?.error || "Generation failed", "danger");
+                    }
+                  }
+                }}
+              >
+                {qActionBusy === "generating" ? "⏳ Generating…" : "🤖 Generate Now"}
+              </button>
+            </div>
+          )}
+
           <div className="card" style={{marginBottom:"1rem"}}>
             <div className="section-title">{editQ?"✏️ Edit Question":"➕ Add Question"}</div>
             <form onSubmit={saveQ}>
@@ -699,7 +1102,60 @@ export default function AdminDashboard() {
           </div>
           <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap",gap:"0.5rem"}}>
-              <div className="section-title" style={{margin:0}}>Question Bank ({filteredQ.length}/{questions.length})</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div className="section-title" style={{margin:0}}>Question Bank ({filteredQ.length}/{questions.length})</div>
+                {/* Generate button */}
+                <button
+                  className="btn-ghost"
+                  style={{ fontSize: "0.78rem", padding: "0.3rem 0.7rem", opacity: qActionBusy ? 0.6 : 1 }}
+                  disabled={!!qActionBusy}
+                  onClick={async () => {
+                    setQActionBusy("generating");
+                    msg("🤖 Generating questions… please wait (30–60s)");
+                    try {
+                      const res = await api.post("/questions/generate-now", { count: 14 }, { timeout: 95000 });
+                      await refreshQuestions();
+                      setQActionBusy("");
+                      msg(`✅ ${res.data.message}`);
+                    } catch (e) {
+                      setQActionBusy("");
+                      await refreshQuestions(); // still refresh — some may have been inserted
+                      if (e?.code === "ECONNABORTED" || e?.message?.includes("timeout")) {
+                        msg("⚠️ Request timed out — questions may still be generating. Check the bank in a moment.", "danger");
+                      } else {
+                        msg(e?.response?.data?.error || "Generation failed", "danger");
+                      }
+                    }
+                  }}
+                >
+                  {qActionBusy === "generating" ? "⏳ Generating…" : "🤖 Generate"}
+                </button>
+
+                {/* Clean Generic button */}
+                <button
+                  className="btn-ghost danger"
+                  style={{ fontSize: "0.78rem", padding: "0.3rem 0.7rem", opacity: qActionBusy ? 0.6 : 1 }}
+                  disabled={!!qActionBusy}
+                  onClick={async () => {
+                    setQActionBusy("cleaning");
+                    try {
+                      const res = await api.post("/questions/clean-generic");
+                      await refreshQuestions();
+                      setQActionBusy("");
+                      if (res.data.deleted === 0) {
+                        msg("✅ Bank is clean — no generic questions found");
+                      } else {
+                        msg(`🗑️ Removed ${res.data.deleted} generic question${res.data.deleted !== 1 ? "s" : ""}. Bank refreshed.`, "danger");
+                      }
+                    } catch (e) {
+                      setQActionBusy("");
+                      msg(e?.response?.data?.error || "Clean failed", "danger");
+                    }
+                  }}
+                >
+                  {qActionBusy === "cleaning" ? "⏳ Cleaning…" : "🗑️ Clean Generic"}
+                </button>
+              </div>
               <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
                 <select className="form-input" style={{width:"auto"}} value={qCat} onChange={e=>setQCat(e.target.value)}>
                   <option value="">All Categories</option>
@@ -708,6 +1164,47 @@ export default function AdminDashboard() {
                 <input className="form-input" style={{width:180}} placeholder="Search…" value={qSearch} onChange={e=>setQSearch(e.target.value)}/>
               </div>
             </div>
+
+            {/* Category balance bars */}
+            {(() => {
+              const maxCount = Math.max(...CATS.map(c => questions.filter(q => q.category === c).length), 1);
+              return (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: "0.5rem",
+                  marginBottom: "1rem",
+                  padding: "0.75rem",
+                  background: "var(--bg-secondary)",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                }}>
+                  {CATS.map(cat => {
+                    const count = questions.filter(q => q.category === cat).length;
+                    const pct = Math.round((count / maxCount) * 100);
+                    const color = count === 0 ? "#f87171" : count <= 1 ? "#fbbf24" : "#4ade80";
+                    return (
+                      <div key={cat} style={{ fontSize: "0.72rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
+                          <span style={{ color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>{cat}</span>
+                          <span style={{ fontWeight: 700, color, flexShrink: 0 }}>{count}</span>
+                        </div>
+                        <div style={{ height: 4, background: "var(--border)", borderRadius: 99 }}>
+                          <div style={{
+                            height: "100%", borderRadius: 99,
+                            width: `${pct}%`,
+                            background: color,
+                            transition: "width 0.4s ease",
+                            minWidth: count > 0 ? 4 : 0,
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             <div className="table-wrap">
               <table className="data-table">
                 <thead><tr><th>Category</th><th>Topic</th><th>Question</th><th>Actions</th></tr></thead>
@@ -1027,7 +1524,7 @@ function LiveSessionsPanel() {
   const [sessions, setSessions]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showForm, setShowForm]     = useState(false);
-  const [form, setForm]             = useState({ title: "", scheduledAt: "", description: "" });
+  const [form, setForm]             = useState({ title: "", scheduledAt: "", description: "", maxParticipants: 20 });
   const [saving, setSaving]         = useState(false);
   const [busy, setBusy]             = useState({});
   const [toast, setToast]           = useState(null);
@@ -1051,7 +1548,7 @@ function LiveSessionsPanel() {
     setSaving(true);
     try {
       await api.post("/live-sessions", form);
-      setForm({ title: "", scheduledAt: "", description: "" });
+      setForm({ title: "", scheduledAt: "", description: "", maxParticipants: 20 });
       setShowForm(false);
       notify("Session scheduled!");
       load();
@@ -1161,6 +1658,42 @@ function LiveSessionsPanel() {
               <input className="form-input" placeholder="What will be covered in this session…"
                 value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label className="form-label">
+                Max Participants
+                <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: "0.75rem", marginLeft: "0.5rem" }}>
+                  (2–100, default 20)
+                </span>
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={2} max={100}
+                  style={{ width: 100 }}
+                  value={form.maxParticipants}
+                  onChange={e => setForm(f => ({ ...f, maxParticipants: Math.min(100, Math.max(2, parseInt(e.target.value) || 20)) }))}
+                />
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                  {[5, 10, 20, 30, 50].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, maxParticipants: n }))}
+                      style={{
+                        padding: "0.25rem 0.6rem", borderRadius: 8, fontSize: "0.75rem",
+                        border: form.maxParticipants === n ? "1px solid #7c6fff" : "1px solid var(--border)",
+                        background: form.maxParticipants === n ? "rgba(124,111,255,0.2)" : "var(--bg-secondary)",
+                        color: form.maxParticipants === n ? "#a78bfa" : "var(--muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <button type="submit" className="btn-primary" disabled={saving} style={{ minWidth: 160 }}>
               {saving ? "Scheduling…" : "📅 Schedule Session"}
             </button>
@@ -1257,7 +1790,15 @@ function SessionCard({ s, onStart, onEnd, onCancel, busy, navigate }) {
 
           <div style={{ display: "flex", gap: "1rem", fontSize: "0.78rem", color: "var(--muted)", flexWrap: "wrap" }}>
             <span>📅 {new Date(s.scheduledAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
-            {s.participantCount > 0 && <span>👥 {s.participantCount} joined</span>}
+            {s.participantCount > 0 && (
+              <span style={{ color: s.participantCount >= (s.maxParticipants || 20) ? "#f87171" : "var(--muted)" }}>
+                👥 {s.participantCount}/{s.maxParticipants || 20}
+                {s.participantCount >= (s.maxParticipants || 20) && " 🔴 Full"}
+              </span>
+            )}
+            {s.participantCount === 0 && (
+              <span>👥 0/{s.maxParticipants || 20} max</span>
+            )}
             {s.durationMinutes && <span>⏱️ {s.durationMinutes} min</span>}
           </div>
         </div>

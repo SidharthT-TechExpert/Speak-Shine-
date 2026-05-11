@@ -40,10 +40,12 @@ export async function getSessionById(req, res) {
  */
 export async function createSession(req, res) {
   try {
-    const { title, scheduledAt, description } = req.body;
+    const { title, scheduledAt, description, maxParticipants } = req.body;
     const createdBy = req.user.phone;
-    
-    const result = await liveSessionsService.createSession(title, scheduledAt, description, createdBy);
+
+    const result = await liveSessionsService.createSession(
+      title, scheduledAt, description, createdBy, maxParticipants
+    );
     res.status(201).json(result);
   } catch (error) {
     console.error("[LiveSessions] Create session error:", error.message);
@@ -128,38 +130,72 @@ export async function cancelSession(req, res) {
 }
 
 /**
- * POST /api/live-sessions/:id/mute/:participantIdentity - Mute a participant (admin)
+ * POST /api/live-sessions/:id/mute/:participantIdentity - Mute a participant (admin/trainer)
  */
 export async function muteParticipant(req, res) {
   try {
-    const result = await liveSessionsService.muteParticipant(
-      req.params.id, 
-      req.params.participantIdentity
-    );
+    const result = await liveSessionsService.muteParticipant(req.params.id, req.params.participantIdentity);
     res.json(result);
   } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
-    }
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[LiveSessions] Mute participant error:", error.message);
     res.status(500).json({ error: error.message });
   }
 }
 
 /**
- * POST /api/live-sessions/:id/remove/:participantIdentity - Remove a participant (admin)
+ * POST /api/live-sessions/:id/disable-video/:participantIdentity - Disable camera (admin/trainer)
+ */
+export async function disableParticipantVideo(req, res) {
+  try {
+    const result = await liveSessionsService.disableParticipantVideo(req.params.id, req.params.participantIdentity);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("[LiveSessions] Disable video error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/live-sessions/:id/kick/:participantIdentity - Kick + ban participant (admin/trainer)
+ */
+export async function kickParticipant(req, res) {
+  try {
+    const io = req.app.get("io");
+    const result = await liveSessionsService.kickParticipant(req.params.id, req.params.participantIdentity, io);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("[LiveSessions] Kick participant error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/live-sessions/:id/approve/:participantIdentity - Approve banned participant (admin/trainer)
+ */
+export async function approveParticipant(req, res) {
+  try {
+    const result = await liveSessionsService.approveParticipant(req.params.id, req.params.participantIdentity);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    console.error("[LiveSessions] Approve participant error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/live-sessions/:id/remove/:participantIdentity - Remove a participant (admin/trainer)
  */
 export async function removeParticipant(req, res) {
   try {
-    const result = await liveSessionsService.removeParticipant(
-      req.params.id, 
-      req.params.participantIdentity
-    );
+    const io = req.app.get("io");
+    const result = await liveSessionsService.kickParticipant(req.params.id, req.params.participantIdentity, io);
     res.json(result);
   } catch (error) {
-    if (error.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
-    }
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     console.error("[LiveSessions] Remove participant error:", error.message);
     res.status(500).json({ error: error.message });
   }

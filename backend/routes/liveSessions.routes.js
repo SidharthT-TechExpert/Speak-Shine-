@@ -20,8 +20,11 @@ router.post("/:id/start", authMiddleware, requireRole("admin", "trainer"), liveS
 router.post("/:id/end", authMiddleware, requireRole("admin", "trainer"), liveSessionsController.endSession);
 router.delete("/:id", authMiddleware, requireRole("admin", "trainer"), liveSessionsController.cancelSession);
 
-// Admin-only routes
-router.post("/:id/mute/:participantIdentity", authMiddleware, requireRole("admin"), liveSessionsController.muteParticipant);
-router.post("/:id/remove/:participantIdentity", authMiddleware, requireRole("admin"), liveSessionsController.removeParticipant);
+// Admin/Trainer moderation routes
+router.post("/:id/mute/:participantIdentity",          authMiddleware, requireRole("admin", "trainer"), liveSessionsController.muteParticipant);
+router.post("/:id/disable-video/:participantIdentity", authMiddleware, requireRole("admin", "trainer"), liveSessionsController.disableParticipantVideo);
+router.post("/:id/kick/:participantIdentity",          authMiddleware, requireRole("admin", "trainer"), liveSessionsController.kickParticipant);
+router.post("/:id/approve/:participantIdentity",       authMiddleware, requireRole("admin", "trainer"), liveSessionsController.approveParticipant);
+router.post("/:id/remove/:participantIdentity",        authMiddleware, requireRole("admin", "trainer"), liveSessionsController.removeParticipant);
 
 export default router;

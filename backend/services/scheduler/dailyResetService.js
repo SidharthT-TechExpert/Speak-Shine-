@@ -5,6 +5,7 @@
 
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
+import StreakRecord from "../../../models/streakRecordSchema.js";
 
 const TIMEZONE = "Asia/Kolkata";
 
@@ -45,6 +46,32 @@ export async function applyDailyFinesAndStreaks() {
           });
         }
       }
+    }
+
+    // ── 4. Update all-time streak record (Hall of Fame) ───────────────────
+    try {
+      const allUsers = await User.find({}).lean();
+      const topUser = allUsers.reduce((best, u) =>
+        (u.streak || 0) > (best ? best.streak || 0 : 0) ? u : best, null);
+
+      if (topUser && (topUser.streak || 0) > 0) {
+        const existing = await StreakRecord.findOne();
+        if (!existing || topUser.streak > existing.streak) {
+          await StreakRecord.findOneAndUpdate(
+            {},
+            {
+              name: topUser.name || topUser.userId || "Unknown",
+              userId: topUser.userId || null,
+              streak: topUser.streak,
+              achievedAt: new Date(),
+            },
+            { upsert: true, new: true }
+          );
+          console.log(`[DailyReset] Hall of Fame updated: ${topUser.name} — ${topUser.streak} days`);
+        }
+      }
+    } catch (recErr) {
+      console.error("[DailyReset] Streak record update failed:", recErr);
     }
 
     return {

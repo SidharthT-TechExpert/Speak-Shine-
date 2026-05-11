@@ -5,7 +5,7 @@ import { getSharedSocket } from "../hooks/useSocket";
 const ROLE_BADGE = { admin: "👑", trainer: "🎓", user: "" };
 const ROLE_COLOR = { admin: "#f59e0b", trainer: "#6c63ff", user: "#e5e7eb" };
 
-export default function GroupChat({ onClose, onUnread }) {
+export default function GroupChat({ onClose, onUnread, hideHeader = false }) {
   const { token, user } = useAuth();
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -158,23 +158,25 @@ export default function GroupChat({ onClose, onUnread }) {
 
   return (
     <div className="chat-window group-chat-window">
-      {/* Header */}
-      <div className="chat-header">
-        <div className="chat-header-info">
-          <div className="chat-avatar group-avatar">🗣️</div>
-          <div>
-            <div className="chat-peer-name">Speak &amp; Shine Group</div>
-            <div className="chat-peer-role">
-              <span
-                className={`chat-status-dot ${connected ? "online" : "offline"}`}
-                style={{ display: "inline-block", marginRight: 4 }}
-              />
-              {connected ? "live" : "connecting…"}
+      {/* Header — hidden when used inside live room (has its own header) */}
+      {!hideHeader && (
+        <div className="chat-header">
+          <div className="chat-header-info">
+            <div className="chat-avatar group-avatar">🗣️</div>
+            <div>
+              <div className="chat-peer-name">Speak &amp; Shine Group</div>
+              <div className="chat-peer-role">
+                <span
+                  className={`chat-status-dot ${connected ? "online" : "offline"}`}
+                  style={{ display: "inline-block", marginRight: 4 }}
+                />
+                {connected ? "live" : "connecting…"}
+              </div>
             </div>
           </div>
+          <button className="chat-close-btn" onClick={onClose}>✕</button>
         </div>
-        <button className="chat-close-btn" onClick={onClose}>✕</button>
-      </div>
+      )}
 
       {/* Error banners */}
       {connectionError && (

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { lazy, Suspense } from "react";
 import { ToastProvider } from "./components/Toast.jsx";
@@ -54,6 +54,13 @@ function HomeRedirect() {
   if (user.role === "trainer") return <Navigate to="/trainer"   replace />;
   if (user.role === "viewer")  return <Navigate to="/admin"     replace />;
   return <Navigate to="/dashboard" replace />;
+}
+
+// Hide ChatLauncher on live session pages
+function ChatLauncherConditional() {
+  const location = useLocation();
+  if (location.pathname.startsWith("/live/")) return null;
+  return <ChatLauncher />;
 }
 
 export default function App() {
@@ -122,7 +129,7 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
             </Suspense>
-            <ChatLauncher />
+            <ChatLauncherConditional />
             <InstallPrompt />
           </BrowserRouter>
         </ConfirmProvider>

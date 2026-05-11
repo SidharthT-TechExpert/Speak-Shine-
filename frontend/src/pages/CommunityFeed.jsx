@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -64,6 +64,55 @@ function Section({ title, children }) {
       {children}
     </div>
   );
+}
+
+// ── Content Protection Hook ──────────────────────────────────────────────────
+function useContentProtection() {
+  const [isObscured, setIsObscured] = useState(false);
+
+  useEffect(() => {
+    const handleContextMenu = (e) => {
+      // Allow right-clicking textareas, inputs, but block globally elsewhere just to be safe
+      if (e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+      }
+    };
+    
+    const handleKeyDown = (e) => {
+      if (e.key === "PrintScreen") {
+        try { navigator.clipboard.writeText(""); } catch(err){}
+        setIsObscured(true); setTimeout(() => setIsObscured(false), 2000);
+        e.preventDefault();
+      }
+      if (
+        (e.metaKey && e.shiftKey && ["s", "S", "3", "4", "5"].includes(e.key)) ||
+        (e.ctrlKey && e.shiftKey && ["s", "S"].includes(e.key)) ||
+        (e.ctrlKey && ["p", "P", "s", "S"].includes(e.key))
+      ) {
+        try { navigator.clipboard.writeText(""); } catch(err){}
+        setIsObscured(true); setTimeout(() => setIsObscured(false), 2000);
+        e.preventDefault();
+      }
+    };
+    const handleBlur = () => setIsObscured(true);
+    const handleFocus = () => setIsObscured(false);
+    const handleVisibility = () => setIsObscured(document.hidden);
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  return isObscured;
 }
 
 // ── Short Feedback Panel — scores + one-liner only ───────────────────────────
@@ -420,6 +469,91 @@ function CommentSection({ item, onAddComment, onDeleteComment }) {
   );
 }
 
+// ── Protected Video Player with YouTube-style buffering ────────────────────────
+function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemId, containerRef, onToggleFullscreen }) {
+  const [buffering, setBuffering] = useState(true);
+  const videoRef = useRef(null);
+
+  return (
+    <div
+      ref={containerRef}
+      className="community-video-wrap"
+      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000" }}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        controls controlsList="nodownload nofullscreen noremoteplayback"
+        autoPlay playsInline preload="auto"
+        disablePictureInPicture
+        onContextMenu={e => e.preventDefault()}
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => setBuffering(false)}
+        onCanPlay={() => setBuffering(false)}
+        onLoadedData={() => setBuffering(false)}
+        onStalled={() => setBuffering(true)}
+        style={{
+          width: "100%", display: "block",
+          maxHeight: fullscreenId === itemId ? "100vh" : "400px",
+          height: fullscreenId === itemId ? "100%" : "auto",
+        }}
+      />
+
+      {/* ── YouTube-style buffering spinner ── */}
+      {buffering && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.35)",
+          pointerEvents: "none",
+        }}>
+          <div className="yt-buffer-ring" />
+        </div>
+      )}
+
+      {/* Subtle tiled watermark */}
+      <div style={{
+        position: "absolute", inset: 0,
+        pointerEvents: "none", zIndex: 10,
+        backgroundImage: `url("${watermarkUrl}")`,
+        backgroundRepeat: "repeat",
+        backgroundSize: "320px 160px",
+      }} />
+
+      {/* Tiny identity badge — top right */}
+      <div style={{
+        position: "absolute", top: 8, right: 48, zIndex: 20,
+        pointerEvents: "none",
+        background: "rgba(0,0,0,0.35)",
+        borderRadius: 4, padding: "2px 7px",
+        color: "rgba(255,255,255,0.3)",
+        fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.02em",
+      }}>{identity}</div>
+
+      {/* Custom fullscreen button */}
+      <button
+        type="button"
+        onClick={onToggleFullscreen}
+        title={fullscreenId === itemId ? "Exit Fullscreen" : "Fullscreen"}
+        style={{
+          position: "absolute", top: 6, right: 8, zIndex: 30,
+          background: "rgba(0,0,0,0.4)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 6, color: "rgba(255,255,255,0.75)",
+          width: 30, height: 24,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", fontSize: "0.75rem",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.7)"}
+        onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
+      >
+        {fullscreenId === itemId ? "⧄" : "⛶"}
+      </button>
+    </div>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function CommunityFeed() {
   const { user } = useAuth();
@@ -429,6 +563,35 @@ export default function CommunityFeed() {
   const [playing, setPlaying]   = useState(null);
   const [view, setView]         = useState({});       // id → "feedback" | "report" | null
   const [showComments, setShowComments] = useState({}); // id → bool
+  const isObscured = useContentProtection();
+  const containerRefs = useRef({});
+  const [fullscreenId, setFullscreenId] = useState(null);
+
+  // Listen for native fullscreen exit (Escape key)
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setFullscreenId(null);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback((id) => {
+    const el = containerRefs.current[id];
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().then(() => setFullscreenId(id)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setFullscreenId(null)).catch(() => {});
+    }
+  }, []);
+
+  const identity = `${user?.name || "User"} • ${user?.phone || ""}`;
+  // Subtle watermark — barely visible, single diagonal text per tile
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160">
+    <text x="160" y="80" transform="rotate(-20 160 80)" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="600" fill="rgba(255,255,255,0.12)" letter-spacing="1">${identity}</text>
+  </svg>`;
+  const watermarkUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
 
   useEffect(() => {
     api.get("/video/community-feed")
@@ -485,7 +648,19 @@ export default function CommunityFeed() {
 
   return (
     <Layout title="Community Feed">
-      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      {isObscured && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999999, background: "rgba(10,10,24,0.98)",
+          backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          textAlign: "center", color: "#fff"
+        }}>
+          <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>🛡️</div>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 800, marginBottom: "0.5rem" }}>Content Protected</h2>
+          <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Screenshots and recording are disabled for privacy.</p>
+        </div>
+      )}
+      <div style={{ maxWidth: "900px", margin: "0 auto", userSelect: "none", WebkitUserSelect: "none" }}>
 
         <div style={{ marginBottom: "1.5rem" }}>
           <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.4rem" }}>
@@ -550,16 +725,24 @@ export default function CommunityFeed() {
 
               {/* Video player */}
               {playing === item._id ? (
-                <div>
-                  <video
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <ProtectedVideoPlayer
                     src={item.videoUrl}
-                    controls autoPlay playsInline preload="metadata"
-                    style={{ width: "100%", borderRadius: "10px", background: "#000", maxHeight: "400px" }}
+                    identity={identity}
+                    watermarkUrl={watermarkUrl}
+                    fullscreenId={fullscreenId}
+                    itemId={item._id}
+                    containerRef={el => containerRefs.current[item._id] = el}
+                    onToggleFullscreen={() => toggleFullscreen(item._id)}
                   />
-                  <button onClick={() => setPlaying(null)}
-                    style={{ marginTop: "0.5rem", fontSize: "0.78rem", color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>
-                    ✕ Close video
-                  </button>
+                  {fullscreenId !== item._id && (
+                    <button onClick={() => setPlaying(null)}
+                      style={{
+                        marginTop: "0.5rem", fontSize: "0.78rem",
+                        color: "var(--muted)", background: "none",
+                        border: "none", cursor: "pointer",
+                      }}>✕ Close video</button>
+                  )}
                 </div>
               ) : (
                 <button onClick={() => setPlaying(item._id)} style={{
@@ -569,6 +752,7 @@ export default function CommunityFeed() {
                   aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <video src={`${item.videoUrl}#t=2`} preload="metadata" muted playsInline
+                    onContextMenu={e => e.preventDefault()}
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(6px) brightness(0.45)", borderRadius: "10px", pointerEvents: "none" }}
                   />
                   <div style={{ position: "relative", zIndex: 1, width: 52, height: 52, borderRadius: "50%", background: "rgba(124,111,255,0.85)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(124,111,255,0.5)" }}>
