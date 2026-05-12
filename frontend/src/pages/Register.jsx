@@ -115,10 +115,9 @@ export default function Register() {
     if (step === 2 && otp.join("").length === 6) verifyOTP();
   }, [otp]);
 
-  // Step 3 → complete registration
+  // Step 3 → complete registration (submit for approval)
   const register = async (e) => {
     e.preventDefault();
-    // Touch all fields
     setFormTouched({ name: true, password: true });
     const errs = {
       name: form.name.trim().length < 2 ? "Name must be at least 2 characters" : "",
@@ -129,9 +128,8 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const { data } = await api.post("/auth/register", { phone, ...form, verifyToken });
-      login(data.token, { phone: data.phone, role: data.role, name: data.name });
-      navigate("/dashboard", { replace: true });
+      await api.post("/auth/register", { phone, ...form, verifyToken });
+      setStep(4); // success / pending approval screen
     } catch (err) {
       setStepError(err.response?.data?.error || "Registration failed");
     } finally {
@@ -168,7 +166,7 @@ export default function Register() {
 
         {/* Step indicators */}
         <div className="otp-steps">
-          {["Phone", "Verify", "Details"].map((label, i) => (
+          {["Phone", "Verify", "Details", "Done"].map((label, i) => (
             <div key={i} className={`otp-step ${step === i + 1 ? "active" : step > i + 1 ? "done" : ""}`}>
               <div className="otp-step-dot">{step > i + 1 ? "✓" : i + 1}</div>
               <div className="otp-step-label">{label}</div>
@@ -315,9 +313,31 @@ export default function Register() {
             </div>
 
             <button type="submit" className="btn-primary" style={{ width: "100%" }} disabled={loading}>
-              {loading ? "Creating account…" : "Create Account 🎉"}
+              {loading ? "Submitting…" : "Submit for Approval 🎉"}
             </button>
           </form>
+        )}
+
+        {/* ── Step 4: Pending approval ── */}
+        {step === 4 && (
+          <div style={{ textAlign: "center", padding: "1rem 0" }}>
+            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⏳</div>
+            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.5rem" }}>
+              Registration Submitted!
+            </div>
+            <div style={{
+              background: "rgba(124,111,255,0.08)", border: "1px solid rgba(124,111,255,0.25)",
+              borderRadius: 12, padding: "1rem", marginBottom: "1.25rem",
+              fontSize: "0.85rem", color: "var(--muted)", lineHeight: 1.6,
+            }}>
+              Your account is <strong style={{ color: "#a78bfa" }}>awaiting admin approval</strong>.<br />
+              You'll be able to log in once an admin reviews your request.<br />
+              <span style={{ fontSize: "0.75rem", color: "#55557a" }}>Requests expire after 24 hours if not reviewed.</span>
+            </div>
+            <button className="btn-primary" style={{ width: "100%" }} onClick={() => navigate("/login")}>
+              Go to Login →
+            </button>
+          </div>
         )}
 
         <p className="auth-link" style={{ marginTop: 16 }}>Already have an account? <Link to="/login">Sign in</Link></p>

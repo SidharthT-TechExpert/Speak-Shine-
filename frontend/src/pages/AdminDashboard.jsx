@@ -13,7 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 const CATS = ["Daily Life","Opinion","Personal Experience","English Growth","Future Goals","Fun Topic","Free Talk"];
 const PIE_COLORS = ["#7c6fff","#4ade80","#fbbf24","#ff6b9d","#38bdf8","#fb923c","#a78bfa"];
 const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, fontSize:12 };
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"submissions",l:"📝 Submissions"},{id:"questions",l:"❓ Questions"},{id:"manual-questions",l:"📝 Manual Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"monitoring",l:"🖥️ Monitor"},{id:"settings",l:"⚙️ Settings"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"today",l:"📅 Today"},{id:"users",l:"👥 Users"},{id:"registrations",l:"📋 Registrations"},{id:"reports",l:"📈 Reports"},{id:"fines",l:"💸 Fines"},{id:"submissions",l:"📝 Submissions"},{id:"questions",l:"❓ Questions"},{id:"manual-questions",l:"📝 Manual Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"monitoring",l:"🖥️ Monitor"},{id:"settings",l:"⚙️ Settings"}];
 
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -46,6 +46,8 @@ export default function AdminDashboard() {
   const [adminOtpLoading, setAdminOtpLoading] = useState(false);
   const [adminOtpError, setAdminOtpError] = useState("");
   const [adminActionToken, setAdminActionToken] = useState("");
+  const [pendingRegs, setPendingRegs] = useState([]);
+  const [pendingRegsLoading, setPendingRegsLoading] = useState(false);
 
   // Lazy loading flags to track what's been loaded
   const [dataLoaded, setDataLoaded] = useState({
@@ -144,6 +146,19 @@ export default function AdminDashboard() {
     }
   };
 
+  // Load pending registrations
+  const loadPendingRegs = async () => {
+    setPendingRegsLoading(true);
+    try {
+      const r = await api.get("/auth/pending");
+      setPendingRegs(r.data);
+    } catch (err) {
+      msg("Failed to load pending registrations", "danger");
+    } finally {
+      setPendingRegsLoading(false);
+    }
+  };
+
   // Load settings data (for Settings tab)
   const loadSettings = async () => {
     if (dataLoaded.settings) return; // Already loaded
@@ -175,6 +190,8 @@ export default function AdminDashboard() {
       loadQuestions();
     } else if (tab === "reports") {
       loadReports();
+    } else if (tab === "registrations") {
+      loadPendingRegs();
     } else if (tab === "settings") {
       loadSettings();
     }
@@ -1359,6 +1376,79 @@ export default function AdminDashboard() {
 
       {/* MONITORING */}
       {tab==="monitoring" && <MonitoringPanel />}
+
+      {/* REGISTRATIONS */}
+      {tab==="registrations" && (
+        <div className="card">
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"1rem" }}>
+            <div className="section-title" style={{ margin:0 }}>📋 Pending Registrations</div>
+            <button className="btn-ghost" style={{ fontSize:"0.8rem" }} onClick={loadPendingRegs} disabled={pendingRegsLoading}>
+              {pendingRegsLoading ? "Loading…" : "↻ Refresh"}
+            </button>
+          </div>
+
+          {pendingRegsLoading && <div style={{ textAlign:"center", color:"var(--muted)", padding:"2rem" }}>Loading…</div>}
+
+          {!pendingRegsLoading && pendingRegs.length === 0 && (
+            <div style={{ textAlign:"center", color:"var(--muted)", padding:"2rem" }}>
+              <div style={{ fontSize:"2rem", marginBottom:"0.5rem" }}>✅</div>
+              No pending registrations
+            </div>
+          )}
+
+          {!pendingRegsLoading && pendingRegs.length > 0 && (
+            <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+              {pendingRegs.map(p => {
+                const hoursLeft = Math.max(0, Math.round((new Date(p.expiresAt) - Date.now()) / 3600000));
+                const urgent = hoursLeft < 4;
+                return (
+                  <div key={p.id} style={{
+                    display:"flex", alignItems:"center", gap:"1rem", flexWrap:"wrap",
+                    background: urgent ? "rgba(248,113,113,0.06)" : "var(--bg2)",
+                    border: `1px solid ${urgent ? "rgba(248,113,113,0.25)" : "var(--border)"}`,
+                    borderRadius:12, padding:"0.85rem 1rem",
+                  }}>
+                    <div style={{ width:38, height:38, borderRadius:"50%", background:"rgba(124,111,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"1rem", fontWeight:700, color:"#a78bfa", flexShrink:0 }}>
+                      {p.name[0]?.toUpperCase()}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:700, fontSize:"0.9rem", color:"var(--text)" }}>{p.name}</div>
+                      <div style={{ fontSize:"0.75rem", color:"var(--muted)" }}>📱 {p.phone}</div>
+                      <div style={{ fontSize:"0.68rem", color: urgent ? "#f87171" : "var(--muted)", marginTop:"0.15rem" }}>
+                        {urgent ? "⚠️" : "⏳"} Expires in {hoursLeft}h · {new Date(p.createdAt).toLocaleString("en-IN", { dateStyle:"short", timeStyle:"short" })}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"0.5rem", flexShrink:0 }}>
+                      <button
+                        className="btn-primary"
+                        style={{ fontSize:"0.8rem", padding:"0.4rem 0.9rem", background:"linear-gradient(135deg,#4ade80,#22c55e)", color:"#065f46" }}
+                        onClick={async () => {
+                          try {
+                            await api.post(`/auth/pending/${p.id}/approve`);
+                            msg(`✅ ${p.name} approved — they can now log in`);
+                            loadPendingRegs();
+                          } catch (e) { msg(e.response?.data?.error || "Approve failed", "danger"); }
+                        }}
+                      >✅ Approve</button>
+                      <button
+                        className="btn-ghost"
+                        style={{ fontSize:"0.8rem", padding:"0.4rem 0.9rem", color:"#f87171", borderColor:"rgba(248,113,113,0.3)" }}
+                        onClick={async () => {
+                          try {
+                            await api.delete(`/auth/pending/${p.id}`);
+                            msg(`Rejected ${p.name}`, "danger");
+                            loadPendingRegs();
+                          } catch (e) { msg(e.response?.data?.error || "Reject failed", "danger"); }
+                        }}
+                      >❌ Reject</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* SETTINGS */}
       {tab==="settings" && (
