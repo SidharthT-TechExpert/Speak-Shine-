@@ -78,8 +78,10 @@ export default function App() {
             <Route path="/login" element={
               <GuestRoute loginFor="user"><Login /></GuestRoute>
             } />
-            {/* /register is disabled — admin creates members from the dashboard */}
-            <Route path="/register" element={<Navigate to="/login" replace />} />
+            {/* /register — open to guests, redirects logged-in users away */}
+            <Route path="/register" element={
+              <GuestRoute loginFor="user"><Register /></GuestRoute>
+            } />
             {/* Forgot password — open to all (phone OTP verification required) */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
 

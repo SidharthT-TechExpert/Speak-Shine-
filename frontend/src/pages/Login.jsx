@@ -272,6 +272,11 @@ export default function Login({ loginFor = "user" }) {
             <Link to="/trainer/login">Trainer Portal →</Link>
           </div>
         )}
+        {loginFor === "user" && (
+          <p className="auth-link" style={{ marginTop: "0.5rem" }}>
+            New here? <Link to="/register">Create an account</Link>
+          </p>
+        )}
       </div>
     </div>
   );
