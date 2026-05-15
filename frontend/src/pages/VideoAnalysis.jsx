@@ -741,6 +741,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", fontSize: "0.9rem", color: "var(--muted)" }}>
               <span>
                 {stage === "hashing" ? "🔍 Analyzing video frames…" :
+                 stage === "uploading-frames" ? "📤 Uploading frames…" :
                  stage === "confirming" ? "Starting analysis…" :
                  progress < 100 ? "☁️ Uploading to cloud…" : "Finalising…"}
               </span>
@@ -761,6 +762,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
           {uploading ?
             (stage === "hashing" ? `Analyzing ${hashProgress}%…` :
+             stage === "uploading-frames" ? "Uploading frames…" :
              stage === "confirming" ? "Starting analysis…" : `Uploading ${progress}%…`) :
             "Upload & Analyze"}
         </button>

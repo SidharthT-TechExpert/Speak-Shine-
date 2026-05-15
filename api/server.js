@@ -221,6 +221,8 @@ app.use(cors({
 }));
 
 // Limit JSON body size to prevent payload DoS
+// /api/video/upload-frames sends 16 base64 frames (~5.6MB), so allow 10MB for that route
+app.use("/api/video/upload-frames", express.json({ limit: "10mb" }));
 app.use(express.json({ limit: "1mb" }));
 
 // General API rate limit: 200 requests per minute per IP
