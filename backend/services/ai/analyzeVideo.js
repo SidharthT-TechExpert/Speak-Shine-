@@ -426,7 +426,7 @@ export async function analyzeVideoFromBrowserFrames(frameBase64Array) {
 /**
  * Main entry point - uses browser frames if provided, otherwise extracts from video
  */
-async function analyzeVideo(videoPath, browserFrames = null) {
+export async function analyzeVideo(videoPath, browserFrames = null) {
   // If browser provided frames, use them (huge optimization!)
   if (browserFrames && browserFrames.length > 0) {
     return analyzeVideoFromBrowserFrames(browserFrames);
