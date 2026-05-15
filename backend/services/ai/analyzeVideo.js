@@ -340,7 +340,7 @@ Return ONLY valid JSON (no markdown, no extra text):
   }
 }
 
-export /**
+/**
  * Analyze video using browser-extracted frames (optimization for 512MB RAM)
  * @param {Array<string>} frameBase64Array - Array of base64-encoded JPEG frames from browser
  * @returns {Promise<object|null>} - Visual analysis result
