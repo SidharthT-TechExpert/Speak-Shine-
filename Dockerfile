@@ -33,8 +33,6 @@ COPY --from=builder /app/api ./api
 COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/models ./models
 COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/db.js ./db.js
-COPY --from=builder /app/redis.js ./redis.js
 COPY --from=builder /app/package.json ./package.json
 
 # Copy built frontend only (no src, no node_modules)
