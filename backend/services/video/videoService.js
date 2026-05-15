@@ -396,6 +396,11 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     console.log(`[VideoService] Using recorded duration from frontend: ${recordedDuration}s`);
   }
 
+  // Store frame keys so the cleanup job can delete them from R2 after 24h
+  if (frames && Array.isArray(frames) && frames.length > 0) {
+    reportData.frameKeys = frames;
+  }
+
   const report = await VideoReport.create(reportData);
 
   console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'} hash=${videoHash ? videoHash.substring(0, 12) + '...' : 'none'} frames=${frames ? frames.length : 0}`);

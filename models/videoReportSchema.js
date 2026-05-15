@@ -88,6 +88,7 @@ const videoReportSchema = new mongoose.Schema({
   // R2 video storage
   videoUrl:   { type: String, default: null },  // public CDN URL
   videoKey:   { type: String, default: null },  // R2 object key (for deletion)
+  frameKeys:  { type: [String], default: [] },  // R2 keys for browser-extracted frames (deleted after 24h)
   isPublic:   { type: Boolean, default: false }, // user opted in to community feed
   uploaderName: { type: String, default: null }, // display name for community feed
 
