@@ -4,7 +4,7 @@
  */
 
 import User from "../../models/userSchema.js";
-import { safeDB } from "../../db.js";
+import { safeDB } from "../config/database.js";
 import { escapeRegex } from "../utils/phoneUtils.js";
 
 /**

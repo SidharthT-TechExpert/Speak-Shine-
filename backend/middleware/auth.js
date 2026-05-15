@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import Auth from "../../models/authSchema.js";
-import { getRedisClient, isRedisAvailable } from "../../redis.js";
+import { getRedisClient, isRedisAvailable } from "../config/redis.js";
 
 // Cache TTL for isActive checks — 60 seconds.
 // A disabled user will be blocked within 1 minute even if their JWT is still valid.

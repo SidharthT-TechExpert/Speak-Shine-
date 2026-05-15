@@ -22,7 +22,7 @@
  *   }
  */
 
-import { getRedisClient, isRedisAvailable } from '../../../redis.js';
+import { getRedisClient, isRedisAvailable } from '../../config/redis.js';
 
 // ---------------------------------------------------------------------------
 // Load keys from environment

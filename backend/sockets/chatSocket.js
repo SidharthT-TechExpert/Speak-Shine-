@@ -5,7 +5,7 @@
 
 import jwt from "jsonwebtoken";
 import { roomKey, liveSessionRoom, getMessages, saveMessages, MAX_MESSAGES, GROUP_ROOM } from "../services/chat/chatService.js";
-import { isRedisAvailable, getRedisClient } from "../../redis.js";
+import { isRedisAvailable, getRedisClient } from "../config/redis.js";
 import { sanitizeText, isValidPhone, SanitizeError, LIMITS } from "../utils/textSanitizer.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;

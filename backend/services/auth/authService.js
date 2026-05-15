@@ -10,7 +10,7 @@ import { randomInt } from "crypto";
 import Auth from "../../../models/authSchema.js";
 import User from "../../../models/userSchema.js";
 import PendingRegistration from "../../../models/pendingRegistrationSchema.js";
-import { getRedisClient, isRedisAvailable } from "../../../redis.js";
+import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { validatePassword } from "../../utils/validationUtils.js";
 
 const OTP_TTL = 300; // 5 minutes

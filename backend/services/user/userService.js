@@ -9,7 +9,7 @@ import { randomInt } from "crypto";
 import User from "../../../models/userSchema.js";
 import Auth from "../../../models/authSchema.js";
 import Status from "../../../models/statusSchema.js";
-import { getRedisClient, isRedisAvailable } from "../../../redis.js";
+import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { escapeRegex } from "../../utils/phoneUtils.js";
 import { validatePassword } from "../../utils/validationUtils.js";
 

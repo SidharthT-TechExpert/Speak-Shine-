@@ -8,8 +8,8 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { Server as SocketIO } from "socket.io";
-import { connectDB } from "../db.js";
-import { getRedisClient } from "../redis.js";
+import { connectDB } from "../backend/config/database.js";
+import { getRedisClient } from "./backend/config/redis.js";
 import { initializeChatSocket } from "../backend/sockets/chatSocket.js";
 import { blockViewer } from "../backend/middleware/auth.js";
 
