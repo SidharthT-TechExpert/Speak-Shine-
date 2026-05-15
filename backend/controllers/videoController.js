@@ -31,7 +31,7 @@ export async function getPresignedUrl(req, res) {
  */
 export async function confirmUpload(req, res) {
   try {
-    const { key, publicUrl, mimeType = "video/webm", isPublic = true, recordedDuration } = req.body;
+    const { key, publicUrl, mimeType = "video/webm", isPublic = true, recordedDuration, videoHash } = req.body;
     
     const result = await videoService.confirmDirectUpload(
       key,
@@ -39,7 +39,8 @@ export async function confirmUpload(req, res) {
       mimeType,
       isPublic,
       req.user,
-      recordedDuration
+      recordedDuration,
+      videoHash
     );
     
     res.json(result);

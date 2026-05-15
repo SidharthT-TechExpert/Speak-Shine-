@@ -13,6 +13,7 @@ import { getVideoDuration } from "../ai/videoProcessor.js";
 import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
 import { moderateVideo } from "../ai/contentModerator.js";
+import { checkSecurityCache, saveSecurityCache } from "../ai/securityCache.js";
 import { fileTypeFromFile } from "file-type";
 import fs from "fs";
 import path from "path";
@@ -36,7 +37,7 @@ function sanitizeFilename(filename) {
  * Download video from R2, run security checks, then enqueue for AI processing.
  * Runs asynchronously — caller does not await this.
  */
-async function downloadAndEnqueue(reportId, videoUrl, phone, displayName) {
+async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoHash = null) {
   const tempPath = `./tmp/uploads/confirm-${reportId}-${Date.now()}.mp4`;
 
   const fail = async (message, eventType = null) => {
@@ -57,50 +58,122 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName) {
   try {
     fs.mkdirSync(path.dirname(tempPath), { recursive: true });
 
-    // ── Step 1: Download ─────────────────────────────────────────────────────
+    // ── Step 0: Check cache if hash provided ─────────────────────────────────
+    if (videoHash) {
+      const cached = await checkSecurityCache(videoHash);
+      if (cached && cached.passed) {
+        console.log(`[VideoService] ⚡ Security checks SKIPPED (cached) for ${reportId}`);
+        pushProgressById(reportId, { status: "processing", stage: "✅ Security checks passed (cached)" });
+        
+        // Skip to AI processing
+        const report = await VideoReport.findById(reportId);
+        const storedDuration = report?.videoDuration;
+        
+        // Still need to download for AI processing
+        pushProgressById(reportId, { status: "processing", stage: "⬇️ Downloading for analysis…" });
+        const downloadStart = Date.now();
+        const response = await fetch(videoUrl);
+        if (!response.ok) throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
+        const buffer = await response.arrayBuffer();
+        fs.writeFileSync(tempPath, Buffer.from(buffer));
+        console.log(`[VideoService] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB in ${Date.now() - downloadStart}ms`);
+        
+        pushProgressById(reportId, { status: "processing", stage: "⏳ Queuing for AI analysis…" });
+        enqueue({
+          reportId,
+          videoPath: tempPath,
+          phone,
+          displayName,
+          knownDuration: storedDuration,
+        });
+        return;
+      }
+    }
+
+    // ── Step 1: Download with progress ───────────────────────────────────────
     pushProgressById(reportId, { status: "processing", stage: "⬇️ Downloading your video…" });
     console.log(`[VideoService] Downloading video for ${reportId}...`);
 
+    const downloadStart = Date.now();
     const response = await fetch(videoUrl);
     if (!response.ok) throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
 
     const buffer = await response.arrayBuffer();
     fs.writeFileSync(tempPath, Buffer.from(buffer));
-    console.log(`[VideoService] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    const downloadTime = Date.now() - downloadStart;
+    console.log(`[VideoService] Downloaded ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB in ${downloadTime}ms`);
 
-    // ── Step 2: Virus scan ───────────────────────────────────────────────────
+    // ── Step 2-4: Run security checks in parallel ────────────────────────────
+    const securityChecks = [];
+    const checksRun = {};
+    
+    // Virus scan (if enabled)
     if (process.env.ENABLE_VIRUS_SCAN === "true") {
-      pushProgressById(reportId, { status: "processing", stage: "🔍 Scanning for viruses…" });
-      const scanResult = await scanFile(tempPath);
-      if (!scanResult.clean && !scanResult.skipped) {
-        const msg = scanResult.threat
-          ? `File rejected: malware detected (${scanResult.threat})`
-          : "File rejected: virus scan failed";
-        await fail(msg, "🦠 Virus / Malware");
-        return;
-      }
+      securityChecks.push(
+        scanFile(tempPath).then(scanResult => {
+          checksRun.virusScan = scanResult.clean || scanResult.skipped;
+          if (!scanResult.clean && !scanResult.skipped) {
+            const msg = scanResult.threat
+              ? `File rejected: malware detected (${scanResult.threat})`
+              : "File rejected: virus scan failed";
+            return { failed: true, message: msg, type: "🦠 Virus / Malware" };
+          }
+          return { failed: false };
+        })
+      );
     }
 
-    // ── Step 3: Codec validation ─────────────────────────────────────────────
+    // Codec validation (if enabled)
     if (process.env.ENABLE_CODEC_VALIDATION === "true") {
-      pushProgressById(reportId, { status: "processing", stage: "🎬 Validating video codec…" });
-      const codecResult = await validateVideoCodecs(tempPath);
-      if (!codecResult.valid) {
-        await fail(codecResult.error || "Unsupported video codec", "🎬 Invalid Codec");
-        return;
-      }
+      securityChecks.push(
+        validateVideoCodecs(tempPath).then(codecResult => {
+          checksRun.codecValid = codecResult.valid;
+          if (!codecResult.valid) {
+            return { 
+              failed: true, 
+              message: codecResult.error || "Unsupported video codec", 
+              type: "🎬 Invalid Codec" 
+            };
+          }
+          return { failed: false };
+        })
+      );
     }
 
-    // ── Step 4: Content moderation ───────────────────────────────────────────
+    // Content moderation (if enabled)
     if (process.env.ENABLE_CONTENT_MODERATION === "true") {
-      pushProgressById(reportId, { status: "processing", stage: "🛡️ Checking content safety…" });
-      const modResult = await moderateVideo(tempPath);
-      if (!modResult.approved && !modResult.skipped) {
-        const reason = modResult.flags?.length
-          ? `Inappropriate content detected: ${modResult.flags.join(", ")}`
-          : "Content moderation rejected this video";
-        await fail(reason, "🛡️ Content Violation");
+      securityChecks.push(
+        moderateVideo(tempPath).then(modResult => {
+          checksRun.contentSafe = modResult.approved || modResult.skipped;
+          if (!modResult.approved && !modResult.skipped) {
+            const reason = modResult.flags?.length
+              ? `Inappropriate content detected: ${modResult.flags.join(", ")}`
+              : "Content moderation rejected this video";
+            return { failed: true, message: reason, type: "🛡️ Content Violation" };
+          }
+          return { failed: false };
+        })
+      );
+    }
+
+    // Run all security checks in parallel
+    if (securityChecks.length > 0) {
+      pushProgressById(reportId, { status: "processing", stage: "🔍 Running security checks…" });
+      const results = await Promise.all(securityChecks);
+      
+      // Check if any failed
+      const failure = results.find(r => r.failed);
+      if (failure) {
+        await fail(failure.message, failure.type);
         return;
+      }
+      
+      // Cache successful result if hash provided
+      if (videoHash) {
+        await saveSecurityCache(videoHash, {
+          passed: true,
+          checks: checksRun,
+        });
       }
     }
 
@@ -147,7 +220,7 @@ export async function getPresignedUrl(filename, mimeType, userId) {
 /**
  * Confirm direct upload to R2 and start processing
  */
-export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, user, recordedDuration = null) {
+export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, user, recordedDuration = null, videoHash = null) {
   if (!key || !publicUrl) {
     const error = new Error("key and publicUrl are required");
     error.statusCode = 400;
@@ -248,10 +321,10 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
 
   const report = await VideoReport.create(reportData);
 
-  console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'}`);
+  console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'} hash=${videoHash ? videoHash.substring(0, 12) + '...' : 'none'}`);
 
   // Enqueue for processing (security scans run inside downloadAndEnqueue on the local file)
-  downloadAndEnqueue(report._id, publicUrl, strippedPhone, userDoc?.name || strippedPhone);
+  downloadAndEnqueue(report._id, publicUrl, strippedPhone, userDoc?.name || strippedPhone, videoHash);
 
   return {
     success: true,
