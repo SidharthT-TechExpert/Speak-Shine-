@@ -629,7 +629,10 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
       let frames = null;
       let cachedResult = null;
       try {
-        const result = await generateHashAndFrames(fileToUpload);
+        const result = await Promise.race([
+          generateHashAndFrames(fileToUpload),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+        ]);
         videoHash = result.hash;
         frames = result.frames; // 16 high-quality frame blobs
         cachedResult = result.cachedResult;
@@ -639,7 +642,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         }
         console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
       } catch (hashErr) {
-        console.warn('[Upload] Frame extraction failed, continuing without:', hashErr);
+        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', hashErr.message);
         // Continue without frames - server will extract them
       }
       
@@ -1139,18 +1142,23 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       let frames = null;
       try {
         setUploadProgress(5);
-        const result = await generateHashAndFrames(file);
-        videoHash = result.hash;
-        frames = result.frames;
+        // Wrap in a timeout — frame extraction can hang on some browsers with recorded blobs
+        const hashResult = await Promise.race([
+          generateHashAndFrames(file),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+        ]);
+        videoHash = hashResult.hash;
+        frames = hashResult.frames;
         
-        if (result.cached) {
+        if (hashResult.cached) {
           console.log('[Upload] ⚡ Video previously checked - security checks will be skipped');
         }
         console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
         setUploadProgress(10);
       } catch (hashErr) {
-        console.warn('[Upload] Frame extraction failed, continuing without:', hashErr);
-        // Continue without frames - not critical
+        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', hashErr.message);
+        setUploadProgress(10);
+        // Continue without frames - server will extract them
       }
 
       // Step 1: Get presigned URL

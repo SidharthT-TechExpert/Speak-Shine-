@@ -42,7 +42,14 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
       reject(new Error('Failed to load video'));
     };
     
+    // Timeout if metadata never loads (can happen with some recorded blobs)
+    const metadataTimeout = setTimeout(() => {
+      URL.revokeObjectURL(video.src);
+      reject(new Error('Video metadata load timeout'));
+    }, 10000);
+    
     video.onloadedmetadata = () => {
+      clearTimeout(metadataTimeout);
       const duration = video.duration;
       const interval = duration / (totalFrames + 1); // Skip first and last frame
       
@@ -78,9 +85,20 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
         
         const time = interval * (currentFrame + 1);
         video.currentTime = time;
+        
+        // If seek doesn't fire within 3s, skip this frame and move on
+        seekTimeout = setTimeout(() => {
+          console.warn(`[VideoHash] Seek timeout for frame ${currentFrame}, skipping`);
+          currentFrame++;
+          captureFrame();
+        }, 3000);
       };
       
+      // Timeout per seek — some browsers hang on seek for recorded blobs
+      let seekTimeout = null;
+      
       video.onseeked = () => {
+        clearTimeout(seekTimeout);
         try {
           // Draw frame to canvas
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
