@@ -2018,7 +2018,7 @@ function MonitoringPanel() {
 
       {/* Row 2: 3 stat tiles */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.75rem"}}>
-        <MonStat icon="🎬" label="Processing Now" value={isIdle ? "Idle" : `${videos.processing} active`} accent="#38bdf8" />
+        <MonStat icon="🎬" label="Processing Now" value={isIdle ? "Idle" : `${videos.activeCount ?? videos.processing} / ${videos.maxConcurrent ?? queue?.maxConcurrent ?? 15}`} accent="#38bdf8" />
         <MonStat icon="⏱️" label="Avg Process Time" value={queue?.avgProcessingMin ? `${queue.avgProcessingMin} min` : "—"} accent="#fbbf24" />
         <MonStat icon="🌐" label="Avg API Response" value={apiStats.avgResponseMs ? `${apiStats.avgResponseMs}ms` : "—"} accent="#fb923c" />
       </div>
@@ -2046,14 +2046,23 @@ function MonitoringPanel() {
 
         {/* Queue */}
         <div className="card">
-          <div style={{fontWeight:600,fontSize:"0.95rem",marginBottom:"1rem"}}>🚦 Video Queue</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
+            <span style={{fontWeight:600,fontSize:"0.95rem"}}>🚦 Video Queue</span>
+            <span style={{fontSize:"0.72rem",background:"rgba(124,111,255,0.15)",color:"#7c6fff",borderRadius:99,padding:"0.15rem 0.55rem",fontWeight:600}}>
+              ⚡ {videos.maxConcurrent ?? queue?.maxConcurrent ?? 15} concurrent
+            </span>
+          </div>
           {isIdle ? (
             <div style={{display:"flex",alignItems:"center",gap:"0.5rem",color:"#4ade80",fontWeight:500,fontSize:"0.9rem"}}>
-              <span style={{fontSize:"1.1rem"}}>✅</span> Queue empty
+              <span style={{fontSize:"1.1rem"}}>✅</span> Queue empty — all slots free
             </div>
           ) : (
             <div style={{display:"grid",gap:"0.6rem",fontSize:"0.88rem"}}>
-              <QueueRow label="Processing" value={videos.activeJobId ? `#${String(videos.activeJobId).slice(-6)}` : "—"} valueColor="#fbbf24" />
+              <QueueRow
+                label="Active now"
+                value={`${videos.activeCount ?? (videos.activeJobId ? 1 : 0)} / ${videos.maxConcurrent ?? queue?.maxConcurrent ?? 15}`}
+                valueColor="#fbbf24"
+              />
               <QueueRow label="Waiting" value={`${videos.queued} video${videos.queued !== 1 ? "s" : ""}`} />
               <QueueRow label="Est. wait" value={queue?.avgProcessingMin ? `~${queue.avgProcessingMin} min` : "~2.5 min"} />
             </div>
