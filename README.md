@@ -1,412 +1,243 @@
-# Speak & Shine - AI-Powered Speech Analysis Platform
+# Speak & Shine
 
-**Version:** 2.0.0  
-**Architecture:** MVC (Model-View-Controller)  
-**Status:** Production Ready ✅
+AI-powered speech analysis platform that helps users improve communication skills through daily video submissions, real-time feedback, and progress tracking.
 
 ---
 
-## 📋 Table of Contents
+## Tech Stack
 
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [API Documentation](#api-documentation)
-- [Deployment](#deployment)
-- [Security](#security)
-
----
-
-## 🎯 Overview
-
-Speak & Shine is a comprehensive AI-powered speech analysis platform designed to help users improve their communication skills through:
-- Video-based speech analysis
-- Real-time feedback on fluency, grammar, confidence, and vocabulary
-- Visual analysis (eye contact, body language, facial expressions)
-- Daily questions and challenges
-- Progress tracking and reporting
-- Live video sessions with trainers
+| Layer | Technology |
+|-------|-----------|
+| Backend | Node.js, Express.js |
+| Frontend | React 18, Vite |
+| Database | MongoDB + Mongoose |
+| Cache | Redis (ioredis) |
+| Storage | Cloudflare R2 |
+| AI | Groq API (Llama Vision, Whisper) |
+| Realtime | Socket.io |
+| Auth | JWT + Argon2 |
 
 ---
 
-## ✨ Features
+## Features
 
-### Core Features
-- **Video Analysis** - AI-powered speech and visual analysis
-- **Daily Questions** - Personalized daily speaking challenges
-- **Progress Tracking** - Detailed reports and statistics
-- **Live Sessions** - Real-time video sessions with trainers (LiveKit)
-- **Chat System** - Group chat and direct messaging
-- **Attendance Tracking** - Session attendance management
-- **Fine System** - Automated fine calculation for missed submissions
-- **Streak Rewards** - 7-day streak rewards
-
-### Technical Features
-- **MVC Architecture** - Clean, maintainable codebase
-- **R2 Storage** - Cloudflare R2 for video storage
-- **Redis Caching** - Fast data access and session management
-- **MongoDB** - Flexible document database
-- **Socket.io** - Real-time communication
-- **JWT Authentication** - Secure user authentication
-- **Rate Limiting** - API protection
-- **Security Headers** - Helmet.js security
+- **Video Analysis** — Upload or record a video; AI scores fluency, grammar, confidence, vocabulary, eye contact, body language, and facial expression
+- **Browser Frame Extraction** — 16 frames extracted in-browser before upload, saving 93% server RAM and speeding up visual analysis
+- **Concurrent Queue** — Up to 15 videos processed simultaneously (configurable via `VIDEO_QUEUE_CONCURRENCY`)
+- **Security Caching** — Redis caches security check results; repeat uploads skip virus/codec/content checks entirely
+- **Daily Questions** — Scheduled question published each morning; special questions on Sundays, month-start, and month-end
+- **Progress Tracking** — Daily reports, streaks, weekly/monthly submission counters, fine system for missed days
+- **Live Sessions** — Trainer-hosted video rooms via LiveKit
+- **Chat** — Group chat and direct messaging via Socket.io
+- **Attendance** — Session attendance tracking
+- **Admin Dashboard** — Real-time monitoring, queue stats, user management, question bank
 
 ---
 
-## 🏗️ Architecture
-
-### MVC Structure
-
-```
-backend/
-├── config/          # Configuration (database, redis, storage)
-├── services/        # Business logic
-│   ├── ai/          # AI processing services
-│   ├── auth/        # Authentication services
-│   ├── video/       # Video processing services
-│   ├── user/        # User management services
-│   ├── dashboard/   # Dashboard services
-│   ├── questions/   # Question bank services
-│   ├── attendance/  # Attendance services
-│   ├── chat/        # Chat services
-│   ├── liveSessions/# Live session services
-│   ├── scheduler/   # Scheduled task services
-│   └── monitoring/  # System monitoring services
-├── controllers/     # HTTP request handlers
-├── routes/          # URL mapping
-├── middleware/      # Auth and validation middleware
-├── sockets/         # Socket.io handlers
-├── utils/           # Utility functions
-└── jobs/            # Background jobs
-
-api/
-├── server.js        # Main server file
-├── scheduler.js     # Cron job orchestration
-├── videoQueue.js    # Video processing queue
-└── posterGenerator.js # Poster generation
-
-models/              # MongoDB schemas
-frontend/            # React application
-```
-
-### Tech Stack
-
-**Backend:**
-- Node.js + Express.js
-- MongoDB + Mongoose
-- Redis (ioredis)
-- Socket.io
-- JWT authentication
-- Cloudflare R2 storage
-
-**Frontend:**
-- React 18
-- Vite
-- TailwindCSS
-- Socket.io client
-- LiveKit client
-
-**AI/ML:**
-- Groq API (speech analysis)
-- Custom grammar analysis
-- Visual analysis algorithms
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+ 
-- MongoDB
-- Redis (optional, falls back to in-memory)
-- Cloudflare R2 account (for video storage)
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd speak-shine
-```
-
-2. **Install dependencies**
-```bash
-# Install API dependencies
-cd api
-npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
-```
-
-3. **Configure environment variables**
-
-Create `.env` file in root:
-```env
-# Database
-MONGODB_URI=mongodb://localhost:27017/speak-shine
-
-# Redis (optional)
-REDIS_URL=redis://localhost:6379
-
-# JWT
-JWT_SECRET=your-secret-key-here
-
-# R2 Storage
-R2_ACCOUNT_ID=your-account-id
-R2_ACCESS_KEY_ID=your-access-key
-R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET_NAME=your-bucket-name
-R2_PUBLIC_URL=https://your-bucket.r2.dev
-
-# Groq API
-GROQ_API_KEY_1=your-groq-key-1
-GROQ_API_KEY_2=your-groq-key-2
-GROQ_API_KEY_3=your-groq-key-3
-
-# LiveKit (optional)
-LIVEKIT_API_KEY=your-livekit-key
-LIVEKIT_API_SECRET=your-livekit-secret
-LIVEKIT_URL=wss://your-livekit-url
-
-# App Settings
-PORT=3001
-NODE_ENV=development
-FINE_AMOUNT=2
-```
-
-4. **Start the application**
-
-**Development:**
-```bash
-# Start API server
-cd api
-npm start
-
-# Start frontend (in another terminal)
-cd frontend
-npm run dev
-```
-
-**Production:**
-```bash
-# Build frontend
-npm run build
-
-# Start server (serves both API and frontend)
-npm start
-```
-
-5. **Access the application**
-- Frontend: http://localhost:5173 (dev) or http://localhost:3001 (prod)
-- API: http://localhost:3001/api
-- Health check: http://localhost:3001/api/health
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 speak-shine/
-├── api/                    # API server
-│   ├── server.js           # Main server
-│   ├── scheduler.js        # Cron jobs
-│   ├── videoQueue.js       # Video processing
-│   └── posterGenerator.js  # Poster generation
+├── api/
+│   ├── server.js           # Express app, routes, Socket.io
+│   ├── scheduler.js        # Cron jobs (questions, resets, R2 cleanup)
+│   ├── videoQueue.js       # Concurrent video processing queue
+│   └── posterGenerator.js
 │
-├── backend/                # MVC backend
-│   ├── config/             # Configuration
-│   ├── services/           # Business logic (9 modules)
-│   ├── controllers/        # HTTP handlers (9 modules)
-│   ├── routes/             # URL mapping (9 modules)
-│   ├── middleware/         # Auth middleware
-│   ├── sockets/            # Socket.io handlers
-│   ├── utils/              # Utilities
-│   └── jobs/               # Background jobs
+├── backend/
+│   ├── config/             # database.js, redis.js, storage.js
+│   ├── controllers/        # HTTP handlers (thin layer)
+│   ├── routes/             # Express routers
+│   ├── services/
+│   │   ├── ai/             # analyzeVideo, analyzeSpeech, transcribe, pipeline…
+│   │   ├── video/          # videoService, videoQueue
+│   │   ├── scheduler/      # dailyReset, dailyReport, questionScheduler, videoCleanup
+│   │   └── …               # auth, user, chat, dashboard, attendance, liveSessions
+│   ├── middleware/         # auth.js (JWT + role check)
+│   ├── sockets/            # chatSocket.js
+│   └── utils/              # dateUtils, errorUtils, validationUtils…
 │
-├── models/                 # MongoDB schemas (12 models)
+├── models/                 # Mongoose schemas
+│   ├── authSchema.js
+│   ├── userSchema.js
+│   ├── videoReportSchema.js
+│   ├── questionSchema.js
+│   ├── attendanceSchema.js
+│   ├── liveSessionSchema.js
+│   ├── dailyReportSchema.js
+│   └── …
 │
-├── frontend/               # React application
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/          # Page components
-│   │   ├── context/        # React context
-│   │   ├── hooks/          # Custom hooks
-│   │   └── api/            # API client
-│   └── public/             # Static assets
+├── frontend/
+│   └── src/
+│       ├── pages/          # VideoAnalysis, AdminDashboard, UserDashboard…
+│       ├── components/     # Layout, Chat, LiveRoom, Modal…
+│       ├── hooks/          # useVideoFrameHash, useNoiseCancellation…
+│       └── context/        # AuthContext
 │
-├── scripts/                # Utility scripts
-├── docker/                 # Docker configurations
-├── .env                    # Environment variables
-└── README.md               # This file
+└── scripts/
+    └── reset-admin-password.js
 ```
 
 ---
 
-## 📡 API Documentation
+## Environment Variables
 
-### Authentication Endpoints
-- `POST /api/auth/login` - User login
-- `POST /api/auth/refresh` - Refresh token
-- `POST /api/auth/request-reset` - Request password reset
-- `POST /api/auth/reset-password` - Reset password
-- `POST /api/auth/verify-otp` - Verify OTP
+```env
+# Database
+MONGODB_URI=mongodb+srv://...
 
-### User Endpoints
-- `GET /api/users/me` - Get current user
-- `PUT /api/users/me` - Update current user
-- `GET /api/users` - Get all users (admin)
-- `POST /api/users` - Create user (admin)
-- `PUT /api/users/:id` - Update user (admin)
-- `DELETE /api/users/:id` - Delete user (admin)
+# Redis
+REDIS_URL=redis://...
 
-### Video Endpoints
-- `POST /api/video/upload` - Upload video
-- `GET /api/video/reports` - Get video reports
-- `GET /api/video/reports/:id` - Get specific report
-- `POST /api/video/retry/:id` - Retry failed video
-- `GET /api/video/progress/:id` - Get processing progress (SSE)
+# JWT
+JWT_SECRET=
+JWT_REFRESH_SECRET=
 
-### Dashboard Endpoints
-- `GET /api/dashboard/stats` - Get dashboard statistics
-- `GET /api/dashboard/settings` - Get settings (admin)
-- `PUT /api/dashboard/settings` - Update settings (admin)
+# Cloudflare R2
+R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=https://...
 
-### Question Endpoints
-- `GET /api/questions/today` - Get today's question
-- `GET /api/questions/bank` - Get question bank (admin)
-- `POST /api/questions/bank` - Add questions (admin)
-- `DELETE /api/questions/bank/:id` - Delete question (admin)
+# Groq AI
+GROQ_API_KEY=
+GROQ_API_KEY_2=          # optional second key for rate-limit rotation
 
-### Attendance Endpoints
-- `POST /api/attendance/mark` - Mark attendance
-- `GET /api/attendance/my` - Get my attendance
-- `GET /api/attendance/all` - Get all attendance (admin)
+# LiveKit (optional)
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
+LIVEKIT_URL=wss://...
 
-### Chat Endpoints
-- `GET /api/chat/users` - Get chat users
-- `GET /api/chat/history/:peerPhone` - Get chat history
+# App
+PORT=3001
+NODE_ENV=production
+FINE_AMOUNT=2
+ALLOWED_ORIGINS=https://your-domain.com
 
-### Live Session Endpoints
-- `POST /api/live-sessions/create` - Create session (trainer)
-- `GET /api/live-sessions` - Get sessions
-- `POST /api/live-sessions/:id/join` - Join session
-- `POST /api/live-sessions/:id/end` - End session (trainer)
+# Feature flags (all default false)
+ENABLE_VIRUS_SCAN=false
+ENABLE_CODEC_VALIDATION=false
+ENABLE_CONTENT_MODERATION=false
 
-### Monitoring Endpoints
-- `GET /api/monitoring` - Get system metrics (admin)
+# Queue concurrency (default 15, safe for 512 MB RAM)
+VIDEO_QUEUE_CONCURRENCY=15
+```
 
 ---
 
-## 🚢 Deployment
-
-### Railway Deployment
-
-1. **Connect repository to Railway**
-2. **Set environment variables** in Railway dashboard
-3. **Deploy** - Railway will automatically build and deploy
-
-### Docker Deployment
+## Quick Start
 
 ```bash
-# Build image
-docker build -t speak-shine .
+# 1. Install dependencies
+npm install          # root (if any)
+cd api && npm install
+cd ../frontend && npm install
 
-# Run container
-docker run -p 3001:3001 --env-file .env speak-shine
+# 2. Copy and fill in environment variables
+cp .env.example .env
+
+# 3. Development
+cd api && npm start          # API on :3001
+cd frontend && npm run dev   # Frontend on :5173
+
+# 4. Production build
+cd frontend && npm run build
+# Then start api/server.js — it serves the built frontend too
 ```
 
-### Manual Deployment
+---
 
-```bash
-# Build frontend
-npm run build
+## API Reference
 
-# Start server
-NODE_ENV=production npm start
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/login` | Login with phone + password |
+| POST | `/api/auth/refresh` | Refresh access token |
+| POST | `/api/auth/request-reset` | Request OTP for password reset |
+| POST | `/api/auth/reset-password` | Reset password with OTP |
+
+### Video
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/video/presign` | Get presigned R2 upload URL |
+| POST | `/api/video/upload-frames` | Upload browser-extracted frames (10 MB limit) |
+| POST | `/api/video/confirm` | Confirm upload, start AI analysis |
+| GET | `/api/video/progress/:id` | SSE stream for processing progress |
+| GET | `/api/video/report/:id` | Get completed report |
+| GET | `/api/video/my-reports` | List user's reports |
+| DELETE | `/api/video/report/:id` | Delete report + R2 files |
+| POST | `/api/video/retry/:id` | Retry failed analysis |
+| GET | `/api/video/community-feed` | Public videos from last 24 h |
+| PATCH | `/api/video/report/:id/visibility` | Toggle public/private |
+| POST | `/api/video/react/:id` | Like / dislike |
+| POST | `/api/video/comment/:id` | Add comment |
+| DELETE | `/api/video/comment/:id/:commentId` | Delete comment |
+
+### Users / Dashboard / Questions / Attendance / Chat / Live Sessions
+Standard CRUD endpoints under `/api/users`, `/api/dashboard`, `/api/questions`, `/api/attendance`, `/api/chat`, `/api/live-sessions`.
+
+### Monitoring (admin only)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/monitoring` | CPU, RAM, queue stats, recent errors |
+
+---
+
+## Video Processing Pipeline
+
+```
+Browser
+  1. Extract 16 frames (720p JPEG) + perceptual hash   ~3–5 s
+  2. Upload video → R2 (presigned PUT)                 ~5–30 s
+  3. POST /upload-frames (all 16 at once, ~5.6 MB)     ~2–5 s
+  4. POST /confirm → server starts async processing
+
+Server (async, up to 15 concurrent)
+  5. Check Redis security cache (hash match → skip checks)
+  6. If cache miss: virus scan + codec check + content mod (parallel)
+  7. Enqueue for AI
+  8. Visual analysis  — Groq Llama Vision, 4 batches of 4 frames  ~6–8 s
+  9. Audio analysis   — Groq Whisper + Llama (parallel with visual) ~2–4 s
+ 10. Merge results, save to MongoDB, push SSE "completed"
+
+Cleanup (hourly cron)
+ 11. Delete expired video files + frame files from R2
 ```
 
----
-
-## 🔒 Security
-
-### Implemented Security Features
-
-1. **Authentication**
-   - JWT-based authentication
-   - Secure password hashing (Argon2)
-   - Token refresh mechanism
-   - OTP verification
-
-2. **Authorization**
-   - Role-based access control (user, trainer, admin)
-   - Route-level permissions
-   - Resource ownership validation
-
-3. **API Security**
-   - Rate limiting (200 req/min general, 5 uploads/hour)
-   - Helmet.js security headers
-   - CORS configuration
-   - Input validation
-   - SQL injection prevention (MongoDB)
-
-4. **Data Security**
-   - Encrypted passwords
-   - Secure file uploads
-   - Video expiration (24 hours)
-   - Presigned URLs for R2
-
-5. **Infrastructure**
-   - HTTPS enforcement (production)
-   - Trust proxy configuration
-   - Error handling without stack traces (production)
+**Memory per video:** ~9 MB (down from 125 MB before browser-frame optimisation)
 
 ---
 
-## 📊 Monitoring
+## Deployment (Railway)
 
-### Health Check
-```bash
-curl http://localhost:3001/api/health
-```
+1. Push to GitHub — Railway auto-deploys on push to `webapp` branch
+2. Set all environment variables in the Railway service dashboard
+3. The single `Dockerfile` builds the frontend and starts the API server
 
-### System Monitoring (Admin)
-```bash
-curl -H "Authorization: Bearer <token>" http://localhost:3001/api/monitoring
-```
+Key Railway settings:
+- **Start command:** `node api/server.js`
+- **Health check:** `GET /api/health`
+- **RAM:** 512 MB is sufficient (video processing uses ~9 MB per video)
 
-Returns:
-- Active users
-- CPU and memory usage
-- Video processing stats
-- Queue status
-- API performance metrics
+To adjust queue concurrency without redeploying, change `VIDEO_QUEUE_CONCURRENCY` in Railway variables and redeploy (takes ~30 s).
 
 ---
 
-## 🤝 Contributing
+## Security
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
----
-
-## 📝 License
-
-Proprietary - All rights reserved
+- JWT access + refresh tokens, Argon2 password hashing
+- Role-based access control: `user` / `trainer` / `admin`
+- Rate limits: 200 req/min general, 5 video uploads/hour per user
+- Helmet.js security headers, CORS allowlist
+- SSRF prevention on R2 URL validation
+- Magic-byte file validation on direct uploads
+- Input sanitisation on all user-supplied text
+- Videos and frames auto-deleted from R2 after 18 hours
 
 ---
 
-## 📞 Support
+## License
 
-For support, contact the development team.
-
----
-
-**Built with ❤️ by the Speak & Shine Team**
+Proprietary — all rights reserved.
