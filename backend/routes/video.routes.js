@@ -45,6 +45,10 @@ function handleMulterError(err, req, res, next) {
 // ── Presigned Upload Routes ──────────────────────────────────────────────────
 // /presign just generates a URL — doesn't count against upload limit
 router.get("/presign", authMiddleware, videoController.getPresignedUrl);
+
+// /upload-frames receives browser-extracted frames for AI analysis (doesn't count against limit)
+router.post("/upload-frames", authMiddleware, videoController.uploadFrames);
+
 // /confirm is the real submission — apply rate limit here
 router.post("/confirm", authMiddleware, videoUploadLimiter, videoController.confirmUpload);
 

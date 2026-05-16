@@ -3,6 +3,7 @@ import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
+import { useVideoFrameHash } from "../hooks/useVideoFrameHash.js";
 
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
@@ -600,8 +601,9 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
   const [file, setFile]           = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
-  const [stage, setStage]         = useState(""); // "uploading" | "confirming"
+  const [stage, setStage]         = useState(""); // "hashing" | "uploading" | "confirming"
   const [error, setError]         = useState(null);
+  const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -620,6 +622,30 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 
     try {
       const fileToUpload = file;
+      
+      // Step 0: Extract frames and generate hash
+      setStage("hashing");
+      let videoHash = null;
+      let frames = null;
+      let cachedResult = null;
+      try {
+        const result = await Promise.race([
+          generateHashAndFrames(fileToUpload),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+        ]);
+        videoHash = result.hash;
+        frames = result.frames; // 16 high-quality frame blobs
+        cachedResult = result.cachedResult;
+        
+        if (result.cached) {
+          console.log('[Upload] ⚡ Video previously checked - security checks will be skipped');
+        }
+        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
+      } catch (hashErr) {
+        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', hashErr.message);
+        // Continue without frames - server will extract them
+      }
+      
       setStage("uploading");
 
       // Step 1: Get presigned URL from our server
@@ -633,21 +659,63 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         xhr.open("PUT", presign.uploadUrl);
         xhr.setRequestHeader("Content-Type", fileToUpload.type || "video/mp4");
         xhr.upload.onprogress = (e) => {
-          if (e.total) setProgress(Math.round((e.loaded / e.total) * 100));
+          if (e.total) setProgress(Math.round((e.loaded / e.total) * 99));
         };
         xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`R2 upload failed: ${xhr.status}`));
         xhr.onerror = () => reject(new Error("Network error during upload"));
         xhr.send(fileToUpload);
       });
 
-      // Step 3: Tell our server the upload is done — start analysis
+      // Step 3: Upload frames if extracted (optional - server can fall back to extracting from video)
+      let frameKeys = null;
+      if (frames && frames.length > 0) {
+        try {
+          setStage("uploading-frames");
+          setProgress(100);
+          console.log('[Upload] Uploading frames to server...');
+          
+          // Convert frames to base64 for JSON transport
+          const frameDataPromises = frames.map(blob => {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result.split(',')[1]); // Get base64 part
+              reader.readAsDataURL(blob);
+            });
+          });
+          
+          const frameData = await Promise.all(frameDataPromises);
+          
+          // Send frames to server
+          const { data: frameUpload } = await api.post("/video/upload-frames", {
+            reportKey: presign.key,
+            frames: frameData,
+          });
+          
+          frameKeys = frameUpload.frameKeys;
+          console.log('[Upload] ⚡ Frames uploaded - server will skip frame extraction!');
+        } catch (frameErr) {
+          console.warn('[Upload] Frame upload failed, server will extract from video:', frameErr);
+          // Continue without frames - not critical
+        }
+      } else {
+        setProgress(100);
+      }
+
+      // Step 4: Tell our server the upload is done — start analysis
       setStage("confirming");
       const { data } = await api.post("/video/confirm", {
         key:       presign.key,
         publicUrl: presign.publicUrl,
         mimeType:  fileToUpload.type || "video/mp4",
         isPublic:  true,
+        videoHash: videoHash, // Send hash for cache checking
+        frameKeys: frameKeys, // Send frame keys if uploaded
       });
+      
+      // Cache successful result for future uploads
+      if (videoHash && data.success) {
+        cacheResult(videoHash, { passed: true });
+      }
 
       onAnalysisStarted(data.reportId);
       setFile(null);
@@ -676,31 +744,67 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         )}
         {uploading && (
           <div style={{ marginBottom: "1rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem", fontSize: "0.9rem", color: "var(--muted)" }}>
-              <span>
-                {stage === "confirming" ? "Starting analysis…" :
-                 progress < 100 ? "☁️ Uploading to cloud…" : "Finalising…"}
+            {/* Step label + percentage */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", fontSize: "0.88rem" }}>
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>
+                {stage === "hashing" ? "🔍 Extracting frames…" :
+                 stage === "uploading-frames" ? "📤 Saving frames…" :
+                 stage === "confirming" ? "🤖 Starting analysis…" :
+                 progress < 100 ? "☁️ Uploading to cloud…" : "✅ Upload complete"}
               </span>
-              {stage === "uploading" && <span>{progress}%</span>}
+              <span style={{ color: "var(--primary)", fontWeight: 700 }}>
+                {stage === "hashing" ? `${hashProgress}%` :
+                 stage === "confirming" || stage === "uploading-frames" ? "100%" :
+                 `${progress}%`}
+              </span>
             </div>
-            <div style={{ background: "var(--bg)", borderRadius: "6px", height: "8px", overflow: "hidden" }}>
+            {/* Progress bar */}
+            <div style={{ background: "var(--bg)", borderRadius: "99px", height: "10px", overflow: "hidden", marginBottom: "0.75rem" }}>
               <div style={{
                 height: "100%",
-                width: stage === "confirming" ? "100%" : `${progress}%`,
-                background: "var(--primary)",
-                borderRadius: "6px",
-                transition: "width 0.3s ease"
+                width: stage === "hashing" ? `${hashProgress}%` : stage === "confirming" || stage === "uploading-frames" ? "100%" : `${progress}%`,
+                background: progress === 100 || stage === "confirming" ? "var(--success)" : "linear-gradient(90deg, var(--primary), #a78bfa)",
+                borderRadius: "99px",
+                transition: "width 0.4s ease",
               }} />
+            </div>
+            {/* Step checklist */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {[
+                { icon: "🔍", label: "Extracting video frames", done: stage !== "hashing", active: stage === "hashing" },
+                { icon: "☁️", label: "Uploading to cloud", done: progress >= 100, active: stage === "uploading" && progress < 100,
+                  sub: stage === "uploading" && progress < 100 ? `${progress}%` : null },
+                { icon: "📤", label: "Saving frames for AI", done: stage === "confirming", active: stage === "uploading-frames" },
+                { icon: "🤖", label: "Starting AI analysis", done: false, active: stage === "confirming" },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", gap: "0.6rem",
+                  padding: "0.45rem 0.75rem", borderRadius: "8px",
+                  background: s.active ? "rgba(124,111,255,0.1)" : s.done ? "rgba(74,222,128,0.07)" : "transparent",
+                  border: `1px solid ${s.active ? "rgba(124,111,255,0.3)" : s.done ? "rgba(74,222,128,0.2)" : "transparent"}`,
+                }}>
+                  <span style={{ fontSize: "0.9rem", width: "1.2rem", textAlign: "center" }}>
+                    {s.done ? "✅" : s.active ? "⏳" : "⬜"}
+                  </span>
+                  <span style={{ fontSize: "0.82rem", color: s.done ? "var(--success)" : s.active ? "var(--text)" : "var(--muted)", fontWeight: s.active ? 600 : 400, flex: 1 }}>
+                    {s.icon} {s.label}
+                  </span>
+                  {s.sub && <span style={{ fontSize: "0.78rem", color: "var(--primary)", fontWeight: 700 }}>{s.sub}</span>}
+                  {s.active && <div style={{ width: "12px", height: "12px", borderRadius: "50%", border: "2px solid var(--primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />}
+                </div>
+              ))}
             </div>
           </div>
         )}
         <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
           {uploading ?
-            (stage === "confirming" ? "Starting analysis…" : `Uploading ${progress}%…`) :
-            "Upload & Analyze"}
-        </button>
+            (stage === "hashing" ? `Analyzing ${hashProgress}%…` :
+             stage === "uploading-frames" ? "Uploading frames…" :
+             stage === "confirming" ? "Starting analysis…" : `Uploading ${progress}%…`) :
+            "Upload & Analyze"}        </button>
       </div>
       {error && <div className="error-box" style={{ marginTop: "1rem" }}><p>{error}</p></div>}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -713,6 +817,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthlyGoals, isWeeklyReflection }) {
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
+  const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
   const [mics, setMics]             = useState([]);
   const [camId, setCamId]           = useState("");
   const [micId, setMicId]           = useState("");
@@ -1066,6 +1171,30 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       
       console.log(`[Upload] Created file - name: ${file.name}, size: ${file.size}, type: ${file.type}`);
 
+      // Step 0: Generate frame hash for cache checking
+      let videoHash = null;
+      let frames = null;
+      try {
+        setUploadProgress(5);
+        // Wrap in a timeout — frame extraction can hang on some browsers with recorded blobs
+        const hashResult = await Promise.race([
+          generateHashAndFrames(file),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+        ]);
+        videoHash = hashResult.hash;
+        frames = hashResult.frames;
+        
+        if (hashResult.cached) {
+          console.log('[Upload] ⚡ Video previously checked - security checks will be skipped');
+        }
+        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
+        setUploadProgress(10);
+      } catch (hashErr) {
+        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', hashErr.message);
+        setUploadProgress(10);
+        // Continue without frames - server will extract them
+      }
+
       // Step 1: Get presigned URL
       const { data: presign } = await api.get("/video/presign", {
         params: { filename: file.name, mimeType: file.type },
@@ -1078,9 +1207,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         xhr.setRequestHeader("Content-Type", file.type);
         xhr.upload.onprogress = (e) => { 
           if (e.total) {
-            const progress = Math.round((e.loaded / e.total) * 100);
-            setUploadProgress(progress);
-            console.log(`[Upload] Progress: ${progress}% (${e.loaded}/${e.total})`);
+            // 10% reserved for frame extraction, 10-99% for R2 upload, 100% for frames+confirm
+            const uploadPercent = Math.round((e.loaded / e.total) * 89);
+            setUploadProgress(10 + uploadPercent);
           }
         };
         xhr.onload = () => {
@@ -1099,6 +1228,38 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         xhr.send(file);
       });
 
+      // Step 2.5: Upload frames if extracted (optional - server can fall back to extracting from video)
+      let frameKeys = null;
+      if (frames && frames.length > 0) {
+        try {
+          console.log('[Upload] Uploading frames to server...');
+          setUploadProgress(100); // Mark video upload done, now saving frames
+          
+          // Convert frames to base64 for JSON transport
+          const frameDataPromises = frames.map(blob => {
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result.split(',')[1]);
+              reader.readAsDataURL(blob);
+            });
+          });
+          
+          const frameData = await Promise.all(frameDataPromises);
+          
+          const { data: frameUpload } = await api.post("/video/upload-frames", {
+            reportKey: presign.key,
+            frames: frameData,
+          });
+          
+          frameKeys = frameUpload.frameKeys;
+          console.log('[Upload] ⚡ Frames uploaded - server will skip frame extraction!');
+        } catch (frameErr) {
+          console.warn('[Upload] Frame upload failed, server will extract from video:', frameErr);
+        }
+      } else {
+        setUploadProgress(100);
+      }
+
       // Step 3: Confirm with server
       const { data } = await api.post("/video/confirm", {
         key:       presign.key,
@@ -1106,7 +1267,14 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         mimeType:  file.type,
         isPublic:  true,
         recordedDuration: elapsed, // Pass the actual recorded duration from frontend timer
+        videoHash: videoHash, // Send hash for cache checking
+        frameKeys: frameKeys, // Send frame keys if uploaded
       });
+      
+      // Cache successful result for future uploads
+      if (videoHash && data.success) {
+        cacheResult(videoHash, { passed: true });
+      }
 
       console.log(`[Upload] Analysis started with reportId: ${data.reportId}`);
       onAnalysisStarted(data.reportId);
@@ -1454,17 +1622,81 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
 
       {/* ── UPLOADING ── */}
       {step === "uploading" && (
-        <div style={{ padding: "2rem", textAlign: "center" }}>
-          <div className="spinner" style={{ margin: "0 auto 1rem" }} />
-          <p style={{ color: "var(--muted)", marginBottom: "0.75rem" }}>Uploading recording…</p>
-          <div style={{ background: "var(--bg)", borderRadius: "6px", height: "8px", overflow: "hidden", maxWidth: "300px", margin: "0 auto" }}>
-            <div style={{ height: "100%", width: `${uploadProgress}%`, background: "var(--primary)", borderRadius: "6px", transition: "width 0.3s ease" }} />
+        <div style={{ padding: "1.5rem 1rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+          {/* Overall progress bar */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <span style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--text)" }}>
+                {uploadProgress < 10 ? "🔍 Extracting frames…" :
+                 uploadProgress < 100 ? "☁️ Uploading to cloud…" :
+                 "✅ Finalising…"}
+              </span>
+              <span style={{ fontWeight: 700, color: "var(--primary)", fontSize: "0.95rem" }}>{uploadProgress}%</span>
+            </div>
+            <div style={{ background: "var(--bg)", borderRadius: "99px", height: "10px", overflow: "hidden" }}>
+              <div style={{
+                height: "100%",
+                width: `${uploadProgress}%`,
+                background: uploadProgress === 100 ? "var(--success)" : "linear-gradient(90deg, var(--primary), #a78bfa)",
+                borderRadius: "99px",
+                transition: "width 0.4s ease",
+              }} />
+            </div>
           </div>
-          <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginTop: "0.5rem" }}>{uploadProgress}%</p>
+
+          {/* Step checklist */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            {[
+              { icon: "🔍", label: "Extracting video frames", done: uploadProgress >= 10, active: uploadProgress < 10 },
+              { icon: "☁️", label: "Uploading video to cloud", done: uploadProgress >= 100, active: uploadProgress >= 10 && uploadProgress < 100,
+                sub: uploadProgress >= 10 && uploadProgress < 100 ? `${uploadProgress}%` : null },
+              { icon: "📤", label: "Saving frames for AI analysis", done: uploadProgress >= 100, active: false },
+              { icon: "🤖", label: "Starting AI analysis", done: false, active: uploadProgress >= 100 },
+            ].map((s, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: "0.75rem",
+                padding: "0.6rem 0.85rem",
+                borderRadius: "10px",
+                background: s.active ? "rgba(124,111,255,0.1)" : s.done ? "rgba(74,222,128,0.07)" : "transparent",
+                border: `1px solid ${s.active ? "rgba(124,111,255,0.3)" : s.done ? "rgba(74,222,128,0.2)" : "transparent"}`,
+                transition: "all 0.3s",
+              }}>
+                <span style={{ fontSize: "1.1rem", width: "1.5rem", textAlign: "center" }}>
+                  {s.done ? "✅" : s.active ? "⏳" : "⬜"}
+                </span>
+                <span style={{
+                  fontSize: "0.88rem",
+                  color: s.done ? "var(--success)" : s.active ? "var(--text)" : "var(--muted)",
+                  fontWeight: s.active ? 600 : 400,
+                  flex: 1,
+                }}>
+                  {s.icon} {s.label}
+                </span>
+                {s.sub && (
+                  <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: 700 }}>{s.sub}</span>
+                )}
+                {s.active && (
+                  <div style={{
+                    width: "14px", height: "14px", borderRadius: "50%",
+                    border: "2px solid var(--primary)", borderTopColor: "transparent",
+                    animation: "spin 0.8s linear infinite", flexShrink: 0,
+                  }} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p style={{ color: "var(--muted)", fontSize: "0.78rem", textAlign: "center" }}>
+            ⚠️ Don't close this tab — upload in progress
+          </p>
         </div>
       )}
 
-      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }`}</style>
+      <style>{`
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+        @keyframes spin  { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

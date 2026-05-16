@@ -11,7 +11,7 @@ import User from "../models/userSchema.js";
 import DailyReport from "../models/dailyReportSchema.js";
 import VideoReport from "../models/videoReportSchema.js";
 import { generateAndInsertQuestions } from "../backend/services/ai/questionGenerator.js";
-import { deleteFromR2 } from "../r2.js";
+import { deleteFromR2 } from "../backend/config/storage.js";
 
 const TIMEZONE = "Asia/Kolkata";
 
@@ -522,26 +522,44 @@ async function midnightJob() {
   await dailyReset();
 }
 
-// ── Clean expired R2 videos ──────────────────────────────────────────────────
+// ── Clean expired R2 videos + frames ────────────────────────────────────────
 async function cleanExpiredVideos() {
   try {
-    // Find reports expiring in the next hour OR already expired, that still have a video key
+    // Find reports expiring in the next hour OR already expired, that still have a video key or frame keys
     const cutoff = new Date(Date.now() + 60 * 60 * 1000); // now + 1hr buffer
     const toClean = await VideoReport.find({
       expiresAt: { $lt: cutoff },
-      videoKey:  { $ne: null },
-    }).select("_id videoKey").lean();
+      $or: [
+        { videoKey:  { $ne: null } },
+        { frameKeys: { $not: { $size: 0 } } },
+      ],
+    }).select("_id videoKey frameKeys").lean();
 
     if (toClean.length === 0) return;
 
-    console.log(`[Scheduler] Cleaning ${toClean.length} expired/expiring video(s) from R2…`);
+    console.log(`[Scheduler] Cleaning ${toClean.length} expired/expiring report(s) from R2…`);
 
     for (const report of toClean) {
-      await deleteFromR2(report.videoKey);
-      await VideoReport.updateOne({ _id: report._id }, { $set: { videoKey: null, videoUrl: null } });
+      // Delete main video
+      if (report.videoKey) {
+        await deleteFromR2(report.videoKey);
+      }
+
+      // Delete all browser-extracted frames
+      if (report.frameKeys?.length > 0) {
+        for (const fk of report.frameKeys) {
+          await deleteFromR2(fk);
+        }
+        console.log(`[Scheduler] Deleted ${report.frameKeys.length} frame(s) for report ${report._id}`);
+      }
+
+      await VideoReport.updateOne(
+        { _id: report._id },
+        { $set: { videoKey: null, videoUrl: null, frameKeys: [] } }
+      );
     }
 
-    console.log(`[Scheduler] ✅ Cleaned ${toClean.length} video(s)`);
+    console.log(`[Scheduler] ✅ Cleaned ${toClean.length} report(s)`);
   } catch (err) {
     console.error("[Scheduler] Video cleanup error:", err.message);
   }

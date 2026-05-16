@@ -9,7 +9,8 @@ import jwt from "jsonwebtoken";
 import { randomInt } from "crypto";
 import Auth from "../../../models/authSchema.js";
 import User from "../../../models/userSchema.js";
-import { getRedisClient, isRedisAvailable } from "../../../redis.js";
+import PendingRegistration from "../../../models/pendingRegistrationSchema.js";
+import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { validatePassword } from "../../utils/validationUtils.js";
 
 const OTP_TTL = 300; // 5 minutes
@@ -125,6 +126,16 @@ export async function loginUser(phone, password, ipAddress) {
 
   if (!auth) {
     console.log(`[Login] No auth found for phone: ${phone}`);
+    // Check if there's a pending registration for this phone
+    const pending = await PendingRegistration.findOne({
+      phone: { $in: [stripped, phone] }
+    });
+    if (pending) {
+      const error = new Error("Your registration is awaiting admin approval. You'll be notified once approved.");
+      error.statusCode = 403;
+      error.code = "PENDING_APPROVAL";
+      throw error;
+    }
     throw new Error("Invalid credentials");
   }
 
@@ -461,4 +472,200 @@ export async function resetPassword(resetToken, newPassword) {
   await auth.save();
 
   return { success: true, message: "Password updated successfully. You can now log in." };
+}
+
+// ── Registration Flow ────────────────────────────────────────────────────────
+
+/**
+ * Step 1 — Send OTP to phone for registration (SMS only, never voice)
+ */
+export async function sendRegistrationOTP(phone) {
+  const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+
+  if (!/^[6-9]\d{9}$/.test(stripped)) {
+    throw new Error("Enter a valid 10-digit Indian mobile number");
+  }
+
+  // Block if already a full account
+  const existing = await Auth.findOne({ phone: { $in: [stripped, `91${stripped}`] } });
+  if (existing) {
+    throw new Error("An account with this number already exists. Please log in.");
+  }
+
+  const otp = generateOTP();
+  await storeOTP(stripped, otp, "register");
+  const sent = await sendSmsOTP(stripped, otp);
+
+  if (!sent) {
+    throw new Error("Failed to send OTP. Please try again.");
+  }
+
+  return { success: true, message: `OTP sent to +91 ${stripped.slice(0, 5)}XXXXX` };
+}
+
+/**
+ * Step 2 — Verify OTP, return a short-lived verifyToken
+ */
+export async function verifyRegistrationOTP(phone, otp) {
+  const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+  const stored = await getStoredOTP(stripped, "register");
+
+  if (!stored) {
+    throw new Error("OTP expired or not found. Request a new one.");
+  }
+  if (stored !== String(otp).trim()) {
+    throw new Error("Incorrect OTP. Please try again.");
+  }
+
+  await deleteOTP(stripped, "register");
+
+  const verifyToken = jwt.sign(
+    { phone: stripped, purpose: "register" },
+    getJwtSecret(),
+    { expiresIn: "10m" }
+  );
+
+  return { success: true, verifyToken };
+}
+
+/**
+ * Step 3 — Submit registration details → stored as PendingRegistration
+ * Admin must approve before the user can log in.
+ */
+export async function submitRegistration(verifyToken, name, password) {
+  // Validate token
+  let decoded;
+  try {
+    decoded = jwt.verify(verifyToken, getJwtSecret());
+  } catch {
+    throw new Error("Verification expired. Please start over.");
+  }
+  if (decoded.purpose !== "register") {
+    throw new Error("Invalid verification token.");
+  }
+
+  const phone = decoded.phone;
+
+  // Validate inputs
+  if (!name || name.trim().length < 2) {
+    throw new Error("Name must be at least 2 characters.");
+  }
+  if (!password || password.length < 6) {
+    throw new Error("Password must be at least 6 characters.");
+  }
+
+  const pwCheck = validatePassword(password);
+  if (!pwCheck.valid) {
+    throw new Error(pwCheck.errors.join(". "));
+  }
+
+  // Block duplicates
+  const existing = await Auth.findOne({ phone: { $in: [phone, `91${phone}`] } });
+  if (existing) {
+    throw new Error("An account with this number already exists.");
+  }
+
+  // Upsert pending registration (replace if they re-registered)
+  const hashed = await argon2.hash(password);
+  await PendingRegistration.findOneAndUpdate(
+    { phone },
+    { phone, name: name.trim(), password: hashed, createdAt: new Date() },
+    { upsert: true, new: true }
+  );
+
+  return {
+    success: true,
+    message: "Registration submitted! An admin will review and approve your account within 24 hours.",
+  };
+}
+
+/**
+ * Admin — list all pending registrations
+ */
+export async function listPendingRegistrations() {
+  const pending = await PendingRegistration.find().sort({ createdAt: -1 }).lean();
+  return pending.map(p => ({
+    id: p._id,
+    phone: p.phone,
+    name: p.name,
+    createdAt: p.createdAt,
+    expiresAt: new Date(new Date(p.createdAt).getTime() + 24 * 60 * 60 * 1000),
+  }));
+}
+
+/**
+ * Admin — approve a pending registration → creates Auth + User records
+ */
+export async function approvePendingRegistration(pendingId) {
+  const pending = await PendingRegistration.findById(pendingId);
+  if (!pending) {
+    throw new Error("Pending registration not found or already processed.");
+  }
+
+  // Check not already approved
+  const existing = await Auth.findOne({ phone: { $in: [pending.phone, `91${pending.phone}`] } });
+  if (existing) {
+    await PendingRegistration.findByIdAndDelete(pendingId);
+    throw new Error("An account with this phone already exists.");
+  }
+
+  // Create the Auth record
+  await Auth.create({
+    phone: pending.phone,
+    name: pending.name,
+    password: pending.password,
+    role: "user",
+    isActive: true,
+  });
+
+  // Create the User tracking record (same as admin-create flow for role "user")
+  // Try to link to an existing WhatsApp user first
+  const stripped = pending.phone;
+  let waUser = await User.findOne({ phone: { $in: [stripped, `91${stripped}`] } });
+  if (!waUser) {
+    // Try matching by userId JID pattern
+    waUser = await User.findOne({ userId: new RegExp(stripped.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) });
+  }
+
+  if (!waUser) {
+    // No existing WhatsApp record — create a fresh User document
+    await User.create({
+      userId: `web:${stripped}`,
+      name: pending.name,
+      phone: stripped,
+      fine: 0,
+      completed: false,
+      streak: 0,
+      weeklySubmissions: 0,
+      weeklyFine: 0,
+      monthlySubmissions: 0,
+      feedbackScores: [],
+    });
+  } else {
+    // Sync name/phone to existing WhatsApp user if missing
+    const updates = {};
+    if (!waUser.name) updates.name = pending.name;
+    if (!waUser.phone) updates.phone = stripped;
+    if (Object.keys(updates).length > 0) {
+      await User.updateOne({ _id: waUser._id }, { $set: updates });
+    }
+  }
+
+  // Remove from pending
+  await PendingRegistration.findByIdAndDelete(pendingId);
+
+  console.log(`[Auth] Approved registration for ${pending.name} (${pending.phone})`);
+  return { success: true, message: `${pending.name} approved. They can now log in.` };
+}
+
+/**
+ * Admin — reject a pending registration
+ */
+export async function rejectPendingRegistration(pendingId) {
+  const pending = await PendingRegistration.findByIdAndDelete(pendingId);
+  if (!pending) {
+    throw new Error("Pending registration not found.");
+  }
+  console.log(`[Auth] Rejected registration for ${pending.name} (${pending.phone})`);
+  return { success: true, message: `Registration for ${pending.name} rejected.` };
 }

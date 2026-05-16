@@ -877,23 +877,30 @@ export default function UserDashboard() {
           )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-          {/* Total fine */}
-          <div style={{
-            background: (profile?.fine || 0) > 0 ? "rgba(239,68,68,0.1)" : "var(--bg2)",
-            border: `1px solid ${(profile?.fine || 0) > 0 ? "rgba(239,68,68,0.3)" : "var(--border)"}`,
-            borderRadius: "12px",
-            padding: "1rem",
-            textAlign: "center",
-          }}>
-            <div style={{ fontSize: "1.5rem", marginBottom: "0.3rem" }}>💸</div>
-            <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.3rem" }}>Total Fine</div>
-            <div style={{ fontSize: "1.6rem", fontWeight: 800, color: (profile?.fine || 0) > 0 ? "#f87171" : "#4ade80" }}>
-              ₹{profile?.fine || 0}
-            </div>
-            {(profile?.fine || 0) > 0 && (
-              <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.25rem" }}>accumulated total</div>
-            )}
-          </div>
+          {/* Total fine — handles negative (streak credit) */}
+          {(() => {
+            const fine = profile?.fine ?? 0;
+            const isCredit = fine < 0;
+            const isZero = fine === 0;
+            return (
+              <div style={{
+                background: isCredit ? "rgba(74,222,128,0.08)" : fine > 0 ? "rgba(239,68,68,0.1)" : "var(--bg2)",
+                border: `1px solid ${isCredit ? "rgba(74,222,128,0.35)" : fine > 0 ? "rgba(239,68,68,0.3)" : "var(--border)"}`,
+                borderRadius: "12px", padding: "1rem", textAlign: "center",
+              }}>
+                <div style={{ fontSize: "1.5rem", marginBottom: "0.3rem" }}>{isCredit ? "🛡️" : "💸"}</div>
+                <div style={{ fontSize: "0.7rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.3rem" }}>
+                  {isCredit ? "Streak Credit" : "Total Fine"}
+                </div>
+                <div style={{ fontSize: "1.6rem", fontWeight: 800, color: isCredit ? "#4ade80" : fine > 0 ? "#f87171" : "#4ade80" }}>
+                  {isCredit ? `+₹${Math.abs(fine)}` : `₹${fine}`}
+                </div>
+                <div style={{ fontSize: "0.68rem", color: "var(--muted)", marginTop: "0.25rem" }}>
+                  {isCredit ? `${Math.floor(Math.abs(fine) / 2)} free day${Math.floor(Math.abs(fine) / 2) !== 1 ? "s" : ""} buffered` : fine > 0 ? "accumulated total" : "no fines 🎉"}
+                </div>
+              </div>
+            );
+          })()}
           {/* Weekly fine */}
           <div style={{
             background: (profile?.weeklyFine || 0) > 0 ? "rgba(251,191,36,0.08)" : "var(--bg2)",
@@ -912,9 +919,14 @@ export default function UserDashboard() {
             )}
           </div>
         </div>
-        {(profile?.fine || 0) > 0 && (
+        {(profile?.fine ?? 0) > 0 && (
           <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.75rem", textAlign: "center", lineHeight: 1.5 }}>
             💡 Submit your video every day to avoid fines. Fines are added at midnight for missed days.
+          </p>
+        )}
+        {(profile?.fine ?? 0) < 0 && (
+          <p style={{ fontSize: "0.75rem", color: "#4ade80", marginTop: "0.75rem", textAlign: "center", lineHeight: 1.5 }}>
+            🛡️ Your 7-day streak reward gives you a fine buffer — missed days are absorbed before any fine is charged.
           </p>
         )}
       </div>

@@ -340,7 +340,99 @@ Return ONLY valid JSON (no markdown, no extra text):
   }
 }
 
-export async function analyzeVideo(videoPath) {
+/**
+ * Analyze video using browser-extracted frames (optimization for 512MB RAM)
+ * @param {Array<string>} frameBase64Array - Array of base64-encoded JPEG frames from browser
+ * @returns {Promise<object|null>} - Visual analysis result
+ */
+export async function analyzeVideoFromBrowserFrames(frameBase64Array) {
+  const initialKey = getVisionKey();
+  if (!initialKey) { 
+    console.log(`[Visual] No Groq API keys configured (${keyStatus()})`); 
+    return null; 
+  }
+
+  if (!frameBase64Array || frameBase64Array.length === 0) {
+    console.log("[Visual] No frames provided");
+    return null;
+  }
+
+  console.log(`[Visual] ⚡ Using ${frameBase64Array.length} browser-extracted frames (skipping ffmpeg extraction)`);
+
+  // Convert base64 strings to frame objects
+  const frames = frameBase64Array.map((base64, index) => ({
+    base64,
+    timestamp: index * 10, // Approximate timestamps (not critical for analysis)
+    frameIndex: index,
+  }));
+
+  // Process batches SEQUENTIALLY to keep peak memory at 4 frames max
+  const totalBatches = Math.ceil(frames.length / GROQ_BATCH_LIMIT);
+  console.log(`[Visual] ${frames.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, processing sequentially`);
+
+  const batchResults = [];
+  for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+    const batchFrames = frames.slice(
+      batchIdx * GROQ_BATCH_LIMIT,
+      (batchIdx + 1) * GROQ_BATCH_LIMIT
+    );
+
+    if (batchFrames.length === 0) {
+      batchResults.push(null);
+      continue;
+    }
+
+    const startSec = batchFrames[0].timestamp;
+    const endSec = batchFrames[batchFrames.length - 1].timestamp;
+
+    const result = await analyzeFrameBatch(
+      batchFrames,
+      `batch${batchIdx + 1}/${totalBatches}`,
+      { index: batchIdx, total: totalBatches, startSec, endSec }
+    );
+
+    // Free base64 data immediately after sending to Groq
+    batchFrames.forEach(f => { f.base64 = null; });
+    // Hint GC to reclaim the freed frame memory before next batch
+    if (global.gc) global.gc();
+
+    batchResults.push(result);
+  }
+
+  // Merge all batch results with 60/40 second-half weighting
+  const merged = mergeWeightedBatchResults(batchResults);
+
+  if (!merged) {
+    console.log("[Visual] All batches failed");
+    return null;
+  }
+
+  // Validation pass
+  const validBatchResults = batchResults.filter(Boolean);
+  let validated;
+  if (validBatchResults.length >= 2 && !scoresAreClose(validBatchResults)) {
+    console.log("[Visual] scores diverge — running reconciliation");
+    validated = await validateAndReconcile(validBatchResults, merged);
+  } else {
+    if (validBatchResults.length >= 2) console.log("[Visual] scores are close — skipping reconciliation");
+    validated = merged;
+  }
+
+  const final = validated ?? merged;
+  console.log("Visual analysis complete (browser frames):", JSON.stringify(final).slice(0, 150));
+  return final;
+}
+
+/**
+ * Main entry point - uses browser frames if provided, otherwise extracts from video
+ */
+export async function analyzeVideo(videoPath, browserFrames = null) {
+  // If browser provided frames, use them (huge optimization!)
+  if (browserFrames && browserFrames.length > 0) {
+    return analyzeVideoFromBrowserFrames(browserFrames);
+  }
+  
+  // Otherwise, extract frames from video (original behavior)
   const initialKey = getVisionKey();
   if (!initialKey) { console.log(`[Visual] No Groq API keys configured (${keyStatus()})`); return null; }
 

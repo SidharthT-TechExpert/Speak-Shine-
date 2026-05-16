@@ -4,7 +4,7 @@
  */
 
 import Auth from "../../../models/authSchema.js";
-import { getRedisClient, isRedisAvailable } from "../../../redis.js";
+import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 
 const TTL          = 86400;        // 24 hours — DM and group chat
 const TTL_LIVE     = 12 * 3600;    // 12 hours — live session chat (after session ends)

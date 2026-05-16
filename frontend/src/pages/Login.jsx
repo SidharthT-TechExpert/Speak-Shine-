@@ -179,14 +179,18 @@ export default function Login({ loginFor = "user" }) {
       if (loginFor === "trainer" && !["trainer", "admin"].includes(data.role)) {
         setServerError("Trainer credentials required.");
         return;
-      }
-      // Store both access token and refresh token
+      }      // Store both access token and refresh token
       login(data.accessToken, { phone: data.phone, role: data.role, name: data.name }, data.refreshToken);
       if (data.role === "admin")        navigate("/admin",     { replace: true });
       else if (data.role === "trainer") navigate("/trainer",   { replace: true });
       else                              navigate("/dashboard", { replace: true });
     } catch (err) {
-      setServerError(err.response?.data?.error || "Invalid phone or password.");
+      const code = err.response?.data?.code;
+      if (code === "PENDING_APPROVAL") {
+        setServerError("⏳ Your registration is awaiting admin approval. Please check back later.");
+      } else {
+        setServerError(err.response?.data?.error || "Invalid phone or password.");
+      }
     } finally {
       setLoading(false);
     }
@@ -267,6 +271,11 @@ export default function Login({ loginFor = "user" }) {
             <Link to="/admin/login">Admin Portal →</Link>
             <Link to="/trainer/login">Trainer Portal →</Link>
           </div>
+        )}
+        {loginFor === "user" && (
+          <p className="auth-link" style={{ marginTop: "0.5rem" }}>
+            New here? <Link to="/register">Create an account</Link>
+          </p>
         )}
       </div>
     </div>

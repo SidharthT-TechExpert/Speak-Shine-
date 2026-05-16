@@ -254,8 +254,12 @@ export async function publishDailyQuestion() {
     }
 
     // Pick a question avoiding recent categories (only from regular questions)
+    // Keep at most (CATEGORIES - 1) recent entries so there's always ≥1 fresh category
+    const ALL_CATS = 7; // Daily Life, Opinion, Personal Experience, English Growth, Future Goals, Fun Topic, Free Talk
+    const MAX_RECENT = ALL_CATS - 1; // 6 — always leaves at least 1 category available
+
     const statusDoc = await Status.findOne();
-    const recentCategories = statusDoc?.recentCategories || [];
+    const recentCategories = (statusDoc?.recentCategories || []).slice(-MAX_RECENT);
 
     let q = null;
     if (recentCategories.length > 0) {
@@ -270,6 +274,19 @@ export async function publishDailyQuestion() {
     }
     
     if (!q || !q.length) {
+      // All categories recently used — pick the least-recently-used one
+      // (oldest entry in recentCategories array, or fully random if array empty)
+      const lruCategory = recentCategories.length > 0 ? recentCategories[0] : null;
+      if (lruCategory) {
+        const lruQ = await Question.aggregate([
+          { $match: { category: lruCategory, isManualSetup: { $ne: true } }},
+          { $sample: { size: 1 } },
+        ]);
+        if (lruQ?.length) q = lruQ;
+      }
+    }
+
+    if (!q || !q.length) {
       q = await Question.aggregate([
         { $match: { isManualSetup: { $ne: true } }},
         { $sample: { size: 1 } }
@@ -281,8 +298,9 @@ export async function publishDailyQuestion() {
     }
 
     const question = q[0];
+    // Slide the window: add new category, keep only last MAX_RECENT
     const updatedRecent = question.category
-      ? [...new Set([...recentCategories, question.category])].slice(-7)
+      ? [...new Set([...recentCategories, question.category])].slice(-MAX_RECENT)
       : recentCategories;
 
     await Status.updateOne({}, {

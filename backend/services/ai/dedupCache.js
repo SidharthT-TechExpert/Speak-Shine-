@@ -13,7 +13,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { getRedisClient, isRedisAvailable } from '../../../redis.js';
+import { getRedisClient, isRedisAvailable } from '../../config/redis.js';
 
 // ---------------------------------------------------------------------------
 // TTL helpers — expire at midnight IST (Asia/Kolkata)

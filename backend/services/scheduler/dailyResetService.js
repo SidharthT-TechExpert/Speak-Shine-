@@ -26,33 +26,35 @@ export async function applyDailyFinesAndStreaks() {
     );
 
     // ── 2. Streak: increment for submitted, reset for missed ──────────────
-    await User.updateMany({ completed: true }, { $inc: { streak: 1 } });
+    await User.updateMany({ completed: true },  { $inc: { streak: 1 } });
     await User.updateMany({ completed: false }, { $set: { streak: 0 } });
 
-    // ── 3. 7-day streak reward: deduct ₹5 from fine (min 0) ──────────────
+    // ── 3. 7-day streak reward: subtract ₹5 from fine (can go negative) ──
+    // Negative fine = "free pass" buffer — absorbs future missed-day fines
     const rewardUsers = await User.find({ completed: true }).lean();
     const rewardedUsers = [];
-    
+
     for (const u of rewardUsers) {
       const currentStreak = u.streak || 0;
       if (currentStreak > 0 && currentStreak % STREAK_REWARD_DAYS === 0) {
-        const deduct = Math.min(u.fine || 0, STREAK_REWARD_AMOUNT);
-        if (deduct > 0) {
-          await User.updateOne({ _id: u._id }, { $inc: { fine: -deduct } });
-          rewardedUsers.push({
-            name: u.name || u.phone,
-            deducted: deduct,
-            streak: currentStreak
-          });
-        }
+        // Always subtract 5 — fine can go negative (that's intentional)
+        await User.updateOne({ _id: u._id }, { $inc: { fine: -STREAK_REWARD_AMOUNT } });
+        rewardedUsers.push({
+          name: u.name || u.phone,
+          previousFine: u.fine || 0,
+          newFine: (u.fine || 0) - STREAK_REWARD_AMOUNT,
+          streak: currentStreak,
+        });
+        console.log(`[DailyReset] 🎁 Streak reward: ${u.name} fine ${u.fine || 0} → ${(u.fine || 0) - STREAK_REWARD_AMOUNT} (${currentStreak} day streak)`);
       }
     }
 
     // ── 4. Update all-time streak record (Hall of Fame) ───────────────────
+    // Fetch AFTER increment so we see the updated streak values
     try {
-      const allUsers = await User.find({}).lean();
-      const topUser = allUsers.reduce((best, u) =>
-        (u.streak || 0) > (best ? best.streak || 0 : 0) ? u : best, null);
+      const updatedUsers = await User.find({}).lean();
+      const topUser = updatedUsers.reduce((best, u) =>
+        (u.streak || 0) > (best ? (best.streak || 0) : 0) ? u : best, null);
 
       if (topUser && (topUser.streak || 0) > 0) {
         const existing = await StreakRecord.findOne();
@@ -67,7 +69,7 @@ export async function applyDailyFinesAndStreaks() {
             },
             { upsert: true, new: true }
           );
-          console.log(`[DailyReset] Hall of Fame updated: ${topUser.name} — ${topUser.streak} days`);
+          console.log(`[DailyReset] 🏆 New all-time streak record: ${topUser.name} — ${topUser.streak} days`);
         }
       }
     } catch (recErr) {

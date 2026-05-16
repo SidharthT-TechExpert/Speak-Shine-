@@ -26,12 +26,41 @@ export async function getPresignedUrl(req, res) {
 }
 
 /**
+ * POST /api/video/upload-frames
+ * Upload extracted frames from browser for AI analysis
+ */
+export async function uploadFrames(req, res) {
+  try {
+    const { reportKey, frames } = req.body;
+    
+    if (!reportKey || !frames || !Array.isArray(frames)) {
+      return res.status(400).json({ error: "reportKey and frames array required" });
+    }
+    
+    if (frames.length !== 16) {
+      return res.status(400).json({ error: "Exactly 16 frames required" });
+    }
+    
+    console.log(`[UploadFrames] Receiving ${frames.length} frames for ${reportKey}`);
+    
+    const result = await videoService.saveFrames(reportKey, frames, req.user.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[UploadFrames] Error:", error.message);
+    res.status(500).json({ error: "Failed to upload frames" });
+  }
+}
+
+/**
  * POST /api/video/confirm
  * Confirm direct upload to R2 and start processing
  */
 export async function confirmUpload(req, res) {
   try {
-    const { key, publicUrl, mimeType = "video/webm", isPublic = true, recordedDuration } = req.body;
+    const { key, publicUrl, mimeType = "video/webm", isPublic = true, recordedDuration, videoHash, frameKeys } = req.body;
     
     const result = await videoService.confirmDirectUpload(
       key,
@@ -39,7 +68,9 @@ export async function confirmUpload(req, res) {
       mimeType,
       isPublic,
       req.user,
-      recordedDuration
+      recordedDuration,
+      videoHash,
+      frameKeys
     );
     
     res.json(result);

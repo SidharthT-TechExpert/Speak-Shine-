@@ -4,7 +4,7 @@
  */
 
 import VideoReport from "../../../models/videoReportSchema.js";
-import { deleteFromR2 } from "../../../r2.js";
+import { deleteFromR2 } from "../../../backend/config/storage.js";
 
 /**
  * Clean expired videos from R2 storage

@@ -29,9 +29,10 @@ const execFileAsync = promisify(execFile);
  * @param {string}   displayName  - User's display name
  * @param {Function} onProgress   - async (stage: string) => void
  * @param {number}   knownDuration - Optional known duration from recording timer (seconds)
+ * @param {Array<string>} browserFrames - Optional browser-extracted frames (base64)
  * @returns {Promise<object>}     - { analysis, duration }
  */
-export async function processWebVideo(videoPath, displayName = "User", onProgress = () => {}, knownDuration = null) {
+export async function processWebVideo(videoPath, displayName = "User", onProgress = () => {}, knownDuration = null, browserFrames = null) {
   const id = Date.now();
   let audioPath = null;
   const isUrl = videoPath.startsWith("http");
@@ -55,10 +56,11 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     let duration;
     if (knownDuration && typeof knownDuration === 'number' && knownDuration > 0) {
       duration = Math.round(knownDuration);
-      console.log(`[VideoProcessor] Using known duration from recording: ${duration}s`);
+      console.log(`[VideoProcessor] ⚡ Using known duration from recording: ${duration}s (skipped detection)`);
     } else {
+      const detectStart = Date.now();
       duration = await getVideoDuration(videoPath, isUrl);
-      console.log(`[VideoProcessor] Detected duration from file: ${duration}s`);
+      console.log(`[VideoProcessor] Detected duration from file: ${duration}s (took ${Date.now() - detectStart}ms)`);
     }
 
     if (duration < 60) throw new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
@@ -90,11 +92,18 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     // Stage 2: Visual + transcription in parallel
     const parallelStage = startStage("parallel");
 
-    const visualPromise = withTimeout(
-      analyzeVideo(videoPath),
-      Number(process.env.VISUAL_TIMEOUT_MS) || VISUAL_TIMEOUT_MS,
-      "visual"
-    );
+    // Visual analysis - use browser frames if provided
+    const visualPromise = browserFrames && browserFrames.length > 0
+      ? withTimeout(
+          analyzeVideo(videoPath, browserFrames), // Pass browser frames
+          Number(process.env.VISUAL_TIMEOUT_MS) || VISUAL_TIMEOUT_MS,
+          "visual"
+        )
+      : withTimeout(
+          analyzeVideo(videoPath), // Extract from video
+          Number(process.env.VISUAL_TIMEOUT_MS) || VISUAL_TIMEOUT_MS,
+          "visual"
+        );
 
     let transcription = null;
     let speechResult = null;
@@ -221,56 +230,52 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning) {
   };
 }
 
+// Cache ffprobe path to avoid repeated searches
+let cachedFfprobePath = null;
+
 /**
- * Get video duration using ffprobe JSON output — works without file extension.
+ * Find ffprobe binary once and cache the result
+ */
+function findFfprobe() {
+  if (cachedFfprobePath) return cachedFfprobePath;
+  
+  try {
+    const result = execSync('which ffprobe 2>/dev/null || find /nix/store -name ffprobe -type f 2>/dev/null | head -1', {
+      encoding: 'utf8',
+      timeout: 3000
+    }).trim();
+    
+    cachedFfprobePath = result || 'ffprobe';
+    console.log('[ffprobe] Cached path:', cachedFfprobePath);
+    return cachedFfprobePath;
+  } catch (err) {
+    cachedFfprobePath = 'ffprobe';
+    return cachedFfprobePath;
+  }
+}
+
+/**
+ * Get video duration using ffprobe JSON output — optimized version.
  * Uses execFile for security (prevents command injection).
+ * Caches ffprobe path and uses minimal fallbacks.
  */
 export function getVideoDuration(videoPath, isUrl = false) {
   return new Promise((resolve, reject) => {
-    // Try to find ffprobe in common locations
-    const ffprobePaths = [
-      'ffprobe', // Try PATH first
-      '/nix/store/*/bin/ffprobe', // Nix store (Railway/Nixpacks)
-      '/usr/bin/ffprobe', // Standard Linux
-      '/usr/local/bin/ffprobe', // Homebrew/custom installs
-    ];
+    const ffprobeCmd = findFfprobe();
 
-    // Find which ffprobe exists - always try to locate it
-    let ffprobeCmd = 'ffprobe';
-    
-    // Try to find ffprobe using which or find in nix store
-    try {
-      const result = execSync('which ffprobe 2>/dev/null || find /nix/store -name ffprobe -type f 2>/dev/null | head -1', {
-        encoding: 'utf8',
-        timeout: 5000
-      }).trim();
-      
-      if (result) {
-        ffprobeCmd = result;
-        console.log('[ffprobe] Found at:', ffprobeCmd);
-      } else {
-        console.log('[ffprobe] Not found in PATH or /nix/store, trying default "ffprobe"');
-      }
-    } catch (findErr) {
-      console.log('[ffprobe] Search failed, using default "ffprobe":', findErr.message);
-    }
-
-    // Build args array for ffprobe
+    // Minimal args - removed -count_packets which is slow
     const args = [
-      '-v', 'quiet',
+      '-v', 'error', // Only show errors
       '-print_format', 'json',
       '-show_format',
       '-show_streams',
-      '-count_packets',
+      '-select_streams', 'v:0', // Only first video stream
       videoPath
     ];
 
-    console.log('[ffprobe] Executing:', ffprobeCmd);
-
-    execFile(ffprobeCmd || 'ffprobe', args, { timeout: 30000 }, (err, stdout, stderr) => {
+    execFile(ffprobeCmd, args, { timeout: 15000 }, (err, stdout, stderr) => {
       if (err || !stdout?.trim()) {
         console.error("[ffprobe] failed:", stderr || err?.message);
-        console.error("[ffprobe] Command was:", ffprobeCmd);
         return reject(new Error("Could not read video duration. Please ensure the file is a valid video."));
       }
       try {
@@ -278,61 +283,23 @@ export function getVideoDuration(videoPath, isUrl = false) {
 
         // Try format duration first (most reliable)
         let dur = parseFloat(info?.format?.duration);
-        console.log("[ffprobe] Format duration:", dur);
 
-        // Fallback 1: Try video stream duration
+        // Fallback: Try video stream duration
         if (!dur || dur <= 0) {
           const videoStream = info?.streams?.find(s => s.codec_type === "video");
           dur = parseFloat(videoStream?.duration) || 0;
-          console.log("[ffprobe] Video stream duration:", dur);
         }
 
-        // Fallback 2: Calculate from file size and bitrate (for corrupted metadata)
+        // Fallback: Calculate from file size and bitrate
         if (!dur || dur <= 0) {
           const fileSize = parseFloat(info?.format?.size) || 0;
           const bitRate = parseFloat(info?.format?.bit_rate) || 0;
           
           if (fileSize > 0 && bitRate > 0) {
-            // Duration = file_size_in_bits / bit_rate
             dur = (fileSize * 8) / bitRate;
-            console.log("[ffprobe] Calculated from size/bitrate:", dur, "seconds (size:", fileSize, "bitrate:", bitRate, ")");
           }
         }
 
-        // Fallback 3: For browser-recorded videos, try frame count method
-        if (!dur || dur <= 0) {
-          const videoStream = info?.streams?.find(s => s.codec_type === "video");
-          if (videoStream) {
-            // Safely parse frame rate fraction (e.g. "30/1", "24000/1001")
-            const frameCount = parseInt(videoStream.nb_frames) || 0;
-            const rawFps = videoStream.r_frame_rate || "0/1";
-            const [num, den] = rawFps.split("/").map(Number);
-            const frameRate = (den && den !== 0) ? num / den : 0;
-            
-            if (frameCount > 0 && frameRate > 0) {
-              dur = frameCount / frameRate;
-              console.log("[ffprobe] Frame-based duration:", dur, "seconds (frames:", frameCount, "fps:", frameRate, ")");
-            }
-          }
-        }
-
-        // Fallback 4: Conservative file size estimate (much more conservative for recorded videos)
-        if (!dur || dur <= 0) {
-          if (!isUrl) {
-            const fileSize = fs.statSync(videoPath).size;
-            // Much more conservative: assume 200KB per second for browser recordings
-            // This gives us a maximum estimate rather than the previous wrong calculation
-            const estimatedDur = Math.min(600, Math.max(60, fileSize / (200 * 1024)));
-            console.log("[ffprobe] Conservative size estimate:", estimatedDur, "seconds (file size:", fileSize, "bytes)");
-            dur = estimatedDur;
-          }
-        }
-
-        // IGNORE packet-based calculation as it's unreliable for MediaRecorder files
-        // The fps calculation from r_frame_rate is often wrong for browser-recorded videos
-
-        console.log("[ffprobe] Final duration:", dur);
-        
         if (!dur || dur <= 0) {
           return reject(new Error("Could not determine video duration."));
         }

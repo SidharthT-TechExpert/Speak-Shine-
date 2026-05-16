@@ -81,6 +81,8 @@ export async function getVideoStats() {
     completedToday,
     failedToday,
     activeJobId: queue.activeJobId,
+    activeCount: queue.activeCount ?? (queue.isProcessing ? 1 : 0),
+    maxConcurrent: queue.maxConcurrent ?? 1,
   };
 }
 
@@ -120,6 +122,8 @@ export async function getMonitoringData() {
       completedToday: videos.completedToday,
       failedToday: videos.failedToday,
       activeJobId: videos.activeJobId,
+      activeCount: videos.activeCount,
+      maxConcurrent: videos.maxConcurrent,
     },
     queue, // Top-level queue object for frontend compatibility
     api,
