@@ -302,32 +302,45 @@ export function getVideoDuration(videoPath, isUrl = false) {
           return resolve(Math.round(dur));
         }
 
-        // Last resort: count packets — works on browser-recorded webm files
-        // that have no duration atom in the container header.
-        console.log("[ffprobe] No duration in metadata — counting packets (webm fallback)…");
-        const countArgs = [
+        // Last resort: seek to end of file and read the last packet timestamp.
+        // Works on browser-recorded webm files that have no duration atom.
+        console.log("[ffprobe] No duration in metadata — reading last packet timestamp (webm fallback)…");
+        const lastPktArgs = [
           '-v', 'error',
           '-select_streams', 'v:0',
-          '-count_packets',
-          '-show_entries', 'stream=nb_read_packets,r_frame_rate',
+          '-show_packets',
+          '-read_intervals', '%+#1',  // read only first packet for speed
+          '-show_entries', 'packet=pts_time,dts_time,duration_time',
           '-print_format', 'json',
           videoPath
         ];
-        execFile(ffprobeCmd, countArgs, { timeout: 30000 }, (err2, stdout2) => {
+        // Also try reading the last few packets to get end timestamp
+        const lastPktArgs2 = [
+          '-v', 'error',
+          '-select_streams', 'v:0',
+          '-show_entries', 'packet=pts_time',
+          '-print_format', 'json',
+          videoPath
+        ];
+        execFile(ffprobeCmd, lastPktArgs2, { timeout: 60000 }, (err2, stdout2) => {
           if (err2 || !stdout2?.trim()) {
             return reject(new Error("Could not determine video duration."));
           }
           try {
             const info2 = JSON.parse(stdout2);
-            const stream = info2?.streams?.[0];
-            const packets = parseInt(stream?.nb_read_packets || "0", 10);
-            // r_frame_rate is a fraction like "30000/1001"
-            const [num, den] = (stream?.r_frame_rate || "30/1").split("/").map(Number);
-            const fps = den > 0 ? num / den : 30;
-            if (packets > 0 && fps > 0) {
-              const computed = Math.round(packets / fps);
-              console.log(`[ffprobe] Packet count: ${packets} packets @ ${fps.toFixed(2)}fps = ${computed}s`);
-              return resolve(computed);
+            const packets = info2?.packets || [];
+            if (packets.length > 0) {
+              // Find the maximum pts_time across all packets
+              let maxPts = 0;
+              for (const pkt of packets) {
+                const t = parseFloat(pkt.pts_time);
+                if (isFinite(t) && t > maxPts) maxPts = t;
+              }
+              if (maxPts > 0) {
+                const computed = Math.round(maxPts);
+                console.log(`[ffprobe] Last packet pts: ${maxPts.toFixed(2)}s → ${computed}s`);
+                return resolve(computed);
+              }
             }
             return reject(new Error("Could not determine video duration."));
           } catch {

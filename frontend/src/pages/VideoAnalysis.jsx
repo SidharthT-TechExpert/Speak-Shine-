@@ -703,6 +703,24 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 
       // Step 4: Tell our server the upload is done — start analysis
       setStage("confirming");
+
+      // Get video duration from the browser before confirming
+      let fileDuration = null;
+      try {
+        fileDuration = await new Promise((resolve) => {
+          const video = document.createElement("video");
+          video.preload = "metadata";
+          const url = URL.createObjectURL(fileToUpload);
+          video.onloadedmetadata = () => {
+            URL.revokeObjectURL(url);
+            const d = video.duration;
+            resolve(isFinite(d) && d > 0 ? Math.round(d) : null);
+          };
+          video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+          video.src = url;
+        });
+      } catch { /* non-critical */ }
+
       const { data } = await api.post("/video/confirm", {
         key:       presign.key,
         publicUrl: presign.publicUrl,
@@ -710,6 +728,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         isPublic:  true,
         videoHash: videoHash, // Send hash for cache checking
         frameKeys: frameKeys, // Send frame keys if uploaded
+        ...(fileDuration ? { recordedDuration: fileDuration } : {}),
       });
       
       // Cache successful result for future uploads
