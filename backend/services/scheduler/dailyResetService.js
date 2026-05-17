@@ -25,33 +25,36 @@ export async function applyDailyFinesAndStreaks() {
       { $inc: { fine: FINE_AMOUNT, weeklyFine: FINE_AMOUNT } }
     );
 
-    // ── 2. Streak: increment for submitted, reset for missed ──────────────
+    // ── 2 & 3. Streak update + milestone reward ───────────────────────────
+    // Fetch BEFORE increment so we can compute the new streak value ourselves
+    // and correctly identify milestone hits without a race condition.
+    const submittedUsers = await User.find({ completed: true }).lean();
+
     await User.updateMany({ completed: true },  { $inc: { streak: 1 } });
     await User.updateMany({ completed: false }, { $set: { streak: 0 } });
 
-    // ── 3. 7-day streak reward: subtract ₹5 from fine (can go negative) ──
+    // ── 4. 7-day streak reward: subtract ₹5 from fine (can go negative) ──
     // Negative fine = "free pass" buffer — absorbs future missed-day fines
-    // Re-fetch users AFTER the streak increment so we see updated values
-    const rewardUsers = await User.find({ completed: true }).lean();
+    // Use pre-fetched users + 1 to get the exact post-increment streak value,
+    // avoiding any timing issue with reading after updateMany.
     const rewardedUsers = [];
 
-    for (const u of rewardUsers) {
-      const currentStreak = (u.streak || 0);
-      if (currentStreak > 0 && currentStreak % STREAK_REWARD_DAYS === 0) {
-        // Always subtract 5 — fine can go negative (that's intentional)
+    for (const u of submittedUsers) {
+      const newStreak = (u.streak || 0) + 1; // what the streak will be after increment
+      if (newStreak > 0 && newStreak % STREAK_REWARD_DAYS === 0) {
         await User.updateOne({ _id: u._id }, { $inc: { fine: -STREAK_REWARD_AMOUNT } });
         rewardedUsers.push({
           name: u.name || u.phone,
           previousFine: u.fine || 0,
           newFine: (u.fine || 0) - STREAK_REWARD_AMOUNT,
-          streak: currentStreak,
+          streak: newStreak,
           deducted: STREAK_REWARD_AMOUNT,
         });
-        console.log(`[DailyReset] 🎁 Streak reward: ${u.name} streak=${currentStreak} fine ${u.fine || 0} → ${(u.fine || 0) - STREAK_REWARD_AMOUNT}`);
+        console.log(`[DailyReset] 🎁 Streak reward: ${u.name} streak=${newStreak} fine ${u.fine || 0} → ${(u.fine || 0) - STREAK_REWARD_AMOUNT}`);
       }
     }
 
-    // ── 4. Update all-time streak record (Hall of Fame) ───────────────────
+    // ── 5. Update all-time streak record (Hall of Fame) ───────────────────
     // Fetch AFTER increment so we see the updated streak values
     try {
       const updatedUsers = await User.find({}).lean();
