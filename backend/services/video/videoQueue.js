@@ -175,9 +175,12 @@ async function processJob(job) {
       browserFrames
     );
 
+    // Persist the actual duration so retries can skip detection
+    const durationToSave = result.duration;
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "completed",
       analysis: result.analysis,
+      ...(durationToSave ? { videoDuration: durationToSave } : {}),
     });
 
     const { fluency, grammar, confidence, vocabulary } = result.analysis;

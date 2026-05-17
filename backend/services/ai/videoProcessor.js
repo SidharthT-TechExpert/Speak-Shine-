@@ -255,21 +255,20 @@ function findFfprobe() {
 }
 
 /**
- * Get video duration using ffprobe JSON output — optimized version.
- * Uses execFile for security (prevents command injection).
- * Caches ffprobe path and uses minimal fallbacks.
+ * Get video duration using ffprobe JSON output.
+ * For webm files recorded in the browser, the duration atom is often missing.
+ * Falls back to packet counting (-count_packets) which is slower but reliable.
  */
 export function getVideoDuration(videoPath, isUrl = false) {
   return new Promise((resolve, reject) => {
     const ffprobeCmd = findFfprobe();
 
-    // Minimal args - removed -count_packets which is slow
     const args = [
-      '-v', 'error', // Only show errors
+      '-v', 'error',
       '-print_format', 'json',
       '-show_format',
       '-show_streams',
-      '-select_streams', 'v:0', // Only first video stream
+      '-select_streams', 'v:0',
       videoPath
     ];
 
@@ -293,18 +292,48 @@ export function getVideoDuration(videoPath, isUrl = false) {
         // Fallback: Calculate from file size and bitrate
         if (!dur || dur <= 0) {
           const fileSize = parseFloat(info?.format?.size) || 0;
-          const bitRate = parseFloat(info?.format?.bit_rate) || 0;
-          
+          const bitRate  = parseFloat(info?.format?.bit_rate) || 0;
           if (fileSize > 0 && bitRate > 0) {
             dur = (fileSize * 8) / bitRate;
           }
         }
 
-        if (!dur || dur <= 0) {
-          return reject(new Error("Could not determine video duration."));
+        if (dur > 0) {
+          return resolve(Math.round(dur));
         }
-        
-        resolve(Math.round(dur));
+
+        // Last resort: count packets — works on browser-recorded webm files
+        // that have no duration atom in the container header.
+        console.log("[ffprobe] No duration in metadata — counting packets (webm fallback)…");
+        const countArgs = [
+          '-v', 'error',
+          '-select_streams', 'v:0',
+          '-count_packets',
+          '-show_entries', 'stream=nb_read_packets,r_frame_rate',
+          '-print_format', 'json',
+          videoPath
+        ];
+        execFile(ffprobeCmd, countArgs, { timeout: 30000 }, (err2, stdout2) => {
+          if (err2 || !stdout2?.trim()) {
+            return reject(new Error("Could not determine video duration."));
+          }
+          try {
+            const info2 = JSON.parse(stdout2);
+            const stream = info2?.streams?.[0];
+            const packets = parseInt(stream?.nb_read_packets || "0", 10);
+            // r_frame_rate is a fraction like "30000/1001"
+            const [num, den] = (stream?.r_frame_rate || "30/1").split("/").map(Number);
+            const fps = den > 0 ? num / den : 30;
+            if (packets > 0 && fps > 0) {
+              const computed = Math.round(packets / fps);
+              console.log(`[ffprobe] Packet count: ${packets} packets @ ${fps.toFixed(2)}fps = ${computed}s`);
+              return resolve(computed);
+            }
+            return reject(new Error("Could not determine video duration."));
+          } catch {
+            return reject(new Error("Could not determine video duration."));
+          }
+        });
       } catch (parseErr) {
         console.error("[ffprobe] Parse error:", parseErr);
         reject(new Error("Could not read video metadata."));
