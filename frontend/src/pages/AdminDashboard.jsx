@@ -1030,7 +1030,7 @@ export default function AdminDashboard() {
                     <td style={{fontWeight:500}}>{u.registeredName||u.name||"—"}</td>
                     <td style={{color:"var(--muted)"}}>{u.phone}</td>
                     <td style={{color:u.fine>0?"var(--danger)":u.fine<0?"#4ade80":"var(--success)",fontWeight:600}}>
-                      {u.fine<0 ? `−₹${Math.abs(u.fine)} credit` : `₹${u.fine??0}`}
+                      {u.fine<0 ? `-\u20b9${Math.abs(u.fine)} credit` : `\u20b9${u.fine??0}`}
                     </td>
                     <td style={{color:"var(--muted)"}}>₹{u.weeklyFine||0}</td>
                     <td>
