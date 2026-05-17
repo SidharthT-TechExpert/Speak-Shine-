@@ -1029,7 +1029,9 @@ export default function AdminDashboard() {
                   <tr key={u.userId}>
                     <td style={{fontWeight:500}}>{u.registeredName||u.name||"—"}</td>
                     <td style={{color:"var(--muted)"}}>{u.phone}</td>
-                    <td style={{color:u.fine>0?"var(--danger)":"var(--success)",fontWeight:600}}>₹{u.fine||0}</td>
+                    <td style={{color:u.fine>0?"var(--danger)":u.fine<0?"#4ade80":"var(--success)",fontWeight:600}}>
+                      {u.fine<0 ? `−₹${Math.abs(u.fine)} credit` : `₹${u.fine??0}`}
+                    </td>
                     <td style={{color:"var(--muted)"}}>₹{u.weeklyFine||0}</td>
                     <td>
                       <button className="btn-ghost" style={{marginRight:3}} onClick={()=>adjustFine(u.phone,u.fine)}>±Adjust</button>

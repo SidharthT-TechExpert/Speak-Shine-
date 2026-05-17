@@ -31,11 +31,12 @@ export async function applyDailyFinesAndStreaks() {
 
     // ── 3. 7-day streak reward: subtract ₹5 from fine (can go negative) ──
     // Negative fine = "free pass" buffer — absorbs future missed-day fines
+    // Re-fetch users AFTER the streak increment so we see updated values
     const rewardUsers = await User.find({ completed: true }).lean();
     const rewardedUsers = [];
 
     for (const u of rewardUsers) {
-      const currentStreak = u.streak || 0;
+      const currentStreak = (u.streak || 0);
       if (currentStreak > 0 && currentStreak % STREAK_REWARD_DAYS === 0) {
         // Always subtract 5 — fine can go negative (that's intentional)
         await User.updateOne({ _id: u._id }, { $inc: { fine: -STREAK_REWARD_AMOUNT } });
@@ -44,8 +45,9 @@ export async function applyDailyFinesAndStreaks() {
           previousFine: u.fine || 0,
           newFine: (u.fine || 0) - STREAK_REWARD_AMOUNT,
           streak: currentStreak,
+          deducted: STREAK_REWARD_AMOUNT,
         });
-        console.log(`[DailyReset] 🎁 Streak reward: ${u.name} fine ${u.fine || 0} → ${(u.fine || 0) - STREAK_REWARD_AMOUNT} (${currentStreak} day streak)`);
+        console.log(`[DailyReset] 🎁 Streak reward: ${u.name} streak=${currentStreak} fine ${u.fine || 0} → ${(u.fine || 0) - STREAK_REWARD_AMOUNT}`);
       }
     }
 
