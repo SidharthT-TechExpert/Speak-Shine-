@@ -1,4 +1,5 @@
 import axios from "axios";
+import { reconnectSocketWithNewToken } from "../hooks/useSocket";
 
 // Dev: set VITE_API_URL=http://localhost:3001/api in frontend/.env.local
 // Production (Railway): API and frontend are on the same origin, so /api works
@@ -36,6 +37,9 @@ async function refreshAccessToken() {
     
     localStorage.setItem("token", accessToken);
     localStorage.setItem("refreshToken", newRefreshToken);
+    
+    // Reconnect socket with the new token so chat doesn't need a hard reload
+    try { reconnectSocketWithNewToken(accessToken); } catch {}
     
     return accessToken;
   } catch (error) {

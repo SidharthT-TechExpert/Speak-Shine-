@@ -34,10 +34,39 @@ function sanitizeFilename(filename) {
 }
 
 /**
+ * Download frames from R2 and convert to base64
+ */
+async function downloadFramesFromR2(frameKeys) {
+  if (!frameKeys || frameKeys.length === 0) return null;
+  
+  console.log(`[VideoService] Downloading ${frameKeys.length} frames from R2...`);
+  const frames = [];
+  
+  for (const key of frameKeys) {
+    try {
+      const url = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn(`[VideoService] Failed to download frame ${key}: ${response.status}`);
+        continue;
+      }
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      frames.push(base64);
+    } catch (err) {
+      console.warn(`[VideoService] Error downloading frame ${key}:`, err.message);
+    }
+  }
+  
+  console.log(`[VideoService] ✅ Downloaded ${frames.length}/${frameKeys.length} frames`);
+  return frames.length > 0 ? frames : null;
+}
+
+/**
  * Download video from R2, run security checks, then enqueue for AI processing.
  * Runs asynchronously — caller does not await this.
  */
-async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoHash = null, browserFrames = null) {
+async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoHash = null, frameKeys = null) {
   const tempPath = `./tmp/uploads/confirm-${reportId}-${Date.now()}.mp4`;
 
   const fail = async (message, eventType = null) => {
@@ -57,6 +86,12 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
 
   try {
     fs.mkdirSync(path.dirname(tempPath), { recursive: true });
+
+    // Download frames from R2 if provided
+    let browserFrames = null;
+    if (frameKeys && frameKeys.length > 0) {
+      browserFrames = await downloadFramesFromR2(frameKeys);
+    }
 
     // ── Step 0: Check cache if hash provided ─────────────────────────────────
     if (videoHash) {
@@ -403,9 +438,10 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
 
   const report = await VideoReport.create(reportData);
 
-  console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'} hash=${videoHash ? videoHash.substring(0, 12) + '...' : 'none'} frames=${frames ? frames.length : 0}`);
+  console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'} hash=${videoHash ? videoHash.substring(0, 12) + '...' : 'none'} frameKeys=${frames ? frames.length : 0}`);
 
   // Enqueue for processing (security scans run inside downloadAndEnqueue on the local file)
+  // Pass frameKeys (R2 keys) - they will be downloaded and converted to base64 inside downloadAndEnqueue
   downloadAndEnqueue(report._id, publicUrl, strippedPhone, userDoc?.name || strippedPhone, videoHash, frames);
 
   return {
