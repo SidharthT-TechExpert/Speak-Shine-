@@ -1,31 +1,26 @@
 /**
  * Shared Socket.io singleton hook.
  * All chat components share one socket connection per token.
+ * When the access token is refreshed (via axios interceptor), call
+ * reconnectSocketWithNewToken() to swap in the new token automatically.
  */
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-// Derive the socket server URL:
-// - Dev: strip /api from VITE_API_URL → e.g. http://localhost:3001
-// - Prod: same origin as the page (API + frontend served together)
 function getSocketUrl() {
   const apiUrl = import.meta.env.VITE_API_URL;
-  if (apiUrl) {
-    // Dev mode — VITE_API_URL is set explicitly
-    return apiUrl.replace(/\/api\/?$/, "");
-  }
-  // Production — same origin, no path needed
+  if (apiUrl) return apiUrl.replace(/\/api\/?$/, "");
   return window.location.origin;
 }
 
 const SOCKET_URL = getSocketUrl();
 
-// Module-level singleton — one socket per browser session
+// Module-level singleton
 let _socket = null;
 let _currentToken = null;
 
 export function getSharedSocket(token) {
-  // If token changed (e.g. re-login), tear down old socket
+  // Token changed (re-login or refresh) → tear down old socket
   if (_socket && _currentToken !== token) {
     _socket.disconnect();
     _socket = null;
@@ -35,10 +30,9 @@ export function getSharedSocket(token) {
   if (!_socket || _socket.disconnected) {
     _socket = io(SOCKET_URL, {
       auth: { token },
-      // In production (same origin), path must match what the server mounts on
       path: "/socket.io",
       transports: ["websocket", "polling"],
-      reconnectionAttempts: 15,
+      reconnectionAttempts: 20,
       reconnectionDelay: 1500,
       reconnectionDelayMax: 8000,
       timeout: 10000,
@@ -46,15 +40,53 @@ export function getSharedSocket(token) {
     });
     _currentToken = token;
 
-    // Debug logging in dev
     if (import.meta.env.DEV) {
-      _socket.on("connect", () => console.log("[Socket] Connected:", _socket.id));
-      _socket.on("disconnect", r => console.log("[Socket] Disconnected:", r));
-      _socket.on("connect_error", e => console.error("[Socket] Error:", e.message));
+      _socket.on("connect",       () => console.log("[Socket] Connected:", _socket.id));
+      _socket.on("disconnect",    r  => console.log("[Socket] Disconnected:", r));
+      _socket.on("connect_error", e  => console.error("[Socket] Error:", e.message));
     }
+
+    // If the server rejects the token (jwt expired), refresh it and reconnect
+    _socket.on("connect_error", async (err) => {
+      const msg = err?.message || "";
+      if (msg.includes("jwt expired") || msg.includes("invalid token") || msg.includes("TokenExpiredError")) {
+        console.log("[Socket] Token expired on connect — refreshing…");
+        try {
+          const refreshToken = localStorage.getItem("refreshToken");
+          if (!refreshToken) return;
+          const { default: axios } = await import("axios");
+          const BASE_URL = import.meta.env.VITE_API_URL || "/api";
+          const res = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
+          const { accessToken, refreshToken: newRefreshToken } = res.data;
+          localStorage.setItem("token", accessToken);
+          localStorage.setItem("refreshToken", newRefreshToken);
+          // Reconnect with the fresh token
+          reconnectSocketWithNewToken(accessToken);
+        } catch {
+          // Refresh failed — let the normal logout flow handle it
+        }
+      }
+    });
   }
 
   return _socket;
+}
+
+/**
+ * Called by the axios interceptor after a successful token refresh.
+ * Reconnects the socket with the new token so it doesn't stay stuck
+ * on an expired JWT without requiring a hard page reload.
+ */
+export function reconnectSocketWithNewToken(newToken) {
+  if (!_socket) return; // no socket yet, nothing to do
+  if (_currentToken === newToken) return; // already up to date
+
+  console.log("[Socket] Token refreshed — reconnecting socket with new token");
+  _socket.disconnect();
+  _socket = null;
+  _currentToken = null;
+  // Re-create with the new token
+  getSharedSocket(newToken);
 }
 
 /**
