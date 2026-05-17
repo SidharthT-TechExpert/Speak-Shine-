@@ -103,3 +103,16 @@ export function useSharedSocket(token) {
 
   return socketRef;
 }
+
+/**
+ * Reconnect the shared socket with a new JWT token.
+ * Called from the Axios interceptor after a silent token refresh
+ * so that the chat connection picks up the new credentials
+ * without requiring a page reload.
+ */
+export function reconnectSocketWithNewToken(newToken) {
+  if (!newToken) return;
+  // getSharedSocket already handles token changes —
+  // it disconnects the old socket when the token differs and creates a new one.
+  _socket = getSharedSocket(newToken);
+}
