@@ -18,8 +18,8 @@ RUN npm ci --no-audit --no-fund --prefer-offline && \
 # ── Build stage ───────────────────────────────────────────────────────────────
 FROM deps AS builder
 COPY . .
-# Set API URL for frontend build - use ENV so it's available during npm build
-ENV VITE_API_URL=https://speak-shine.onrender.com
+# Set API URL for frontend build - use relative path since frontend and backend are on same domain
+ENV VITE_API_URL=/api
 RUN cd frontend && NODE_ENV=production npm run build && ls -la dist/
 
 # ── Final image — only what's needed to run ───────────────────────────────────

@@ -1,7 +1,7 @@
 services:
-  # Backend API Service
+  # Full-Stack Service (Frontend + Backend)
   - type: web
-    name: speak-shine-backend
+    name: speak-shine
     runtime: docker
     plan: free
     region: singapore
@@ -39,5 +39,7 @@ services:
         sync: false
       - key: LIVEKIT_API_SECRET
         sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://speak-shine.onrender.com
     healthCheckPath: /api/health
     autoDeploy: true
