@@ -1594,7 +1594,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
             fontSize: "0.85rem",
             color: "var(--muted)"
           }}>
-            📊 Recording: {fmtTime(elapsed)} • {recordedBlob ? `${Math.round(recordedBlob.size / 1024)}KB` : 'Processing...'} • {mimeTypeRef.current || 'Unknown format'}
+            📊 Recording: {fmtTime(elapsed)} • {recordedBlob ? `${(recordedBlob.size / (1024 * 1024)).toFixed(1)}MB` : 'Processing...'} • {mimeTypeRef.current || 'Unknown format'}
             
             {/* Corruption warning if blob is too small */}
             {recordedBlob && recordedBlob.size < elapsed * 5000 && (
