@@ -625,10 +625,9 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     <div
       ref={(el) => { wrapRef.current = el; if (typeof containerRef === "function") containerRef(el); else if (containerRef) containerRef.current = el; }}
       className="community-video-wrap"
-      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000", cursor: "pointer", outline: "none" }}
+      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000", outline: "none" }}
       onMouseMove={resetHide}
       onTouchStart={resetHide}
-      onClick={togglePlay}
       tabIndex={0}
     >
       <video
@@ -637,6 +636,11 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
         playsInline preload="auto"
         disablePictureInPicture
         onContextMenu={e => e.preventDefault()}
+        onClick={togglePlay}
+        style={{ cursor: "pointer", width: "100%", display: "block",
+          maxHeight: fullscreenId === itemId ? "100vh" : "400px",
+          height: fullscreenId === itemId ? "100%" : "auto",
+        }}
         onWaiting={() => setBuffering(true)}
         onPlaying={() => { setBuffering(false); setPlaying(true); }}
         onCanPlay={() => { setBuffering(false); if (videoRef.current?.duration) setDuration(videoRef.current.duration); }}
@@ -647,11 +651,6 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
         onDurationChange={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
         onEnded={() => setPlaying(false)}
         muted={muted}
-        style={{
-          width: "100%", display: "block",
-          maxHeight: fullscreenId === itemId ? "100vh" : "400px",
-          height: fullscreenId === itemId ? "100%" : "auto",
-        }}
       />
 
       {/* Buffering spinner */}
