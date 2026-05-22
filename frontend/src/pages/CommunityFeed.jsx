@@ -623,7 +623,7 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
 
   return (
     <div
-      ref={(el) => { wrapRef.current = el; if (containerRef) containerRef.current = el; }}
+      ref={(el) => { wrapRef.current = el; if (typeof containerRef === "function") containerRef(el); else if (containerRef) containerRef.current = el; }}
       className="community-video-wrap"
       style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000", cursor: "pointer", outline: "none" }}
       onMouseMove={resetHide}
@@ -856,19 +856,31 @@ export default function CommunityFeed() {
   // Listen for native fullscreen exit (Escape key)
   useEffect(() => {
     const onFsChange = () => {
-      if (!document.fullscreenElement) setFullscreenId(null);
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        setFullscreenId(null);
+      }
     };
     document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
   }, []);
 
   const toggleFullscreen = useCallback((id) => {
     const el = containerRefs.current[id];
     if (!el) return;
     if (!document.fullscreenElement) {
-      el.requestFullscreen().then(() => setFullscreenId(id)).catch(() => {});
+      // Try container first, fall back to video element for mobile Safari
+      const target = el.querySelector("video") || el;
+      const req = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen;
+      if (req) {
+        req.call(target).then(() => setFullscreenId(id)).catch(() => {});
+      }
     } else {
-      document.exitFullscreen().then(() => setFullscreenId(null)).catch(() => {});
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen;
+      if (exit) exit.call(document).then(() => setFullscreenId(null)).catch(() => {});
     }
   }, []);
 
