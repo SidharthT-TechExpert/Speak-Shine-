@@ -1056,8 +1056,7 @@ export default function UserDashboard() {
 
       {scores.length > 0 ? (
         <>
-          {/* ── Hall of Fame — all-time streak record (outside the box, golden) ── */}
-          {data?.streakRecord && (
+          <div className="stat-grid">
             {Object.entries(SCORES).map(([k, c]) => (
               <StatCard key={k} icon={k==="fluency"?"🗣️":k==="grammar"?"📝":k==="confidence"?"💪":"📚"}
                 label={`Avg ${k.charAt(0).toUpperCase()+k.slice(1)}`} value={avg(scores, k)} color={c} />
