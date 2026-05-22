@@ -1,9 +1,9 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authMiddleware } from "../middleware/auth.js";
 import Notification from "../../models/notificationSchema.js";
 
 const router = express.Router();
-router.use(authenticate);
+router.use(authMiddleware);
 
 // GET /api/notifications — fetch unread notifications for logged-in user
 router.get("/", async (req, res) => {
