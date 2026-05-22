@@ -542,13 +542,10 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     setCurrent(v.currentTime);
   };
 
-  // ── Keyboard shortcuts (only when player is focused/hovered) ──────────────
+  // ── Keyboard shortcuts — document-level so they work without clicking player ──
   useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-
     const onKey = (e) => {
-      // Only fire if the player wrap (or a child) is focused, or no input is focused
+      // Don't fire when typing in inputs/textareas
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
@@ -607,11 +604,9 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
       }
     };
 
-    // Listen on the wrap div so shortcuts only fire when player is in view
-    wrap.setAttribute("tabindex", "0");
-    wrap.addEventListener("keydown", onKey);
-    return () => wrap.removeEventListener("keydown", onKey);
-  }, [duration]); // re-bind when duration changes
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [duration]);
 
   useEffect(() => {
     const v = videoRef.current;
