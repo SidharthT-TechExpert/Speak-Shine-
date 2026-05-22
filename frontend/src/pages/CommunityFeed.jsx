@@ -471,38 +471,39 @@ function CommentSection({ item, onAddComment, onDeleteComment }) {
 
 // ── Protected Video Player with YouTube-style controls ────────────────────────
 function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemId, containerRef, onToggleFullscreen }) {
-  const videoRef      = useRef(null);
-  const seekRef       = useRef(null);
-  const wrapRef       = useRef(null);
-  const hideTimer     = useRef(null);
+  const videoRef    = useRef(null);
+  const wrapRef     = useRef(null);
+  const hideTimer   = useRef(null);
+  const flashTimer  = useRef(null);
+  const rafRef      = useRef(null);
 
-  const [playing,    setPlaying]    = useState(false);
-  const [buffering,  setBuffering]  = useState(true);
-  const [current,    setCurrent]    = useState(0);
-  const [duration,   setDuration]   = useState(0);
-  const [muted,      setMuted]      = useState(false);
-  const [showCtrl,   setShowCtrl]   = useState(true);
-  const [seeking,    setSeeking]    = useState(false);
-  // Hover tooltip on seek bar
-  const [hoverPct,   setHoverPct]   = useState(null);   // 0-100 or null
-  const [hoverTime,  setHoverTime]  = useState("");
-  // Flash indicator (like YT's +10 / -10 animation)
-  const [flash,      setFlash]      = useState(null);   // { text, side }
-  const flashTimer   = useRef(null);
+  const [tick,      setTick]      = useState(0);   // increment to force re-render
+  const [playing,   setPlaying]   = useState(false);
+  const [buffering, setBuffering] = useState(true);
+  const [muted,     setMuted]     = useState(false);
+  const [showCtrl,  setShowCtrl]  = useState(true);
+  const [seeking,   setSeeking]   = useState(false);
+  const [hoverPct,  setHoverPct]  = useState(null);
+  const [hoverTime, setHoverTime] = useState("");
+  const [flash,     setFlash]     = useState(null);
+
+  // Read directly from video element — never stale
+  const v         = videoRef.current;
+  const rawDur    = v?.duration;
+  const dur       = (rawDur && isFinite(rawDur) && rawDur > 0) ? rawDur : 0;
+  const cur       = v?.currentTime || 0;
+  const pct       = dur > 0 ? (cur / dur) * 100 : 0;
+
+  const fmt = (s) => {
+    if (!s || !isFinite(s) || s < 0) return "0:00";
+    const m = Math.floor(s / 60);
+    return `${m}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
+  };
 
   const resetHide = () => {
     setShowCtrl(true);
     clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      if (!seeking) setShowCtrl(false);
-    }, 3000);
-  };
-
-  const fmt = (s) => {
-    if (!isFinite(s) || s < 0) return "0:00";
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, "0")}`;
+    hideTimer.current = setTimeout(() => setShowCtrl(false), 3000);
   };
 
   const showFlash = (text, side) => {
@@ -528,110 +529,63 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
   };
 
   const toggleMute = () => {
-    setMuted(m => {
-      showFlash(!m ? "🔇" : "🔊", "center");
-      return !m;
-    });
+    setMuted(m => { showFlash(!m ? "🔇" : "🔊", "center"); return !m; });
     resetHide();
   };
 
-  const onSeekInput = (e) => {
+  const seekTo = (clientX, rect) => {
     const v = videoRef.current;
     if (!v) return;
-    v.currentTime = (e.target.value / 1000) * (v.duration || 0);
-    setCurrent(v.currentTime);
+    const p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    // Even if duration is Infinity, try seeking — browser handles it
+    const d = isFinite(v.duration) ? v.duration : 0;
+    if (d > 0) v.currentTime = p * d;
   };
 
-  // ── Keyboard shortcuts — document-level so they work without clicking player ──
+  // rAF loop — re-renders every animation frame while playing so bar moves smoothly
+  useEffect(() => {
+    const loop = () => {
+      setTick(t => t + 1);
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
-      // Don't fire when typing in inputs/textareas
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-
       const v = videoRef.current;
       if (!v) return;
-
       switch (e.key) {
-        case " ":
-        case "k":
-        case "K":
-          e.preventDefault();
-          togglePlay();
-          break;
-        case "ArrowRight":
-        case "l":
-        case "L":
-          e.preventDefault();
-          skip(10);
-          break;
-        case "ArrowLeft":
-        case "j":
-        case "J":
-          e.preventDefault();
-          skip(-10);
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          v.volume = Math.min(1, (v.volume || 0) + 0.1);
-          showFlash(`🔊 ${Math.round(v.volume * 100)}%`, "center");
-          resetHide();
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          v.volume = Math.max(0, (v.volume || 0) - 0.1);
-          showFlash(`🔊 ${Math.round(v.volume * 100)}%`, "center");
-          resetHide();
-          break;
-        case "m":
-        case "M":
-          e.preventDefault();
-          toggleMute();
-          break;
-        case "f":
-        case "F":
-          e.preventDefault();
-          onToggleFullscreen();
-          break;
+        case " ": case "k": case "K": e.preventDefault(); togglePlay(); break;
+        case "ArrowRight": case "l": case "L": e.preventDefault(); skip(10); break;
+        case "ArrowLeft":  case "j": case "J": e.preventDefault(); skip(-10); break;
+        case "ArrowUp":   e.preventDefault(); v.volume = Math.min(1, v.volume + 0.1); showFlash(`🔊 ${Math.round(v.volume*100)}%`, "center"); resetHide(); break;
+        case "ArrowDown": e.preventDefault(); v.volume = Math.max(0, v.volume - 0.1); showFlash(`🔊 ${Math.round(v.volume*100)}%`, "center"); resetHide(); break;
+        case "m": case "M": e.preventDefault(); toggleMute(); break;
+        case "f": case "F": e.preventDefault(); onToggleFullscreen(); break;
         case "0": case "1": case "2": case "3": case "4":
         case "5": case "6": case "7": case "8": case "9":
           e.preventDefault();
-          v.currentTime = (parseInt(e.key) / 10) * (v.duration || 0);
-          showFlash(`${e.key}0%`, "center");
-          resetHide();
-          break;
+          if (isFinite(v.duration)) v.currentTime = (parseInt(e.key) / 10) * v.duration;
+          showFlash(`${e.key}0%`, "center"); resetHide(); break;
         default: break;
       }
     };
-
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [duration]);
+  }, []);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     v.play().catch(() => {});
     resetHide();
-
-    // Poll duration every 500ms until we get a finite value
-    // R2 streaming videos often don't fire loadedmetadata reliably
-    const durationPoller = setInterval(() => {
-      const d = v.duration;
-      if (d && isFinite(d) && d > 0) {
-        setDuration(d);
-        clearInterval(durationPoller);
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(hideTimer.current);
-      clearTimeout(flashTimer.current);
-      clearInterval(durationPoller);
-    };
+    return () => { clearTimeout(hideTimer.current); clearTimeout(flashTimer.current); };
   }, []);
-
-  const pct = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
     <div
@@ -655,18 +609,9 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
         }}
         onWaiting={() => setBuffering(true)}
         onPlaying={() => { setBuffering(false); setPlaying(true); }}
-        onCanPlay={() => { setBuffering(false); if (videoRef.current?.duration) setDuration(videoRef.current.duration); }}
-        onLoadedData={() => { setBuffering(false); if (videoRef.current?.duration) setDuration(videoRef.current.duration); }}
+        onCanPlay={() => setBuffering(false)}
+        onLoadedData={() => setBuffering(false)}
         onStalled={() => setBuffering(true)}
-        onTimeUpdate={() => {
-          const v = videoRef.current;
-          if (!v) return;
-          setCurrent(v.currentTime);
-          const d = v.duration;
-          if (d && isFinite(d) && d > 0 && d !== duration) setDuration(d);
-        }}
-        onLoadedMetadata={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
-        onDurationChange={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
         onEnded={() => setPlaying(false)}
         muted={muted}
       />
@@ -746,40 +691,22 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
           style={{ position: "relative", height: 20, display: "flex", alignItems: "center", marginBottom: 4, cursor: "pointer" }}
           onClick={e => {
             e.stopPropagation();
-            const v = videoRef.current;
-            if (!v || !v.duration) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            v.currentTime = p * v.duration;
-            setCurrent(v.currentTime);
+            seekTo(e.clientX, e.currentTarget.getBoundingClientRect());
           }}
           onMouseDown={e => { e.stopPropagation(); setSeeking(true); }}
           onMouseUp={e => { e.stopPropagation(); setSeeking(false); }}
           onTouchStart={e => {
             e.stopPropagation();
             setSeeking(true);
-            const v = videoRef.current;
-            if (!v || !v.duration) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const touch = e.touches[0];
-            const p = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-            v.currentTime = p * v.duration;
-            setCurrent(v.currentTime);
+            seekTo(e.touches[0].clientX, e.currentTarget.getBoundingClientRect());
           }}
           onTouchEnd={e => { e.stopPropagation(); setSeeking(false); }}
           onMouseMove={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             setHoverPct(p * 100);
-            setHoverTime(fmt(p * (videoRef.current?.duration || 0)));
-            // Drag-seek while holding mouse button
-            if (seeking && e.buttons === 1) {
-              const v = videoRef.current;
-              if (v && v.duration) {
-                v.currentTime = p * v.duration;
-                setCurrent(v.currentTime);
-              }
-            }
+            setHoverTime(fmt(p * dur));
+            if (seeking && e.buttons === 1) seekTo(e.clientX, rect);
           }}
           onMouseLeave={() => { setHoverPct(null); setSeeking(false); }}
         >
@@ -849,7 +776,7 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
 
           {/* Time */}
           <span style={{ color: "#fff", fontSize: "0.72rem", fontWeight: 500, flex: 1 }}>
-            {fmt(current)} / {fmt(duration)}
+            {fmt(cur)} / {fmt(dur)}
           </span>
 
           {/* Mute  M */}
