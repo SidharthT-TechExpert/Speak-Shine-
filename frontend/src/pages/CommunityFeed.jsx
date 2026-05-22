@@ -471,9 +471,10 @@ function CommentSection({ item, onAddComment, onDeleteComment }) {
 
 // ── Protected Video Player with YouTube-style controls ────────────────────────
 function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemId, containerRef, onToggleFullscreen }) {
-  const videoRef   = useRef(null);
-  const seekRef    = useRef(null);
-  const hideTimer  = useRef(null);
+  const videoRef      = useRef(null);
+  const seekRef       = useRef(null);
+  const wrapRef       = useRef(null);
+  const hideTimer     = useRef(null);
 
   const [playing,    setPlaying]    = useState(false);
   const [buffering,  setBuffering]  = useState(true);
@@ -482,8 +483,13 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
   const [muted,      setMuted]      = useState(false);
   const [showCtrl,   setShowCtrl]   = useState(true);
   const [seeking,    setSeeking]    = useState(false);
+  // Hover tooltip on seek bar
+  const [hoverPct,   setHoverPct]   = useState(null);   // 0-100 or null
+  const [hoverTime,  setHoverTime]  = useState("");
+  // Flash indicator (like YT's +10 / -10 animation)
+  const [flash,      setFlash]      = useState(null);   // { text, side }
+  const flashTimer   = useRef(null);
 
-  // Auto-hide controls after 3s of inactivity
   const resetHide = () => {
     setShowCtrl(true);
     clearTimeout(hideTimer.current);
@@ -492,26 +498,24 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     }, 3000);
   };
 
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.play().catch(() => {});
-    resetHide();
-    return () => clearTimeout(hideTimer.current);
-  }, []);
-
   const fmt = (s) => {
-    if (!isFinite(s)) return "0:00";
+    if (!isFinite(s) || s < 0) return "0:00";
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
+  const showFlash = (text, side) => {
+    clearTimeout(flashTimer.current);
+    setFlash({ text, side });
+    flashTimer.current = setTimeout(() => setFlash(null), 700);
+  };
+
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) { v.play(); setPlaying(true); }
-    else          { v.pause(); setPlaying(false); }
+    if (v.paused) { v.play(); setPlaying(true); showFlash("▶", "center"); }
+    else          { v.pause(); setPlaying(false); showFlash("⏸", "center"); }
     resetHide();
   };
 
@@ -519,6 +523,15 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     const v = videoRef.current;
     if (!v) return;
     v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + sec));
+    showFlash(sec > 0 ? `+${sec}s` : `${sec}s`, sec > 0 ? "right" : "left");
+    resetHide();
+  };
+
+  const toggleMute = () => {
+    setMuted(m => {
+      showFlash(!m ? "🔇" : "🔊", "center");
+      return !m;
+    });
     resetHide();
   };
 
@@ -529,16 +542,99 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     setCurrent(v.currentTime);
   };
 
+  // ── Keyboard shortcuts (only when player is focused/hovered) ──────────────
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    const onKey = (e) => {
+      // Only fire if the player wrap (or a child) is focused, or no input is focused
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      const v = videoRef.current;
+      if (!v) return;
+
+      switch (e.key) {
+        case " ":
+        case "k":
+        case "K":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "ArrowRight":
+        case "l":
+        case "L":
+          e.preventDefault();
+          skip(10);
+          break;
+        case "ArrowLeft":
+        case "j":
+        case "J":
+          e.preventDefault();
+          skip(-10);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          v.volume = Math.min(1, (v.volume || 0) + 0.1);
+          showFlash(`🔊 ${Math.round(v.volume * 100)}%`, "center");
+          resetHide();
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          v.volume = Math.max(0, (v.volume || 0) - 0.1);
+          showFlash(`🔊 ${Math.round(v.volume * 100)}%`, "center");
+          resetHide();
+          break;
+        case "m":
+        case "M":
+          e.preventDefault();
+          toggleMute();
+          break;
+        case "f":
+        case "F":
+          e.preventDefault();
+          onToggleFullscreen();
+          break;
+        case "0": case "1": case "2": case "3": case "4":
+        case "5": case "6": case "7": case "8": case "9":
+          e.preventDefault();
+          v.currentTime = (parseInt(e.key) / 10) * (v.duration || 0);
+          showFlash(`${e.key}0%`, "center");
+          resetHide();
+          break;
+        default: break;
+      }
+    };
+
+    // Listen on the wrap div so shortcuts only fire when player is in view
+    wrap.setAttribute("tabindex", "0");
+    wrap.addEventListener("keydown", onKey);
+    return () => wrap.removeEventListener("keydown", onKey);
+  }, [duration]); // re-bind when duration changes
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.play().catch(() => {});
+    resetHide();
+    return () => {
+      clearTimeout(hideTimer.current);
+      clearTimeout(flashTimer.current);
+    };
+  }, []);
+
   const pct = duration > 0 ? (current / duration) * 1000 : 0;
 
   return (
     <div
-      ref={containerRef}
+      ref={(el) => { wrapRef.current = el; if (containerRef) containerRef.current = el; }}
       className="community-video-wrap"
-      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000", cursor: "pointer" }}
+      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000", cursor: "pointer", outline: "none" }}
       onMouseMove={resetHide}
       onTouchStart={resetHide}
       onClick={togglePlay}
+      tabIndex={0}
     >
       <video
         ref={videoRef}
@@ -573,6 +669,23 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
         </div>
       )}
 
+      {/* Flash indicator (skip / play / pause) */}
+      {flash && (
+        <div style={{
+          position: "absolute", zIndex: 60, pointerEvents: "none",
+          top: "50%", transform: "translateY(-50%)",
+          ...(flash.side === "left"   ? { left: "15%" }  :
+              flash.side === "right"  ? { right: "15%" } :
+              { left: "50%", transform: "translate(-50%, -50%)" }),
+          background: "rgba(0,0,0,0.55)",
+          borderRadius: 12, padding: "8px 16px",
+          color: "#fff", fontSize: "1.1rem", fontWeight: 700,
+          animation: "yt-flash 0.7s ease forwards",
+        }}>
+          {flash.text}
+        </div>
+      )}
+
       {/* Watermark */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10,
@@ -603,41 +716,71 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
         {fullscreenId === itemId ? "⧄" : "⛶"}
       </button>
 
-      {/* ── YouTube-style controls bar ── */}
+      {/* ── Controls bar ── */}
       <div
         onClick={e => e.stopPropagation()}
         style={{
           position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25,
-          background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
-          padding: "24px 10px 8px",
+          background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+          padding: "28px 10px 8px",
           transition: "opacity 0.25s",
           opacity: showCtrl ? 1 : 0,
           pointerEvents: showCtrl ? "auto" : "none",
         }}
       >
-        {/* Seek bar */}
-        <div style={{ position: "relative", height: 16, display: "flex", alignItems: "center", marginBottom: 4 }}>
-          {/* Track background */}
-          <div style={{
-            position: "absolute", left: 0, right: 0, height: 3,
-            background: "rgba(255,255,255,0.25)", borderRadius: 99,
-          }} />
-          {/* Filled portion */}
+        {/* ── Seek bar with hover tooltip ── */}
+        <div
+          style={{ position: "relative", height: 18, display: "flex", alignItems: "center", marginBottom: 4 }}
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            setHoverPct(p * 100);
+            setHoverTime(fmt(p * duration));
+          }}
+          onMouseLeave={() => setHoverPct(null)}
+        >
+          {/* Track */}
+          <div style={{ position: "absolute", left: 0, right: 0, height: 3, background: "rgba(255,255,255,0.25)", borderRadius: 99 }} />
+          {/* Fill */}
           <div style={{
             position: "absolute", left: 0, height: 3,
             width: `${(pct / 1000) * 100}%`,
             background: "#ff0000", borderRadius: 99,
             transition: seeking ? "none" : "width 0.1s linear",
           }} />
+          {/* Hover preview fill */}
+          {hoverPct !== null && (
+            <div style={{
+              position: "absolute", left: 0, height: 3,
+              width: `${hoverPct}%`,
+              background: "rgba(255,255,255,0.4)", borderRadius: 99,
+              pointerEvents: "none",
+            }} />
+          )}
           {/* Thumb */}
           <div style={{
-            position: "absolute", width: 12, height: 12, borderRadius: "50%",
+            position: "absolute", width: 13, height: 13, borderRadius: "50%",
             background: "#ff0000", border: "2px solid #fff",
             left: `calc(${(pct / 1000) * 100}% - 6px)`,
-            boxShadow: "0 0 4px rgba(0,0,0,0.5)",
+            boxShadow: "0 0 4px rgba(0,0,0,0.6)",
             transition: seeking ? "none" : "left 0.1s linear",
+            pointerEvents: "none",
           }} />
-          {/* Invisible range input for interaction */}
+          {/* Hover time tooltip */}
+          {hoverPct !== null && (
+            <div style={{
+              position: "absolute", bottom: 20,
+              left: `clamp(20px, ${hoverPct}%, calc(100% - 36px))`,
+              transform: "translateX(-50%)",
+              background: "rgba(0,0,0,0.85)", color: "#fff",
+              fontSize: "0.68rem", fontWeight: 600,
+              padding: "2px 7px", borderRadius: 5,
+              pointerEvents: "none", whiteSpace: "nowrap",
+            }}>
+              {hoverTime}
+            </div>
+          )}
+          {/* Range input */}
           <input
             ref={seekRef}
             type="range" min={0} max={1000} step={1}
@@ -647,41 +790,30 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
             onMouseUp={() => setSeeking(false)}
             onTouchEnd={() => setSeeking(false)}
             onChange={onSeekInput}
-            style={{
-              position: "absolute", inset: 0, width: "100%", height: "100%",
-              opacity: 0, cursor: "pointer", margin: 0,
-            }}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", margin: 0 }}
           />
         </div>
 
-        {/* Bottom row: play, skip, time, mute */}
+        {/* Bottom row */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Play/Pause */}
-          <button
-            onClick={togglePlay}
-            style={{ background: "none", border: "none", color: "#fff", fontSize: "1.1rem", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
-          >
+          {/* Play/Pause  Space / K */}
+          <button onClick={togglePlay} title="Play/Pause (Space / K)"
+            style={{ background: "none", border: "none", color: "#fff", fontSize: "1.1rem", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}>
             {playing ? "⏸" : "▶"}
           </button>
 
-          {/* Skip back 10s */}
-          <button
-            onClick={() => skip(-10)}
-            style={{ background: "none", border: "none", color: "#fff", fontSize: "0.75rem", cursor: "pointer", padding: "0 2px", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}
-            title="Back 10s"
-          >
+          {/* Skip -10  ← / J */}
+          <button onClick={() => skip(-10)} title="Back 10s (← / J)"
+            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: "0 2px", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
             <span style={{ fontSize: "1rem" }}>⟪</span>
-            <span style={{ fontSize: "0.55rem", marginTop: 1 }}>10</span>
+            <span style={{ fontSize: "0.52rem", color: "rgba(255,255,255,0.7)" }}>10s</span>
           </button>
 
-          {/* Skip forward 10s */}
-          <button
-            onClick={() => skip(10)}
-            style={{ background: "none", border: "none", color: "#fff", fontSize: "0.75rem", cursor: "pointer", padding: "0 2px", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}
-            title="Forward 10s"
-          >
+          {/* Skip +10  → / L */}
+          <button onClick={() => skip(10)} title="Forward 10s (→ / L)"
+            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: "0 2px", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
             <span style={{ fontSize: "1rem" }}>⟫</span>
-            <span style={{ fontSize: "0.55rem", marginTop: 1 }}>10</span>
+            <span style={{ fontSize: "0.52rem", color: "rgba(255,255,255,0.7)" }}>10s</span>
           </button>
 
           {/* Time */}
@@ -689,15 +821,26 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
             {fmt(current)} / {fmt(duration)}
           </span>
 
-          {/* Mute */}
-          <button
-            onClick={() => { setMuted(m => !m); resetHide(); }}
-            style={{ background: "none", border: "none", color: "#fff", fontSize: "1rem", cursor: "pointer", padding: "0 2px" }}
-          >
+          {/* Mute  M */}
+          <button onClick={toggleMute} title="Mute/Unmute (M)"
+            style={{ background: "none", border: "none", color: "#fff", fontSize: "1rem", cursor: "pointer", padding: "0 2px" }}>
             {muted ? "🔇" : "🔊"}
           </button>
         </div>
+
+        {/* Keyboard shortcut hint — shown briefly on focus */}
+        <div style={{ textAlign: "center", fontSize: "0.58rem", color: "rgba(255,255,255,0.3)", marginTop: 2, letterSpacing: "0.03em" }}>
+          Space/K · ←/J · →/L · M · F · 0-9
+        </div>
       </div>
+
+      <style>{`
+        @keyframes yt-flash {
+          0%   { opacity: 1; transform: translateY(-50%) scale(1.1); }
+          60%  { opacity: 1; transform: translateY(-50%) scale(1); }
+          100% { opacity: 0; transform: translateY(-50%) scale(0.9); }
+        }
+      `}</style>
     </div>
   );
 }
