@@ -872,14 +872,17 @@ export default function CommunityFeed() {
       .then(r => {
         const items = r.data.feed || [];
         setFeed(items);
-        // Auto-open comments for highlighted video
-        if (highlightId) {
-          setShowComments(prev => ({ ...prev, [highlightId]: true }));
-        }
       })
       .catch(() => setError("Failed to load community feed"))
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open comments when highlightId changes (e.g. clicking notification while already on page)
+  useEffect(() => {
+    if (highlightId && feed.length > 0) {
+      setShowComments(prev => ({ ...prev, [highlightId]: true }));
+    }
+  }, [highlightId, feed.length]);
 
   // Scroll to highlighted card after feed renders
   useEffect(() => {

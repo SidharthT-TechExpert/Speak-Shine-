@@ -214,6 +214,42 @@ export async function reactToVideo(req, res) {
     }
 
     await report.save();
+
+    // ── Notify video owner (if not reacting to own video) ──────────────────
+    if (!alreadyReacted && reaction === "like" && report.phone && report.phone !== phone) {
+      try {
+        const Notification = (await import("../../models/notificationSchema.js")).default;
+        const name = req.user.name || "Someone";
+        const notif = await Notification.create({
+          recipientPhone: report.phone,
+          type: "like",
+          message: `👍 ${name} liked your video!`,
+          reportId: report._id,
+          read: false,
+        });
+
+        // Real-time: emit to owner's socket if they're online
+        const io = req.app.get("io");
+        const onlineUsers = req.app.get("onlineUsers");
+        if (io && onlineUsers) {
+          const ownerSocketId = onlineUsers.get(report.phone);
+          if (ownerSocketId) {
+            io.to(ownerSocketId).emit("notification:new", {
+              _id: notif._id,
+              type: "like",
+              message: notif.message,
+              reportId: report._id,
+              read: false,
+              createdAt: notif.createdAt,
+            });
+          }
+        }
+      } catch (notifErr) {
+        // Non-fatal
+        console.error("[React] Notification error:", notifErr.message);
+      }
+    }
+
     res.json({ likes: report.likes.length, dislikes: report.dislikes.length, userReaction: alreadyReacted ? null : reaction });
   } catch (error) {
     console.error("[React] Error:", error.message);
@@ -264,12 +300,12 @@ export async function addComment(req, res) {
     const saved = report.comments[report.comments.length - 1];
 
     // ── Notify video owner (if not commenting on own video) ──────────────────
-    if (report.uploaderPhone && report.uploaderPhone !== phone) {
+    if (report.phone && report.phone !== phone) {
       try {
         const Notification = (await import("../../models/notificationSchema.js")).default;
         const preview = cleanText.length > 60 ? cleanText.slice(0, 60) + "…" : cleanText;
         const notif = await Notification.create({
-          recipientPhone: report.uploaderPhone,
+          recipientPhone: report.phone,
           type: "comment",
           message: `💬 ${name} commented on your video: "${preview}"`,
           reportId: report._id,
@@ -280,7 +316,7 @@ export async function addComment(req, res) {
         const io = req.app.get("io");
         const onlineUsers = req.app.get("onlineUsers");
         if (io && onlineUsers) {
-          const ownerSocketId = onlineUsers.get(report.uploaderPhone);
+          const ownerSocketId = onlineUsers.get(report.phone);
           if (ownerSocketId) {
             io.to(ownerSocketId).emit("notification:new", {
               _id: notif._id,

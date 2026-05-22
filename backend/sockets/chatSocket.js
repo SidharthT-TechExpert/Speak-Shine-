@@ -473,7 +473,9 @@ export function initializeChatSocket(io, onlineUsers) {
     });
 
     socket.on("disconnect", () => {
-      onlineUsers.delete(phone);
+      if (onlineUsers.get(phone) === socket.id) {
+        onlineUsers.delete(phone);
+      }
       console.log(`[Chat] Disconnected: ${name} (${phone})`);
     });
   });
