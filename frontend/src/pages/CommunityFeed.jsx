@@ -584,8 +584,11 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     if (!v) return;
     v.play().catch(() => {});
     resetHide();
-    return () => { clearTimeout(hideTimer.current); clearTimeout(flashTimer.current); };
-  }, []);
+    return () => {
+      clearTimeout(hideTimer.current);
+      clearTimeout(flashTimer.current);
+    };
+  }, [src]);
 
   return (
     <div
@@ -988,7 +991,7 @@ export default function CommunityFeed() {
               {playing === item._id ? (
                 <div style={{ marginBottom: "1.5rem" }}>
                   <ProtectedVideoPlayer
-                    src={item.videoUrl}
+                    src={item.videoUrl ? item.videoUrl + "#t=0.1" : item.videoUrl}
                     identity={identity}
                     watermarkUrl={watermarkUrl}
                     fullscreenId={fullscreenId}
