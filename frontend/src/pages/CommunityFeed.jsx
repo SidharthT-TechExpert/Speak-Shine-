@@ -613,9 +613,21 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
     if (!v) return;
     v.play().catch(() => {});
     resetHide();
+
+    // Poll duration every 500ms until we get a finite value
+    // R2 streaming videos often don't fire loadedmetadata reliably
+    const durationPoller = setInterval(() => {
+      const d = v.duration;
+      if (d && isFinite(d) && d > 0) {
+        setDuration(d);
+        clearInterval(durationPoller);
+      }
+    }, 500);
+
     return () => {
       clearTimeout(hideTimer.current);
       clearTimeout(flashTimer.current);
+      clearInterval(durationPoller);
     };
   }, []);
 
@@ -650,10 +662,8 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
           const v = videoRef.current;
           if (!v) return;
           setCurrent(v.currentTime);
-          // Re-read duration on every tick in case it wasn't available at load time
-          if (v.duration && isFinite(v.duration) && v.duration !== duration) {
-            setDuration(v.duration);
-          }
+          const d = v.duration;
+          if (d && isFinite(d) && d > 0 && d !== duration) setDuration(d);
         }}
         onLoadedMetadata={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
         onDurationChange={() => { const d = videoRef.current?.duration; if (d && isFinite(d)) setDuration(d); }}
