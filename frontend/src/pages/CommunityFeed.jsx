@@ -469,29 +469,92 @@ function CommentSection({ item, onAddComment, onDeleteComment }) {
   );
 }
 
-// ── Protected Video Player with YouTube-style buffering ────────────────────────
+// ── Protected Video Player with YouTube-style controls ────────────────────────
 function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemId, containerRef, onToggleFullscreen }) {
-  const [buffering, setBuffering] = useState(true);
-  const videoRef = useRef(null);
+  const videoRef   = useRef(null);
+  const seekRef    = useRef(null);
+  const hideTimer  = useRef(null);
+
+  const [playing,    setPlaying]    = useState(false);
+  const [buffering,  setBuffering]  = useState(true);
+  const [current,    setCurrent]    = useState(0);
+  const [duration,   setDuration]   = useState(0);
+  const [muted,      setMuted]      = useState(false);
+  const [showCtrl,   setShowCtrl]   = useState(true);
+  const [seeking,    setSeeking]    = useState(false);
+
+  // Auto-hide controls after 3s of inactivity
+  const resetHide = () => {
+    setShowCtrl(true);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      if (!seeking) setShowCtrl(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.play().catch(() => {});
+    resetHide();
+    return () => clearTimeout(hideTimer.current);
+  }, []);
+
+  const fmt = (s) => {
+    if (!isFinite(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) { v.play(); setPlaying(true); }
+    else          { v.pause(); setPlaying(false); }
+    resetHide();
+  };
+
+  const skip = (sec) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + sec));
+    resetHide();
+  };
+
+  const onSeekInput = (e) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = (e.target.value / 1000) * (v.duration || 0);
+    setCurrent(v.currentTime);
+  };
+
+  const pct = duration > 0 ? (current / duration) * 1000 : 0;
 
   return (
     <div
       ref={containerRef}
       className="community-video-wrap"
-      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000" }}
+      style={{ position: "relative", borderRadius: "10px", overflow: "hidden", background: "#000", cursor: "pointer" }}
+      onMouseMove={resetHide}
+      onTouchStart={resetHide}
+      onClick={togglePlay}
     >
       <video
         ref={videoRef}
         src={src}
-        controls controlsList="nodownload nofullscreen noremoteplayback"
-        autoPlay playsInline preload="auto"
+        playsInline preload="auto"
         disablePictureInPicture
         onContextMenu={e => e.preventDefault()}
         onWaiting={() => setBuffering(true)}
-        onPlaying={() => setBuffering(false)}
+        onPlaying={() => { setBuffering(false); setPlaying(true); }}
         onCanPlay={() => setBuffering(false)}
         onLoadedData={() => setBuffering(false)}
         onStalled={() => setBuffering(true)}
+        onTimeUpdate={() => setCurrent(videoRef.current?.currentTime || 0)}
+        onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+        onEnded={() => setPlaying(false)}
+        muted={muted}
         style={{
           width: "100%", display: "block",
           maxHeight: fullscreenId === itemId ? "100vh" : "400px",
@@ -499,57 +562,142 @@ function ProtectedVideoPlayer({ src, identity, watermarkUrl, fullscreenId, itemI
         }}
       />
 
-      {/* ── YouTube-style buffering spinner ── */}
+      {/* Buffering spinner */}
       {buffering && (
         <div style={{
           position: "absolute", inset: 0, zIndex: 50,
           display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(0,0,0,0.35)",
-          pointerEvents: "none",
+          background: "rgba(0,0,0,0.35)", pointerEvents: "none",
         }}>
           <div className="yt-buffer-ring" />
         </div>
       )}
 
-      {/* Subtle tiled watermark */}
+      {/* Watermark */}
       <div style={{
-        position: "absolute", inset: 0,
-        pointerEvents: "none", zIndex: 10,
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10,
         backgroundImage: `url("${watermarkUrl}")`,
-        backgroundRepeat: "repeat",
-        backgroundSize: "320px 160px",
+        backgroundRepeat: "repeat", backgroundSize: "320px 160px",
       }} />
 
-      {/* Tiny identity badge — top right */}
+      {/* Identity badge */}
       <div style={{
-        position: "absolute", top: 8, right: 48, zIndex: 20,
-        pointerEvents: "none",
-        background: "rgba(0,0,0,0.35)",
-        borderRadius: 4, padding: "2px 7px",
-        color: "rgba(255,255,255,0.3)",
-        fontSize: "0.58rem", fontWeight: 600, letterSpacing: "0.02em",
+        position: "absolute", top: 8, right: 48, zIndex: 20, pointerEvents: "none",
+        background: "rgba(0,0,0,0.35)", borderRadius: 4, padding: "2px 7px",
+        color: "rgba(255,255,255,0.3)", fontSize: "0.58rem", fontWeight: 600,
       }}>{identity}</div>
 
-      {/* Custom fullscreen button */}
+      {/* Fullscreen button */}
       <button
         type="button"
-        onClick={onToggleFullscreen}
-        title={fullscreenId === itemId ? "Exit Fullscreen" : "Fullscreen"}
+        onClick={e => { e.stopPropagation(); onToggleFullscreen(); }}
         style={{
           position: "absolute", top: 6, right: 8, zIndex: 30,
-          background: "rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.15)",
+          background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.15)",
           borderRadius: 6, color: "rgba(255,255,255,0.75)",
           width: 30, height: 24,
           display: "flex", alignItems: "center", justifyContent: "center",
           cursor: "pointer", fontSize: "0.75rem",
-          transition: "background 0.15s",
         }}
-        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.7)"}
-        onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
       >
         {fullscreenId === itemId ? "⧄" : "⛶"}
       </button>
+
+      {/* ── YouTube-style controls bar ── */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25,
+          background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
+          padding: "24px 10px 8px",
+          transition: "opacity 0.25s",
+          opacity: showCtrl ? 1 : 0,
+          pointerEvents: showCtrl ? "auto" : "none",
+        }}
+      >
+        {/* Seek bar */}
+        <div style={{ position: "relative", height: 16, display: "flex", alignItems: "center", marginBottom: 4 }}>
+          {/* Track background */}
+          <div style={{
+            position: "absolute", left: 0, right: 0, height: 3,
+            background: "rgba(255,255,255,0.25)", borderRadius: 99,
+          }} />
+          {/* Filled portion */}
+          <div style={{
+            position: "absolute", left: 0, height: 3,
+            width: `${(pct / 1000) * 100}%`,
+            background: "#ff0000", borderRadius: 99,
+            transition: seeking ? "none" : "width 0.1s linear",
+          }} />
+          {/* Thumb */}
+          <div style={{
+            position: "absolute", width: 12, height: 12, borderRadius: "50%",
+            background: "#ff0000", border: "2px solid #fff",
+            left: `calc(${(pct / 1000) * 100}% - 6px)`,
+            boxShadow: "0 0 4px rgba(0,0,0,0.5)",
+            transition: seeking ? "none" : "left 0.1s linear",
+          }} />
+          {/* Invisible range input for interaction */}
+          <input
+            ref={seekRef}
+            type="range" min={0} max={1000} step={1}
+            value={Math.round(pct)}
+            onMouseDown={() => setSeeking(true)}
+            onTouchStart={() => setSeeking(true)}
+            onMouseUp={() => setSeeking(false)}
+            onTouchEnd={() => setSeeking(false)}
+            onChange={onSeekInput}
+            style={{
+              position: "absolute", inset: 0, width: "100%", height: "100%",
+              opacity: 0, cursor: "pointer", margin: 0,
+            }}
+          />
+        </div>
+
+        {/* Bottom row: play, skip, time, mute */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Play/Pause */}
+          <button
+            onClick={togglePlay}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: "1.1rem", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+          >
+            {playing ? "⏸" : "▶"}
+          </button>
+
+          {/* Skip back 10s */}
+          <button
+            onClick={() => skip(-10)}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: "0.75rem", cursor: "pointer", padding: "0 2px", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}
+            title="Back 10s"
+          >
+            <span style={{ fontSize: "1rem" }}>⟪</span>
+            <span style={{ fontSize: "0.55rem", marginTop: 1 }}>10</span>
+          </button>
+
+          {/* Skip forward 10s */}
+          <button
+            onClick={() => skip(10)}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: "0.75rem", cursor: "pointer", padding: "0 2px", display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}
+            title="Forward 10s"
+          >
+            <span style={{ fontSize: "1rem" }}>⟫</span>
+            <span style={{ fontSize: "0.55rem", marginTop: 1 }}>10</span>
+          </button>
+
+          {/* Time */}
+          <span style={{ color: "#fff", fontSize: "0.72rem", fontWeight: 500, flex: 1 }}>
+            {fmt(current)} / {fmt(duration)}
+          </span>
+
+          {/* Mute */}
+          <button
+            onClick={() => { setMuted(m => !m); resetHide(); }}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: "1rem", cursor: "pointer", padding: "0 2px" }}
+          >
+            {muted ? "🔇" : "🔊"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
