@@ -28,7 +28,6 @@ import liveSessionRoutes from "../backend/routes/liveSessions.routes.js";
 import monitoringRoutes from "../backend/routes/monitoring.routes.js";
 import notificationRoutes from "../backend/routes/notifications.routes.js";
 import submissionsRoutes from "../backend/routes/submissions.routes.js";
-import notificationRoutes from "../backend/routes/notification.routes.js";
 
 console.log("[Routes] Loading MVC routes...");
 console.log("[Routes] Auth routes loaded:", !!authRoutes);
