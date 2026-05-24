@@ -5,60 +5,59 @@
 
 import * as videoService from "../services/video/videoService.js";
 import * as videoQueue from "../services/video/videoQueue.js";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+// Reusable S3 client for proxy uploads — checksum disabled for R2 compatibility
+const proxyS3 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId:     process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+  requestChecksumCalculation: "when_required",
+  responseChecksumValidation: "when_required",
+});
 
 /**
  * PUT /api/video/proxy-upload
- * Streams the video body from the browser directly to R2 via the presigned URL.
- * This avoids CORS issues — the browser uploads to our server, we pipe to R2.
+ * Receives the video body from the browser and uploads it directly to R2
+ * using the AWS SDK. Avoids all presigned URL signature issues.
  * express.raw() middleware buffers the body before this handler runs.
  */
 export async function proxyUpload(req, res) {
   try {
-    const uploadUrl = req.headers["x-upload-url"];
-    const mimeType  = req.headers["content-type"] || "video/mp4";
+    const key      = req.headers["x-r2-key"];
+    const mimeType = req.headers["x-mime-type"] || "video/mp4";
 
-    if (!uploadUrl) {
-      return res.status(400).json({ error: "Missing x-upload-url header" });
-    }
-    // Validate the URL is our R2 bucket (prevent SSRF)
-    let parsed;
-    try { parsed = new URL(uploadUrl); } catch {
-      return res.status(400).json({ error: "Invalid upload URL" });
+    if (!key) {
+      return res.status(400).json({ error: "Missing x-r2-key header" });
     }
 
-    const r2Endpoint = process.env.R2_ENDPOINT || "";
-    let r2Host = "";
-    try { r2Host = new URL(r2Endpoint).hostname; } catch {}
-
-    if (!parsed.hostname.endsWith("r2.cloudflarestorage.com") && parsed.hostname !== r2Host) {
-      console.error("[ProxyUpload] SSRF attempt blocked:", parsed.hostname);
-      return res.status(400).json({ error: "Invalid upload URL" });
+    // Validate key belongs to this user (must start with videos/{userId}/)
+    const expectedPrefix = `videos/${req.user.id}/`;
+    if (!key.startsWith(expectedPrefix)) {
+      console.error(`[ProxyUpload] Key mismatch — user ${req.user.id} tried to upload to ${key}`);
+      return res.status(403).json({ error: "Invalid upload key" });
     }
 
-    // req.body is a Buffer (from express.raw middleware)
     const body = req.body;
     if (!body || body.length === 0) {
       return res.status(400).json({ error: "Empty upload body" });
     }
 
-    console.log(`[ProxyUpload] Uploading ${(body.length / 1024 / 1024).toFixed(1)}MB to R2 for user: ${req.user?.id}`);
+    console.log(`[ProxyUpload] Uploading ${(body.length / 1024 / 1024).toFixed(1)}MB → R2 key: ${key}`);
 
-    // PUT the buffer directly to R2 using the presigned URL.
-    // IMPORTANT: Do NOT send Content-Type — the presigned URL only signs "host",
-    // so any extra headers in the actual request cause SignatureDoesNotMatch.
-    const r2Response = await fetch(uploadUrl, {
-      method: "PUT",
-      body,
-    });
+    await proxyS3.send(new PutObjectCommand({
+      Bucket:      process.env.R2_BUCKET_NAME,
+      Key:         key,
+      Body:        body,
+      ContentType: mimeType,
+    }));
 
-    if (!r2Response.ok) {
-      const text = await r2Response.text().catch(() => "");
-      console.error("[ProxyUpload] R2 rejected upload:", r2Response.status, text);
-      return res.status(502).json({ error: `R2 upload failed: ${r2Response.status}` });
-    }
-
-    console.log("[ProxyUpload] ✅ Upload proxied to R2 successfully");
-    res.json({ success: true });
+    const publicUrl = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
+    console.log(`[ProxyUpload] ✅ Uploaded successfully: ${publicUrl}`);
+    res.json({ success: true, publicUrl });
   } catch (error) {
     console.error("[ProxyUpload] Error:", error.message);
     res.status(500).json({ error: "Upload failed: " + error.message });

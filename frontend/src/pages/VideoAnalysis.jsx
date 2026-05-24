@@ -657,10 +657,10 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
       await new Promise((resolve, reject) => {
         const token = localStorage.getItem("token");
         const xhr = new XMLHttpRequest();
-        // Pass token as query param as fallback (same as SSE progress endpoint)
         xhr.open("PUT", `/api/video/proxy-upload?token=${encodeURIComponent(token)}`);
         xhr.setRequestHeader("Content-Type", fileToUpload.type || "video/mp4");
-        xhr.setRequestHeader("x-upload-url", presign.uploadUrl);
+        xhr.setRequestHeader("x-r2-key", presign.key);
+        xhr.setRequestHeader("x-mime-type", fileToUpload.type || "video/mp4");
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
         xhr.upload.onprogress = (e) => {
           if (e.total) setProgress(Math.round((e.loaded / e.total) * 99));
@@ -1235,10 +1235,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       await new Promise((resolve, reject) => {
         const token = localStorage.getItem("token");
         const xhr = new XMLHttpRequest();
-        // Pass token as query param as fallback (same as SSE progress endpoint)
         xhr.open("PUT", `/api/video/proxy-upload?token=${encodeURIComponent(token)}`);
         xhr.setRequestHeader("Content-Type", file.type);
-        xhr.setRequestHeader("x-upload-url", presign.uploadUrl);
+        xhr.setRequestHeader("x-r2-key", presign.key);
+        xhr.setRequestHeader("x-mime-type", file.type);
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
         xhr.upload.onprogress = (e) => { 
           if (e.total) {
