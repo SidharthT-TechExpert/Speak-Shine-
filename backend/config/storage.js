@@ -40,6 +40,9 @@ if (missingVars.length > 0) {
 
 // Create S3 client only if config is valid
 let r2 = null;
+// Separate client for presigned URLs — disables automatic checksum injection
+// AWS SDK v3.600+ adds x-amz-checksum-crc32 by default; R2 rejects it with SignatureDoesNotMatch
+let r2Presign = null;
 if (r2ConfigValid) {
   try {
     r2 = new S3Client({
@@ -49,6 +52,18 @@ if (r2ConfigValid) {
         accessKeyId: R2_ACCESS_KEY_ID,
         secretAccessKey: R2_SECRET_ACCESS_KEY,
       },
+    });
+    // Presign client: requestChecksumCalculation "when_required" stops the SDK
+    // from auto-adding checksum headers that R2 doesn't support
+    r2Presign = new S3Client({
+      region: "auto",
+      endpoint: R2_ENDPOINT,
+      credentials: {
+        accessKeyId: R2_ACCESS_KEY_ID,
+        secretAccessKey: R2_SECRET_ACCESS_KEY,
+      },
+      requestChecksumCalculation: "when_required",
+      responseChecksumValidation: "when_required",
     });
     console.log("[R2] ✅ S3 client initialized successfully");
   } catch (error) {
@@ -61,7 +76,7 @@ if (r2ConfigValid) {
  * Check if R2 is properly configured
  */
 function ensureR2Configured() {
-  if (!r2ConfigValid || !r2) {
+  if (!r2ConfigValid || !r2 || !r2Presign) {
     throw new Error("R2 storage is not configured. Please set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.");
   }
 }
@@ -138,20 +153,16 @@ export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
   try {
     console.log("[R2] Generating presigned URL - key:", key, "mimeType:", mimeType);
     
+    // Use r2Presign client which has requestChecksumCalculation: "when_required"
+    // This prevents the SDK from injecting x-amz-checksum-crc32 into the signed headers,
+    // which R2 doesn't support and rejects with SignatureDoesNotMatch.
     const command = new PutObjectCommand({
       Bucket:      BUCKET,
       Key:         key,
       ContentType: mimeType,
-      // Explicitly disable checksum — AWS SDK v3.600+ auto-adds x-amz-checksum-crc32
-      // which R2 does not support and rejects with 403.
-      ChecksumAlgorithm: undefined,
     });
     
-    const url = await getSignedUrl(r2, command, {
-      expiresIn: 900, // 15 min
-      // Disable the SDK's automatic checksum injection for presigned URLs
-      unhoistableHeaders: new Set(["x-amz-checksum-crc32", "x-amz-sdk-checksum-algorithm"]),
-    });
+    const url = await getSignedUrl(r2Presign, command, { expiresIn: 900 }); // 15 min
     console.log("[R2] Presigned URL generated successfully");
     return url;
   } catch (error) {
