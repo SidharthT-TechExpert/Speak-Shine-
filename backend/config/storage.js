@@ -10,6 +10,31 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
 
+// Validate R2 configuration on startup
+if (!process.env.R2_ENDPOINT) {
+  console.error("[R2] FATAL: R2_ENDPOINT is not set");
+  throw new Error("R2_ENDPOINT environment variable is required");
+}
+if (!process.env.R2_ACCESS_KEY_ID) {
+  console.error("[R2] FATAL: R2_ACCESS_KEY_ID is not set");
+  throw new Error("R2_ACCESS_KEY_ID environment variable is required");
+}
+if (!process.env.R2_SECRET_ACCESS_KEY) {
+  console.error("[R2] FATAL: R2_SECRET_ACCESS_KEY is not set");
+  throw new Error("R2_SECRET_ACCESS_KEY environment variable is required");
+}
+if (!process.env.R2_BUCKET_NAME) {
+  console.error("[R2] FATAL: R2_BUCKET_NAME is not set");
+  throw new Error("R2_BUCKET_NAME environment variable is required");
+}
+
+console.log("[R2] Configuration loaded:", {
+  endpoint: process.env.R2_ENDPOINT,
+  bucket: process.env.R2_BUCKET_NAME,
+  accessKeyId: process.env.R2_ACCESS_KEY_ID?.substring(0, 8) + "...",
+  secretKeyLength: process.env.R2_SECRET_ACCESS_KEY?.length
+});
+
 const r2 = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT,
@@ -86,19 +111,7 @@ export async function deleteFromR2(key) {
  */
 export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
   try {
-    console.log("[R2] Generating presigned URL - key:", key, "mimeType:", mimeType, "bucket:", BUCKET);
-    
-    if (!BUCKET) {
-      throw new Error("R2_BUCKET_NAME is not configured");
-    }
-    
-    if (!process.env.R2_ENDPOINT) {
-      throw new Error("R2_ENDPOINT is not configured");
-    }
-    
-    if (!process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
-      throw new Error("R2 credentials are not configured");
-    }
+    console.log("[R2] Generating presigned URL - key:", key, "mimeType:", mimeType);
     
     const command = new PutObjectCommand({
       Bucket:      BUCKET,
@@ -107,11 +120,16 @@ export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
     });
     
     const url = await getSignedUrl(r2, command, { expiresIn: 900 }); // 15 min
-    console.log("[R2] Presigned URL generated successfully (length):", url?.length);
+    console.log("[R2] Presigned URL generated successfully");
     return url;
   } catch (error) {
-    console.error("[R2] Failed to generate presigned URL:", error.message, error.stack);
-    throw error;
+    console.error("[R2] Failed to generate presigned URL:", {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+      stack: error.stack
+    });
+    throw new Error(`Failed to generate upload URL: ${error.message}`);
   }
 }
 
