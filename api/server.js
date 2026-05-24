@@ -101,8 +101,9 @@ const isProd = process.env.NODE_ENV === "production";
 // Trust proxy - required for Railway/reverse proxies to get real client IP
 app.set('trust proxy', 1);
 
-// Force HTTPS in production
-if (isProd) {
+// Force HTTPS in production (only when behind a proxy that sets x-forwarded-proto,
+// e.g. Railway. On EC2 behind Nginx, Nginx handles SSL termination so this is skipped.)
+if (isProd && process.env.FORCE_HTTPS === "true") {
   app.use((req, res, next) => {
     // Skip WebSocket upgrade requests — they handle their own protocol
     if (req.headers.upgrade === "websocket") return next();
@@ -375,7 +376,8 @@ if (isProd) {
 //     before the 06:00 active period. Without this the 6 AM ping gets a 503.
 function startSelfPing() {
   if (!isProd) return; // only needed in production
-  const selfUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  // RENDER_EXTERNAL_URL is set on Render; on EC2 use APP_URL or fall back to localhost
+  const selfUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || `http://localhost:${PORT}`;
   const pingUrl = `${selfUrl}/api/health`;
 
   function getISTHour() {
