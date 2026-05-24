@@ -77,7 +77,8 @@ export default function NotificationBell() {
         method:  "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      // Remove all notifications from the list immediately after marking read
+      setNotifications([]);
       setUnreadCount(0);
     } catch {}
   };
@@ -85,19 +86,18 @@ export default function NotificationBell() {
   // ── Mark one read & navigate ────────────────────────────────────────────────
   const handleClick = async (notif) => {
     setOpen(false);
+    // Remove from list immediately
+    setNotifications((prev) => prev.filter((n) => n._id !== notif._id));
+    setUnreadCount((c) => Math.max(0, notif.read ? c : c - 1));
+
     if (!notif.read) {
       try {
         await fetch(`/api/notifications/${notif._id}/read`, {
           method:  "PATCH",
           headers: { Authorization: `Bearer ${token}` },
         });
-        setNotifications((prev) =>
-          prev.map((n) => (n._id === notif._id ? { ...n, read: true } : n))
-        );
-        setUnreadCount((c) => Math.max(0, c - 1));
       } catch {}
     }
-    // Navigate: prefer explicit url, fall back to reportId deep-link, then community
     if (notif.url) {
       navigate(notif.url);
     } else if (notif.reportId) {
@@ -107,14 +107,13 @@ export default function NotificationBell() {
     }
   };
 
-  // ── Open bell: mark all read automatically ──────────────────────────────────
+  // ── Open bell: show notifications, then mark all read after 2s ─────────────
   const togglePanel = () => {
     const next = !open;
     setOpen(next);
-    if (next && unreadCount > 0) markAllRead();
-    // When closing, remove already-read notifications from view for cleanliness
-    if (!next) {
-      setNotifications(prev => prev.filter(n => !n.read));
+    if (next && unreadCount > 0) {
+      // Mark all read after 2 seconds (user has seen them)
+      setTimeout(() => markAllRead(), 2000);
     }
   };
 
