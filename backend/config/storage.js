@@ -3,9 +3,7 @@
  * Exports uploadToR2, deleteFromR2, getR2Key, getPresignedUploadUrl
  */
 
-import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { Upload } from "@aws-sdk/lib-storage";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
@@ -39,10 +37,7 @@ if (missingVars.length > 0) {
 }
 
 // Create S3 client only if config is valid
-// AWS SDK v3.600+ adds x-amz-checksum-crc32 by default; R2 rejects it with SignatureDoesNotMatch
-// Both clients use requestChecksumCalculation: "when_required" to prevent this
 let r2 = null;
-let r2Presign = null;
 if (r2ConfigValid) {
   try {
     r2 = new S3Client({
@@ -52,21 +47,24 @@ if (r2ConfigValid) {
         accessKeyId: R2_ACCESS_KEY_ID,
         secretAccessKey: R2_SECRET_ACCESS_KEY,
       },
-      requestChecksumCalculation: "when_required",
-      responseChecksumValidation: "when_required",
     });
-    // Presign client: requestChecksumCalculation "when_required" stops the SDK
-    // from auto-adding checksum headers that R2 doesn't support
-    r2Presign = new S3Client({
-      region: "auto",
-      endpoint: R2_ENDPOINT,
-      credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID,
-        secretAccessKey: R2_SECRET_ACCESS_KEY,
+
+    // Strip x-amz-checksum-* headers before signing.
+    // R2 doesn't support flexible checksums; leaving them causes SignatureDoesNotMatch.
+    r2.middlewareStack.add(
+      (next) => async (args) => {
+        if (args.request && args.request.headers) {
+          for (const h of Object.keys(args.request.headers)) {
+            if (h.startsWith("x-amz-checksum-")) {
+              delete args.request.headers[h];
+            }
+          }
+        }
+        return next(args);
       },
-      requestChecksumCalculation: "when_required",
-      responseChecksumValidation: "when_required",
-    });
+      { step: "build", name: "r2StripChecksumHeaders", priority: "low" }
+    );
+
     console.log("[R2] ✅ S3 client initialized successfully");
   } catch (error) {
     console.error("[R2] ❌ Failed to initialize S3 client:", error.message);
@@ -78,7 +76,7 @@ if (r2ConfigValid) {
  * Check if R2 is properly configured
  */
 function ensureR2Configured() {
-  if (!r2ConfigValid || !r2 || !r2Presign) {
+  if (!r2ConfigValid || !r2) {
     throw new Error("R2 storage is not configured. Please set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.");
   }
 }
@@ -95,8 +93,9 @@ export function getR2Key(userId, originalName) {
 }
 
 /**
- * Upload a local file to R2 using multipart upload.
- * Returns the public URL of the uploaded object.
+ * Upload a local file to R2.
+ * Uses PutObjectCommand (single PUT, up to 5 GB on R2) instead of multipart
+ * to avoid checksum / signing issues with Cloudflare R2.
  *
  * @param {string} filePath   — local temp file path
  * @param {string} key        — R2 object key (from getR2Key)
@@ -105,22 +104,34 @@ export function getR2Key(userId, originalName) {
  */
 export async function uploadToR2(filePath, key, mimeType = "video/webm") {
   ensureR2Configured();
-  
-  const fileStream = fs.createReadStream(filePath);
 
-  const upload = new Upload({
-    client: r2,
-    params: {
-      Bucket:      BUCKET,
-      Key:         key,
-      Body:        fileStream,
-      ContentType: mimeType,
-    },
-    queueSize: 4,       // parallel parts
-    partSize:  10 * 1024 * 1024, // 10MB parts
-  });
+  const body = fs.readFileSync(filePath);
+  await r2.send(new PutObjectCommand({
+    Bucket:      BUCKET,
+    Key:         key,
+    Body:        body,
+    ContentType: mimeType,
+  }));
+  return `${PUBLIC_URL}/${key}`;
+}
 
-  await upload.done();
+/**
+ * Upload a Buffer directly to R2 (avoids writing to a temp file).
+ *
+ * @param {Buffer} buffer
+ * @param {string} key
+ * @param {string} mimeType
+ * @returns {Promise<string>} — public URL
+ */
+export async function uploadBufferToR2(buffer, key, mimeType = "video/mp4") {
+  ensureR2Configured();
+
+  await r2.send(new PutObjectCommand({
+    Bucket:      BUCKET,
+    Key:         key,
+    Body:        buffer,
+    ContentType: mimeType,
+  }));
   return `${PUBLIC_URL}/${key}`;
 }
 
@@ -155,18 +166,13 @@ export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
   try {
     console.log("[R2] Generating presigned URL - key:", key, "mimeType:", mimeType);
     
-    // Use r2Presign client which has requestChecksumCalculation: "when_required"
-    // This prevents the SDK from injecting x-amz-checksum-crc32 into the signed headers,
-    // which R2 doesn't support and rejects with SignatureDoesNotMatch.
-    // Note: ContentType is intentionally omitted from the command — presigned PUT URLs
-    // only sign "host" by default, so sending Content-Type in the actual request
-    // causes SignatureDoesNotMatch. The proxy forwards the body without Content-Type.
     const command = new PutObjectCommand({
       Bucket: BUCKET,
       Key:    key,
     });
     
-    const url = await getSignedUrl(r2Presign, command, { expiresIn: 900 }); // 15 min    console.log("[R2] Presigned URL generated successfully");
+    const url = await getSignedUrl(r2, command, { expiresIn: 900 });
+    console.log("[R2] Presigned URL generated successfully");
     return url;
   } catch (error) {
     console.error("[R2] Failed to generate presigned URL:", {
@@ -197,3 +203,6 @@ export async function getPresignedDownloadUrl(key, expiresIn = 3600) {
   });
   return getSignedUrl(r2, command, { expiresIn });
 }
+
+// Re-export the shared r2 client for modules that need direct access
+export { r2 as r2Client, BUCKET };

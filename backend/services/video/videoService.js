@@ -7,7 +7,7 @@ import VideoReport from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import UploadAudit from "../../../models/uploadAuditSchema.js";
-import { uploadToR2, deleteFromR2, getR2Key, getPresignedUploadUrl, getPresignedDownloadUrl } from "../../config/storage.js";
+import { uploadToR2, uploadBufferToR2, deleteFromR2, getR2Key, getPresignedUploadUrl, getPresignedDownloadUrl } from "../../config/storage.js";
 import { enqueue, pushProgressById, recordSecurityEvent } from "./videoQueue.js";
 import { getVideoDuration } from "../ai/videoProcessor.js";
 import { scanFile } from "../ai/virusScanner.js";
@@ -286,27 +286,10 @@ export async function saveFrames(reportKey, framesBase64, authId) {
 
 /**
  * Upload buffer to R2 (helper for frame upload)
+ * Uses the shared r2 client from storage.js which has checksum-stripping middleware.
  */
 async function uploadToR2Buffer(buffer, key, mimeType) {
-  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-  
-  const s3 = new S3Client({
-    region: 'auto',
-    endpoint: process.env.R2_ENDPOINT,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-    },
-  });
-
-  await s3.send(new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME,
-    Key: key,
-    Body: buffer,
-    ContentType: mimeType,
-  }));
-
-  return `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
+  return uploadBufferToR2(buffer, key, mimeType);
 }
 
 /**
