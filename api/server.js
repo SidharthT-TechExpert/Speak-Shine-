@@ -178,8 +178,8 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         process.env.R2_PUBLIC_URL || "https:",
-        "https://*.95507d8602ddb955795f0d78ed3d2df5.r2.cloudflarestorage.com",
-        "https://cloudflareinsights.com", // Cloudflare Web Analytics beacon
+        `https://${(process.env.R2_ENDPOINT || "").replace(/^https?:\/\//, "")}`,
+        "https://cloudflareinsights.com",
         "https://*.livekit.cloud",
         "wss:",
         "ws:"
