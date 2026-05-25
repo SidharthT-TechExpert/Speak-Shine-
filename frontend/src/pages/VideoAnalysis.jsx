@@ -653,22 +653,18 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         params: { filename: fileToUpload.name, mimeType: fileToUpload.type || "video/mp4" },
       });
 
-      // Step 2: Upload via our backend proxy (avoids CORS issues with R2 direct upload)
-      await new Promise((resolve, reject) => {
-        const token = localStorage.getItem("token");
+      // Step 2: Upload directly to R2 via presigned URL (faster — no proxy hop)
+      //         Falls back to backend proxy if direct upload fails (e.g. CORS)
+      const uploadFile = (url, headers = {}) => new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("PUT", `/api/video/proxy-upload?token=${encodeURIComponent(token)}`);
-        xhr.setRequestHeader("Content-Type", fileToUpload.type || "video/mp4");
-        xhr.setRequestHeader("x-r2-key", presign.key);
-        xhr.setRequestHeader("x-mime-type", fileToUpload.type || "video/mp4");
-        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.open("PUT", url);
+        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
         xhr.upload.onprogress = (e) => {
           if (e.total) setProgress(Math.round((e.loaded / e.total) * 99));
         };
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
             let msg = `Upload failed (${xhr.status})`;
             try { msg = JSON.parse(xhr.responseText)?.error || msg; } catch {}
             reject(new Error(msg));
@@ -677,6 +673,24 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         xhr.onerror = () => reject(new Error("Network error during upload"));
         xhr.send(fileToUpload);
       });
+
+      try {
+        // Direct upload to R2 via presigned URL (skips server proxy — much faster)
+        await uploadFile(presign.uploadUrl, {
+          "Content-Type": fileToUpload.type || "video/mp4",
+        });
+        console.log("[Upload] ⚡ Direct R2 upload succeeded");
+      } catch (directErr) {
+        console.warn("[Upload] Direct R2 upload failed, falling back to proxy:", directErr.message);
+        setProgress(0);
+        const token = localStorage.getItem("token");
+        await uploadFile(`/api/video/proxy-upload?token=${encodeURIComponent(token)}`, {
+          "Content-Type": fileToUpload.type || "video/mp4",
+          "x-r2-key": presign.key,
+          "x-mime-type": fileToUpload.type || "video/mp4",
+          "Authorization": `Bearer ${token}`,
+        });
+      }
 
       // Step 3: Upload frames if extracted (optional - server can fall back to extracting from video)
       let frameKeys = null;
@@ -1231,43 +1245,46 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         params: { filename: file.name, mimeType: file.type },
       });
 
-      // Step 2: Upload via our backend proxy (avoids CORS issues with R2 direct upload)
-      await new Promise((resolve, reject) => {
-        const token = localStorage.getItem("token");
+      // Step 2: Upload directly to R2 via presigned URL (faster — no proxy hop)
+      //         Falls back to backend proxy if direct upload fails (e.g. CORS)
+      const uploadRecFile = (url, headers = {}) => new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("PUT", `/api/video/proxy-upload?token=${encodeURIComponent(token)}`);
-        xhr.setRequestHeader("Content-Type", file.type);
-        xhr.setRequestHeader("x-r2-key", presign.key);
-        xhr.setRequestHeader("x-mime-type", file.type);
-        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-        xhr.upload.onprogress = (e) => { 
+        xhr.open("PUT", url);
+        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+        xhr.upload.onprogress = (e) => {
           if (e.total) {
-            // 10% reserved for frame extraction, 10-99% for upload, 100% for frames+confirm
             const uploadPercent = Math.round((e.loaded / e.total) * 89);
             setUploadProgress(10 + uploadPercent);
           }
         };
         xhr.onload = () => {
-          console.log(`[Upload] XHR completed with status: ${xhr.status}`);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
             let msg = `Upload failed (${xhr.status})`;
             try { msg = JSON.parse(xhr.responseText)?.error || msg; } catch {}
             reject(new Error(msg));
           }
         };
-        xhr.onerror = () => {
-          console.error(`[Upload] XHR error`);
-          reject(new Error("Network error during upload"));
-        };
-        xhr.ontimeout = () => {
-          console.error(`[Upload] XHR timeout`);
-          reject(new Error("Upload timeout"));
-        };
-        xhr.timeout = 300000; // 5 minute timeout for large files
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.ontimeout = () => reject(new Error("Upload timeout"));
+        xhr.timeout = 300000;
         xhr.send(file);
       });
+
+      try {
+        await uploadRecFile(presign.uploadUrl, { "Content-Type": file.type });
+        console.log("[Upload] ⚡ Direct R2 upload succeeded");
+      } catch (directErr) {
+        console.warn("[Upload] Direct R2 upload failed, falling back to proxy:", directErr.message);
+        setUploadProgress(10);
+        const token = localStorage.getItem("token");
+        await uploadRecFile(`/api/video/proxy-upload?token=${encodeURIComponent(token)}`, {
+          "Content-Type": file.type,
+          "x-r2-key": presign.key,
+          "x-mime-type": file.type,
+          "Authorization": `Bearer ${token}`,
+        });
+      }
 
       // Step 2.5: Upload frames if extracted (optional - server can fall back to extracting from video)
       let frameKeys = null;

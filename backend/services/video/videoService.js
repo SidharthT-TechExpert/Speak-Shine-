@@ -38,27 +38,26 @@ function sanitizeFilename(filename) {
  */
 async function downloadFramesFromR2(frameKeys) {
   if (!frameKeys || frameKeys.length === 0) return null;
-  
-  console.log(`[VideoService] Downloading ${frameKeys.length} frames from R2...`);
-  const frames = [];
-  
-  for (const key of frameKeys) {
-    try {
+
+  console.log(`[VideoService] Downloading ${frameKeys.length} frames from R2 (parallel)...`);
+  const start = Date.now();
+
+  const results = await Promise.allSettled(
+    frameKeys.map(async (key) => {
       const url = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
       const response = await fetch(url);
-      if (!response.ok) {
-        console.warn(`[VideoService] Failed to download frame ${key}: ${response.status}`);
-        continue;
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const buffer = await response.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
-      frames.push(base64);
-    } catch (err) {
-      console.warn(`[VideoService] Error downloading frame ${key}:`, err.message);
-    }
-  }
-  
-  console.log(`[VideoService] ✅ Downloaded ${frames.length}/${frameKeys.length} frames`);
+      return Buffer.from(buffer).toString('base64');
+    })
+  );
+
+  const frames = results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
+
+  const failed = results.filter(r => r.status === 'rejected').length;
+  console.log(`[VideoService] ✅ Downloaded ${frames.length}/${frameKeys.length} frames in ${Date.now() - start}ms${failed ? ` (${failed} failed)` : ''}`);
   return frames.length > 0 ? frames : null;
 }
 
@@ -243,41 +242,31 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
  */
 export async function saveFrames(reportKey, framesBase64, authId) {
   try {
-    // Create unique frame keys
     const timestamp = Date.now();
-    const frameKeys = [];
-    
-    console.log(`[SaveFrames] Saving ${framesBase64.length} frames for ${reportKey}`);
-    
-    // Save each frame to R2
-    for (let i = 0; i < framesBase64.length; i++) {
-      const frameKey = `frames/${reportKey.replace(/\.[^.]+$/, '')}_${timestamp}_frame${i}.jpg`;
-      
-      // Convert base64 to buffer
-      const buffer = Buffer.from(framesBase64[i], 'base64');
-      
-      // Validate frame size (max 500KB per frame)
+    console.log(`[SaveFrames] Saving ${framesBase64.length} frames for ${reportKey} (parallel)`);
+
+    // Validate all frames first (fast, synchronous)
+    const uploads = framesBase64.map((b64, i) => {
+      const buffer = Buffer.from(b64, 'base64');
       if (buffer.length > 500 * 1024) {
-        console.warn(`[SaveFrames] Frame ${i} too large: ${(buffer.length / 1024).toFixed(0)}KB`);
         const error = new Error(`Frame ${i} exceeds 500KB limit`);
         error.statusCode = 400;
         throw error;
       }
-      
-      // Upload to R2
-      const frameUrl = await uploadToR2Buffer(buffer, frameKey, 'image/jpeg');
-      frameKeys.push(frameKey);
-      
-      console.log(`[SaveFrames] Saved frame ${i}: ${(buffer.length / 1024).toFixed(0)}KB`);
-    }
-    
-    console.log(`[SaveFrames] ✅ All ${frameKeys.length} frames saved`);
-    
-    return {
-      success: true,
-      frameKeys,
-      totalFrames: frameKeys.length,
-    };
+      const frameKey = `frames/${reportKey.replace(/\.[^.]+$/, '')}_${timestamp}_frame${i}.jpg`;
+      return { buffer, frameKey, index: i };
+    });
+
+    // Upload all frames in parallel
+    const frameKeys = await Promise.all(
+      uploads.map(async ({ buffer, frameKey, index }) => {
+        await uploadToR2Buffer(buffer, frameKey, 'image/jpeg');
+        return frameKey;
+      })
+    );
+
+    console.log(`[SaveFrames] ✅ All ${frameKeys.length} frames saved (parallel)`);
+    return { success: true, frameKeys, totalFrames: frameKeys.length };
   } catch (err) {
     console.error('[SaveFrames] Error:', err.message);
     throw err;

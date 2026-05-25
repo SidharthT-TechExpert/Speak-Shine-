@@ -144,8 +144,9 @@ export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
     console.log("[R2] Generating presigned URL - key:", key, "mimeType:", mimeType);
 
     const command = new PutObjectCommand({
-      Bucket: getBucket(),
-      Key:    key,
+      Bucket:      getBucket(),
+      Key:         key,
+      ContentType: mimeType,
     });
 
     const url = await getSignedUrl(getR2Client(), command, { expiresIn: 900 });
