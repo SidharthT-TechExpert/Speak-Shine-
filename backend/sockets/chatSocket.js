@@ -9,7 +9,12 @@ import { isRedisAvailable, getRedisClient } from "../config/redis.js";
 import { sanitizeText, isValidPhone, SanitizeError, LIMITS } from "../utils/textSanitizer.js";
 import { phoneVariants } from "../utils/phoneVariants.js";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+/** Read at verify time — not at import (dotenv loads after ESM imports in server.js). */
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET environment variable is not set");
+  return secret;
+}
 
 // ── Per-user rate limiter (in-memory, resets on server restart) ───────────────
 // Allows MAX_MSG messages per WINDOW_MS per phone number.
@@ -96,7 +101,7 @@ export function initializeChatSocket(io, onlineUsers) {
       return next(new Error("No token"));
     }
     try {
-      socket.user = jwt.verify(token, JWT_SECRET);
+      socket.user = jwt.verify(token, getJwtSecret());
       console.log(`[Chat] Socket authenticated: ${socket.user.name} (${socket.user.phone})`);
       next();
     } catch (err) {

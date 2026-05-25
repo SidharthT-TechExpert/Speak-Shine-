@@ -14,7 +14,9 @@ module.exports = {
     script: './api/server.js',
     instances: 1,
     exec_mode: 'fork',
-    
+    // 12 GB server — allow Node up to 4 GB heap (video queue + uploads)
+    node_args: '--max-old-space-size=4096 --expose-gc',
+
     // Environment configuration
     env: {
       NODE_ENV: 'production',
