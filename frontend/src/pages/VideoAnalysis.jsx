@@ -603,6 +603,9 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
   const [progress, setProgress]   = useState(0);
   const [stage, setStage]         = useState(""); // "hashing" | "uploading" | "confirming"
   const [error, setError]         = useState(null);
+  const [uploadSpeed, setUploadSpeed] = useState(null); // MB/s
+  const [uploadEta, setUploadEta]     = useState(null); // seconds
+  const uploadStartRef = useRef(null);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
   const handleFileChange = (e) => {
@@ -650,6 +653,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 
       const { data: presign } = await presignPromise;
       setStage("uploading");
+      uploadStartRef.current = Date.now();
 
       // ── Upload video (runs in parallel with frame extraction) ──
       const uploadFile = (url, headers = {}) => new Promise((resolve, reject) => {
@@ -657,9 +661,21 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         xhr.open("PUT", url);
         Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
         xhr.upload.onprogress = (e) => {
-          if (e.total) setProgress(Math.round((e.loaded / e.total) * 99));
+          if (e.total) {
+            const pct = Math.round((e.loaded / e.total) * 99);
+            setProgress(pct);
+            const elapsed = (Date.now() - uploadStartRef.current) / 1000;
+            if (elapsed > 1 && e.loaded > 0) {
+              const speed = e.loaded / elapsed; // bytes/s
+              setUploadSpeed(speed / (1024 * 1024)); // MB/s
+              const remaining = (e.total - e.loaded) / speed;
+              setUploadEta(Math.ceil(remaining));
+            }
+          }
         };
         xhr.onload = () => {
+          setUploadSpeed(null);
+          setUploadEta(null);
           if (xhr.status >= 200 && xhr.status < 300) resolve();
           else {
             let msg = `Upload failed (${xhr.status})`;
@@ -679,6 +695,9 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
       } catch (directErr) {
         console.warn("[Upload] Direct R2 upload failed, falling back to proxy:", directErr.message);
         setProgress(0);
+        setUploadSpeed(null);
+        setUploadEta(null);
+        uploadStartRef.current = Date.now();
         const token = localStorage.getItem("token");
         await uploadFile(`/api/video/proxy-upload?token=${encodeURIComponent(token)}`, {
           "Content-Type": fileToUpload.type || "video/mp4",
@@ -767,7 +786,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Upload failed");
     } finally {
-      setUploading(false); setProgress(0); setStage("");
+      setUploading(false); setProgress(0); setStage(""); setUploadSpeed(null); setUploadEta(null);
     }
   };
 
@@ -817,7 +836,9 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
               {[
                 { icon: "🔍", label: "Extracting video frames", done: stage !== "hashing", active: stage === "hashing" },
                 { icon: "☁️", label: "Uploading to cloud", done: progress >= 100, active: stage === "uploading" && progress < 100,
-                  sub: stage === "uploading" && progress < 100 ? `${progress}%` : null },
+                  sub: stage === "uploading" && progress < 100
+                    ? `${progress}%${uploadSpeed ? ` · ${uploadSpeed.toFixed(1)} MB/s` : ""}${uploadEta ? ` · ~${uploadEta}s left` : ""}`
+                    : null },
                 { icon: "📤", label: "Saving frames for AI", done: stage === "confirming", active: stage === "uploading-frames" },
                 { icon: "🤖", label: "Starting AI analysis", done: false, active: stage === "confirming" },
               ].map((s, i) => (
