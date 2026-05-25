@@ -984,6 +984,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [error, setError]           = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState(""); // "compressing" | "hashing" | "uploading" | "uploading-frames" | "confirming"
+  const [uploadSpeed, setUploadSpeed] = useState(null); // MB/s
+  const [uploadEta, setUploadEta]     = useState(null); // seconds
+  const [compressProgress, setCompressProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
   const [noiseCancel, setNoiseCancel] = useState(true);
   const [ncStatus, setNcStatus]     = useState("idle");
@@ -999,6 +1003,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const countdownRef    = useRef(null);
   const pendingBlobRef  = useRef(null); // holds blob until preview video mounts
   const mimeTypeRef     = useRef("video/webm"); // store the actual MIME type used
+  const uploadStartRef  = useRef(null);
 
   // Dynamic time limits based on question type
   const MAX_SECONDS = isMonthlyReflection || isMonthlyGoals 
@@ -1294,83 +1299,88 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     if (!recordedBlob) return;
     if (elapsed < 60) { setError("Recording must be at least 1 minute. Please record again."); return; }
     
-    // Additional blob validation before upload
     console.log(`[Upload] Validating blob - size: ${recordedBlob.size}, type: ${recordedBlob.type}, elapsed: ${elapsed}s`);
     
-    // Check if blob size is reasonable for the duration
-    const expectedMinSize = elapsed * 8000; // ~8KB per second minimum (very conservative)
-    const expectedMaxSize = elapsed * 200000; // ~200KB per second maximum (generous)
-    
+    const expectedMinSize = elapsed * 8000;
     if (recordedBlob.size < expectedMinSize) {
-      console.error(`[Upload] Blob too small: ${recordedBlob.size} bytes for ${elapsed}s (expected min: ${expectedMinSize})`);
       setError(`Recording seems corrupted (too small: ${Math.round(recordedBlob.size/1024)}KB for ${elapsed}s). Please record again.`);
       return;
     }
     
-    if (recordedBlob.size > expectedMaxSize) {
-      console.warn(`[Upload] Blob very large: ${recordedBlob.size} bytes for ${elapsed}s (expected max: ${expectedMaxSize})`);
-    }
-    
     setStep("uploading");
     setUploadProgress(0);
+    setUploadStage("");
+    setUploadSpeed(null);
+    setUploadEta(null);
+    setCompressProgress(0);
     setError(null);
-    try {
-      // Use the stored MIME type from recording (fallback to blob.type, then default)
-      let mimeType = mimeTypeRef.current || recordedBlob.type || "video/webm";
-      
-      // Ensure it's a video type
-      if (!mimeType.startsWith("video/")) {
-        console.warn(`[Upload] Invalid MIME type detected: ${mimeType}, forcing to video/webm`);
-        mimeType = "video/webm";
-      }
-      
-      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
-      const file = new File([recordedBlob], `recording.${ext}`, { type: mimeType });
-      
-      console.log(`[Upload] Created file - name: ${file.name}, size: ${file.size}, type: ${file.type}`);
 
-      // Step 0: Generate frame hash for cache checking
+    try {
+      let mimeType = mimeTypeRef.current || recordedBlob.type || "video/webm";
+      if (!mimeType.startsWith("video/")) mimeType = "video/webm";
+      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+      let fileToUpload = new File([recordedBlob], `recording.${ext}`, { type: mimeType });
+      console.log(`[Upload] Created file - name: ${fileToUpload.name}, size: ${fileToUpload.size}, type: ${fileToUpload.type}`);
+
+      // ── Compress large recordings ──
+      if (fileToUpload.size > COMPRESS_THRESHOLD && typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement.prototype.captureStream === "function") {
+        setUploadStage("compressing");
+        setCompressProgress(0);
+        try {
+          const compressed = await compressVideo(fileToUpload, (p) => setCompressProgress(Math.round(p * 100)));
+          fileToUpload = new File([compressed], "recording.webm", { type: "video/webm" });
+          console.log(`[Upload] Compressed ${(recordedBlob.size/1024/1024).toFixed(1)}MB → ${(fileToUpload.size/1024/1024).toFixed(1)}MB`);
+        } catch (compErr) {
+          console.warn("[Upload] Compression failed, uploading original:", compErr.message);
+        }
+      }
+
+      // ── Frame extraction + presigned URL in parallel ──
+      setUploadStage("hashing");
       let videoHash = null;
       let frames = null;
-      try {
-        setUploadProgress(5);
-        // Wrap in a timeout — frame extraction can hang on some browsers with recorded blobs
-        const hashResult = await Promise.race([
-          generateHashAndFrames(file),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
-        ]);
-        videoHash = hashResult.hash;
-        frames = hashResult.frames;
-        
-        if (hashResult.cached) {
-          console.log('[Upload] ⚡ Video previously checked - security checks will be skipped');
-        }
-        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
-        setUploadProgress(10);
-      } catch (hashErr) {
-        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', hashErr.message);
-        setUploadProgress(10);
-        // Continue without frames - server will extract them
-      }
 
-      // Step 1: Get presigned URL
-      const { data: presign } = await api.get("/video/presign", {
-        params: { filename: file.name, mimeType: file.type },
+      const framePromise = Promise.race([
+        generateHashAndFrames(fileToUpload),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+      ]).then(result => {
+        videoHash = result.hash;
+        frames = result.frames;
+        if (result.cached) console.log('[Upload] ⚡ Video previously checked');
+        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
+      }).catch(err => {
+        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', err.message);
       });
 
-      // Step 2: Upload directly to R2 via presigned URL (faster — no proxy hop)
-      //         Falls back to backend proxy if direct upload fails (e.g. CORS)
+      const presignPromise = api.get("/video/presign", {
+        params: { filename: fileToUpload.name, mimeType: fileToUpload.type },
+      });
+
+      const { data: presign } = await presignPromise;
+      setUploadStage("uploading");
+      uploadStartRef.current = Date.now();
+
+      // ── Upload video (runs in parallel with frame extraction) ──
       const uploadRecFile = (url, headers = {}) => new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", url);
         Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
         xhr.upload.onprogress = (e) => {
           if (e.total) {
-            const uploadPercent = Math.round((e.loaded / e.total) * 89);
-            setUploadProgress(10 + uploadPercent);
+            const pct = Math.round((e.loaded / e.total) * 99);
+            setUploadProgress(pct);
+            const elapsedMs = (Date.now() - uploadStartRef.current) / 1000;
+            if (elapsedMs > 1 && e.loaded > 0) {
+              const speed = e.loaded / elapsedMs;
+              setUploadSpeed(speed / (1024 * 1024));
+              const remaining = (e.total - e.loaded) / speed;
+              setUploadEta(Math.ceil(remaining));
+            }
           }
         };
         xhr.onload = () => {
+          setUploadSpeed(null);
+          setUploadEta(null);
           if (xhr.status >= 200 && xhr.status < 300) resolve();
           else {
             let msg = `Upload failed (${xhr.status})`;
@@ -1381,32 +1391,38 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         xhr.onerror = () => reject(new Error("Network error during upload"));
         xhr.ontimeout = () => reject(new Error("Upload timeout"));
         xhr.timeout = 300000;
-        xhr.send(file);
+        xhr.send(fileToUpload);
       });
 
       try {
-        await uploadRecFile(presign.uploadUrl, { "Content-Type": file.type });
+        await uploadRecFile(presign.uploadUrl, { "Content-Type": fileToUpload.type });
         console.log("[Upload] ⚡ Direct R2 upload succeeded");
       } catch (directErr) {
         console.warn("[Upload] Direct R2 upload failed, falling back to proxy:", directErr.message);
-        setUploadProgress(10);
+        setUploadProgress(0);
+        setUploadSpeed(null);
+        setUploadEta(null);
+        uploadStartRef.current = Date.now();
         const token = localStorage.getItem("token");
         await uploadRecFile(`/api/video/proxy-upload?token=${encodeURIComponent(token)}`, {
-          "Content-Type": file.type,
+          "Content-Type": fileToUpload.type,
           "x-r2-key": presign.key,
-          "x-mime-type": file.type,
+          "x-mime-type": fileToUpload.type,
           "Authorization": `Bearer ${token}`,
         });
       }
 
-      // Step 2.5: Upload frames if extracted (optional - server can fall back to extracting from video)
+      // Wait for frame extraction to finish
+      await framePromise;
+
+      // ── Upload frames if extracted ──
       let frameKeys = null;
       if (frames && frames.length > 0) {
         try {
+          setUploadStage("uploading-frames");
+          setUploadProgress(100);
           console.log('[Upload] Uploading frames to server...');
-          setUploadProgress(100); // Mark video upload done, now saving frames
-          
-          // Convert frames to base64 for JSON transport
+
           const frameDataPromises = frames.map(blob => {
             return new Promise((resolve) => {
               const reader = new FileReader();
@@ -1414,14 +1430,14 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
               reader.readAsDataURL(blob);
             });
           });
-          
+
           const frameData = await Promise.all(frameDataPromises);
-          
+
           const { data: frameUpload } = await api.post("/video/upload-frames", {
             reportKey: presign.key,
             frames: frameData,
           });
-          
+
           frameKeys = frameUpload.frameKeys;
           console.log('[Upload] ⚡ Frames uploaded - server will skip frame extraction!');
         } catch (frameErr) {
@@ -1431,18 +1447,19 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         setUploadProgress(100);
       }
 
-      // Step 3: Confirm with server
+      // ── Confirm with server — start analysis ──
+      setUploadStage("confirming");
+
       const { data } = await api.post("/video/confirm", {
         key:       presign.key,
         publicUrl: presign.publicUrl,
-        mimeType:  file.type,
+        mimeType:  fileToUpload.type,
         isPublic:  true,
-        recordedDuration: elapsed, // Pass the actual recorded duration from frontend timer
-        videoHash: videoHash, // Send hash for cache checking
-        frameKeys: frameKeys, // Send frame keys if uploaded
+        recordedDuration: elapsed,
+        videoHash: videoHash,
+        frameKeys: frameKeys,
       });
       
-      // Cache successful result for future uploads
       if (videoHash && data.success) {
         cacheResult(videoHash, { passed: true });
       }
@@ -1456,6 +1473,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       console.error("[Upload] Error:", err);
       setError(err.response?.data?.error || err.message || "Upload failed");
       setStep("preview");
+    } finally {
+      setUploadStage("");
+      setUploadSpeed(null);
+      setUploadEta(null);
     }
   };
 
@@ -1795,67 +1816,63 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       {step === "uploading" && (
         <div style={{ padding: "1.5rem 1rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
 
-          {/* Overall progress bar */}
+          {/* Step label + percentage */}
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <span style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--text)" }}>
-                {uploadProgress < 10 ? "🔍 Extracting frames…" :
-                 uploadProgress < 100 ? "☁️ Uploading to cloud…" :
-                 "✅ Finalising…"}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", fontSize: "0.88rem" }}>
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>
+                {uploadStage === "compressing" ? "🗜️ Compressing video…" :
+                 uploadStage === "hashing" ? "🔍 Extracting frames…" :
+                 uploadStage === "uploading-frames" ? "📤 Saving frames…" :
+                 uploadStage === "confirming" ? "🤖 Starting analysis…" :
+                 uploadProgress < 100 ? "☁️ Uploading to cloud…" : "✅ Upload complete"}
               </span>
-              <span style={{ fontWeight: 700, color: "var(--primary)", fontSize: "0.95rem" }}>{uploadProgress}%</span>
+              <span style={{ color: "var(--primary)", fontWeight: 700 }}>
+                {uploadStage === "compressing" ? `${compressProgress}%` :
+                 uploadStage === "hashing" ? `${hashProgress}%` :
+                 uploadStage === "confirming" || uploadStage === "uploading-frames" ? "100%" :
+                 `${uploadProgress}%`}
+              </span>
             </div>
-            <div style={{ background: "var(--bg)", borderRadius: "99px", height: "10px", overflow: "hidden" }}>
+            {/* Progress bar */}
+            <div style={{ background: "var(--bg)", borderRadius: "99px", height: "10px", overflow: "hidden", marginBottom: "0.75rem" }}>
               <div style={{
                 height: "100%",
-                width: `${uploadProgress}%`,
-                background: uploadProgress === 100 ? "var(--success)" : "linear-gradient(90deg, var(--primary), #a78bfa)",
+                width: uploadStage === "compressing" ? `${compressProgress}%` : uploadStage === "hashing" ? `${hashProgress}%` : uploadStage === "confirming" || uploadStage === "uploading-frames" ? "100%" : `${uploadProgress}%`,
+                background: uploadProgress === 100 || uploadStage === "confirming" ? "var(--success)" : uploadStage === "compressing" ? "linear-gradient(90deg, #f59e0b, #ef4444)" : "linear-gradient(90deg, var(--primary), #a78bfa)",
                 borderRadius: "99px",
                 transition: "width 0.4s ease",
               }} />
             </div>
-          </div>
-
-          {/* Step checklist */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            {[
-              { icon: "🔍", label: "Extracting video frames", done: uploadProgress >= 10, active: uploadProgress < 10 },
-              { icon: "☁️", label: "Uploading video to cloud", done: uploadProgress >= 100, active: uploadProgress >= 10 && uploadProgress < 100,
-                sub: uploadProgress >= 10 && uploadProgress < 100 ? `${uploadProgress}%` : null },
-              { icon: "📤", label: "Saving frames for AI analysis", done: uploadProgress >= 100, active: false },
-              { icon: "🤖", label: "Starting AI analysis", done: false, active: uploadProgress >= 100 },
-            ].map((s, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: "0.75rem",
-                padding: "0.6rem 0.85rem",
-                borderRadius: "10px",
-                background: s.active ? "rgba(124,111,255,0.1)" : s.done ? "rgba(74,222,128,0.07)" : "transparent",
-                border: `1px solid ${s.active ? "rgba(124,111,255,0.3)" : s.done ? "rgba(74,222,128,0.2)" : "transparent"}`,
-                transition: "all 0.3s",
-              }}>
-                <span style={{ fontSize: "1.1rem", width: "1.5rem", textAlign: "center" }}>
-                  {s.done ? "✅" : s.active ? "⏳" : "⬜"}
-                </span>
-                <span style={{
-                  fontSize: "0.88rem",
-                  color: s.done ? "var(--success)" : s.active ? "var(--text)" : "var(--muted)",
-                  fontWeight: s.active ? 600 : 400,
-                  flex: 1,
+            {/* Step checklist */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              {[
+                ...(recordedBlob && recordedBlob.size > COMPRESS_THRESHOLD ? [{ icon: "🗜️", label: `Compressing video (${(recordedBlob.size/1024/1024).toFixed(0)}MB)`, done: uploadStage !== "compressing" && uploadStage !== "", active: uploadStage === "compressing",
+                  sub: uploadStage === "compressing" ? `${compressProgress}%` : null }] : []),
+                { icon: "🔍", label: "Extracting video frames", done: uploadStage !== "hashing" && uploadStage !== "compressing", active: uploadStage === "hashing" },
+                { icon: "☁️", label: "Uploading to cloud", done: uploadProgress >= 100, active: uploadStage === "uploading" && uploadProgress < 100,
+                  sub: uploadStage === "uploading" && uploadProgress < 100
+                    ? `${uploadProgress}%${uploadSpeed ? ` · ${uploadSpeed.toFixed(1)} MB/s` : ""}${uploadEta ? ` · ~${uploadEta}s left` : ""}`
+                    : null },
+                { icon: "📤", label: "Saving frames for AI", done: uploadStage === "confirming", active: uploadStage === "uploading-frames" },
+                { icon: "🤖", label: "Starting AI analysis", done: false, active: uploadStage === "confirming" },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", gap: "0.6rem",
+                  padding: "0.45rem 0.75rem", borderRadius: "8px",
+                  background: s.active ? "rgba(124,111,255,0.1)" : s.done ? "rgba(74,222,128,0.07)" : "transparent",
+                  border: `1px solid ${s.active ? "rgba(124,111,255,0.3)" : s.done ? "rgba(74,222,128,0.2)" : "transparent"}`,
                 }}>
-                  {s.icon} {s.label}
-                </span>
-                {s.sub && (
-                  <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: 700 }}>{s.sub}</span>
-                )}
-                {s.active && (
-                  <div style={{
-                    width: "14px", height: "14px", borderRadius: "50%",
-                    border: "2px solid var(--primary)", borderTopColor: "transparent",
-                    animation: "spin 0.8s linear infinite", flexShrink: 0,
-                  }} />
-                )}
-              </div>
-            ))}
+                  <span style={{ fontSize: "0.9rem", width: "1.2rem", textAlign: "center" }}>
+                    {s.done ? "✅" : s.active ? "⏳" : "⬜"}
+                  </span>
+                  <span style={{ fontSize: "0.82rem", color: s.done ? "var(--success)" : s.active ? "var(--text)" : "var(--muted)", fontWeight: s.active ? 600 : 400, flex: 1 }}>
+                    {s.icon} {s.label}
+                  </span>
+                  {s.sub && <span style={{ fontSize: "0.78rem", color: "var(--primary)", fontWeight: 700 }}>{s.sub}</span>}
+                  {s.active && <div style={{ width: "12px", height: "12px", borderRadius: "50%", border: "2px solid var(--primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />}
+                </div>
+              ))}
+            </div>
           </div>
 
           <p style={{ color: "var(--muted)", fontSize: "0.78rem", textAlign: "center" }}>
