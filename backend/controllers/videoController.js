@@ -95,8 +95,8 @@ export async function uploadFrames(req, res) {
       return res.status(400).json({ error: "reportKey and frames array required" });
     }
     
-    if (frames.length !== 16) {
-      return res.status(400).json({ error: "Exactly 16 frames required" });
+    if (frames.length < 8 || frames.length > 16) {
+      return res.status(400).json({ error: "Between 8 and 16 frames required" });
     }
     
     console.log(`[UploadFrames] Receiving ${frames.length} frames for ${reportKey}`);
@@ -109,6 +109,31 @@ export async function uploadFrames(req, res) {
     }
     console.error("[UploadFrames] Error:", error.message);
     res.status(500).json({ error: "Failed to upload frames" });
+  }
+}
+
+/**
+ * POST /api/video/pre-check
+ * Fast client-side-aligned gate before upload (no file upload).
+ */
+export async function preCheckSubmit(req, res) {
+  try {
+    const { evaluateSubmitGate } = await import("../services/video/submitGate.js");
+    const flags = {
+      isMonthlyReflection: !!req.body?.isMonthlyReflection,
+      isMonthlyGoals: !!req.body?.isMonthlyGoals,
+      isWeeklyReflection: !!req.body?.isWeeklyReflection,
+    };
+    const gate = evaluateSubmitGate({
+      durationSeconds: req.body?.durationSeconds ?? null,
+      fileSizeBytes: req.body?.fileSizeBytes ?? null,
+      frameCount: req.body?.frameCount ?? null,
+      flags,
+    });
+    res.json(gate);
+  } catch (err) {
+    console.error("[PreCheck] Error:", err.message);
+    res.status(500).json({ error: "Pre-check failed" });
   }
 }
 

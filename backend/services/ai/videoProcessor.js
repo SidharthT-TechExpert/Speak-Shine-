@@ -11,6 +11,7 @@ import { transcribe } from "./transcribe.js";
 import { analyzeSpeech } from "./analyzeSpeech.js";
 import { analyzeVideo } from "./analyzeVideo.js";
 import { synthesizeOverallComment, parseFeedbackToStructure } from "./webFeedbackHelpers.js";
+import { buildAnalysisSummary } from "../video/submitGate.js";
 import {
   withTimeout,
   startStage,
@@ -161,11 +162,16 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
 
     await onProgress("Generating feedback…");
 
-    // Stage 3: Synthesize overall comment
-    speechResult.overallComment = await synthesizeOverallComment(speechResult, visual);
+    // Stage 3: Synthesize overall comment only when draft is thin (saves ~1 LLM call)
+    const draft = speechResult.overallComment || "";
+    if (draft.length < 80) {
+      speechResult.overallComment = await synthesizeOverallComment(speechResult, visual);
+    }
 
-    // Stage 4: Build structured analysis object directly (no text parsing needed)
-    const analysis = buildStructuredAnalysis(speechResult, visual, qualityWarning);
+    // Stage 4: Structured analysis + calibrated overall score / tier
+    const analysis = buildAnalysisSummary(
+      buildStructuredAnalysis(speechResult, visual, qualityWarning)
+    );
 
     return { analysis, duration };
 

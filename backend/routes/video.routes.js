@@ -65,6 +65,9 @@ router.put(
 // /upload-frames receives browser-extracted frames for AI analysis (doesn't count against limit)
 router.post("/upload-frames", authMiddleware, videoController.uploadFrames);
 
+// /pre-check — validate duration/size/frames before upload (no rate limit)
+router.post("/pre-check", authMiddleware, videoController.preCheckSubmit);
+
 // /confirm is the real submission — apply rate limit here
 router.post("/confirm", authMiddleware, videoUploadLimiter, videoController.confirmUpload);
 

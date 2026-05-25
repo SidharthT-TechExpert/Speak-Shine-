@@ -13,17 +13,17 @@
 // Timeout constants (env-overridable with numeric fallback)
 // ---------------------------------------------------------------------------
 
-/** Maximum ms to wait for Groq Whisper transcription. Default: 180 000 (3 min) */
+/** Maximum ms to wait for Groq Whisper transcription. Default: 120 000 (2 min) */
 export const TRANSCRIBE_TIMEOUT_MS =
-  Number(process.env.TRANSCRIBE_TIMEOUT_MS) || 180_000;
+  Number(process.env.TRANSCRIBE_TIMEOUT_MS) || 120_000;
 
-/** Maximum ms to wait for Groq Llama speech analysis. Default: 90 000 (1.5 min) */
+/** Maximum ms to wait for Groq Llama speech analysis. Default: 75 000 */
 export const SPEECH_TIMEOUT_MS =
-  Number(process.env.SPEECH_TIMEOUT_MS) || 90_000;
+  Number(process.env.SPEECH_TIMEOUT_MS) || 75_000;
 
-/** Maximum ms to wait for Groq Vision visual analysis. Default: 180 000 (3 min) */
+/** Maximum ms to wait for Groq Vision visual analysis. Default: 120 000 (2 min) */
 export const VISUAL_TIMEOUT_MS =
-  Number(process.env.VISUAL_TIMEOUT_MS) || 180_000;
+  Number(process.env.VISUAL_TIMEOUT_MS) || 120_000;
 
 // ---------------------------------------------------------------------------
 // withTimeout

@@ -32,7 +32,7 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
     const frames = [];
     const frameBlobs = []; // Full-quality frames for AI
     let currentFrame = 0;
-    const totalFrames = 16;
+    const totalFrames = 12; // 12 frames = faster upload, still accurate for vision AI
     
     video.preload = 'metadata';
     video.muted = true;
@@ -91,7 +91,7 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
           console.warn(`[VideoHash] Seek timeout for frame ${currentFrame}, skipping`);
           currentFrame++;
           captureFrame();
-        }, 3000);
+        }, 2000);
       };
       
       // Timeout per seek — some browsers hang on seek for recorded blobs

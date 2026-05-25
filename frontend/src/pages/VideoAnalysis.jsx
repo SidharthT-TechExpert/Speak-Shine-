@@ -4,6 +4,7 @@ import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 import { useVideoFrameHash } from "../hooks/useVideoFrameHash.js";
+import { evaluateSubmitGate } from "../utils/videoSubmitGate.js";
 
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
@@ -744,9 +745,40 @@ async function openRecordingStream(camId, micId) {
   }
 }
 
+function SubmitGatePanel({ gate }) {
+  if (!gate?.checks?.length) return null;
+  const icon = { pass: "✅", warn: "⚠️", fail: "❌" };
+  const color = { pass: "var(--success)", warn: "var(--warning)", fail: "var(--danger)" };
+  return (
+    <div style={{
+      marginBottom: "1rem",
+      padding: "0.85rem 1rem",
+      borderRadius: 12,
+      border: `1px solid ${gate.passed ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.4)"}`,
+      background: gate.passed ? "rgba(74,222,128,0.06)" : "rgba(248,113,113,0.08)",
+    }}>
+      <div style={{ fontWeight: 700, fontSize: "0.82rem", marginBottom: "0.5rem", color: "var(--text)" }}>
+        {gate.passed ? "✓ Ready to submit" : "✗ Fix these before submitting"}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        {gate.checks.map((c) => (
+          <div key={c.id} style={{ display: "flex", gap: "0.5rem", fontSize: "0.8rem", alignItems: "flex-start" }}>
+            <span style={{ flexShrink: 0 }}>{icon[c.status]}</span>
+            <span>
+              <strong style={{ color: color[c.status] }}>{c.label}:</strong>{" "}
+              <span style={{ color: "var(--muted)" }}>{c.message}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
 function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, isWeeklyReflection }) {
   const [file, setFile]           = useState(null);
+  const [fileDuration, setFileDuration] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
   const [stage, setStage]         = useState(""); // "hashing" | "uploading" | "confirming"
@@ -757,15 +789,37 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
   const uploadStartRef = useRef(null);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
+  const gateFlags = { isMonthlyReflection, isMonthlyGoals, isWeeklyReflection };
+
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
     if (f.size > 500 * 1024 * 1024) { setError("File size must be less than 500MB."); return; }
     setFile(f);
+    setFileDuration(null);
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    const url = URL.createObjectURL(f);
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      const d = v.duration;
+      setFileDuration(isFinite(d) && d > 0 ? Math.round(d) : null);
+    };
+    v.onerror = () => { URL.revokeObjectURL(url); };
+    v.src = url;
   };
+
+  const uploadGate = file
+    ? evaluateSubmitGate({ durationSeconds: fileDuration, fileSizeBytes: file.size, flags: gateFlags })
+    : null;
 
   const handleUpload = async () => {
     if (!file) { setError("Please select a video file"); return; }
+    const gate = evaluateSubmitGate({ durationSeconds: fileDuration, fileSizeBytes: file.size, flags: gateFlags });
+    if (!gate.passed) {
+      setError(gate.checks.find((c) => c.status === "fail")?.message || "Video does not meet requirements.");
+      return;
+    }
     setUploading(true); setProgress(0); setError(null);
 
     try {
@@ -795,13 +849,14 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 
       const framePromise = Promise.race([
         generateHashAndFrames(file),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 12000))
       ]).then(result => {
         videoHash = result.hash;
         frames = result.frames;
         cachedResult = result.cachedResult;
         if (result.cached) console.log('[Upload] ⚡ Video previously checked');
-        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
+        if (result.duration && !fileDuration) setFileDuration(Math.round(result.duration));
+        console.log(`[Upload] Extracted ${frames?.length || 0} frames for AI analysis`);
       }).catch(err => {
         console.warn('[Upload] Frame extraction failed/timed out, continuing without:', err.message);
       });
@@ -1025,7 +1080,8 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
             </div>
           </div>
         )}
-        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading} style={{ width: "100%" }}>
+        {uploadGate && <SubmitGatePanel gate={uploadGate} />}
+        <button className="btn-primary" onClick={handleUpload} disabled={!file || uploading || (uploadGate && !uploadGate.passed)} style={{ width: "100%" }}>
           {uploading ?
             (stage === "hashing" ? `Analyzing ${hashProgress}%…` :
              stage === "uploading-frames" ? "Uploading frames…" :
@@ -1366,9 +1422,19 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     cleanup();
   };
 
+  const gateFlags = { isMonthlyReflection, isMonthlyGoals, isWeeklyReflection };
+
   const submitRecording = async () => {
     if (!recordedBlob) return;
-    if (elapsed < 60) { setError("Recording must be at least 1 minute. Please record again."); return; }
+    const gate = evaluateSubmitGate({
+      durationSeconds: elapsed,
+      fileSizeBytes: recordedBlob.size,
+      flags: gateFlags,
+    });
+    if (!gate.passed) {
+      setError(gate.checks.find((c) => c.status === "fail")?.message || "Recording does not meet requirements.");
+      return;
+    }
     
     console.log(`[Upload] Validating blob - size: ${recordedBlob.size}, type: ${recordedBlob.type}, elapsed: ${elapsed}s`);
     
@@ -1413,12 +1479,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
 
       const framePromise = Promise.race([
         generateHashAndFrames(fileToUpload),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 12000))
       ]).then(result => {
         videoHash = result.hash;
         frames = result.frames;
         if (result.cached) console.log('[Upload] ⚡ Video previously checked');
-        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
+        console.log(`[Upload] Extracted ${frames?.length || 0} frames for AI analysis`);
       }).catch(err => {
         console.warn('[Upload] Frame extraction failed/timed out, continuing without:', err.message);
       });
@@ -1552,6 +1618,14 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   };
 
   const fmtTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  const recordGate = recordedBlob
+    ? evaluateSubmitGate({
+        durationSeconds: elapsed,
+        fileSizeBytes: recordedBlob.size,
+        flags: gateFlags,
+      })
+    : null;
 
   return (
     <div className="card">
@@ -1852,9 +1926,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
           
           <video ref={previewVideoRef} controls playsInline
             style={{ width: "100%", borderRadius: "12px", background: "#000", aspectRatio: "16/9", marginBottom: "1rem" }} />
+          {recordGate && <SubmitGatePanel gate={recordGate} />}
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="btn-secondary" onClick={retake} style={{ flex: 1 }}>🔄 Retake</button>
-            <button className="btn-primary" onClick={submitRecording} disabled={elapsed < 60} style={{ flex: 2 }}>
+            <button className="btn-primary" onClick={submitRecording} disabled={!recordGate?.passed} style={{ flex: 2 }}>
               🚀 Submit for Analysis
             </button>
           </div>
@@ -1982,8 +2057,50 @@ function Section({ title, children }) {
 
 function ReportView({ analysis: a, expiresAt, formatTimeRemaining }) {
   const s = a.stats || {};
+  const tierColor = {
+    excellent: "#4ade80",
+    good: "#a78bfa",
+    developing: "#fbbf24",
+    needs_work: "#f87171",
+  };
   return (
     <div className="report-content">
+      {a.overallScore != null && (
+        <div style={{
+          marginBottom: "1rem",
+          padding: "1rem 1.25rem",
+          borderRadius: 14,
+          border: "1px solid rgba(124,111,255,0.35)",
+          background: "linear-gradient(135deg, rgba(124,111,255,0.12), rgba(79,70,229,0.06))",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "1rem",
+        }}>
+          <div>
+            <div style={{ fontSize: "0.72rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>Overall score</div>
+            <div style={{ fontSize: "2rem", fontWeight: 900, color: tierColor[a.performanceTier] || "var(--text)" }}>{a.overallScore}/10</div>
+          </div>
+          {a.performanceLabel && (
+            <span style={{
+              padding: "0.35rem 0.85rem",
+              borderRadius: 20,
+              background: `${tierColor[a.performanceTier] || "#a78bfa"}22`,
+              border: `1px solid ${tierColor[a.performanceTier] || "#a78bfa"}55`,
+              color: tierColor[a.performanceTier] || "#a78bfa",
+              fontWeight: 700,
+              fontSize: "0.85rem",
+            }}>{a.performanceLabel}</span>
+          )}
+          {a.scoreBreakdown && (
+            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", fontSize: "0.8rem", color: "var(--muted)" }}>
+              {a.scoreBreakdown.speech != null && <span>🗣️ Speech <strong style={{ color: "var(--text)" }}>{a.scoreBreakdown.speech}</strong></span>}
+              {a.scoreBreakdown.visual != null && <span>📹 Presence <strong style={{ color: "var(--text)" }}>{a.scoreBreakdown.visual}</strong></span>}
+              {a.scoreBreakdown.topic != null && <span>🎯 On-topic <strong style={{ color: "var(--text)" }}>{a.scoreBreakdown.topic}</strong></span>}
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ background: "var(--bg-secondary)", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", gap: "1rem", fontSize: "0.95rem" }}>
         {s.duration && <span>⏱️ <strong>{s.duration}</strong></span>}
         {s.wpm && <span>📊 <strong>{s.wpm} wpm</strong> {s.wpm < 100 ? "🐢 Slow" : s.wpm <= 150 ? "✅ Good" : "⚡ Fast"}</span>}

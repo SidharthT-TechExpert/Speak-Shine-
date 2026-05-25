@@ -117,13 +117,16 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
         }
         
         pushProgressById(reportId, { status: "processing", stage: "⏳ Queuing for AI analysis…" });
+        if (browserFrames?.length >= 8 && fs.existsSync(tempPath)) {
+          try { fs.unlinkSync(tempPath); } catch {}
+        }
         enqueue({
           reportId,
-          videoPath: browserFrames && browserFrames.length > 0 ? videoUrl : tempPath, // Use URL if we have frames
+          videoPath: browserFrames?.length >= 8 ? videoUrl : tempPath,
           phone,
           displayName,
           knownDuration: storedDuration,
-          browserFrames: browserFrames, // Pass frames to queue
+          browserFrames: browserFrames,
         });
         return;
       }
@@ -222,13 +225,21 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
     const report = await VideoReport.findById(reportId);
     const storedDuration = report?.videoDuration;
 
+    // With browser frames, stream audio from R2 URL — skip keeping large temp file on disk
+    const useRemotePath = browserFrames && browserFrames.length >= 8;
+    const queueVideoPath = useRemotePath ? videoUrl : tempPath;
+    if (useRemotePath && fs.existsSync(tempPath)) {
+      try { fs.unlinkSync(tempPath); } catch {}
+      console.log(`[VideoService] ⚡ Using R2 URL + ${browserFrames.length} frames (temp file removed)`);
+    }
+
     enqueue({
       reportId,
-      videoPath: tempPath,
+      videoPath: queueVideoPath,
       phone,
       displayName,
       knownDuration: storedDuration,
-      browserFrames: browserFrames, // Pass frames to queue
+      browserFrames: browserFrames,
     });
 
   } catch (err) {
@@ -363,7 +374,34 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     throw error;
   }
 
-  // Check file size
+  // Submit gate (duration + size) before creating report
+  try {
+    const { evaluateSubmitGate } = await import("./submitGate.js");
+    let contentLength = 0;
+    try {
+      const headRes = await fetch(publicUrl, { method: "HEAD" });
+      contentLength = parseInt(headRes.headers.get("content-length") || "0", 10);
+    } catch { /* non-fatal */ }
+
+    const gate = evaluateSubmitGate({
+      durationSeconds: recordedDuration ?? null,
+      fileSizeBytes: contentLength > 0 ? contentLength : null,
+      frameCount: Array.isArray(frames) ? frames.length : null,
+      flags: {},
+    });
+    if (!gate.passed) {
+      try { await deleteFromR2(key); } catch {}
+      const failCheck = gate.checks.find((c) => c.status === "fail");
+      const error = new Error(failCheck?.message || "Video does not meet submission requirements.");
+      error.statusCode = 400;
+      throw error;
+    }
+  } catch (gateErr) {
+    if (gateErr.statusCode) throw gateErr;
+    console.warn("[ConfirmUpload] Gate check skipped:", gateErr.message);
+  }
+
+  // Check file size (redundant safety)
   try {
     const headRes = await fetch(publicUrl, { method: "HEAD" });
     const contentLength = parseInt(headRes.headers.get("content-length") || "0", 10);
