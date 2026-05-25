@@ -415,7 +415,7 @@ function CelebrationCard({ name, streak, navigate }) {
       </div>
 
       {/* stats row */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"0.6rem", marginBottom:"1.25rem" }}>
+      <div className="grid-cols-3" style={{ gap:"0.6rem", marginBottom:"1.25rem" }}>
         {[
           { icon:"✅", value:"Done", sub:"Today", accent:"rgba(74,222,128,0.2)", border:"rgba(74,222,128,0.3)" },
           { icon:"🔥", value:streak||0, sub:"Day Streak", accent:"rgba(249,115,22,0.2)", border:"rgba(249,115,22,0.35)" },
@@ -577,7 +577,7 @@ export default function UserDashboard() {
               {/* Scores */}
               <div style={{ marginTop: "1.5rem" }}>
                 <div className="daily-poster-section-label">YOUR SCORES</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", marginTop: "0.75rem" }}>
+                <div className="grid-cols-2" style={{ marginTop: "0.75rem" }}>
                   {[
                     { label: "Fluency", value: data.dailyReport.fluency, icon: "🗣️" },
                     { label: "Grammar", value: data.dailyReport.grammar, icon: "📝" },
@@ -606,7 +606,7 @@ export default function UserDashboard() {
               )}
 
               {/* Stats */}
-              <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem" }}>
+              <div className="grid-cols-3" style={{ marginTop: "1.5rem" }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "1.5rem" }}>🔥</div>
                   <div style={{ fontSize: "1.25rem", fontWeight: "bold", marginTop: "0.25rem" }}>{data.dailyReport.streak}</div>
@@ -625,7 +625,7 @@ export default function UserDashboard() {
               </div>
 
               {/* Fine Information */}
-              <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem" }}>
+              <div className="grid-cols-2" style={{ marginTop: "1.5rem" }}>
                 <div style={{ background: "rgba(248, 113, 113, 0.1)", padding: "0.75rem", borderRadius: "8px", textAlign: "center", border: "1px solid rgba(248, 113, 113, 0.2)" }}>
                   <div style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>💸</div>
                   <div style={{ fontSize: "0.75rem", color: "#8888aa", marginBottom: "0.25rem" }}>Total Fine</div>
@@ -653,7 +653,7 @@ export default function UserDashboard() {
               <div style={{ fontSize: "0.9rem", color: "#8888aa", marginBottom: "1rem" }}>Don't worry! Today is a new opportunity to shine.</div>
               
               {/* Fine Information for Missed Day */}
-              <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem", maxWidth: "300px", margin: "1.5rem auto 0" }}>
+              <div className="grid-cols-2" style={{ maxWidth: "300px", margin: "1.5rem auto 0" }}>
                 <div style={{ background: "rgba(248, 113, 113, 0.1)", padding: "0.75rem", borderRadius: "8px", textAlign: "center", border: "1px solid rgba(248, 113, 113, 0.2)" }}>
                   <div style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>💸</div>
                   <div style={{ fontSize: "0.75rem", color: "#8888aa", marginBottom: "0.25rem" }}>Total Fine</div>
@@ -876,7 +876,7 @@ export default function UserDashboard() {
             </span>
           )}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+        <div className="grid-cols-2">
           {/* Total fine — handles negative (streak credit) */}
           {(() => {
             const fine = profile?.fine ?? 0;
