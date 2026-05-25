@@ -52,10 +52,24 @@ const r2 = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
 });
-console.log("   ✅ S3 client created");
+// Strip checksum headers (same as production storage.js)
+r2.middlewareStack.add(
+  (next) => async (args) => {
+    if (args.request && args.request.headers) {
+      for (const h of Object.keys(args.request.headers)) {
+        if (h.startsWith("x-amz-checksum-")) {
+          delete args.request.headers[h];
+        }
+      }
+    }
+    return next(args);
+  },
+  { step: "build", name: "r2StripChecksumHeaders", priority: "low" }
+);
+console.log("   ✅ S3 client created (with checksum-stripping middleware)");
 
-// Test 1: List buckets
-console.log("\n3. Testing bucket access...");
+// Test 1: List buckets (optional — bucket-scoped tokens can't list)
+console.log("\n3. Testing bucket access (ListBuckets)...");
 try {
   const listCommand = new ListBucketsCommand({});
   const response = await r2.send(listCommand);
@@ -70,13 +84,8 @@ try {
     console.log(`   ⚠️  Target bucket "${targetBucket}" not found in account`);
   }
 } catch (error) {
-  console.error("   ❌ Failed to list buckets:", error.message);
-  console.error("   Error details:", {
-    name: error.name,
-    code: error.code,
-    statusCode: error.$metadata?.httpStatusCode
-  });
-  process.exit(1);
+  console.log("   ⚠️  ListBuckets not available (expected for bucket-scoped tokens):", error.message);
+  console.log("   Skipping — this does not affect uploads.");
 }
 
 // Test 2: Generate presigned URL
