@@ -26,6 +26,42 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { getSharedSocket } from "../hooks/useSocket.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 
+// ── Mobile detection ───────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 640) {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(`(max-width: ${breakpoint}px)`).matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const onChange = () => setMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [breakpoint]);
+  return mobile;
+}
+
+function useClickOutside(ref, onOutside) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onOutside();
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [ref, onOutside]);
+}
+
+const isScreenShareSupported = () => {
+  if (typeof navigator === "undefined") return false;
+  const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (mobileUa) return false;
+  return !!(navigator.mediaDevices?.getDisplayMedia);
+};
+
 // ── Device Picker Popup ───────────────────────────────────────────────────────
 function DevicePicker({ kind, onClose, onSelectDevice }) {
   const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind, requestPermissions: true });
@@ -127,11 +163,11 @@ function CtrlBtn({ icon, label, active = true, muted = false, danger = false, pe
   );
 }
 
-// ── Emoji Reactions Overlay ──────────────────────────────────────────────────
+// Must match backend ALLOWED_EMOJIS in chatSocket.js
 const EMOJI_LIST = [
-  "👍","👎","❤️","😂","😮","😢",
-  "👏","🎉","🔥","😍","🙌","💯",
-  "🤔","💪","🚀","⭐","😎","🥳",
+  "👍","❤️","😂","😮","👏","🎉",
+  "🔥","😍","🙌","💯","🤔","😢",
+  "💪","🚀","⭐","😎","🥳",
 ];
 
 function FloatingReactions({ reactions }) {
@@ -207,15 +243,23 @@ function EmojiBtn({ e, onPick, onClose }) {
   );
 }
 
-function EmojiPickerBar({ onPick, onClose }) {
+function EmojiPickerBar({ onPick, onClose, mobile = false }) {
+  const rows = mobile
+    ? [EMOJI_LIST.slice(0, 6), EMOJI_LIST.slice(6, 12), EMOJI_LIST.slice(12)]
+    : [EMOJI_LIST.slice(0, 9), EMOJI_LIST.slice(9)];
   return (
-    <div className="lr-emoji-picker">
-      <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
-         {EMOJI_LIST.slice(0, 9).map(e => <EmojiBtn key={e} e={e} onPick={onPick} onClose={onClose} />)}
-      </div>
-      <div style={{ display: "flex", gap: "0.2rem", justifyContent: "center" }}>
-         {EMOJI_LIST.slice(9, 18).map(e => <EmojiBtn key={e} e={e} onPick={onPick} onClose={onClose} />)}
-      </div>
+    <div className={`lr-emoji-picker${mobile ? " lr-emoji-picker--mobile" : ""}`}>
+      {mobile && (
+        <div className="lr-sheet-handle-row">
+          <span className="lr-sheet-title">Send a reaction</span>
+          <button type="button" className="lr-sheet-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+      )}
+      {rows.map((row, i) => (
+        <div key={i} className="lr-emoji-row">
+          {row.map(e => <EmojiBtn key={e} e={e} onPick={onPick} onClose={onClose} />)}
+        </div>
+      ))}
     </div>
   );
 }
@@ -224,11 +268,7 @@ function EmojiPickerBar({ onPick, onClose }) {
 function HandRaiseQueue({ raisedHands, onDismiss, onDismissAll }) {
   if (raisedHands.length === 0) return null;
   return (
-    <div style={{
-      position:"fixed", top:60, left:"50%", transform:"translateX(-50%)",
-      zIndex:99995, display:"flex", flexDirection:"column", gap:"0.35rem",
-      pointerEvents:"none", minWidth:"min(300px, calc(100vw - 2rem))", maxWidth:"min(380px, calc(100vw - 1rem))",
-    }}>
+    <div className="lr-hand-queue">
       {/* Queue header */}
       <div style={{
         display:"flex", alignItems:"center", justifyContent:"space-between",
@@ -301,25 +341,47 @@ function HandRaiseQueue({ raisedHands, onDismiss, onDismissAll }) {
 }
 
 // ── Custom Control Bar ────────────────────────────────────────────────────────
-function CustomControls({ userRole, onLeave, chatOpen, onChatToggle, unreadCount, ncOn, onNcToggle, ncLoading, handRaised, onHandToggle, onReaction, participantsOpen, onParticipantsToggle }) {
+function CustomControls({
+  userRole, onLeave, chatOpen, onChatToggle, unreadCount,
+  ncOn, onNcToggle, ncLoading, handRaised, onHandToggle, onReaction,
+  participantsOpen, onParticipantsToggle, isMobile,
+}) {
   const { localParticipant } = useLocalParticipant();
+  const toast = useToast();
   const [picker, setPicker]  = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const barRef = useRef(null);
+  const canShare = isScreenShareSupported();
 
-  // Use robust LiveKit track toggles to manage permissions, errors, and pending states automatically
   const { toggle: toggleMic, enabled: micOn, pending: micPending } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn, pending: camPending } = useTrackToggle({ source: Track.Source.Camera });
   const { toggle: toggleShare, enabled: shareOn, pending: sharePending } = useTrackToggle({ source: Track.Source.ScreenShare });
 
-  useEffect(() => {
-    const handler = (e) => { if (barRef.current && !barRef.current.contains(e.target)) setPicker(null); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  const closePickers = useCallback(() => { setPicker(null); setMoreOpen(false); }, []);
+  useClickOutside(barRef, closePickers);
 
   const handleLeave = () => {
     localParticipant?.room?.disconnect();
     onLeave();
+  };
+
+  const handleShare = async () => {
+    if (!canShare) {
+      toast("Screen sharing is only available on desktop browsers", "warning");
+      return;
+    }
+    try {
+      await toggleShare();
+    } catch (e) {
+      console.error(e);
+      toast(e?.message?.includes("Permission") ? "Screen share permission denied" : "Could not start screen share", "error");
+    }
+  };
+
+  const handleReactionPick = (emoji) => {
+    onReaction(emoji);
+    setPicker(null);
+    setMoreOpen(false);
   };
 
   const chevronStyle = (muted) => ({
@@ -333,88 +395,138 @@ function CustomControls({ userRole, onLeave, chatOpen, onChatToggle, unreadCount
     transition: "all 0.15s",
   });
 
-  return (
-    <div ref={barRef} className="lr-controls-bar">
-      {/* LEFT GROUP — Mic + Cam */}
-      <div className="lr-ctrl-group">
-        <div style={{ position: "relative" }}>
-          <div style={{ display: "flex" }}>
-            <CtrlBtn icon={micOn ? "🎤" : "🔇"} label={micOn ? "Mute" : "Unmute"}
-              active={micOn} muted={!micOn} pending={micPending}
-              onClick={async () => { try { await toggleMic(); } catch(e) { console.error(e); } }}
-              style={{ borderRadius: "14px 0 0 14px" }}
-            />
-            <button type="button" className="lr-chevron" data-muted={!micOn}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPicker(p => p === "audioinput" ? null : "audioinput"); }}
-            >▴</button>
-          </div>
-          {picker === "audioinput" && <DevicePicker kind="audioinput" onClose={() => setPicker(null)} onSelectDevice={async () => { if (!micOn) { try { await toggleMic(); } catch(e){} } }} />}
+  const micCamGroup = (
+    <>
+      <div className="lr-ctrl-with-picker">
+        <div className="lr-ctrl-split">
+          <CtrlBtn icon={micOn ? "🎤" : "🔇"} label={micOn ? "Mute" : "Unmute"}
+            active={micOn} muted={!micOn} pending={micPending}
+            onClick={async () => { try { await toggleMic(); } catch(e) { console.error(e); } }}
+            style={{ borderRadius: "14px 0 0 14px" }}
+          />
+          <button type="button" className="lr-chevron" data-muted={!micOn}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMoreOpen(false); setPicker(p => p === "audioinput" ? null : "audioinput"); }}
+          >▴</button>
         </div>
-        <div style={{ position: "relative" }}>
-          <div style={{ display: "flex" }}>
-            <CtrlBtn icon={camOn ? "📹" : "🚫"} label={camOn ? "Camera" : "No Cam"}
-              active={camOn} muted={!camOn} pending={camPending}
-              onClick={async () => { try { await toggleCam(); } catch(e) { console.error(e); } }}
-              style={{ borderRadius: "14px 0 0 14px" }}
-            />
-            <button type="button" className="lr-chevron" data-muted={!camOn}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPicker(p => p === "videoinput" ? null : "videoinput"); }}
-            >▴</button>
-          </div>
-          {picker === "videoinput" && <DevicePicker kind="videoinput" onClose={() => setPicker(null)} onSelectDevice={async () => { if (!camOn) { try { await toggleCam(); } catch(e){} } }} />}
-        </div>
+        {picker === "audioinput" && <DevicePicker kind="audioinput" onClose={() => setPicker(null)} onSelectDevice={async () => { if (!micOn) { try { await toggleMic(); } catch(e){} } }} />}
       </div>
+      <div className="lr-ctrl-with-picker">
+        <div className="lr-ctrl-split">
+          <CtrlBtn icon={camOn ? "📹" : "🚫"} label={camOn ? "Camera" : "No Cam"}
+            active={camOn} muted={!camOn} pending={camPending}
+            onClick={async () => { try { await toggleCam(); } catch(e) { console.error(e); } }}
+            style={{ borderRadius: "14px 0 0 14px" }}
+          />
+          <button type="button" className="lr-chevron" data-muted={!camOn}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMoreOpen(false); setPicker(p => p === "videoinput" ? null : "videoinput"); }}
+          >▴</button>
+        </div>
+        {picker === "videoinput" && <DevicePicker kind="videoinput" onClose={() => setPicker(null)} onSelectDevice={async () => { if (!camOn) { try { await toggleCam(); } catch(e){} } }} />}
+      </div>
+    </>
+  );
 
-      {/* DIVIDER */}
-      <div className="lr-ctrl-divider" />
+  const reactBtn = (
+    <div className="lr-ctrl-with-picker">
+      <CtrlBtn icon="😀" label="React" active
+        onClick={() => { setMoreOpen(false); setPicker(p => p === "emoji" ? null : "emoji"); }}
+        iconBoxStyle={picker === "emoji" ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+      />
+      {picker === "emoji" && !isMobile && (
+        <EmojiPickerBar onPick={handleReactionPick} onClose={() => setPicker(null)} />
+      )}
+    </div>
+  );
 
-      {/* CENTER GROUP — Share, NC, Hand, React */}
-      <div className="lr-ctrl-group">
+  const hostPeopleBtn = (userRole === "admin" || userRole === "trainer") && (
+    <CtrlBtn icon="👥" label="People" active={!participantsOpen} onClick={() => { setPicker(null); setMoreOpen(false); onParticipantsToggle(); }}
+      iconBoxStyle={participantsOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+    />
+  );
+
+  const chatBtn = (
+    <div className="lr-ctrl-with-picker" style={{ position: "relative" }}>
+      <CtrlBtn icon="💬"
+        label={unreadCount > 0 && !chatOpen ? `Chat (${unreadCount > 99 ? "99+" : unreadCount})` : "Chat"}
+        active={!chatOpen} onClick={() => { setPicker(null); setMoreOpen(false); onChatToggle(); }}
+        iconBoxStyle={chatOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" }
+          : unreadCount > 0 ? { border: "1px solid rgba(239,68,68,0.5)", background: "rgba(239,68,68,0.1)", color: "#fca5a5", animation: "badgePulse 1.5s ease-in-out infinite" } : {}}
+      />
+      {unreadCount > 0 && !chatOpen && (
+        <div className="lr-unread-badge">{unreadCount > 99 ? "99+" : unreadCount}</div>
+      )}
+    </div>
+  );
+
+  const secondaryControls = (
+    <>
+      {canShare && (
         <CtrlBtn icon="🖥️" label={shareOn ? "Sharing" : "Share"} active={!shareOn} pending={sharePending}
-          onClick={async () => { try { await toggleShare(); } catch(e) { console.error(e); } }}
+          onClick={handleShare}
           iconBoxStyle={shareOn ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
         />
-        <CtrlBtn
-          icon={ncLoading ? "⏳" : ncOn ? "🎧" : "🎙️"}
-          label={ncLoading ? "Loading…" : ncOn ? "Clear Audio" : "Normal Audio"}
-          active={!ncOn} onClick={onNcToggle}
-          iconBoxStyle={ncOn ? { border: "1px solid rgba(168,85,247,0.5)", background: "rgba(168,85,247,0.15)", color: "#d8b4fe", boxShadow: "0 0 16px rgba(168,85,247,0.3)" } : {}}
-        />
-        <CtrlBtn
-          icon={handRaised ? "✋" : "🖐️"} label={handRaised ? "Lower Hand" : "Raise Hand"}
-          active={!handRaised} onClick={onHandToggle}
-          iconBoxStyle={handRaised ? { border: "1.5px solid rgba(251,191,36,0.7)", background: "rgba(251,191,36,0.18)", color: "#fde68a", boxShadow: "0 0 0 3px rgba(251,191,36,0.2)", animation: "handPulse 1.2s ease-in-out infinite" } : {}}
-        />
-        <div style={{ position: "relative" }}>
-          <CtrlBtn icon="😀" label="React" active
-            onClick={() => setPicker(p => p === "emoji" ? null : "emoji")}
-            iconBoxStyle={picker === "emoji" ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
+      )}
+      <CtrlBtn
+        icon={ncLoading ? "⏳" : ncOn ? "🎧" : "🎙️"}
+        label={ncLoading ? "Loading…" : ncOn ? "Clear Audio" : "Normal Audio"}
+        active={!ncOn} onClick={() => { setPicker(null); onNcToggle(); }}
+        iconBoxStyle={ncOn ? { border: "1px solid rgba(168,85,247,0.5)", background: "rgba(168,85,247,0.15)", color: "#d8b4fe", boxShadow: "0 0 16px rgba(168,85,247,0.3)" } : {}}
+      />
+      <CtrlBtn
+        icon={handRaised ? "✋" : "🖐️"} label={handRaised ? "Lower Hand" : "Raise Hand"}
+        active={!handRaised} onClick={() => { setPicker(null); onHandToggle(); }}
+        iconBoxStyle={handRaised ? { border: "1.5px solid rgba(251,191,36,0.7)", background: "rgba(251,191,36,0.18)", color: "#fde68a", boxShadow: "0 0 0 3px rgba(251,191,36,0.2)", animation: "handPulse 1.2s ease-in-out infinite" } : {}}
+      />
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div ref={barRef} className="lr-controls-bar lr-controls-bar--mobile">
+        {picker === "emoji" && (
+          <>
+            <div className="lr-mobile-backdrop" onClick={() => setPicker(null)} />
+            <EmojiPickerBar mobile onPick={handleReactionPick} onClose={() => setPicker(null)} />
+          </>
+        )}
+        {moreOpen && (
+          <>
+            <div className="lr-mobile-backdrop" onClick={() => setMoreOpen(false)} />
+            <div className="lr-more-sheet">
+              <div className="lr-sheet-handle-row">
+                <span className="lr-sheet-title">More controls</span>
+                <button type="button" className="lr-sheet-close" onClick={() => setMoreOpen(false)}>✕</button>
+              </div>
+              <div className="lr-more-sheet-grid">{secondaryControls}</div>
+            </div>
+          </>
+        )}
+        <div className="lr-ctrl-group lr-ctrl-group--primary">
+          {micCamGroup}
+          {reactBtn}
+          {hostPeopleBtn}
+          {chatBtn}
+          <CtrlBtn icon="⋯" label="More" active={!moreOpen} onClick={() => { setPicker(null); setMoreOpen(v => !v); }}
+            iconBoxStyle={moreOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
           />
-          {picker === "emoji" && <EmojiPickerBar onPick={onReaction} onClose={() => setPicker(null)} />}
+          <CtrlBtn icon="📞" label="Leave" danger onClick={handleLeave} />
         </div>
       </div>
+    );
+  }
 
-      {/* DIVIDER */}
+  return (
+    <div ref={barRef} className="lr-controls-bar">
+      <div className="lr-ctrl-group">{micCamGroup}</div>
       <div className="lr-ctrl-divider" />
-
-      {/* RIGHT GROUP — Chat, People, Leave */}
       <div className="lr-ctrl-group">
-        {(userRole === "admin" || userRole === "trainer") && (
-          <CtrlBtn icon="👥" label="People" active={!participantsOpen} onClick={onParticipantsToggle}
-            iconBoxStyle={participantsOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" } : {}}
-          />
-        )}
-        <div style={{ position: "relative" }}>
-          <CtrlBtn icon="💬"
-            label={unreadCount > 0 && !chatOpen ? `Chat (${unreadCount > 99 ? "99+" : unreadCount})` : "Chat"}
-            active={!chatOpen} onClick={onChatToggle}
-            iconBoxStyle={chatOpen ? { border: "1px solid rgba(124,111,255,0.5)", background: "rgba(124,111,255,0.2)", color: "#a78bfa" }
-              : unreadCount > 0 ? { border: "1px solid rgba(239,68,68,0.5)", background: "rgba(239,68,68,0.1)", color: "#fca5a5", animation: "badgePulse 1.5s ease-in-out infinite" } : {}}
-          />
-          {unreadCount > 0 && !chatOpen && (
-            <div className="lr-unread-badge">{unreadCount > 99 ? "99+" : unreadCount}</div>
-          )}
-        </div>
+        {secondaryControls}
+        {reactBtn}
+      </div>
+      <div className="lr-ctrl-divider" />
+      <div className="lr-ctrl-group">
+        {hostPeopleBtn}
+        {chatBtn}
         <CtrlBtn icon="📞" label="Leave" danger onClick={handleLeave} />
       </div>
     </div>
@@ -423,7 +535,7 @@ function CustomControls({ userRole, onLeave, chatOpen, onChatToggle, unreadCount
 
 
 // ── Participants Panel ────────────────────────────────────────────────────────
-function ParticipantsPanel({ sessionId, onKicked, onClose }) {
+function ParticipantsPanel({ sessionId, onKicked, onClose, overlay = false }) {
   const participants = useParticipants();
   const [busy, setBusy]           = useState({});
   const toast = useToast();
@@ -453,7 +565,7 @@ function ParticipantsPanel({ sessionId, onKicked, onClose }) {
   });
 
   return (
-    <div className="lr-participants-panel">
+    <div className={`lr-participants-panel${overlay ? " lr-participants-panel--overlay" : ""}`}>
       {/* Header */}
       <div className="lr-panel-header">
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -628,8 +740,13 @@ function VideoGrid({ raisedHands }) {
 
 // ── Inner Room ────────────────────────────────────────────────────────────────
 function InnerRoom({ sessionId, userRole, onLeave, session }) {
+  const isMobile = useIsMobile();
+  const isHost = userRole === "admin" || userRole === "trainer";
   const [chatOpen,         setChatOpen]         = useState(false);
-  const [participantsOpen, setParticipantsOpen] = useState(true);
+  const [participantsOpen, setParticipantsOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(min-width: 641px)").matches && (userRole === "admin" || userRole === "trainer");
+  });
   const [unreadCount,      setUnreadCount]      = useState(0);
   const [kicked,      setKicked]      = useState(false);
   const [ncOn,        setNcOn]        = useState(false);
@@ -832,9 +949,16 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
       {/* Main area: participants sidebar + video + chat sidebar */}
       <div className="lr-main">
 
-        {/* Host participants panel — left sidebar */}
-        {(userRole === "admin" || userRole === "trainer") && participantsOpen && (
-          <ParticipantsPanel sessionId={sessionId} onClose={() => setParticipantsOpen(false)} />
+        {/* Host participants panel — sidebar on desktop, full overlay on mobile */}
+        {isHost && participantsOpen && (
+          <>
+            {isMobile && <div className="lr-mobile-backdrop" onClick={() => setParticipantsOpen(false)} />}
+            <ParticipantsPanel
+              sessionId={sessionId}
+              onClose={() => setParticipantsOpen(false)}
+              overlay={isMobile}
+            />
+          </>
         )}
 
         {/* Video grid — fills remaining space */}
@@ -874,6 +998,7 @@ function InnerRoom({ sessionId, userRole, onLeave, session }) {
         onReaction={handleReaction}
         participantsOpen={participantsOpen}
         onParticipantsToggle={() => setParticipantsOpen(v => !v)}
+        isMobile={isMobile}
       />
     </div>
   );

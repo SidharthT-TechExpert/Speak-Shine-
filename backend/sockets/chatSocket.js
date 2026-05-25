@@ -461,7 +461,7 @@ export function initializeChatSocket(io, onlineUsers) {
     socket.on("live:reaction", ({ sessionId, emoji }) => {
       if (!isValidSessionId(sessionId)) return;
       // Whitelist allowed emojis to prevent abuse
-      const ALLOWED_EMOJIS = ["👍","❤️","😂","😮","👏","🎉","🔥","😍","🙌","💯","🤔","😢","💪","🚀","⭐"];
+      const ALLOWED_EMOJIS = ["👍","❤️","😂","😮","👏","🎉","🔥","😍","🙌","💯","🤔","😢","💪","🚀","⭐","😎","🥳"];
       if (!ALLOWED_EMOJIS.includes(emoji)) return;
       const liveRoom = liveSessionRoom(sessionId);
       io.to(liveRoom).emit("live:reaction", {
