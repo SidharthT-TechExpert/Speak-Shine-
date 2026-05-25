@@ -126,24 +126,186 @@ VIDEO_QUEUE_CONCURRENCY=15
 
 ---
 
-## Quick Start
+## Prerequisites
+
+| Tool | Version |
+|------|---------|
+| [Node.js](https://nodejs.org/) | 18+ (20 or 22 recommended) |
+| [MongoDB](https://www.mongodb.com/) | Local install, Docker, or [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) |
+| [Redis](https://redis.io/) | Optional (app works without it; uses in-memory cache) |
+
+You also need **Groq API** and **Cloudflare R2** credentials for video upload and AI analysis.
+
+---
+
+## Run locally (development)
+
+### 1. Clone and install
 
 ```bash
-# 1. Install dependencies
-npm install          # root (if any)
-cd api && npm install
-cd ../frontend && npm install
+git clone <your-repo-url>
+cd speak-shine   # or your folder name (e.g. whatsapp-bot)
 
-# 2. Copy and fill in environment variables
+# Backend dependencies (project root)
+npm install
+
+# Frontend dependencies
+cd frontend
+npm install
+cd ..
+```
+
+> Dependencies live at the **project root** and in **`frontend/`**. You do **not** need `cd api && npm install` for normal development — start the API with `npm run dev:api` from the root.
+
+### 2. Environment files
+
+**Backend** — copy the example env to the project root:
+
+```bash
+# Linux / macOS
 cp .env.example .env
 
-# 3. Development
-cd api && npm start          # API on :3001
-cd frontend && npm run dev   # Frontend on :5173
+# Windows (PowerShell or CMD)
+copy .env.example .env
+```
 
-# 4. Production build
-cd frontend && npm run build
-# Then start api/server.js — it serves the built frontend too
+Edit `.env` and set at least:
+
+- `MONGODB_URI` — your MongoDB connection string  
+- `JWT_SECRET` and `JWT_REFRESH_SECRET` — any long random strings  
+- `GROQ_API_KEY` — from [console.groq.com](https://console.groq.com)  
+- `R2_*` — Cloudflare R2 bucket credentials  
+
+Set `NODE_ENV=development` (or leave unset) so CORS allows the Vite dev server.
+
+**Frontend** — copy the example env for Vite:
+
+```bash
+# Linux / macOS
+cp frontend/.env.example frontend/.env.local
+
+# Windows
+copy frontend\.env.example frontend\.env.local
+```
+
+Default `VITE_API_URL=/api` uses the Vite proxy to `http://localhost:3001` (see `frontend/vite.config.js`).
+
+### 3. Start backend and frontend (two terminals)
+
+**Terminal 1 — API (port 3001)**
+
+```bash
+# From project root
+npm run dev:api
+```
+
+Wait for: `✅ Speak & Shine API running on port 3001`
+
+**Terminal 2 — React app (port 5173)**
+
+```bash
+# From project root
+npm run dev:frontend
+```
+
+Open in the browser: **http://localhost:5173**
+
+**Health check:** http://localhost:3001/api/health
+
+### 4. Login / admin account
+
+Users log in with **phone + password** (accounts in MongoDB `auths` collection).
+
+Create or reset an admin password (with MongoDB running and `.env` configured):
+
+```bash
+node scripts/reset-admin-password.js <phone> <newPassword>
+```
+
+Example:
+
+```bash
+node scripts/reset-admin-password.js 9876543210 MySecurePass123
+```
+
+---
+
+## Local development (Windows PowerShell)
+
+Same steps as above; use `copy` instead of `cp`:
+
+```powershell
+cd C:\path\to\speak-shine
+npm install
+cd frontend; npm install; cd ..
+
+copy .env.example .env
+copy frontend\.env.example frontend\.env.local
+# Edit .env and frontend\.env.local in your editor
+
+# Terminal 1
+npm run dev:api
+
+# Terminal 2
+npm run dev:frontend
+```
+
+---
+
+## Run locally (production-like, single server)
+
+Build the frontend once, then serve it from Express:
+
+```bash
+npm install
+cd frontend && npm install && npm run build && cd ..
+npm run start:api
+```
+
+Open **http://localhost:3001** (API serves the built `frontend/dist` in production mode).
+
+For this mode set `NODE_ENV=production` in `.env` only if you need production CORS/HTTPS behavior.
+
+---
+
+## Useful npm scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev:api` | Start API on port 3001 (development) |
+| `npm run dev:frontend` | Start Vite dev server on port 5173 |
+| `npm run start:api` | Start API (same as dev, no NODE_ENV forced) |
+| `npm start` | Production start with memory limits |
+| `npm run build` | Install frontend deps and build to `frontend/dist` |
+| `npm test` | Run Vitest (daily reset + other tests) |
+| `npm run test:daily-reset` | Standalone daily-reset logic test (plain Node, no Vitest) |
+
+**Do not run** `node backend/services/scheduler/dailyResetService.test.js` — that file needs Vitest. Use `npm test` or `npm run test:daily-reset`.
+
+---
+
+## Troubleshooting (local)
+
+| Problem | Fix |
+|---------|-----|
+| `JWT_SECRET environment variable is not set` | Add `JWT_SECRET` to root `.env` and restart API |
+| Frontend loads but API calls fail | Ensure API is running; use `VITE_API_URL=/api` in `frontend/.env.local` |
+| CORS errors in production mode | Set `ALLOWED_ORIGINS=http://localhost:5173` or use `NODE_ENV=development` |
+| Video upload fails | Check `R2_*` variables and bucket CORS (`node scripts/set-r2-cors.js`) |
+| MongoDB connection error | Verify `MONGODB_URI` and that MongoDB is running |
+| Port already in use | Change `PORT` in `.env` or stop the other process on 3001 / 5173 |
+
+---
+
+## Quick Start (summary)
+
+```bash
+npm install && cd frontend && npm install && cd ..
+cp .env.example .env && cp frontend/.env.example frontend/.env.local
+# Edit .env (MongoDB, JWT, Groq, R2)
+
+npm run dev:api      # terminal 1
+npm run dev:frontend # terminal 2 → http://localhost:5173
 ```
 
 ---
