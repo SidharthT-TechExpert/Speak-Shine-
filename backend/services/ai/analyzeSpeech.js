@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { checkGrammar } from "./grammarCheck.js";
+import { checkGrammar, filterGrammarErrors } from "./grammarCheck.js";
 import { getTextKey, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 
 // ---------------------------------------------------------------------------
@@ -391,6 +391,9 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     const partNote = partLabel ? `\nNOTE: This is ${partLabel} of the full transcript. Score accordingly.\n` : "";
     return `You are an expert English speaking coach analyzing a student's spoken English video submission.
 
+TRANSCRIPT SOURCE (critical):
+The TRANSCRIPT below is automatic speech-to-text (audio → text). It often has NO punctuation, NO sentence capitals, and occasional STT glitches (repeated words, "i I", homophones). Evaluate the SPEAKER's real English grammar — not transcription formatting.
+
 AUDIO STATS (measured objectively from the recording):
 - Duration: ${durationStr}
 - Word count: ${wordCount} words
@@ -455,8 +458,14 @@ SCORING GUIDE:
 - rhythmNote: comment on the rhythm stats above — mention if they rush, have good flow, or inconsistent pace
 ${topicRelevanceGuide}
 
+GRAMMAR ERRORS (grammarErrors) — strict rules:
+- ONLY include substantive grammar the speaker actually got wrong: verb tense/form, articles (a/an/the), prepositions, subject-verb agreement, wrong word order, broken clause structure, wrong plural/count.
+- NEVER include: capitalization (youtube/YouTube, i/I at start), punctuation fixes, brand/proper-noun styling, or STT duplication fixes ("i I" → "I", "the the" → "the").
+- Quote the exact phrase from the transcript in "original"; give a natural corrected phrase in "correction"; brief "rule" label (e.g. verb tense, article usage).
+- If there are no real grammar mistakes, return an empty grammarErrors array [].
+- Maximum 4 items.
+
 RULES:
-- grammarErrors: list up to 4 real mistakes found in the transcript with exact quotes
 - suggestions: make them specific to THIS transcript, not generic advice
 - strongPoints: find at least 1-2 genuine positives
 - If filler words were detected, address them in suggestions
@@ -551,7 +560,9 @@ RULES:
       checkGrammar(transcript),
     ]);
     scores = result;
-    scores.grammarErrors = mergeGrammarErrors(scores.grammarErrors || [], ltErrors);
+    scores.grammarErrors = filterGrammarErrors(
+      mergeGrammarErrors(scores.grammarErrors || [], ltErrors)
+    );
   } else {
     // Long transcript — split into 2 halves, fire both in parallel
     const [half1, half2] = splitTranscript(transcript);
@@ -562,7 +573,9 @@ RULES:
       checkGrammar(transcript),
     ]);
     scores = mergeScores(result1, result2);
-    scores.grammarErrors = mergeGrammarErrors(scores.grammarErrors || [], ltErrors);
+    scores.grammarErrors = filterGrammarErrors(
+      mergeGrammarErrors(scores.grammarErrors || [], ltErrors)
+    );
   }
 
   return {
@@ -606,7 +619,7 @@ function mergeGrammarErrors(aiErrors, ltErrors) {
   const seen = new Set(
     aiErrors.map((e) => e.original?.toLowerCase().trim()).filter(Boolean)
   );
-  const merged = [...aiErrors];
+  const merged = [...filterGrammarErrors(aiErrors)];
   for (const e of ltErrors) {
     if (!seen.has(e.original?.toLowerCase().trim())) {
       merged.push(e);

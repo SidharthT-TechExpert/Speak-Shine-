@@ -49,8 +49,16 @@ export async function proxyUpload(req, res) {
     console.log(`[ProxyUpload] ✅ Uploaded successfully: ${publicUrl}`);
     res.json({ success: true, publicUrl });
   } catch (error) {
-    console.error("[ProxyUpload] Error:", error.message, "| Code:", error.Code || error.name, "| HTTP:", error.$metadata?.httpStatusCode);
-    res.status(500).json({ error: error.message || "Upload failed" });
+    const http = error.$metadata?.httpStatusCode;
+    console.error("[ProxyUpload] Error:", error.message, "| Code:", error.Code || error.name, "| HTTP:", http);
+    const hint =
+      http === 401 || error.name === "Unauthorized"
+        ? "R2 credentials rejected. Regenerate the R2 API token (Object Read & Write) and update R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY in .env."
+        : undefined;
+    res.status(500).json({
+      error: error.message || "Upload failed",
+      ...(hint ? { hint } : {}),
+    });
   }
 }
 

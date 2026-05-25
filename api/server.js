@@ -100,6 +100,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || process.env.API_PORT || 3001;
 const isProd = process.env.NODE_ENV === "production";
 
+/** Always allow Vite / local frontend even when NODE_ENV=production in .env */
+function isLocalDevOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  }
+}
+
+function isAllowedCorsOrigin(origin, allowedList) {
+  if (!origin) return true;
+  if (allowedList.length === 0 || allowedList.includes("*")) return true;
+  if (isLocalDevOrigin(origin)) return true;
+  if (allowedList.includes(origin)) return true;
+  if (origin.endsWith(".railway.app") || origin.endsWith(".up.railway.app")) return true;
+  return false;
+}
+
 // Trust proxy - required for Railway/reverse proxies to get real client IP
 app.set('trust proxy', 1);
 
@@ -131,11 +151,7 @@ const io = new SocketIO(httpServer, {
           if (socketAllowedOrigins.length === 0 || socketAllowedOrigins.includes("*")) {
             return cb(null, true);
           }
-          if (socketAllowedOrigins.includes(origin)) {
-            return cb(null, true);
-          }
-          // Also allow any *.railway.app origin as a safety net
-          if (origin.endsWith(".railway.app") || origin.endsWith(".up.railway.app")) {
+          if (isAllowedCorsOrigin(origin, socketAllowedOrigins)) {
             return cb(null, true);
           }
           console.error(`[Socket.io CORS] Blocked origin: ${origin}`);
@@ -219,8 +235,7 @@ app.use(cors({
           cb(null, true);
           return;
         }
-        // Check if origin is in allowed list
-        if (allowedOrigins.includes(origin)) {
+        if (isAllowedCorsOrigin(origin, allowedOrigins)) {
           cb(null, true);
         } else {
           console.error(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedOrigins.join(", ")}`);

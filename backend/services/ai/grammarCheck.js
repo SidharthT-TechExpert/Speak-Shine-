@@ -15,12 +15,60 @@ const IGNORED_RULE_IDS = [
   "WORD_CONTAINS_UNDERSCORE",
 ];
 
-// Category IDs to ignore (too noisy for spoken English)
+// Category IDs to ignore (too noisy for spoken English / STT)
 const IGNORED_CATEGORIES = [
   "TYPOGRAPHY",
   "PUNCTUATION",
   "CASING",
+  "COMPOUNDING", // often false positives on spoken fragments
 ];
+
+/** True when correction only changes letter case (STT has no caps). */
+export function isOnlyCapitalizationChange(original, correction) {
+  const o = (original || "").trim();
+  const c = (correction || "").trim();
+  if (!o || !c) return false;
+  return o.toLowerCase() === c.toLowerCase() && o !== c;
+}
+
+/** STT often duplicates words/syllables: "i I", "the the". */
+export function isSttRepetitionFix(original, correction) {
+  const oWords = (original || "").trim().split(/\s+/).filter(Boolean);
+  const cWords = (correction || "").trim().split(/\s+/).filter(Boolean);
+  if (cWords.length !== 1 || oWords.length < 2) return false;
+  const target = cWords[0].toLowerCase();
+  return oWords.every((w) => w.toLowerCase() === target);
+}
+
+/**
+ * Keep only substantive grammar mistakes — not STT/capitalization noise.
+ */
+export function filterGrammarErrors(errors) {
+  return (errors || []).filter((e) => {
+    const original = (e?.original || "").trim();
+    const correction = (e?.correction || "").trim();
+    const rule = (e?.rule || "").toLowerCase();
+
+    if (!original || !correction || original.length < 4) return false;
+    if (isOnlyCapitalizationChange(original, correction)) return false;
+    if (isSttRepetitionFix(original, correction)) return false;
+
+    if (
+      /capitaliz|casing|typograph|proper noun|brand name|spelling of/i.test(rule) ||
+      /upper\s*case|lower\s*case/i.test(rule)
+    ) {
+      return false;
+    }
+    if (/repeat|duplicat|double\s+word|word repetition/i.test(rule)) {
+      return false;
+    }
+    if (/punctuation|comma|period|quot/i.test(rule)) {
+      return false;
+    }
+
+    return true;
+  }).slice(0, 4);
+}
 
 /**
  * Checks a transcript against LanguageTool's free public API.
@@ -78,7 +126,10 @@ export async function checkGrammar(transcript, aiErrors = []) {
       const correction = match.replacements[0].value;
       const rule = match.shortMessage || match.message || match.rule?.description || "";
 
-      results.push({ original, correction, rule: rule.slice(0, 80) });
+      const entry = { original, correction, rule: rule.slice(0, 80) };
+      if (!filterGrammarErrors([entry]).length) continue;
+
+      results.push(entry);
 
       // Cap at 3 additional errors from LanguageTool
       if (results.length >= 3) break;

@@ -292,6 +292,7 @@ For this mode set `NODE_ENV=production` in `.env` only if you need production CO
 | Frontend loads but API calls fail | Ensure API is running; use `VITE_API_URL=/api` in `frontend/.env.local` |
 | CORS errors in production mode | Set `ALLOWED_ORIGINS=http://localhost:5173` or use `NODE_ENV=development` |
 | Video upload fails | Check `R2_*` variables and bucket CORS (`node scripts/set-r2-cors.js`) |
+| `[ProxyUpload] 401 Unauthorized` | Regenerate R2 API token with **Object Read & Write** on your bucket; run `node scripts/test-r2-upload.js`; restart API |
 | MongoDB connection error | Verify `MONGODB_URI` and that MongoDB is running |
 | Port already in use | Change `PORT` in `.env` or stop the other process on 3001 / 5173 |
 

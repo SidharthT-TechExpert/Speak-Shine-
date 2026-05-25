@@ -53,19 +53,25 @@ function getR2Client() {
     region: "auto",
     endpoint: R2_ENDPOINT,
     forcePathStyle: true,
+    // R2 does not support AWS SDK default flexible checksums on PutObject streams
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: R2_ACCESS_KEY_ID,
       secretAccessKey: R2_SECRET_ACCESS_KEY,
     },
   });
 
-  // Strip x-amz-checksum-* headers before signing.
-  // R2 doesn't support flexible checksums; leaving them causes SignatureDoesNotMatch.
+  // Strip checksum headers R2 rejects (401/501 with newer @aws-sdk/client-s3)
   _r2.middlewareStack.add(
     (next) => async (args) => {
-      if (args.request && args.request.headers) {
+      if (args.request?.headers) {
         for (const h of Object.keys(args.request.headers)) {
-          if (h.startsWith("x-amz-checksum-")) {
+          const lower = h.toLowerCase();
+          if (
+            lower.startsWith("x-amz-checksum-") ||
+            lower === "x-amz-sdk-checksum-algorithm"
+          ) {
             delete args.request.headers[h];
           }
         }
@@ -123,18 +129,43 @@ export async function uploadBufferToR2(buffer, key, mimeType = "video/mp4") {
   return `${getPublicUrl()}/${key}`;
 }
 
+const PROXY_UPLOAD_MAX_BYTES = 110 * 1024 * 1024;
+
 /**
- * Stream a Readable (e.g. an Express req) directly to R2.
- * The body is piped to R2 as it arrives — never buffered in full.
- * ContentLength must be known up front (from the Content-Length header).
+ * Read a Node Readable stream into a Buffer (for R2 PutObject compatibility).
+ */
+async function readStreamToBuffer(stream, expectedLength = 0) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of stream) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buf.length;
+    if (total > PROXY_UPLOAD_MAX_BYTES) {
+      throw new Error("Upload exceeds 110MB limit");
+    }
+    chunks.push(buf);
+  }
+  const body = Buffer.concat(chunks);
+  if (expectedLength > 0 && body.length !== expectedLength) {
+    console.warn(
+      `[R2] Content-Length mismatch: header=${expectedLength} received=${body.length}`
+    );
+  }
+  return body;
+}
+
+/**
+ * Upload from an Express request stream (proxy-upload).
+ * Buffers up to 110MB then PutObject — avoids R2 401 on streaming + checksum.
  */
 export async function streamUploadToR2(stream, key, mimeType, contentLength) {
+  const body = await readStreamToBuffer(stream, contentLength);
   await getR2Client().send(new PutObjectCommand({
-    Bucket:        getBucket(),
-    Key:           key,
-    Body:          stream,
-    ContentType:   mimeType,
-    ContentLength: contentLength,
+    Bucket:      getBucket(),
+    Key:         key,
+    Body:        body,
+    ContentType: mimeType,
+    ContentLength: body.length,
   }));
   return `${getPublicUrl()}/${key}`;
 }
