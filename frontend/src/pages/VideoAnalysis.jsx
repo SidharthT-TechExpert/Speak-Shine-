@@ -596,6 +596,83 @@ function ProcessingProgress({ stage, queueInfo, isLoading }) {
   );
 }
 
+// ── Client-side video compression ────────────────────────────────────────────
+const COMPRESS_THRESHOLD = 50 * 1024 * 1024; // 50 MB
+
+function compressVideo(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "auto";
+    video.playsInline = true;
+    const blobUrl = URL.createObjectURL(file);
+    video.src = blobUrl;
+
+    const cleanup = () => URL.revokeObjectURL(blobUrl);
+    video.onerror = () => { cleanup(); reject(new Error("Failed to load video for compression")); };
+
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      if (!duration || !isFinite(duration)) { cleanup(); reject(new Error("Unknown duration")); return; }
+
+      // Scale to max 720p
+      let w = video.videoWidth, h = video.videoHeight;
+      const maxDim = 720;
+      if (Math.max(w, h) > maxDim) {
+        const scale = maxDim / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      w += w % 2; h += h % 2; // even dimensions
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      const canvasStream = canvas.captureStream(24);
+
+      // Capture audio via Web Audio API (silent — no speaker output)
+      let audioCtx;
+      try {
+        audioCtx = new AudioContext();
+        const src = audioCtx.createMediaElementSource(video);
+        const dest = audioCtx.createMediaStreamDestination();
+        src.connect(dest);
+        dest.stream.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+      } catch (e) {
+        console.warn("[Compress] Audio capture failed:", e.message);
+      }
+
+      // Target bitrate: aim for ~40MB output
+      const targetBitrate = Math.min(1200000, Math.floor((40 * 8 * 1024 * 1024) / duration));
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus" : "video/webm";
+
+      const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: targetBitrate });
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => {
+        cleanup();
+        if (audioCtx) audioCtx.close().catch(() => {});
+        const blob = new Blob(chunks, { type: "video/webm" });
+        console.log(`[Compress] Done: ${(file.size/1024/1024).toFixed(1)}MB → ${(blob.size/1024/1024).toFixed(1)}MB`);
+        resolve(blob);
+      };
+      recorder.onerror = () => { cleanup(); reject(new Error("Compression recording failed")); };
+
+      recorder.start(1000);
+      video.play().catch(e => { cleanup(); reject(new Error("Autoplay blocked: " + e.message)); });
+
+      const draw = () => {
+        if (video.ended || video.paused) return;
+        ctx.drawImage(video, 0, 0, w, h);
+        if (onProgress) onProgress(Math.min(video.currentTime / duration, 0.99));
+        requestAnimationFrame(draw);
+      };
+      video.onplay = draw;
+      video.onended = () => { recorder.stop(); if (onProgress) onProgress(1); };
+    };
+  });
+}
+
 // ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
 function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, isWeeklyReflection }) {
   const [file, setFile]           = useState(null);
@@ -605,17 +682,14 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
   const [error, setError]         = useState(null);
   const [uploadSpeed, setUploadSpeed] = useState(null); // MB/s
   const [uploadEta, setUploadEta]     = useState(null); // seconds
+  const [compressProgress, setCompressProgress] = useState(0);
   const uploadStartRef = useRef(null);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    if (f.size > 350 * 1024 * 1024) { setError("File size must be less than 350MB."); return; }
-    if (f.size > 110 * 1024 * 1024) {
-      setError(`⚠️ This file is ${(f.size/1024/1024).toFixed(0)}MB. Maximum allowed is 110MB. Please record a shorter or lower-quality video.`);
-      return;
-    }
+    if (f.size > 500 * 1024 * 1024) { setError("File size must be less than 500MB."); return; }
     setFile(f);
   };
 
@@ -624,7 +698,22 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
     setUploading(true); setProgress(0); setError(null);
 
     try {
-      const fileToUpload = file;
+      let fileToUpload = file;
+
+      // ── Compress large files in the browser ──
+      if (file.size > COMPRESS_THRESHOLD && typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement.prototype.captureStream === "function") {
+        setStage("compressing");
+        setCompressProgress(0);
+        try {
+          const compressed = await compressVideo(file, (p) => setCompressProgress(Math.round(p * 100)));
+          const ext = file.name.replace(/\.[^.]+$/, ".webm");
+          fileToUpload = new File([compressed], ext, { type: "video/webm" });
+          console.log(`[Upload] Compressed ${(file.size/1024/1024).toFixed(1)}MB → ${(fileToUpload.size/1024/1024).toFixed(1)}MB`);
+        } catch (compErr) {
+          console.warn("[Upload] Compression failed, uploading original:", compErr.message);
+          fileToUpload = file;
+        }
+      }
 
       // ── Kick off frame extraction + presigned URL fetch in parallel ──
       // Frame extraction runs in the background while we start uploading.
@@ -634,7 +723,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
       let cachedResult = null;
 
       const framePromise = Promise.race([
-        generateHashAndFrames(fileToUpload),
+        generateHashAndFrames(file),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
       ]).then(result => {
         videoHash = result.hash;
@@ -794,7 +883,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum 1 minute · Max {isMonthlyReflection || isMonthlyGoals ? "10" : isWeeklyReflection ? "7" : "5"} minutes · Up to 110MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
+        Minimum 1 minute · Max {isMonthlyReflection || isMonthlyGoals ? "10" : isWeeklyReflection ? "7" : "5"} minutes · Up to 500MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"
@@ -810,13 +899,15 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
             {/* Step label + percentage */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", fontSize: "0.88rem" }}>
               <span style={{ color: "var(--text)", fontWeight: 600 }}>
-                {stage === "hashing" ? "🔍 Extracting frames…" :
+                {stage === "compressing" ? "🗜️ Compressing video…" :
+                 stage === "hashing" ? "🔍 Extracting frames…" :
                  stage === "uploading-frames" ? "📤 Saving frames…" :
                  stage === "confirming" ? "🤖 Starting analysis…" :
                  progress < 100 ? "☁️ Uploading to cloud…" : "✅ Upload complete"}
               </span>
               <span style={{ color: "var(--primary)", fontWeight: 700 }}>
-                {stage === "hashing" ? `${hashProgress}%` :
+                {stage === "compressing" ? `${compressProgress}%` :
+                 stage === "hashing" ? `${hashProgress}%` :
                  stage === "confirming" || stage === "uploading-frames" ? "100%" :
                  `${progress}%`}
               </span>
@@ -825,8 +916,8 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
             <div style={{ background: "var(--bg)", borderRadius: "99px", height: "10px", overflow: "hidden", marginBottom: "0.75rem" }}>
               <div style={{
                 height: "100%",
-                width: stage === "hashing" ? `${hashProgress}%` : stage === "confirming" || stage === "uploading-frames" ? "100%" : `${progress}%`,
-                background: progress === 100 || stage === "confirming" ? "var(--success)" : "linear-gradient(90deg, var(--primary), #a78bfa)",
+                width: stage === "compressing" ? `${compressProgress}%` : stage === "hashing" ? `${hashProgress}%` : stage === "confirming" || stage === "uploading-frames" ? "100%" : `${progress}%`,
+                background: progress === 100 || stage === "confirming" ? "var(--success)" : stage === "compressing" ? "linear-gradient(90deg, #f59e0b, #ef4444)" : "linear-gradient(90deg, var(--primary), #a78bfa)",
                 borderRadius: "99px",
                 transition: "width 0.4s ease",
               }} />
@@ -834,7 +925,9 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
             {/* Step checklist */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               {[
-                { icon: "🔍", label: "Extracting video frames", done: stage !== "hashing", active: stage === "hashing" },
+                ...(file && file.size > COMPRESS_THRESHOLD ? [{ icon: "🗜️", label: `Compressing video (${(file.size/1024/1024).toFixed(0)}MB)`, done: stage !== "compressing" && stage !== "", active: stage === "compressing",
+                  sub: stage === "compressing" ? `${compressProgress}%` : null }] : []),
+                { icon: "🔍", label: "Extracting video frames", done: stage !== "hashing" && stage !== "compressing", active: stage === "hashing" },
                 { icon: "☁️", label: "Uploading to cloud", done: progress >= 100, active: stage === "uploading" && progress < 100,
                   sub: stage === "uploading" && progress < 100
                     ? `${progress}%${uploadSpeed ? ` · ${uploadSpeed.toFixed(1)} MB/s` : ""}${uploadEta ? ` · ~${uploadEta}s left` : ""}`
