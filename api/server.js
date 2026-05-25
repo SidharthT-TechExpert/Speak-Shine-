@@ -230,15 +230,17 @@ app.use(cors({
 // Limit JSON body size to prevent payload DoS
 // /api/video/upload-frames sends 16 base64 frames (~5.6MB), so allow 10MB for that route
 app.use("/api/video/upload-frames", express.json({ limit: "10mb" }));
-// /api/video/proxy-upload streams raw binary — must be registered BEFORE global json parser
-// express.raw buffers the entire body as a Buffer so the controller can forward it to R2
-app.use((req, res, next) => {
-  if (req.path === "/api/video/proxy-upload" && req.method === "PUT") {
-    return express.raw({ type: "*/*", limit: "120mb" })(req, res, next);
-  }
-  next();
-});
-app.use(express.json({ limit: "1mb" }));
+// /api/video/proxy-upload — skip ALL body parsing so the controller can stream
+// the request body directly to R2 (avoids buffering the entire file in RAM).
+// The global JSON parser below must also skip this route.
+app.use(express.json({
+  limit: "1mb",
+  type: (req) => {
+    // Don't parse proxy-upload — its body is streamed directly to R2
+    if (req.path === "/api/video/proxy-upload") return false;
+    return req.headers["content-type"]?.includes("json");
+  },
+}));
 
 // General API rate limit: 200 requests per minute per IP
 const apiLimiter = rateLimit({

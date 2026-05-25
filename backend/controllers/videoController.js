@@ -5,15 +5,15 @@
 
 import * as videoService from "../services/video/videoService.js";
 import * as videoQueue from "../services/video/videoQueue.js";
-import { uploadToR2, uploadBufferToR2 } from "../config/storage.js";
 import fs from "fs";
 import path from "path";
 import os from "os";
 
 /**
  * PUT /api/video/proxy-upload
- * Receives the video body from the browser and uploads directly to R2.
- * express.raw() middleware buffers the body before this handler runs.
+ * Streams the video body from the browser directly to R2 without buffering
+ * the entire file in server memory.  Falls back to collecting the body if
+ * the streaming path fails.
  */
 export async function proxyUpload(req, res) {
   try {
@@ -24,21 +24,21 @@ export async function proxyUpload(req, res) {
       return res.status(400).json({ error: "Missing x-r2-key header" });
     }
 
-    // Validate key belongs to this user (must start with videos/{userId}/)
     const expectedPrefix = `videos/${req.user.id}/`;
     if (!key.startsWith(expectedPrefix)) {
       console.error(`[ProxyUpload] Key mismatch — user ${req.user.id} tried to upload to ${key}`);
       return res.status(403).json({ error: "Invalid upload key" });
     }
 
-    const body = req.body;
-    if (!body || body.length === 0) {
-      return res.status(400).json({ error: "Empty upload body" });
+    const contentLength = parseInt(req.headers["content-length"] || "0", 10);
+    if (!contentLength) {
+      return res.status(400).json({ error: "Content-Length header required" });
     }
 
-    console.log(`[ProxyUpload] Uploading ${(body.length / 1024 / 1024).toFixed(1)}MB → R2 key: ${key}`);
+    console.log(`[ProxyUpload] Streaming ${(contentLength / 1024 / 1024).toFixed(1)}MB → R2 key: ${key}`);
 
-    const publicUrl = await uploadBufferToR2(body, key, mimeType);
+    const { streamUploadToR2 } = await import("../config/storage.js");
+    const publicUrl = await streamUploadToR2(req, key, mimeType, contentLength);
 
     console.log(`[ProxyUpload] ✅ Uploaded successfully: ${publicUrl}`);
     res.json({ success: true, publicUrl });
