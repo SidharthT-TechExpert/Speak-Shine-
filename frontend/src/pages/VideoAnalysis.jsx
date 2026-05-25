@@ -673,6 +673,77 @@ function compressVideo(file, onProgress) {
   });
 }
 
+// ── Mobile-friendly camera (avoids 2–3× digital zoom / tight face crop) ───────
+function isMobileRecordingDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|webOS|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 0 && window.matchMedia("(max-width: 768px)").matches);
+}
+
+async function resetCameraZoom(videoTrack) {
+  if (!videoTrack?.getCapabilities) return;
+  try {
+    const caps = videoTrack.getCapabilities();
+    if (caps.zoom == null) return;
+    const zoom = typeof caps.zoom === "object" ? (caps.zoom.min ?? 1) : 1;
+    await videoTrack.applyConstraints({ advanced: [{ zoom }] });
+  } catch {
+    try { await videoTrack.applyConstraints({ zoom: 1 }); } catch { /* unsupported */ }
+  }
+}
+
+function buildRecordingMediaConstraints(camId, micId) {
+  const isMobile = isMobileRecordingDevice();
+  const videoBase = camId ? { deviceId: { ideal: camId } } : { facingMode: "user" };
+
+  const video = isMobile
+    ? {
+        ...videoBase,
+        resizeMode: { ideal: "none" },
+        frameRate: { ideal: 24, max: 30 },
+        width: { max: 1280 },
+        height: { max: 1280 },
+      }
+    : {
+        ...videoBase,
+        resizeMode: { ideal: "none" },
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        aspectRatio: { ideal: 16 / 9 },
+        frameRate: { ideal: 30, max: 30 },
+      };
+
+  return {
+    video,
+    audio: {
+      ...(micId ? { deviceId: { ideal: micId } } : {}),
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      sampleRate: 48000,
+      channelCount: 1,
+    },
+  };
+}
+
+async function openRecordingStream(camId, micId) {
+  const full = buildRecordingMediaConstraints(camId, micId);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(full);
+    const track = stream.getVideoTracks()[0];
+    if (track) await resetCameraZoom(track);
+    return stream;
+  } catch {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: camId ? { deviceId: { ideal: camId }, facingMode: "user" } : { facingMode: "user" },
+      audio: full.audio,
+    });
+    const track = stream.getVideoTracks()[0];
+    if (track) await resetCameraZoom(track);
+    return stream;
+  }
+}
+
 // ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
 function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, isWeeklyReflection }) {
   const [file, setFile]           = useState(null);
@@ -991,6 +1062,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const [isPaused, setIsPaused]     = useState(false);
   const [noiseCancel, setNoiseCancel] = useState(true);
   const [ncStatus, setNcStatus]     = useState("idle");
+  const [previewAspect, setPreviewAspect] = useState(null);
 
   const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
@@ -1028,13 +1100,32 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     return () => cleanup();
   }, []);
 
+  const syncPreviewAspect = useCallback(() => {
+    const v = liveVideoRef.current;
+    if (v?.videoWidth && v?.videoHeight) {
+      setPreviewAspect(`${v.videoWidth} / ${v.videoHeight}`);
+    }
+  }, []);
+
+  const livePreviewStyle = {
+    width: "100%",
+    maxWidth: "480px",
+    borderRadius: "12px",
+    background: "#000",
+    objectFit: "contain",
+    display: "block",
+    aspectRatio: previewAspect || (isMobileRecordingDevice() ? "3 / 4" : "16 / 9"),
+    maxHeight: isMobileRecordingDevice() ? "70vh" : "none",
+  };
+
   // Attach stream to live video once countdown/recording step renders the element
   useEffect(() => {
     if ((step === "countdown" || step === "recording") && liveVideoRef.current && streamRef.current) {
       liveVideoRef.current.srcObject = streamRef.current;
       liveVideoRef.current.play().catch(() => {});
+      syncPreviewAspect();
     }
-  }, [step]);
+  }, [step, syncPreviewAspect]);
 
   // Attach blob URL to preview video once preview step renders the element
   useEffect(() => {
@@ -1064,27 +1155,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     }
     
     try {
-      // ── Option 1: browser-level noise suppression via getUserMedia constraints ──
-      const isMobile = window.innerWidth < 600;
-      const constraints = {
-        video: {
-          ...(camId ? { deviceId: { exact: camId } } : {}),
-          width:  isMobile ? { ideal: 1080 } : { ideal: 1920, min: 1280 },
-          height: isMobile ? { ideal: 1920 } : { ideal: 1080, min: 720 },
-          aspectRatio: { ideal: isMobile ? 9/16 : 16/9 },
-          frameRate: { ideal: 30, min: 24 },
-          facingMode: isMobile ? "user" : "user",
-        },
-        audio: {
-          ...(micId ? { deviceId: { exact: micId } } : {}),
-          echoCancellation: true,
-          noiseSuppression: true,   // browser built-in
-          autoGainControl: true,
-          sampleRate: 48000,
-          channelCount: 1,
-        },
-      };
-      const rawStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const rawStream = await openRecordingStream(camId, micId);
 
       let finalStream = rawStream;
 
@@ -1627,7 +1698,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       {step === "countdown" && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem" }}>
           <video ref={liveVideoRef} autoPlay muted playsInline
-            style={{ width: "100%", maxWidth: "480px", borderRadius: "12px", background: "#000", aspectRatio: "16/9", objectFit: "cover" }} />
+            onLoadedMetadata={syncPreviewAspect}
+            style={livePreviewStyle} />
           <div style={{ fontSize: "5rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1 }}>{countdown}</div>
           {ncStatus === "loading" && (
             <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI noise cancellation…</p>
@@ -1651,15 +1723,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
           {/* Video — 9:16 on mobile, 16:9 on desktop */}
           <div style={{ position: "relative", marginBottom: "0.85rem" }}>
             <video ref={liveVideoRef} autoPlay muted playsInline
-              style={{
-                width: "100%",
-                borderRadius: "12px",
-                background: "#000",
-                objectFit: "cover",
-                display: "block",
-                aspectRatio: window.innerWidth < 600 ? "9/16" : "16/9",
-                maxHeight: window.innerWidth < 600 ? "70vh" : "none",
-              }} />
+              onLoadedMetadata={syncPreviewAspect}
+              style={{ ...livePreviewStyle, maxWidth: "100%" }} />
 
             {/* REC badge */}
             <div style={{
