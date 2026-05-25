@@ -475,7 +475,7 @@ export default function AdminDashboard() {
           )}
 
           {/* ── Row 1: Submission donut + Streak leaderboard ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: "1rem", marginBottom: "1rem" }}>
+          <div className="grid-cols-2" style={{ marginBottom: "1rem" }}>
 
             {/* Submission donut — redesigned */}
             <div className="card" style={{ display: "flex", flexDirection: "column" }}>
@@ -567,7 +567,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* ── Row 2: Weekly bar + Fine bar + Category pie ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+          <div className="grid-cols-3" style={{ gap: "1rem" }}>
 
             {/* Weekly submissions bar */}
             <div className="card">
@@ -1733,7 +1733,7 @@ function LiveSessionsPanel() {
         }}>
           <div style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1rem" }}>📅 New Session</div>
           <form onSubmit={create}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div className="grid-cols-2" style={{ marginBottom: "0.75rem" }}>
               <div>
                 <label className="form-label">Session Title *</label>
                 <input className="form-input" placeholder="e.g. Weekly Speaking Practice" required
@@ -2012,14 +2012,14 @@ function MonitoringPanel() {
       </div>
 
       {/* Row 1: 3 stat tiles */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.75rem"}}>
+      <div className="grid-cols-3">
         <MonStat icon="👥" label="Active Users" value={activeUsers} accent="#7c6fff" />
         <MonStat icon="✅" label="Done Today" value={videos.completedToday} accent="#4ade80" />
         <MonStat icon="❌" label="Failed Today" value={videos.failedToday} accent={videos.failedToday > 0 ? "#f87171" : "#4ade80"} />
       </div>
 
       {/* Row 2: 3 stat tiles */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"0.75rem"}}>
+      <div className="grid-cols-3">
         <MonStat icon="🎬" label="Processing Now" value={isIdle ? "Idle" : `${videos.activeCount ?? videos.processing} / ${videos.maxConcurrent ?? queue?.maxConcurrent ?? 15}`} accent="#38bdf8" />
         <MonStat icon="⏱️" label="Avg Process Time" value={queue?.avgProcessingMin ? `${queue.avgProcessingMin} min` : "—"} accent="#fbbf24" />
         <MonStat icon="🌐" label="Avg API Response" value={apiStats.avgResponseMs ? `${apiStats.avgResponseMs}ms` : "—"} accent="#fb923c" />
@@ -2044,7 +2044,7 @@ function MonitoringPanel() {
       </div>
 
       {/* Queue + Errors — errors full width when there are security events */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.75rem"}}>
+      <div className="grid-cols-2">
 
         {/* Queue */}
         <div className="card">
@@ -2069,7 +2069,7 @@ function MonitoringPanel() {
               <QueueRow label="Est. wait" value={queue?.avgProcessingMin ? `~${queue.avgProcessingMin} min` : "~2.5 min"} />
             </div>
           )}
-          <div style={{marginTop:"1rem",paddingTop:"0.75rem",borderTop:"1px solid var(--border)",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",fontSize:"0.82rem",color:"var(--muted)"}}>
+          <div className="grid-cols-2" style={{marginTop:"1rem",paddingTop:"0.75rem",borderTop:"1px solid var(--border)",gap:"0.5rem",fontSize:"0.82rem",color:"var(--muted)"}}>
             <span>Total processed: <strong style={{color:"var(--text)"}}>{queue?.totalProcessed || 0}</strong></span>
             <span>Total failed: <strong style={{color: (queue?.totalFailed || 0) > 0 ? "#f87171" : "var(--text)"}}>{queue?.totalFailed || 0}</strong></span>
           </div>
@@ -2357,7 +2357,7 @@ function ManualQuestionsPanel() {
         }}>
           <div style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1rem" }}>📝 Setup Manual Question</div>
           <form onSubmit={setupQuestion}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div className="grid-cols-2" style={{ marginBottom: "0.75rem" }}>
               <div>
                 <label className="form-label">Question Type *</label>
                 <select 
@@ -2415,7 +2415,7 @@ function ManualQuestionsPanel() {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div className="grid-cols-2" style={{ marginBottom: "0.75rem" }}>
               <div>
                 <label className="form-label">Category *</label>
                 <input 

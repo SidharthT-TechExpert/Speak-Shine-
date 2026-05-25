@@ -1550,7 +1550,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
           )}
 
           {/* Device selectors */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
+          <div className="grid-cols-2" style={{ marginBottom: "1.25rem" }}>
             <div>
               <label className="form-label">📷 Camera</label>
               <select className="form-input" value={camId} onChange={e => setCamId(e.target.value)}>

@@ -761,7 +761,7 @@ function TrainerLivePanel() {
       {showForm && (
         <div style={{ background: "rgba(124,111,255,0.08)", border: "1px solid rgba(124,111,255,0.25)", borderRadius: 16, padding: "1.5rem", marginBottom: "1.5rem" }}>
           <form onSubmit={create}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div className="grid-cols-2" style={{ marginBottom: "0.75rem" }}>
               <div><label className="form-label">Title *</label><input className="form-input" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
               <div><label className="form-label">Date & Time *</label><input className="form-input" type="datetime-local" required value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} /></div>
             </div>
@@ -1009,7 +1009,7 @@ function ManualQuestionsPanel() {
         }}>
           <div style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1rem" }}>📝 Setup Manual Question</div>
           <form onSubmit={setupQuestion}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div className="grid-cols-2" style={{ marginBottom: "0.75rem" }}>
               <div>
                 <label className="form-label">Question Type *</label>
                 <select 
@@ -1067,7 +1067,7 @@ function ManualQuestionsPanel() {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+            <div className="grid-cols-2" style={{ marginBottom: "0.75rem" }}>
               <div>
                 <label className="form-label">Category *</label>
                 <input 
