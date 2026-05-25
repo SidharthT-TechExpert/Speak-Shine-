@@ -1,6 +1,13 @@
 /**
  * storage.js — Cloudflare R2 client (S3-compatible)
- * Exports uploadToR2, deleteFromR2, getR2Key, getPresignedUploadUrl
+ * Exports uploadToR2, uploadBufferToR2, deleteFromR2, getR2Key,
+ *         getPresignedUploadUrl, getPresignedDownloadUrl
+ *
+ * IMPORTANT: The S3 client is created lazily (on first use) so that
+ * dotenv.config() in server.js has time to load .env before we read
+ * process.env.  ES-module imports are hoisted, so top-level code here
+ * runs BEFORE server.js body — reading env vars eagerly would pick up
+ * stale / empty values.
  */
 
 import { S3Client, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -8,79 +15,74 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
 
-// Validate R2 configuration but don't crash - just warn
-const R2_ENDPOINT = process.env.R2_ENDPOINT;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const BUCKET = process.env.R2_BUCKET_NAME || "speak-shine-videos";
-const PUBLIC_URL = (process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
+// ── Lazy-initialised singleton ──────────────────────────────────────────────
+let _r2 = null;
+let _bucket = null;
+let _publicUrl = null;
 
-let r2ConfigValid = true;
-const missingVars = [];
+function getR2Client() {
+  if (_r2) return _r2;
 
-if (!R2_ENDPOINT) missingVars.push("R2_ENDPOINT");
-if (!R2_ACCESS_KEY_ID) missingVars.push("R2_ACCESS_KEY_ID");
-if (!R2_SECRET_ACCESS_KEY) missingVars.push("R2_SECRET_ACCESS_KEY");
-if (!BUCKET) missingVars.push("R2_BUCKET_NAME");
+  const R2_ENDPOINT        = process.env.R2_ENDPOINT;
+  const R2_ACCESS_KEY_ID   = process.env.R2_ACCESS_KEY_ID;
+  const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+  _bucket    = process.env.R2_BUCKET_NAME || "speak-shine-videos";
+  _publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
 
-if (missingVars.length > 0) {
-  console.error("[R2] ⚠️  WARNING: Missing R2 configuration:", missingVars.join(", "));
-  console.error("[R2] Video upload functionality will not work until these are set.");
-  r2ConfigValid = false;
-} else {
-  console.log("[R2] ✅ Configuration loaded:", {
+  const missing = [];
+  if (!R2_ENDPOINT)          missing.push("R2_ENDPOINT");
+  if (!R2_ACCESS_KEY_ID)     missing.push("R2_ACCESS_KEY_ID");
+  if (!R2_SECRET_ACCESS_KEY) missing.push("R2_SECRET_ACCESS_KEY");
+  if (!_bucket)              missing.push("R2_BUCKET_NAME");
+
+  if (missing.length > 0) {
+    throw new Error(
+      `R2 storage is not configured. Missing: ${missing.join(", ")}. ` +
+      "Set these environment variables and restart."
+    );
+  }
+
+  console.log("[R2] Initialising S3 client:", {
     endpoint: R2_ENDPOINT,
-    bucket: BUCKET,
-    accessKeyId: R2_ACCESS_KEY_ID?.substring(0, 8) + "...",
-    secretKeyLength: R2_SECRET_ACCESS_KEY?.length
+    bucket: _bucket,
+    accessKeyId: R2_ACCESS_KEY_ID.substring(0, 8) + "...",
+    secretKeyLength: R2_SECRET_ACCESS_KEY.length,
   });
-}
 
-// Create S3 client only if config is valid
-let r2 = null;
-if (r2ConfigValid) {
-  try {
-    r2 = new S3Client({
-      region: "auto",
-      endpoint: R2_ENDPOINT,
-      forcePathStyle: true,
-      credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID,
-        secretAccessKey: R2_SECRET_ACCESS_KEY,
-      },
-    });
+  _r2 = new S3Client({
+    region: "auto",
+    endpoint: R2_ENDPOINT,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
 
-    // Strip x-amz-checksum-* headers before signing.
-    // R2 doesn't support flexible checksums; leaving them causes SignatureDoesNotMatch.
-    r2.middlewareStack.add(
-      (next) => async (args) => {
-        if (args.request && args.request.headers) {
-          for (const h of Object.keys(args.request.headers)) {
-            if (h.startsWith("x-amz-checksum-")) {
-              delete args.request.headers[h];
-            }
+  // Strip x-amz-checksum-* headers before signing.
+  // R2 doesn't support flexible checksums; leaving them causes SignatureDoesNotMatch.
+  _r2.middlewareStack.add(
+    (next) => async (args) => {
+      if (args.request && args.request.headers) {
+        for (const h of Object.keys(args.request.headers)) {
+          if (h.startsWith("x-amz-checksum-")) {
+            delete args.request.headers[h];
           }
         }
-        return next(args);
-      },
-      { step: "build", name: "r2StripChecksumHeaders", priority: "low" }
-    );
+      }
+      return next(args);
+    },
+    { step: "build", name: "r2StripChecksumHeaders", priority: "low" }
+  );
 
-    console.log("[R2] ✅ S3 client initialized successfully");
-  } catch (error) {
-    console.error("[R2] ❌ Failed to initialize S3 client:", error.message);
-    r2ConfigValid = false;
-  }
+  console.log("[R2] S3 client ready");
+  return _r2;
 }
 
-/**
- * Check if R2 is properly configured
- */
-function ensureR2Configured() {
-  if (!r2ConfigValid || !r2) {
-    throw new Error("R2 storage is not configured. Please set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME environment variables.");
-  }
-}
+function getBucket()    { if (!_bucket)    getR2Client(); return _bucket; }
+function getPublicUrl() { if (!_publicUrl && _publicUrl !== "") getR2Client(); return _publicUrl; }
+
+// ── Public helpers ──────────────────────────────────────────────────────────
 
 /**
  * Build a unique R2 object key for a video.
@@ -88,65 +90,45 @@ function ensureR2Configured() {
  */
 export function getR2Key(userId, originalName) {
   const ext  = path.extname(originalName || ".webm") || ".webm";
-  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const date = new Date().toISOString().slice(0, 10);
   const uid  = Math.random().toString(36).slice(2, 10);
   return `videos/${userId}/${date}/${uid}${ext}`;
 }
 
 /**
  * Upload a local file to R2.
- * Uses PutObjectCommand (single PUT, up to 5 GB on R2) instead of multipart
- * to avoid checksum / signing issues with Cloudflare R2.
- *
- * @param {string} filePath   — local temp file path
- * @param {string} key        — R2 object key (from getR2Key)
- * @param {string} mimeType   — e.g. "video/webm"
- * @returns {Promise<string>} — public URL
+ * Uses PutObjectCommand (single PUT, up to 5 GB on R2).
  */
 export async function uploadToR2(filePath, key, mimeType = "video/webm") {
-  ensureR2Configured();
-
   const body = fs.readFileSync(filePath);
-  await r2.send(new PutObjectCommand({
-    Bucket:      BUCKET,
+  await getR2Client().send(new PutObjectCommand({
+    Bucket:      getBucket(),
     Key:         key,
     Body:        body,
     ContentType: mimeType,
   }));
-  return `${PUBLIC_URL}/${key}`;
+  return `${getPublicUrl()}/${key}`;
 }
 
 /**
  * Upload a Buffer directly to R2 (avoids writing to a temp file).
- *
- * @param {Buffer} buffer
- * @param {string} key
- * @param {string} mimeType
- * @returns {Promise<string>} — public URL
  */
 export async function uploadBufferToR2(buffer, key, mimeType = "video/mp4") {
-  ensureR2Configured();
-
-  await r2.send(new PutObjectCommand({
-    Bucket:      BUCKET,
+  await getR2Client().send(new PutObjectCommand({
+    Bucket:      getBucket(),
     Key:         key,
     Body:        buffer,
     ContentType: mimeType,
   }));
-  return `${PUBLIC_URL}/${key}`;
+  return `${getPublicUrl()}/${key}`;
 }
 
 /**
  * Delete an object from R2 by key.
- * Silently ignores errors (object may already be expired/deleted).
- *
- * @param {string} key — R2 object key
  */
 export async function deleteFromR2(key) {
-  ensureR2Configured();
-  
   try {
-    await r2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    await getR2Client().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }));
     console.log(`[R2] Deleted: ${key}`);
   } catch (err) {
     console.log(`[R2] Delete failed (ignored): ${err.message}`);
@@ -156,23 +138,17 @@ export async function deleteFromR2(key) {
 /**
  * Generate a presigned PUT URL so the browser can upload directly to R2.
  * The URL expires in 15 minutes.
- *
- * @param {string} key      — R2 object key (from getR2Key)
- * @param {string} mimeType — e.g. "video/webm"
- * @returns {Promise<string>} — presigned PUT URL
  */
 export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
-  ensureR2Configured();
-  
   try {
     console.log("[R2] Generating presigned URL - key:", key, "mimeType:", mimeType);
-    
+
     const command = new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: getBucket(),
       Key:    key,
     });
-    
-    const url = await getSignedUrl(r2, command, { expiresIn: 900 });
+
+    const url = await getSignedUrl(getR2Client(), command, { expiresIn: 900 });
     console.log("[R2] Presigned URL generated successfully");
     return url;
   } catch (error) {
@@ -180,30 +156,22 @@ export async function getPresignedUploadUrl(key, mimeType = "video/webm") {
       message: error.message,
       code: error.code,
       name: error.name,
-      stack: error.stack
     });
     throw new Error(`Failed to generate upload URL: ${error.message}`);
   }
 }
 
 /**
- * Generate a presigned GET URL so the browser can download from R2 with authentication.
- * Used for private videos to prevent unauthorized access.
- * The URL expires after the specified time.
- *
- * @param {string} key        — R2 object key
- * @param {number} expiresIn  — expiration time in seconds (default: 1 hour)
- * @returns {Promise<string>} — presigned GET URL
+ * Generate a presigned GET URL for downloading from R2.
  */
 export async function getPresignedDownloadUrl(key, expiresIn = 3600) {
-  ensureR2Configured();
-  
   const command = new GetObjectCommand({
-    Bucket: BUCKET,
+    Bucket: getBucket(),
     Key: key,
   });
-  return getSignedUrl(r2, command, { expiresIn });
+  return getSignedUrl(getR2Client(), command, { expiresIn });
 }
 
-// Re-export the shared r2 client for modules that need direct access
-export { r2 as r2Client, BUCKET };
+// Expose client getter for modules that need direct access
+export { getR2Client as r2Client };
+export { getBucket as BUCKET };
