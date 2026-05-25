@@ -8,7 +8,7 @@ import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import UploadAudit from "../../../models/uploadAuditSchema.js";
 import { uploadToR2, uploadBufferToR2, deleteFromR2, getR2Key, getPresignedUploadUrl, getPresignedDownloadUrl } from "../../config/storage.js";
-import { enqueue, pushProgressById, recordSecurityEvent } from "./videoQueue.js";
+import { enqueue, pushProgressById, pushPipelineStep, recordSecurityEvent, trackReportPhone } from "./videoQueue.js";
 import { getVideoDuration } from "../ai/videoProcessor.js";
 import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
@@ -97,7 +97,9 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
       const cached = await checkSecurityCache(videoHash);
       if (cached && cached.passed) {
         console.log(`[VideoService] ⚡ Security checks SKIPPED (cached) for ${reportId}`);
-        pushProgressById(reportId, { status: "processing", stage: "✅ Security checks passed (cached)" });
+        pushPipelineStep(reportId, "virus", "Security checks passed (cached)");
+        pushPipelineStep(reportId, "codec", "Codec validation skipped (cached)");
+        pushPipelineStep(reportId, "moderation", "Content check skipped (cached)");
         
         // Skip to AI processing
         const report = await VideoReport.findById(reportId);
@@ -105,7 +107,7 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
         
         // Still need to download for AI processing (unless we have browser frames)
         if (!browserFrames || browserFrames.length === 0) {
-          pushProgressById(reportId, { status: "processing", stage: "⬇️ Downloading for analysis…" });
+          pushPipelineStep(reportId, "download", "Downloading for analysis…");
           const downloadStart = Date.now();
           const response = await fetch(videoUrl);
           if (!response.ok) throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
@@ -116,7 +118,7 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
           console.log(`[VideoService] ⚡ Skipping video download - using browser frames for visual analysis`);
         }
         
-        pushProgressById(reportId, { status: "processing", stage: "⏳ Queuing for AI analysis…" });
+        pushPipelineStep(reportId, "queue", "Queued for AI analysis…");
         if (browserFrames?.length >= 8 && fs.existsSync(tempPath)) {
           try { fs.unlinkSync(tempPath); } catch {}
         }
@@ -133,7 +135,7 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
     }
 
     // ── Step 1: Download with progress ───────────────────────────────────────
-    pushProgressById(reportId, { status: "processing", stage: "⬇️ Downloading your video…" });
+    pushPipelineStep(reportId, "download", "Downloading your video…");
     console.log(`[VideoService] Downloading video for ${reportId}...`);
 
     const downloadStart = Date.now();
@@ -200,7 +202,13 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
 
     // Run all security checks in parallel
     if (securityChecks.length > 0) {
-      pushProgressById(reportId, { status: "processing", stage: "🔍 Running security checks…" });
+      pushPipelineStep(reportId, "virus", "Running virus scan…");
+      if (process.env.ENABLE_CODEC_VALIDATION === "true") {
+        pushPipelineStep(reportId, "codec", "Validating video codec…");
+      }
+      if (process.env.ENABLE_CONTENT_MODERATION === "true") {
+        pushPipelineStep(reportId, "moderation", "Running content safety check…");
+      }
       const results = await Promise.all(securityChecks);
       
       // Check if any failed
@@ -219,8 +227,16 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
       }
     }
 
+    if (securityChecks.length === 0) {
+      pushPipelineStep(reportId, "virus", "Virus scan skipped");
+      pushPipelineStep(reportId, "codec", "Codec check skipped");
+      pushPipelineStep(reportId, "moderation", "Content check skipped");
+    } else {
+      pushPipelineStep(reportId, "moderation", "Security checks passed");
+    }
+
     // ── Step 5: Hand off to AI queue ─────────────────────────────────────────
-    pushProgressById(reportId, { status: "processing", stage: "⏳ Queuing for AI analysis…" });
+    pushPipelineStep(reportId, "queue", "Queued for AI analysis…");
 
     const report = await VideoReport.findById(reportId);
     const storedDuration = report?.videoDuration;
@@ -461,8 +477,11 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
   }
 
   const report = await VideoReport.create(reportData);
+  trackReportPhone(report._id, strippedPhone);
 
   console.log(`[VideoService] Report created: ${report._id} key=${key} webm=${isWebm} duration=${recordedDuration || 'unknown'} hash=${videoHash ? videoHash.substring(0, 12) + '...' : 'none'} frameKeys=${frames ? frames.length : 0}`);
+
+  pushPipelineStep(report._id, "download", "Preparing your video…");
 
   // Enqueue for processing (security scans run inside downloadAndEnqueue on the local file)
   // Pass frameKeys (R2 keys) - they will be downloaded and converted to base64 inside downloadAndEnqueue
@@ -715,6 +734,8 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
     });
 
     console.log(`[VideoService] Report created: ${report._id}`);
+    trackReportPhone(report._id, strippedPhone);
+    pushPipelineStep(report._id, "download", "Preparing your video…");
 
     // Log successful upload
     await UploadAudit.logUpload({
@@ -1085,6 +1106,10 @@ export async function retryVideoAnalysis(reportId, authId) {
   report.errorMessage = null;
   report.analysis = {};
   await report.save();
+
+  const retryPhone = user.phone || report.phone;
+  trackReportPhone(reportId, retryPhone);
+  pushPipelineStep(reportId, "download", "Restarting analysis…");
 
   if (report.videoUrl) {
     console.log("[RetryVideoAnalysis] Re-enqueuing video:", report.videoUrl);

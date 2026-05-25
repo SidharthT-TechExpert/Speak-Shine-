@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
+import { getSharedSocket } from "../hooks/useSocket.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 import { useVideoFrameHash } from "../hooks/useVideoFrameHash.js";
 import { evaluateSubmitGate } from "../utils/videoSubmitGate.js";
@@ -21,6 +22,9 @@ export default function VideoAnalysis() {
   const [reportId, setReportId]       = useState(null);
   const [report, setReport]           = useState(null);
   const [progressStage, setProgressStage] = useState("");
+  const [progressStageKey, setProgressStageKey] = useState("");
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [progressPercent, setProgressPercent] = useState(0);
   const [queueInfo, setQueueInfo]     = useState(null);
   const [myReports, setMyReports]     = useState([]);
   const [modal, setModal]             = useState(null);
@@ -49,39 +53,77 @@ export default function VideoAnalysis() {
     return () => clearInterval(interval);
   }, [myReports]);
 
-  // SSE for real-time progress
+  // Real-time progress: polling + SSE + Socket.io (fixes buffered/batched updates)
   useEffect(() => {
     if (!reportId || !report || report.status !== "processing") return;
+
+    let done = false;
     const token = localStorage.getItem("token");
+
+    const finish = (data) => {
+      if (done) return;
+      done = true;
+      setQueueInfo(null);
+      if (data.status === "completed") setProgressPercent(100);
+      api.get(`/video/report/${reportId}`).then((r) => {
+        setReport(r.data);
+        loadMyReports();
+      });
+    };
+
+    const applyProgress = (data) => {
+      if (!data || done) return;
+      if (data.status === "queued") {
+        setQueueInfo({
+          position: data.position,
+          queueLength: data.queueLength,
+          estimatedWait: data.estimatedWait,
+        });
+        setProgressStage(`Position #${data.position} in queue…`);
+        return;
+      }
+      if (Array.isArray(data.completedSteps)) setCompletedSteps([...data.completedSteps]);
+      if (data.stageKey) setProgressStageKey(data.stageKey);
+      if (data.stage) {
+        setProgressStage(data.stage);
+        setQueueInfo(null);
+      }
+      if (typeof data.percent === "number") setProgressPercent(data.percent);
+      if (data.status === "completed" || data.status === "failed") finish(data);
+    };
+
+    const poll = async () => {
+      if (done) return;
+      try {
+        const { data } = await api.get(`/video/progress-state/${reportId}`);
+        applyProgress(data);
+      } catch { /* retry next tick */ }
+    };
+
+    poll();
+    const pollTimer = setInterval(poll, 700);
+
     const evtSource = new EventSource(`/api/video/progress/${reportId}?token=${token}`);
     evtSource.onmessage = (e) => {
       try {
-        const data = JSON.parse(e.data);
-        if (data.status === "queued") {
-          setQueueInfo({ position: data.position, queueLength: data.queueLength, estimatedWait: data.estimatedWait });
-          setProgressStage(`Position #${data.position} in queue…`);
-          return;
-        }
-        if (data.stage) { setProgressStage(data.stage); setQueueInfo(null); }
-        if (data.status === "completed" || data.status === "failed") {
-          evtSource.close();
-          setQueueInfo(null);
-          api.get(`/video/report/${reportId}`).then(r => {
-            setReport(r.data); loadMyReports();
-          });
-        }
-      } catch {}
+        applyProgress(JSON.parse(e.data));
+      } catch { /* ignore */ }
     };
-    evtSource.onerror = () => {
+    evtSource.onerror = () => evtSource.close();
+
+    const socket = token ? getSharedSocket(token) : null;
+    const onSocketProgress = (payload) => {
+      if (String(payload?.reportId) !== String(reportId)) return;
+      applyProgress(payload);
+    };
+    socket?.on("video:progress", onSocketProgress);
+
+    return () => {
+      done = true;
+      clearInterval(pollTimer);
       evtSource.close();
-      setTimeout(() => {
-        api.get(`/video/report/${reportId}`).then(r => {
-          setReport(r.data);
-          if (r.data.status !== "processing") loadMyReports();
-        }).catch(() => {});
-      }, 5000);
+      socket?.off("video:progress", onSocketProgress);
     };
-    return () => evtSource.close();
   }, [reportId, report?.status]);
 
   const loadMyReports = async () => {
@@ -94,7 +136,10 @@ export default function VideoAnalysis() {
   const onAnalysisStarted = (id) => {
     setReportId(id);
     setReport({ status: "processing" });
-    setProgressStage("");
+    setProgressStage("Preparing your video…");
+    setProgressStageKey("download");
+    setCompletedSteps([]);
+    setProgressPercent(5);
     setQueueInfo(null);
     loadMyReports();
     setTimeout(() => document.getElementById("report-section")?.scrollIntoView({ behavior: "smooth" }), 200);
@@ -379,6 +424,9 @@ export default function VideoAnalysis() {
             {(report.status === "loading" || report.status === "processing") && (
               <ProcessingProgress
                 stage={progressStage}
+                stageKey={progressStageKey}
+                completedSteps={completedSteps}
+                percent={progressPercent}
                 queueInfo={queueInfo}
                 isLoading={report.status === "loading"}
               />
@@ -392,7 +440,10 @@ export default function VideoAnalysis() {
                   onClick={async () => {
                     try {
                       setReport({ status: "processing" });
-                      setProgressStage("Retrying analysis...");
+                      setProgressStage("Retrying analysis…");
+                      setProgressStageKey("queue");
+                      setCompletedSteps([]);
+                      setProgressPercent(10);
                       await api.post(`/video/retry/${reportId}`);
                       // Will be updated via SSE
                     } catch (err) {
@@ -492,21 +543,21 @@ export default function VideoAnalysis() {
 // Maps SSE stage strings to ordered pipeline steps with icons and labels.
 
 const PIPELINE_STEPS = [
-  { key: "download",   match: /downloading/i,        icon: "⬇️", label: "Downloading video" },
-  { key: "virus",      match: /virus|scanning/i,     icon: "🔍", label: "Virus scan" },
-  { key: "codec",      match: /codec|validating/i,   icon: "🎬", label: "Codec validation" },
-  { key: "moderation", match: /content|safety/i,     icon: "🛡️", label: "Content safety check" },
-  { key: "queuing",    match: /queuing|queue/i,       icon: "⏳", label: "Queued for AI" },
-  { key: "audio",      match: /audio|extract/i,       icon: "🎵", label: "Extracting audio" },
-  { key: "analysis",   match: /analys|video/i,        icon: "🎥", label: "Analysing video" },
-  { key: "speech",     match: /speech|scoring/i,      icon: "🗣️", label: "Scoring speech" },
-  { key: "feedback",   match: /feedback|generating/i, icon: "📝", label: "Generating feedback" },
+  { key: "download",   icon: "⬇️", label: "Downloading video" },
+  { key: "virus",      icon: "🔍", label: "Virus scan" },
+  { key: "codec",      icon: "🎬", label: "Codec validation" },
+  { key: "moderation", icon: "🛡️", label: "Content safety check" },
+  { key: "queue",      icon: "⏳", label: "Queued for AI" },
+  { key: "audio",      icon: "🎵", label: "Extracting audio" },
+  { key: "visual",     icon: "🎥", label: "Analysing video" },
+  { key: "speech",     icon: "🗣️", label: "Scoring speech" },
+  { key: "feedback",   icon: "📝", label: "Generating feedback" },
 ];
 
-function ProcessingProgress({ stage, queueInfo, isLoading }) {
-  // Determine which step is currently active
-  const activeIdx = stage
-    ? PIPELINE_STEPS.findIndex(s => s.match.test(stage))
+function ProcessingProgress({ stage, stageKey, completedSteps = [], percent = 0, queueInfo, isLoading }) {
+  const completedSet = new Set(completedSteps);
+  const activeIdx = stageKey
+    ? PIPELINE_STEPS.findIndex((s) => s.key === stageKey)
     : -1;
 
   if (isLoading) {
@@ -532,8 +583,29 @@ function ProcessingProgress({ stage, queueInfo, isLoading }) {
     );
   }
 
+  const pct = Math.min(100, Math.max(0, percent || 0));
+
   return (
     <div style={{ padding: "1rem 0" }}>
+      {/* Overall progress bar */}
+      <div style={{ marginBottom: "1.25rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem", fontSize: "0.8rem" }}>
+          <span style={{ color: "var(--muted)" }}>Overall progress</span>
+          <span style={{ color: "var(--primary)", fontWeight: 700 }}>{pct}%</span>
+        </div>
+        <div style={{
+          height: 8, borderRadius: 999, background: "var(--bg2)", overflow: "hidden",
+          border: "1px solid var(--border)",
+        }}>
+          <div style={{
+            height: "100%", width: `${pct}%`,
+            background: "linear-gradient(90deg, var(--primary), #a78bfa)",
+            transition: "width 0.45s ease",
+            borderRadius: 999,
+          }} />
+        </div>
+      </div>
+
       {/* Spinner + current stage label */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.25rem" }}>
         <div className="spinner" style={{ flexShrink: 0 }} />
@@ -545,9 +617,9 @@ function ProcessingProgress({ stage, queueInfo, isLoading }) {
       {/* Step pipeline */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         {PIPELINE_STEPS.map((step, i) => {
-          const isDone    = activeIdx > i;
-          const isActive  = activeIdx === i;
-          const isPending = activeIdx < i;
+          const isActive  = stageKey === step.key;
+          const isDone    = completedSet.has(step.key) && !isActive;
+          const isPending = !isDone && !isActive;
           return (
             <div key={step.key} style={{
               display: "flex", alignItems: "center", gap: "0.75rem",

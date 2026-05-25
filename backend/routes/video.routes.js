@@ -101,6 +101,7 @@ router.post(
 );
 
 // ── Progress Stream ──────────────────────────────────────────────────────────
+router.get("/progress-state/:reportId", authMiddleware, videoController.getProgressState);
 router.get("/progress/:reportId", authMiddleware, videoController.getProgress);
 
 // ── Report Management ────────────────────────────────────────────────────────

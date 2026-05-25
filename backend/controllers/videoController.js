@@ -202,6 +202,73 @@ export async function uploadVideo(req, res) {
   }
 }
 
+async function assertReportOwner(req, reportId) {
+  const VideoReport = (await import("../../models/videoReportSchema.js")).default;
+  const Auth = (await import("../../models/authSchema.js")).default;
+  const User = (await import("../../models/userSchema.js")).default;
+
+  const report = await VideoReport.findById(reportId).lean();
+  if (!report) {
+    const err = new Error("Report not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const auth = await Auth.findById(req.user.id);
+  if (!auth) {
+    const err = new Error("Access denied");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const stripped = auth.phone.replace(/^(\+91|91)/, "");
+  const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+  if (!user) {
+    const err = new Error("Access denied");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (report.userId.toString() !== user._id.toString()) {
+    const err = new Error("Access denied");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  return report;
+}
+
+/**
+ * GET /api/video/progress-state/:reportId
+ * JSON snapshot for polling (updates every ~700ms on the client)
+ */
+export async function getProgressState(req, res) {
+  try {
+    const { reportId } = req.params;
+    const report = await assertReportOwner(req, reportId);
+    const snap = videoQueue.getProgressSnapshot(reportId);
+
+    res.json({
+      reportId,
+      status: snap?.status || report.status,
+      stage: snap?.stage || "Starting…",
+      stageKey: snap?.stageKey || "download",
+      completedSteps: snap?.completedSteps || [],
+      percent: snap?.percent ?? (report.status === "completed" ? 100 : 5),
+      position: snap?.position,
+      queueLength: snap?.queueLength,
+      estimatedWait: snap?.estimatedWait,
+      error: snap?.error,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[ProgressState] Error:", error.message);
+    res.status(500).json({ error: "Failed to load progress" });
+  }
+}
+
 /**
  * GET /api/video/progress/:reportId
  * SSE progress stream for video processing
@@ -209,41 +276,15 @@ export async function uploadVideo(req, res) {
 export async function getProgress(req, res) {
   try {
     const { reportId } = req.params;
-    
-    const VideoReport = (await import("../../models/videoReportSchema.js")).default;
-    const report = await VideoReport.findById(reportId).lean();
-    
-    if (!report) {
-      return res.status(404).json({ error: "Report not found" });
-    }
-    
-    // Import Auth and User models for proper user lookup
-    const Auth = (await import("../../models/authSchema.js")).default;
-    const User = (await import("../../models/userSchema.js")).default;
-    
-    // Find the auth record by ID (JWT contains auth._id as 'id')
-    const auth = await Auth.findById(req.user.id);
-    if (!auth) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    
-    // Find the user by phone to get the actual User._id
-    const stripped = auth.phone.replace(/^(\+91|91)/, "");
-    const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
-    
-    if (!user) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    
-    // Check if this user owns the report
-    if (report.userId.toString() !== user._id.toString()) {
-      return res.status(403).json({ error: "Access denied" });
-    }
+    const report = await assertReportOwner(req, reportId);
 
     // If already done, return immediately
     if (report.status === "completed" || report.status === "failed") {
       res.setHeader("Content-Type", "text/event-stream");
-      res.write(`data: ${JSON.stringify({ status: report.status })}\n\n`);
+      res.write(`data: ${JSON.stringify({
+        status: report.status,
+        percent: report.status === "completed" ? 100 : 0,
+      })}\n\n`);
       return res.end();
     }
 
@@ -254,7 +295,10 @@ export async function getProgress(req, res) {
 
     videoQueue.registerSseClient(reportId, res);
 
-    const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15000);
+    const heartbeat = setInterval(() => {
+      res.write(": heartbeat\n\n");
+      if (typeof res.flush === "function") res.flush();
+    }, 15000);
 
     req.on("close", () => {
       clearInterval(heartbeat);

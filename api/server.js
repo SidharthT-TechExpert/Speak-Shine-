@@ -65,6 +65,7 @@ console.log("[Routes] Notification routes loaded:", !!notificationRoutes);
 import { recoverStuckJobs } from "./videoQueue.js";
 import { startScheduler } from "./scheduler.js";
 import { startDailyReset } from "./scheduler.js";
+import { setSocketIO } from "../backend/services/video/videoQueue.js";
 
 // (env already loaded at top of file — see dotenv block above)
 const __filename_server = fileURLToPath(import.meta.url);
@@ -172,6 +173,8 @@ setOnlineUsersRef(onlineUsers);
 // Initialize chat socket handlers
 initializeChatSocket(io, onlineUsers);
 
+setSocketIO(io, onlineUsers);
+
 // ── Express setup ───────────────────────────────────────────────────────────
 const uploadDir = path.join(__dirname, "../tmp/uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -183,8 +186,16 @@ app.set("io", io);
 // Make onlineUsers available to controllers via req.app.get("onlineUsers")
 app.set("onlineUsers", onlineUsers);
 
-// Gzip/deflate compression — reduces JS/CSS/JSON transfer size ~70%
-app.use(compression({ level: 6, threshold: 1024 }));
+// Gzip/deflate compression — never buffer SSE progress streams
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.originalUrl?.includes("/video/progress")) return false;
+    if (res.getHeader("Content-Type") === "text/event-stream") return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // Security headers with HSTS
 app.use(helmet({

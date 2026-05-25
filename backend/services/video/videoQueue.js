@@ -8,6 +8,7 @@
 import VideoReport from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import { processWebVideo } from "../ai/videoProcessor.js";
+import { phoneVariants } from "../../utils/phoneVariants.js";
 import fs from "fs";
 
 // ── Concurrency limit ────────────────────────────────────────────────────────
@@ -29,14 +30,74 @@ const stats = {
   securityEvents: [],    // scan/moderation rejections logged before enqueue
 };
 
-// ── SSE Clients: reportId → res ──────────────────────────────────────────────
+// ── SSE + progress snapshots + Socket.io ─────────────────────────────────────
 const sseClients = new Map();
+/** Last progress payload per report — replayed when the browser connects to SSE */
+const progressSnapshots = new Map();
+/** reportId → owner phone (for Socket.io push) */
+const reportPhones = new Map();
+
+let _io = null;
+let _onlineUsers = null;
+
+export function setSocketIO(io, onlineUsers) {
+  _io = io;
+  _onlineUsers = onlineUsers;
+}
+
+export function trackReportPhone(reportId, phone) {
+  if (reportId && phone) reportPhones.set(String(reportId), phone);
+}
+
+export function getProgressSnapshot(reportId) {
+  return progressSnapshots.get(String(reportId)) || null;
+}
+
+/** Ordered pipeline keys (must match frontend ProcessingProgress) */
+export const PIPELINE_ORDER = [
+  "download",
+  "virus",
+  "codec",
+  "moderation",
+  "queue",
+  "audio",
+  "visual",
+  "speech",
+  "feedback",
+];
+
+const AI_STAGE_MAP = {
+  "Extracting audio…": { key: "audio", label: "Extracting audio…" },
+  "Analysing your video…": { key: "visual", label: "Analysing video frames…" },
+  "Scoring your speech…": { key: "speech", label: "Scoring speech…" },
+  "Generating feedback…": { key: "feedback", label: "Generating feedback…" },
+};
 
 // ── Public helpers ───────────────────────────────────────────────────────────
 
 /** Called from videoService before the job enters the queue (security stage). */
 export function pushProgressById(reportId, data) {
   pushProgress(reportId, data);
+}
+
+/**
+ * Push a structured pipeline step for real-time UI (SSE + snapshot replay).
+ */
+export function pushPipelineStep(reportId, stageKey, stageLabel, extra = {}) {
+  const idx = PIPELINE_ORDER.indexOf(stageKey);
+  const completedSteps = idx >= 0 ? PIPELINE_ORDER.slice(0, idx + 1) : [];
+  const percent =
+    extra.percent ??
+    Math.min(99, Math.round(((idx + 1) / PIPELINE_ORDER.length) * 100));
+
+  pushProgress(reportId, {
+    status: "processing",
+    stageKey,
+    stage: stageLabel,
+    completedSteps,
+    percent,
+    ...extra,
+  });
 }
 
 /** Record a security rejection (virus / codec / content moderation). */
@@ -52,8 +113,30 @@ export function recordSecurityEvent({ reportId, error, userName, phone, type }) 
   if (stats.securityEvents.length > 50) stats.securityEvents.shift();
 }
 
+function writeSseEvent(client, payload) {
+  client.write(`data: ${JSON.stringify(payload)}\n\n`);
+  if (typeof client.flush === "function") client.flush();
+}
+
+function emitSocketProgress(reportId, payload) {
+  if (!_io || !_onlineUsers) return;
+  const phone = reportPhones.get(String(reportId));
+  if (!phone) return;
+  const msg = { reportId: String(reportId), ...payload };
+  for (const variant of phoneVariants(phone)) {
+    const sid = _onlineUsers.get(variant);
+    if (sid) {
+      _io.to(sid).emit("video:progress", msg);
+      return;
+    }
+  }
+}
+
 export function registerSseClient(reportId, res) {
-  sseClients.set(String(reportId), res);
+  const id = String(reportId);
+  sseClients.set(id, res);
+  const snap = progressSnapshots.get(id);
+  if (snap) writeSseEvent(res, snap);
 }
 
 export function unregisterSseClient(reportId) {
@@ -63,16 +146,39 @@ export function unregisterSseClient(reportId) {
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 function pushProgress(reportId, data) {
-  const client = sseClients.get(String(reportId));
-  if (client) client.write(`data: ${JSON.stringify(data)}\n\n`);
+  const id = String(reportId);
+  const prev = progressSnapshots.get(id) || {};
+  const merged = {
+    ...prev,
+    ...data,
+    ts: Date.now(),
+  };
+  if (data.stageKey && PIPELINE_ORDER.includes(data.stageKey) && data.status === "processing") {
+    const idx = PIPELINE_ORDER.indexOf(data.stageKey);
+    merged.completedSteps = PIPELINE_ORDER.slice(0, idx + 1);
+    if (merged.percent == null) {
+      merged.percent = Math.min(99, Math.round(((idx + 1) / PIPELINE_ORDER.length) * 100));
+    }
+  }
+  progressSnapshots.set(id, merged);
+
+  const client = sseClients.get(id);
+  if (client) writeSseEvent(client, merged);
+
+  emitSocketProgress(id, merged);
 }
 
 function closeSse(reportId) {
-  const client = sseClients.get(String(reportId));
+  const id = String(reportId);
+  const client = sseClients.get(id);
   if (client) {
     client.end();
-    sseClients.delete(String(reportId));
+    sseClients.delete(id);
   }
+  setTimeout(() => {
+    progressSnapshots.delete(id);
+    reportPhones.delete(id);
+  }, 60_000);
 }
 
 /** Broadcast updated queue positions to every waiting job. */
@@ -169,7 +275,8 @@ async function processJob(job) {
       displayName,
       async (stage) => {
         console.log(`[Queue] ${reportId}: ${stage}`);
-        pushProgress(reportId, { status: "processing", stage });
+        const mapped = AI_STAGE_MAP[stage] || { key: "visual", label: stage };
+        pushPipelineStep(reportId, mapped.key, mapped.label);
       },
       knownDuration,
       browserFrames
@@ -198,7 +305,7 @@ async function processJob(job) {
       );
     }
 
-    pushProgress(reportId, { status: "completed" });
+    pushProgress(reportId, { status: "completed", percent: 100, stage: "Analysis complete" });
     closeSse(reportId);
     console.log(`[Queue] ✓ Done ${reportId} in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
     recordFinish(reportId, startTime, "success");
