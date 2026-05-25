@@ -34,7 +34,7 @@ function DevicePicker({ kind, onClose, onSelectDevice }) {
       position: "absolute", bottom: "calc(100% + 16px)", left: 0,
       background: "rgba(10,10,24,0.95)", backdropFilter: "blur(32px)",
       border: "1px solid rgba(124,111,255,0.25)", borderRadius: 16,
-      padding: "0.8rem", width: 340, zIndex: 100000,
+      padding: "0.8rem", width: "min(340px, calc(100vw - 1.5rem))", zIndex: 100000,
       boxShadow: "0 -12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)",
       animation: "slideUpIn 0.2s cubic-bezier(0.34,1.56,0.64,1)",
       maxHeight: "65vh", display: "flex", flexDirection: "column"
@@ -188,7 +188,7 @@ function EmojiBtn({ e, onPick, onClose }) {
       style={{
         background: "none", border: "none",
         fontSize: "1.6rem", cursor: "pointer",
-        borderRadius: "50%", width: 44, height: 44,
+        borderRadius: "50%", width: "clamp(36px, 8vw, 44px)", height: "clamp(36px, 8vw, 44px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         transition: "transform 0.15s, background 0.15s, box-shadow 0.15s",
         lineHeight: 1,
@@ -227,7 +227,7 @@ function HandRaiseQueue({ raisedHands, onDismiss, onDismissAll }) {
     <div style={{
       position:"fixed", top:60, left:"50%", transform:"translateX(-50%)",
       zIndex:99995, display:"flex", flexDirection:"column", gap:"0.35rem",
-      pointerEvents:"none", minWidth:300, maxWidth:380,
+      pointerEvents:"none", minWidth:"min(300px, calc(100vw - 2rem))", maxWidth:"min(380px, calc(100vw - 1rem))",
     }}>
       {/* Queue header */}
       <div style={{
