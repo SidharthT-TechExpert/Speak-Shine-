@@ -9,7 +9,8 @@
     "start:api": "node api/server.js",
     "build": "cd frontend && npm install --prefer-offline --no-audit --no-fund && npm run build",
     "build:frontend": "cd frontend && npm ci --prefer-offline --no-audit --no-fund && npm run build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:daily-reset": "node backend/services/scheduler/test-daily-reset-standalone.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

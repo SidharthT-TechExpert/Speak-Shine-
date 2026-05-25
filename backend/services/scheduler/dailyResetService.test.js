@@ -1,3 +1,11 @@
+/**
+ * Vitest tests — run from project root only:
+ *   npm test
+ *   npx vitest run backend/services/scheduler/dailyResetService.test.js
+ *
+ * For plain node on a server (no Vitest):
+ *   node backend/services/scheduler/test-daily-reset-standalone.js
+ */
 import { describe, it, expect } from "vitest";
 import { computeMissedDayFineUpdate } from "./dailyResetService.js";
 
