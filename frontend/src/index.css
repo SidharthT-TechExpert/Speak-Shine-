@@ -1891,62 +1891,56 @@ button[aria-label="Toggle Chat"] {
    MOBILE RESPONSIVENESS — comprehensive overrides for phone screens
    ============================================================================ */
 
-/* Responsive grid helpers (use these in JSX instead of inline grid styles) */
+/* Responsive grid helpers (use className instead of inline grid styles) */
 .grid-cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 .grid-cols-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-.flex-wrap-mobile { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-/* ── Small phones (≤480px) ── */
-@media (max-width: 480px) {
-  .app-main { padding: 0.75rem 0.6rem; }
-  .page-title { font-size: 1.1rem; margin-bottom: 0.75rem; }
+/* ── Phones (≤640px) — covers all phones including larger ones ── */
+@media (max-width: 640px) {
+  /* Layout */
+  .app-main { padding: 0.75rem 0.65rem; }
+  .page-title { font-size: 1.15rem; margin-bottom: 0.75rem; }
   .card { padding: 0.85rem; border-radius: 14px; }
   .section-title { font-size: 0.78rem; margin-bottom: 0.75rem; }
 
-  /* Responsive grids collapse */
+  /* ALL multi-column grids → single column on phones */
   .grid-cols-3 { grid-template-columns: 1fr !important; }
   .grid-cols-2 { grid-template-columns: 1fr !important; }
-  .stat-grid { grid-template-columns: 1fr 1fr !important; }
 
-  /* Buttons should be full-width on small phones */
-  .btn-primary, .btn-secondary, .btn-outline {
-    width: 100% !important;
-    font-size: 0.82rem !important;
-    padding: 0.7rem 1rem !important;
-  }
+  /* Stat grid: 2 cols on phones (icons are small enough) */
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 0.5rem !important; }
+  .stat-card { padding: 0.65rem; gap: 0.4rem; }
+  .stat-icon { font-size: 1.3rem; }
+  .stat-value { font-size: 1rem; }
+  .stat-label { font-size: 0.6rem; }
+
+  /* Tabs — horizontal scroll */
+  .tab-bar { gap: 0.25rem; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap !important; scrollbar-width: none; }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-btn { flex-shrink: 0; font-size: 0.7rem; padding: 0.35rem 0.7rem; white-space: nowrap; }
 
   /* Tables scroll horizontally */
-  .table-wrap { margin: 0 -0.85rem; padding: 0 0.85rem; }
-  .data-table { font-size: 0.68rem; }
-  .data-table th, .data-table td { padding: 0.4rem 0.4rem; }
+  .table-wrap { margin: 0 -0.65rem; padding: 0 0.65rem; }
+  .data-table { font-size: 0.7rem; }
+  .data-table th, .data-table td { padding: 0.45rem 0.5rem; }
 
   /* Auth pages */
   .auth-card { padding: 1.5rem 1rem; max-width: 100%; }
   .auth-title { font-size: 1.2rem; }
 
   /* Upload area */
-  .upload-area { padding: 1rem; }
+  .upload-area { padding: 0.85rem; }
   .upload-area input[type="file"] { font-size: 0.78rem; }
 
   /* Modal */
   .modal-box { padding: 1.5rem 1rem 1.25rem; max-width: 95vw; }
 
-  /* Tabs — horizontal scroll instead of wrapping */
-  .tab-bar { gap: 0.25rem; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap !important; }
-  .tab-btn { flex-shrink: 0; font-size: 0.68rem; padding: 0.3rem 0.6rem; white-space: nowrap; }
-
   /* Score bars */
   .score-bar-label, .score-bar-value { font-size: 0.75rem; }
 
-  /* Stat cards */
-  .stat-card { padding: 0.65rem; gap: 0.4rem; }
-  .stat-icon { font-size: 1.2rem; }
-  .stat-value { font-size: 1rem; }
-  .stat-label { font-size: 0.58rem; }
-
   /* Streak list */
   .streak-row { padding: 0.5rem 0.65rem; }
-  .streak-name { font-size: 0.75rem; }
+  .streak-name { font-size: 0.78rem; }
   .streak-val { font-size: 0.72rem; }
 
   /* Badges */
@@ -1955,12 +1949,6 @@ button[aria-label="Toggle Chat"] {
 
   /* Toast full width */
   .toast-container { left: 0.5rem !important; right: 0.5rem !important; bottom: 0.5rem !important; }
-}
-
-/* ── Phones (≤640px) ── */
-@media (max-width: 640px) {
-  /* Responsive grids → 2 cols on phones */
-  .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
 
   /* Video analysis page */
   .video-analysis-page { padding: 0; }
@@ -1969,17 +1957,57 @@ button[aria-label="Toggle Chat"] {
   .feedback-section { padding: 0.6rem; }
   .feedback-section h4 { font-size: 0.82rem; }
 
-  /* Upload area */
-  .upload-area { padding: 0.85rem; }
-
   /* Community feed */
   .community-post { padding: 0.85rem; }
 
-  /* Chart containers */
+  /* Chart containers — make responsive */
   .recharts-wrapper { font-size: 0.7rem; }
 
   /* Video elements */
   video { max-width: 100% !important; border-radius: 8px !important; }
+
+  /* Pie chart / donut — center on mobile, remove horizontal layout */
+  .card [style*="display: flex"][style*="gap: 1.5rem"],
+  .card [style*="display:flex"][style*="gap:1.5rem"] {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  /* Buttons */
+  .btn-primary, .btn-secondary, .btn-outline {
+    width: 100% !important;
+    font-size: 0.82rem !important;
+    padding: 0.7rem 1rem !important;
+  }
+
+  /* Fixed-width inputs: cap at 100% on phones */
+  .form-input { max-width: 100% !important; box-sizing: border-box; }
+  input.form-input[style*="width"] { width: 100% !important; }
+
+  /* Prevent horizontal overflow */
+  body, .app-main { overflow-x: hidden; }
+
+  /* User table on mobile — scroll wrapper */
+  .user-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Search bar full width */
+  .form-input[placeholder*="Search"] { width: 100% !important; }
+
+  /* Header compact on phones */
+  .app-header { padding: 0 0.5rem; min-height: 52px; }
+  .brand { font-size: 0.95rem; gap: 0.4rem; }
+  .brand-emoji { font-size: 1rem; }
+  .role-badge { font-size: 0.5rem; padding: 0.15rem 0.4rem; }
+  .logout-btn { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
+
+  /* Notification bell */
+  .notif-bell { padding: 0.35rem; }
+
+  /* Chat drawer — full screen on mobile */
+  .chat-drawer { width: 100vw !important; max-width: 100vw !important; }
+
+  /* PWA install prompt */
+  .install-label { display: none; }
 }
 
 /* ── Tablets (≤768px) ── */
