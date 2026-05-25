@@ -3,9 +3,9 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { lazy, Suspense, useState, useEffect } from "react";
 import { ToastProvider } from "./components/Toast.jsx";
 import { ConfirmProvider } from "./components/ConfirmDialog.jsx";
-import ChatLauncher from "./components/ChatLauncher.jsx";
-import InstallPrompt from "./components/InstallPrompt.jsx";
-import WakeUpScreen from "./components/WakeUpScreen.jsx";
+const ChatLauncher = lazy(() => import("./components/ChatLauncher.jsx"));
+const InstallPrompt = lazy(() => import("./components/InstallPrompt.jsx"));
+const WakeUpScreen  = lazy(() => import("./components/WakeUpScreen.jsx"));
 
 // Lazy-load all pages — each becomes its own JS chunk, only loaded when needed
 const Login           = lazy(() => import("./pages/Login.jsx"));
@@ -91,7 +91,7 @@ export default function App() {
   }
 
   if (!serverReady) {
-    return <WakeUpScreen onReady={() => setServerReady(true)} />;
+    return <Suspense fallback={<PageLoader />}><WakeUpScreen onReady={() => setServerReady(true)} /></Suspense>;
   }
 
   return (
@@ -161,8 +161,8 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
             </Suspense>
-            <ChatLauncherConditional />
-            <InstallPrompt />
+            <Suspense fallback={null}><ChatLauncherConditional /></Suspense>
+            <Suspense fallback={null}><InstallPrompt /></Suspense>
           </BrowserRouter>
         </ConfirmProvider>
       </ToastProvider>

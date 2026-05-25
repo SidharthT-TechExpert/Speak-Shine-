@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -165,6 +166,9 @@ if (!fs.existsSync(uploadDir)) {
 app.set("io", io);
 // Make onlineUsers available to controllers via req.app.get("onlineUsers")
 app.set("onlineUsers", onlineUsers);
+
+// Gzip/deflate compression — reduces JS/CSS/JSON transfer size ~70%
+app.use(compression({ level: 6, threshold: 1024 }));
 
 // Security headers with HSTS
 app.use(helmet({
