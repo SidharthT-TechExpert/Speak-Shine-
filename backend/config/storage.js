@@ -124,6 +124,22 @@ export async function uploadBufferToR2(buffer, key, mimeType = "video/mp4") {
 }
 
 /**
+ * Stream a Readable (e.g. an Express req) directly to R2.
+ * The body is piped to R2 as it arrives — never buffered in full.
+ * ContentLength must be known up front (from the Content-Length header).
+ */
+export async function streamUploadToR2(stream, key, mimeType, contentLength) {
+  await getR2Client().send(new PutObjectCommand({
+    Bucket:        getBucket(),
+    Key:           key,
+    Body:          stream,
+    ContentType:   mimeType,
+    ContentLength: contentLength,
+  }));
+  return `${getPublicUrl()}/${key}`;
+}
+
+/**
  * Delete an object from R2 by key.
  */
 export async function deleteFromR2(key) {

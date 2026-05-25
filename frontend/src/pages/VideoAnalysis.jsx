@@ -622,39 +622,36 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 
     try {
       const fileToUpload = file;
-      
-      // Step 0: Extract frames and generate hash
+
+      // ── Kick off frame extraction + presigned URL fetch in parallel ──
+      // Frame extraction runs in the background while we start uploading.
       setStage("hashing");
       let videoHash = null;
       let frames = null;
       let cachedResult = null;
-      try {
-        const result = await Promise.race([
-          generateHashAndFrames(fileToUpload),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
-        ]);
-        videoHash = result.hash;
-        frames = result.frames; // 16 high-quality frame blobs
-        cachedResult = result.cachedResult;
-        
-        if (result.cached) {
-          console.log('[Upload] ⚡ Video previously checked - security checks will be skipped');
-        }
-        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
-      } catch (hashErr) {
-        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', hashErr.message);
-        // Continue without frames - server will extract them
-      }
-      
-      setStage("uploading");
 
-      // Step 1: Get presigned URL from our server
-      const { data: presign } = await api.get("/video/presign", {
+      const framePromise = Promise.race([
+        generateHashAndFrames(fileToUpload),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Frame extraction timeout")), 15000))
+      ]).then(result => {
+        videoHash = result.hash;
+        frames = result.frames;
+        cachedResult = result.cachedResult;
+        if (result.cached) console.log('[Upload] ⚡ Video previously checked');
+        console.log(`[Upload] Extracted ${frames.length} frames for AI analysis`);
+      }).catch(err => {
+        console.warn('[Upload] Frame extraction failed/timed out, continuing without:', err.message);
+      });
+
+      // Get presigned URL immediately (don't wait for frames)
+      const presignPromise = api.get("/video/presign", {
         params: { filename: fileToUpload.name, mimeType: fileToUpload.type || "video/mp4" },
       });
 
-      // Step 2: Upload directly to R2 via presigned URL (faster — no proxy hop)
-      //         Falls back to backend proxy if direct upload fails (e.g. CORS)
+      const { data: presign } = await presignPromise;
+      setStage("uploading");
+
+      // ── Upload video (runs in parallel with frame extraction) ──
       const uploadFile = (url, headers = {}) => new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", url);
@@ -675,7 +672,6 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
       });
 
       try {
-        // Direct upload to R2 via presigned URL (skips server proxy — much faster)
         await uploadFile(presign.uploadUrl, {
           "Content-Type": fileToUpload.type || "video/mp4",
         });
@@ -691,6 +687,9 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
           "Authorization": `Bearer ${token}`,
         });
       }
+
+      // Wait for frame extraction to finish (may already be done)
+      await framePromise;
 
       // Step 3: Upload frames if extracted (optional - server can fall back to extracting from video)
       let frameKeys = null;
