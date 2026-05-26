@@ -27,11 +27,12 @@ cp frontend/.env.example frontend/.env.local
 # edit frontend/.env.local to set VITE_API_URL and other public values
 ```
 
-4. Start services
+4. Setup local files and start services
 
 ```bash
 # Backend
 npm install
+npm run setup
 npm run dev:api
 
 # Frontend
