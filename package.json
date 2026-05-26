@@ -9,7 +9,7 @@
     "start:api": "node api/server.js",
     "dev:api": "node api/server.js",
     "dev:frontend": "cd frontend && npm run dev",
-    "setup": "node scripts/setup.js",
+    "setup": "node scripts/setup.cjs",
     "build": "cd frontend && npm install --prefer-offline --no-audit --no-fund && npm run build",
     "build:frontend": "cd frontend && npm ci --prefer-offline --no-audit --no-fund && npm run build",
     "test": "vitest run",
