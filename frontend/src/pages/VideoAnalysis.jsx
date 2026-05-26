@@ -6,6 +6,7 @@ import { getSharedSocket } from "../hooks/useSocket.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
 import { useVideoFrameHash } from "../hooks/useVideoFrameHash.js";
 import { evaluateSubmitGate } from "../utils/videoSubmitGate.js";
+import { saveDraft, loadDraft, clearDraft } from "../utils/videoDraftDB.js";
 
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
@@ -1191,6 +1192,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const [noiseCancel, setNoiseCancel] = useState(true);
   const [ncStatus, setNcStatus]     = useState("idle");
   const [previewAspect, setPreviewAspect] = useState(null);
+  const [draftRestored, setDraftRestored] = useState(false); // true when draft loaded from IndexedDB
 
   const { applyNoiseCancellation, cleanupNC } = useNoiseCancellation();
 
@@ -1212,9 +1214,26 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     ? 420  // 7 minutes for weekly reflection
     : 300; // 5 minutes for regular daily questions
 
-  // Enumerate devices on mount
+  // Enumerate devices + restore any saved draft on mount
   useEffect(() => {
     (async () => {
+      // ── Restore video draft from IndexedDB (survives page refresh) ──
+      try {
+        const draft = await loadDraft();
+        if (draft?.blob && draft.blob.size > 0) {
+          mimeTypeRef.current = draft.mimeType || "video/webm";
+          pendingBlobRef.current = draft.blob;
+          setRecordedBlob(draft.blob);
+          setElapsed(draft.elapsed || 0);
+          setStep("preview");
+          setDraftRestored(true);
+          console.log(`[VideoDraft] Restored draft — ${(draft.blob.size / 1024 / 1024).toFixed(1)} MB, ${draft.elapsed}s`);
+        }
+      } catch (draftErr) {
+        console.warn("[VideoDraft] Could not restore draft:", draftErr);
+      }
+
+      // ── Enumerate camera/mic devices ──
       try {
         const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         tmp.getTracks().forEach(t => t.stop());
@@ -1413,9 +1432,15 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         cleanup();
         return;
       }
+
+      // ── Persist to IndexedDB so a refresh doesn't lose the recording ──
+      saveDraft({ blob, mimeType: mimeTypeRef.current, elapsed })
+        .then(() => console.log("[VideoDraft] Draft saved to IndexedDB"))
+        .catch(err => console.warn("[VideoDraft] Could not save draft:", err));
       
       pendingBlobRef.current = blob;
       setRecordedBlob(blob);
+      setDraftRestored(false); // this is a fresh recording, not a restore
       setStep("preview");
       cleanup();
     };
@@ -1488,8 +1513,11 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   };
 
   const retake = () => {
+    // Delete the IndexedDB draft so it doesn't restore again
+    clearDraft().catch(() => {});
     setRecordedBlob(null);
     setElapsed(0);
+    setDraftRestored(false);
     setStep("setup");
     cleanup();
   };
@@ -1674,10 +1702,13 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       }
 
       console.log(`[Upload] Analysis started with reportId: ${data.reportId}`);
+      // ── Clear the draft — video has been submitted successfully ──
+      clearDraft().catch(() => {});
       onAnalysisStarted(data.reportId);
       setStep("setup");
       setRecordedBlob(null);
       setElapsed(0);
+      setDraftRestored(false);
     } catch (err) {
       console.error("[Upload] Error:", err);
       setError(err.response?.data?.error || err.message || "Upload failed");
@@ -1963,10 +1994,34 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       {/* ── PREVIEW ── */}
       {step === "preview" && (
         <div>
+          {/* Draft-restored banner */}
+          {draftRestored && (
+            <div style={{
+              display:        "flex",
+              alignItems:     "center",
+              gap:            "0.6rem",
+              background:     "rgba(74,222,128,0.1)",
+              border:         "1px solid rgba(74,222,128,0.35)",
+              borderRadius:   12,
+              padding:        "0.7rem 1rem",
+              marginBottom:   "0.9rem",
+              fontSize:       "0.82rem",
+              color:          "#86efac",
+              fontWeight:     500,
+            }}>
+              <span style={{ fontSize: "1.1rem" }}>📼</span>
+              <span>
+                <strong style={{ color: "#4ade80" }}>Recording restored!</strong>{" "}
+                Your video ({fmtTime(elapsed)}) survived the page refresh. Review it below or retake.
+              </span>
+            </div>
+          )}
+
           <p style={{ color: "var(--muted)", marginBottom: "1rem", fontSize: "0.9rem" }}>
             Review your recording before submitting for analysis.
             {elapsed < 60 && <span style={{ color: "var(--danger)" }}> ⚠️ Too short ({fmtTime(elapsed)}) — minimum 1 minute.</span>}
           </p>
+
           
           {/* Recording info display */}
           <div style={{ 
