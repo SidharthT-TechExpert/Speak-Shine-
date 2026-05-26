@@ -310,7 +310,7 @@ function SubmitNudge({ name, streak, navigate, specialDay }) {
 
       {/* CTA Button */}
       <button
-        onClick={() => navigate('/video-analysis')}
+        onClick={() => navigate('/record')}
         style={{
           width: "100%",
           background: urgency === "high"
@@ -790,7 +790,7 @@ export default function UserDashboard() {
           {/* CTA Button */}
           <button
             className="daily-poster-cta"
-            onClick={() => navigate('/video-analysis')}
+            onClick={() => navigate('/record')}
             style={{
               cursor: 'pointer', border: 'none', width: '100%',
               transition: 'transform 0.2s, box-shadow 0.2s',

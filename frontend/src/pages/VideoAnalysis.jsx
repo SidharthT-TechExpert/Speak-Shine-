@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api from "../api/client.js";
@@ -13,7 +14,21 @@ import { saveDraft, loadDraft, clearDraft } from "../utils/videoDraftDB.js";
 // "record"  → new live-record flow
 
 export default function VideoAnalysis() {
-  const [mode, setMode] = useState("upload"); // "upload" | "record"
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [mode, setMode] = useState(() => {
+    return location.pathname === "/record" ? "record" : "upload";
+  });
+
+  useEffect(() => {
+    if (location.pathname === "/record") {
+      setMode("record");
+    } else {
+      setMode("upload");
+    }
+  }, [location.pathname]);
+
   const [todayQuestion, setTodayQuestion] = useState(null);
   const [isMonthlyReflection, setIsMonthlyReflection] = useState(false);
   const [isMonthlyGoals, setIsMonthlyGoals] = useState(false);
@@ -400,11 +415,17 @@ export default function VideoAnalysis() {
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
           <button
             className={`tab-btn${mode === "upload" ? " active" : ""}`}
-            onClick={() => setMode("upload")}
+            onClick={() => {
+              setMode("upload");
+              navigate("/video-analysis");
+            }}
           >📁 Upload Video</button>
           <button
             className={`tab-btn${mode === "record" ? " active" : ""}`}
-            onClick={() => setMode("record")}
+            onClick={() => {
+              setMode("record");
+              navigate("/record");
+            }}
           >🎥 Record Now</button>
         </div>
 

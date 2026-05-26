@@ -272,7 +272,7 @@ export default function Layout({ children, title }) {
         {links.length > 0 && (
           <nav className="header-nav">
             {links.map(l => (
-              <Link key={l.to} to={l.to} className={`nav-link${location.pathname === l.to ? " active" : ""}`}>
+              <Link key={l.to} to={l.to} className={`nav-link${location.pathname === l.to || (l.to === "/video-analysis" && location.pathname === "/record") ? " active" : ""}`}>
                 {l.label}
               </Link>
             ))}
@@ -355,7 +355,7 @@ export default function Layout({ children, title }) {
         <div className="mobile-nav open" onClick={() => setMenuOpen(false)}>
           {links.map(l => (
             <Link key={l.to} to={l.to}
-              className={`nav-link${location.pathname === l.to ? " active" : ""}`}
+              className={`nav-link${location.pathname === l.to || (l.to === "/video-analysis" && location.pathname === "/record") ? " active" : ""}`}
               onClick={() => setMenuOpen(false)}>
               {l.label}
             </Link>

@@ -136,6 +136,11 @@ export default function App() {
                 <VideoAnalysis />
               </ProtectedRoute>
             } />
+            <Route path="/record" element={
+              <ProtectedRoute roles={["user","admin","trainer"]} loginPath="/login">
+                <VideoAnalysis />
+              </ProtectedRoute>
+            } />
             <Route path="/community" element={
               <ProtectedRoute roles={["user","admin","trainer"]} loginPath="/login">
                 <CommunityFeed />

@@ -41,7 +41,7 @@
       "name": "Submit Video",
       "short_name": "Submit",
       "description": "Upload today's speaking video",
-      "url": "/video-analysis",
+      "url": "/record",
       "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
     }
   ]
