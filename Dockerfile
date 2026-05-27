@@ -1,49 +1,77 @@
 # syntax=docker/dockerfile:1
+
+# =========================
+# Dependencies Stage
+# =========================
 FROM node:22-slim AS deps
 
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# ── Copy ONLY package files first so this layer is cached until deps change ──
+# Copy package files only for better cache
 COPY package.json package-lock.json ./
 COPY api/package.json api/package-lock.json* ./api/
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 
-# Install all deps in one cached layer (including dev deps for build)
+# Install dependencies
 RUN npm ci --no-audit --no-fund --prefer-offline && \
-    cd api && npm install --no-audit --no-fund --prefer-offline && \
+    cd api && npm ci --no-audit --no-fund --prefer-offline && \
     cd ../frontend && npm ci --no-audit --no-fund --prefer-offline
 
-# ── Build stage ───────────────────────────────────────────────────────────────
+# =========================
+# Builder Stage
+# =========================
 FROM deps AS builder
-COPY . .
-# Set API URL for frontend build - use relative path since frontend and backend are on same domain
-ENV VITE_API_URL=/api
-RUN cd frontend && NODE_ENV=production npm run build && ls -la dist/
-
-# ── Final image — only what's needed to run ───────────────────────────────────
-FROM node:22-slim AS runner
-
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy backend deps + source
+COPY . .
+
+ENV VITE_API_URL=/api
+ENV NODE_ENV=production
+
+# Build frontend
+RUN cd frontend && npm run build
+
+# =========================
+# Production Runner
+# =========================
+FROM node:22-slim AS runner
+
+ENV NODE_ENV=production
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy only production files
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/api ./api
 COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/models ./models
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./package.json
-
-# Copy built frontend only (no src, no node_modules)
 COPY --from=builder /app/frontend/dist ./frontend/dist
 
-# Temp upload dir
+# Create temp upload directory
 RUN mkdir -p tmp/uploads
 
-ENV NODE_ENV=production
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+CMD curl -f http://localhost:3001 || exit 1
+
 EXPOSE 3001
 
 CMD ["node", "api/server.js"]

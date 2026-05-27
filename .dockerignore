@@ -1,45 +1,80 @@
+# =========================
 # Dependencies
+# =========================
 node_modules/
 frontend/node_modules/
 api/node_modules/
 
-# Build outputs
+# =========================
+# Build Outputs
+# =========================
 frontend/dist/
+dist/
+build/
+
+# =========================
+# Logs
+# =========================
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Development files
+# =========================
+# Environment Files
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Git Files
+# =========================
 .git/
+.github/
 .gitignore
-*.md
-.env.local
-.env.development
 
-# Test files
-**/*.test.js
-**/*.spec.js
-coverage/
-
-# IDE files
+# =========================
+# IDE Files
+# =========================
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS files
+# =========================
+# OS Files
+# =========================
 .DS_Store
 Thumbs.db
 
-# Temporary files
+# =========================
+# Testing
+# =========================
+coverage/
+**/*.test.js
+**/*.spec.js
+
+# =========================
+# Temporary Files
+# =========================
 tmp/
 temp/
 *.tmp
 
-# Auth files
+# =========================
+# Docs
+# =========================
+*.md
+
+# =========================
+# Auth / Secrets
+# =========================
 auth/
+*.pem
+*.key
 
-# Kiro specs
+# =========================
+# Misc
+# =========================
 .kiro/
-
-.github/
-.env
