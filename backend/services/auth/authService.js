@@ -103,6 +103,18 @@ async function autoLinkPhone(phone) {
 
 // ── Authentication Services ──────────────────────────────────────────────────
 
+// Fixed argon2 hash used to equalize login response time when no account
+// exists. Verifying against it costs the same as a real password check, so an
+// attacker cannot distinguish "wrong password" from "no such account" by
+// timing the response (account enumeration). Generated once, lazily.
+let _dummyHash = null;
+async function getDummyHash() {
+  if (!_dummyHash) {
+    _dummyHash = await argon2.hash("timing-attack-placeholder-password");
+  }
+  return _dummyHash;
+}
+
 /**
  * Login user with phone and password
  */
@@ -126,6 +138,9 @@ export async function loginUser(phone, password, ipAddress) {
 
   if (!auth) {
     console.log(`[Login] No auth found for phone: ${phone}`);
+    // Burn the same time a real password verification would take, so the
+    // "no account" path is not detectably faster than "wrong password".
+    await argon2.verify(await getDummyHash(), password).catch(() => false);
     // Check if there's a pending registration for this phone
     const pending = await PendingRegistration.findOne({
       phone: { $in: [stripped, phone] }
@@ -152,6 +167,13 @@ export async function loginUser(phone, password, ipAddress) {
     const error = new Error(`Account locked due to too many failed attempts. Try again in ${minutesLeft} minutes.`);
     error.statusCode = 423;
     throw error;
+  }
+
+  // Lock window has elapsed — clear stale lockout state so the user gets a
+  // fresh set of attempts instead of being re-locked on the first wrong try.
+  if (auth.lockUntil && auth.lockUntil <= Date.now()) {
+    auth.failedLoginAttempts = 0;
+    auth.lockUntil = null;
   }
 
   // Verify password (support both bcrypt and argon2)

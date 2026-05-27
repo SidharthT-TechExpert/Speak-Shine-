@@ -51,7 +51,12 @@ export default function Register() {
   }, [resendTimer]);
 
   const handlePhoneChange = (e) => {
-    const val = e.target.value;
+    // Digits only, 10 max. Drop a +91/91 country code.
+    const hadPlus = e.target.value.trimStart().startsWith("+");
+    let d = e.target.value.replace(/\D/g, "");
+    if (hadPlus) d = d.replace(/^91/, "");                 // explicit +91 → strip
+    else if (d.length > 10 && d.startsWith("91")) d = d.slice(2); // 91XXXXXXXXXX → strip
+    const val = d.slice(0, 10);
     setPhone(val);
     setPhoneError(val ? (validatePhone(val) || "") : "");
   };
@@ -194,7 +199,7 @@ export default function Register() {
               <div style={{ position: "relative" }}>
                 <input className={`form-input ${phoneError ? "input-error" : phoneOk ? "input-ok" : ""}`}
                   type="tel" placeholder="9876543210" value={phone}
-                  onChange={handlePhoneChange} required maxLength={13} autoFocus />
+                  onChange={handlePhoneChange} required maxLength={10} inputMode="numeric" autoFocus />
                 {phoneOk && <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#22c55e" }}>✓</span>}
               </div>
               {phoneError && <p className="input-error-msg">⚠ {phoneError}</p>}

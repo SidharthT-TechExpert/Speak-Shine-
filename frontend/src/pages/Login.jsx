@@ -11,10 +11,10 @@ const META = {
 
 // ── Validators ────────────────────────────────────────────────────────────────
 function validatePhone(val) {
-  if (!val.trim()) return "Phone number is required";
-  const digits = val.replace(/^(\+91|91)/, "").replace(/\D/g, "");
-  if (digits.length < 10) return "Must be at least 10 digits";
-  if (!/^\d+$/.test(digits)) return "Digits only";
+  const digits = val.replace(/\D/g, "");
+  if (!digits) return "Phone number is required";
+  if (digits.length !== 10) return `Must be 10 digits (you entered ${digits.length})`;
+  if (!/^[6-9]/.test(digits)) return "Must start with 6, 7, 8, or 9";
   return "";
 }
 
@@ -145,6 +145,14 @@ export default function Login({ loginFor = "user" }) {
   });
 
   const handleChange = (field, val) => {
+    // Phone field: digits only, 10 max. Drop a +91/91 country code.
+    if (field === "phone") {
+      const hadPlus = val.trimStart().startsWith("+");
+      let d = val.replace(/\D/g, "");
+      if (hadPlus) d = d.replace(/^91/, "");                 // explicit +91 → strip
+      else if (d.length > 10 && d.startsWith("91")) d = d.slice(2); // 91XXXXXXXXXX → strip
+      val = d.slice(0, 10);
+    }
     const next = { ...form, [field]: val };
     setForm(next);
     setServerError("");
