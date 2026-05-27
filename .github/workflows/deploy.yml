@@ -10,9 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: Deploy to AWS EC2
         uses: appleboy/ssh-action@master
 
@@ -20,12 +17,21 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          script_stop: true
 
           script: |
             cd ~/Speak-Shine
 
+            echo "Pull latest code"
+
             git pull origin main
+
+            echo "Install packages"
 
             npm install
 
+            echo "Restart PM2"
+
             pm2 restart speak-shine
+
+            echo "Deployment success"
