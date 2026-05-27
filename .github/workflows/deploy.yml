@@ -16,7 +16,6 @@ jobs:
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
-
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -47,8 +46,11 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          script_stop: true
 
           script: |
+
+            set -e
 
             cd ~/Speak-Shine-
 
@@ -59,7 +61,7 @@ jobs:
             git pull origin main
 
             echo "================================="
-            echo "Backup docker compose"
+            echo "Backup current compose file"
             echo "================================="
 
             cp docker-compose.yml docker-compose.backup.yml
@@ -68,57 +70,75 @@ jobs:
             echo "Login to AWS ECR"
             echo "================================="
 
-            aws ecr get-login-password --region ap-south-1 | \
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
             docker login --username AWS --password-stdin \
-            284187934444.dkr.ecr.ap-south-1.amazonaws.com
-
-            echo "================================="
-            echo "Stopping old containers"
-            echo "================================="
-
-            docker compose down
+            ${{ steps.login-ecr.outputs.registry }}
 
             echo "================================="
             echo "Pull latest Docker image"
             echo "================================="
 
             docker pull \
-            284187934444.dkr.ecr.ap-south-1.amazonaws.com/speak-shine:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+            echo "================================="
+            echo "Backup current running containers"
+            echo "================================="
+
+            docker compose down || true
 
             echo "================================="
             echo "Start updated containers"
             echo "================================="
 
-            docker compose up -d
+            docker compose up -d --force-recreate
 
             echo "================================="
-            echo "Waiting for health check"
+            echo "Waiting for containers"
             echo "================================="
 
-            sleep 20
+            sleep 25
 
             echo "================================="
-            echo "Checking deployment status"
+            echo "Container Status"
             echo "================================="
 
-            if docker ps | grep speak-shine-app; then
+            docker ps -a
+
+            echo "================================="
+            echo "Checking App Health"
+            echo "================================="
+
+            if docker ps | grep speak-shine-app
+            then
 
               echo "================================="
-              echo "Deployment successful"
+              echo "Deployment Successful"
               echo "================================="
+
+              docker image prune -af || true
 
             else
 
               echo "================================="
-              echo "Deployment failed"
-              echo "Rolling back..."
+              echo "Deployment Failed"
               echo "================================="
 
-              docker compose down
+              echo "================================="
+              echo "Container Logs"
+              echo "================================="
+
+              docker compose logs --tail=100
+
+              echo "================================="
+              echo "Rolling Back"
+              echo "================================="
+
+              docker compose down || true
 
               cp docker-compose.backup.yml docker-compose.yml
 
-              docker compose up -d
+              docker compose up -d --force-recreate
 
               exit 1
 
@@ -131,9 +151,16 @@ jobs:
             docker ps
 
             echo "================================="
-            echo "Deployment Completed"
-            echo "================================="   
+            echo "Docker Usage"
+            echo "================================="
 
+            docker system df
+
+            echo "================================="
+            echo "Deployment Completed"
+            echo "================================="
+
+            
 # name: Speak-Shine Deployment
 
 # on:
