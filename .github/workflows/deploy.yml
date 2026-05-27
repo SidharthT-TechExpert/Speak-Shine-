@@ -76,6 +76,16 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}
 
             echo "================================="
+            echo "Cleaning old Docker data"
+            echo "================================="
+
+            docker system prune -af || true
+            docker builder prune -af || true
+            docker image prune -af || true
+            docker container prune -f || true
+            docker volume prune -f || true
+
+            echo "================================="
             echo "Pull latest Docker image"
             echo "================================="
 
