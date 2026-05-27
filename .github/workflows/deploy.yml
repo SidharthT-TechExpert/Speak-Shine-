@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy with Docker Rollback
+      - name: Deploy with Docker Compose Rollback
         uses: appleboy/ssh-action@master
 
         with:
@@ -21,46 +21,80 @@ jobs:
           script: |
             cd ~/Speak-Shine-
 
+            echo "================================="
             echo "Pull latest code"
+            echo "================================="
+
             git pull origin main
 
-            echo "Stopping current container"
-            docker stop speak-shine-container || true
+            echo "================================="
+            echo "Creating backup compose file"
+            echo "================================="
 
-            echo "Creating backup container"
-            docker rename speak-shine-container speak-shine-backup || true
+            cp docker-compose.yml docker-compose.backup.yml
 
-            echo "Building new Docker image"
-            docker build -t speak-shine .
+            echo "================================="
+            echo "Stopping old containers"
+            echo "================================="
 
-            echo "Starting new container"
-            docker run -d \
-              --env-file .env \
-              -p 3001:3001 \
-              --name speak-shine-container \
-              speak-shine
+            docker compose down
 
-            echo "Waiting for health check..."
-            sleep 15
+            echo "================================="
+            echo "Cleaning unused Docker resources"
+            echo "================================="
 
-            if docker ps | grep speak-shine-container; then
+            docker system prune -f
+
+            echo "================================="
+            echo "Starting updated containers"
+            echo "================================="
+
+            docker compose up -d --build
+
+            echo "================================="
+            echo "Waiting for health check"
+            echo "================================="
+
+            sleep 20
+
+            echo "================================="
+            echo "Checking container health"
+            echo "================================="
+
+            if docker ps | grep speak-shine-app; then
+
+              echo "================================="
               echo "Deployment successful"
-
-              docker rm -f speak-shine-backup || true
+              echo "================================="
 
             else
-              echo "Deployment failed. Rolling back..."
 
-              docker rm -f speak-shine-container || true
+              echo "================================="
+              echo "Deployment failed"
+              echo "Rolling back..."
+              echo "================================="
 
-              docker rename speak-shine-backup speak-shine-container || true
+              docker compose down
 
-              docker start speak-shine-container || true
+              cp docker-compose.backup.yml docker-compose.yml
+
+              docker compose up -d --build
 
               exit 1
+
             fi
 
+            echo "================================="
+            echo "Running containers"
+            echo "================================="
 
+            docker ps
+
+            echo "================================="
+            echo "Deployment completed"
+            echo "================================="
+
+            
 
 # name: Speak-Shine Deployment
 
