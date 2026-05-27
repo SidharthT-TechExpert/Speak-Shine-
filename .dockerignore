@@ -40,3 +40,6 @@ auth/
 
 # Kiro specs
 .kiro/
+
+.github/
+.env

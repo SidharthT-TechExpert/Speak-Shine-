@@ -23,6 +23,45 @@ jobs:
 
             git pull origin main
 
-            npm install
+            docker stop speak-shine-container || true
 
-            pm2 restart speak-shine
+            docker rm speak-shine-container || true
+
+            docker build -t speak-shine .
+
+            docker run -d \
+              --env-file .env \
+              -p 3001:3001 \
+              --name speak-shine-container \
+              speak-shine
+
+
+
+# name: Speak-Shine Deployment
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Deploy to AWS EC2
+#         uses: appleboy/ssh-action@master
+
+#         with:
+#           host: ${{ secrets.HOST }}
+#           username: ${{ secrets.USERNAME }}
+#           key: ${{ secrets.SSH_KEY }}
+
+#           script: |
+#             cd ~/Speak-Shine-
+
+#             git pull origin main
+
+#             npm install
+
+#             pm2 restart speak-shine
