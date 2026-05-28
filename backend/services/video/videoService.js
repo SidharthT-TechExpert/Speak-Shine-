@@ -14,7 +14,7 @@ import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
 import { moderateVideo } from "../ai/contentModerator.js";
 import { checkSecurityCache, saveSecurityCache } from "../ai/securityCache.js";
-import { fileTypeFromFile } from "file-type";
+import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 import fs from "fs";
 import path from "path";
 
@@ -24,13 +24,113 @@ const ALLOWED_VIDEO_TYPES = [
   'video/x-msvideo', 'video/mpeg', 'video/x-matroska', 'video/x-ms-wmv'
 ];
 
+const VIDEO_EXTENSIONS_BY_MIME = {
+  "video/mp4": [".mp4", ".m4v"],
+  "video/webm": [".webm"],
+  "video/quicktime": [".mov", ".qt"],
+  "video/x-msvideo": [".avi"],
+  "video/mpeg": [".mpeg", ".mpg"],
+  "video/x-matroska": [".mkv"],
+  "video/x-ms-wmv": [".wmv"],
+};
+
+const MIME_BY_EXTENSION = Object.entries(VIDEO_EXTENSIONS_BY_MIME).reduce((acc, [mime, exts]) => {
+  for (const ext of exts) acc[ext] = mime;
+  return acc;
+}, {});
+
 const MAX_ANALYSIS_MB = 110; // Railway RAM limit
 
 /**
  * Sanitize filename to prevent path traversal
  */
 function sanitizeFilename(filename) {
-  return path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+  const base = path.basename(String(filename || "video.webm")).replace(/\s+/g, "_");
+  const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_").slice(0, 120);
+  return cleaned && cleaned !== "." && cleaned !== ".." ? cleaned : "video.webm";
+}
+
+function getBaseMimeType(mimeType) {
+  return String(mimeType || "").split(";")[0].trim().toLowerCase();
+}
+
+function validateVideoNameAndMime(filename, mimeType) {
+  const baseType = getBaseMimeType(mimeType);
+  if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
+    const error = new Error("Invalid file type. Only supported video files are allowed.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const safeFilename = sanitizeFilename(filename);
+  let ext = path.extname(safeFilename).toLowerCase();
+
+  if (ext && !MIME_BY_EXTENSION[ext]) {
+    const error = new Error("Invalid video file extension.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!ext) {
+    ext = VIDEO_EXTENSIONS_BY_MIME[baseType]?.[0] || ".webm";
+  }
+
+  const expectedMime = MIME_BY_EXTENSION[ext];
+  if (expectedMime && expectedMime !== baseType) {
+    const error = new Error("Video extension does not match the selected video type.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const stem = path.basename(safeFilename, path.extname(safeFilename)).replace(/\.+/g, "_") || "video";
+  return {
+    baseType,
+    extension: ext,
+    safeFilename: `${stem}${ext}`,
+  };
+}
+
+function assertOwnedVideoKey(key, userId) {
+  const expectedPrefix = `videos/${userId}/`;
+  const validKeyPattern = new RegExp(`^videos/${String(userId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/\\d{4}-\\d{2}-\\d{2}/[a-z0-9]{8}\\.[a-z0-9]+$`);
+  if (!key?.startsWith(expectedPrefix) || !validKeyPattern.test(key)) {
+    const error = new Error("Invalid upload key");
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
+function isDetectedVideoCompatible(declaredMime, detectedMime) {
+  if (!detectedMime || !detectedMime.startsWith("video/")) return false;
+  if (declaredMime === detectedMime) return true;
+
+  // Some MP4-family files are reported as QuickTime/MP4 depending on container metadata.
+  const mp4Family = new Set(["video/mp4", "video/quicktime", "video/x-m4v"]);
+  if (mp4Family.has(declaredMime) && mp4Family.has(detectedMime)) return true;
+
+  return false;
+}
+
+async function sniffRemoteVideo(publicUrl, declaredMime) {
+  const response = await fetch(publicUrl, {
+    headers: { Range: "bytes=0-8191" },
+  });
+
+  if (!response.ok && response.status !== 206) {
+    const error = new Error("Could not inspect uploaded video file.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const detected = await fileTypeFromBuffer(buffer);
+  if (!detected || !isDetectedVideoCompatible(declaredMime, detected.mime)) {
+    const error = new Error("Invalid video file. File content does not match the selected video type.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return detected;
 }
 
 /**
@@ -314,22 +414,14 @@ async function uploadToR2Buffer(buffer, key, mimeType) {
 export async function getPresignedUrl(filename, mimeType, userId) {
   try {
     console.log("[VideoService] getPresignedUrl - filename:", filename, "mimeType:", mimeType, "userId:", userId);
-    
-    // Validate MIME type
-    const baseType = mimeType.split(';')[0].trim();
-    if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
-      const error = new Error("Invalid file type. Only video files are allowed.");
-      error.statusCode = 400;
-      throw error;
-    }
-    
-    const safeFilename = sanitizeFilename(filename);
-    console.log("[VideoService] Safe filename:", safeFilename);
+
+    const { baseType, safeFilename } = validateVideoNameAndMime(filename, mimeType);
+    console.log("[VideoService] Safe filename:", safeFilename, "baseType:", baseType);
     
     const key = getR2Key(userId, safeFilename);
     console.log("[VideoService] Generated R2 key:", key);
     
-    const uploadUrl = await getPresignedUploadUrl(key, mimeType);
+    const uploadUrl = await getPresignedUploadUrl(key, baseType);
     console.log("[VideoService] Generated presigned URL (length):", uploadUrl?.length);
     
     const publicUrl = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
@@ -352,19 +444,21 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     throw error;
   }
 
-  // Validate MIME type
-  const baseType = mimeType.split(';')[0].trim();
-  if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
-    try { await deleteFromR2(key); } catch {}
-    const error = new Error("Invalid file type. Only video files are allowed.");
-    error.statusCode = 400;
-    throw error;
-  }
-
   const authId = user.id; // JWT contains auth._id as 'id'
   const phone = user.phone;
-  const isWebm = baseType.includes("webm") || key.endsWith(".webm");
   const strippedPhone = phone.replace(/^(\+91|91)/, "");
+
+  let baseType;
+  try {
+    assertOwnedVideoKey(key, authId);
+    const validated = validateVideoNameAndMime(path.basename(key), mimeType);
+    baseType = validated.baseType;
+  } catch (validationErr) {
+    try { await deleteFromR2(key); } catch {}
+    throw validationErr;
+  }
+
+  const isWebm = baseType.includes("webm") || key.endsWith(".webm");
 
   // Validate publicUrl is from our R2 bucket (prevent SSRF)
   const r2Endpoint = process.env.R2_ENDPOINT || "";
@@ -388,6 +482,25 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     const error = new Error("Invalid upload URL");
     error.statusCode = 400;
     throw error;
+  }
+
+  const decodedUrlPath = decodeURIComponent(parsedPublicUrl.pathname.replace(/^\/+/, ""));
+  if (!decodedUrlPath.endsWith(key)) {
+    console.error(`[ConfirmUpload] URL/key mismatch blocked — urlPath=${decodedUrlPath} key=${key}`);
+    try { await deleteFromR2(key); } catch {}
+    const error = new Error("Upload URL does not match the upload key");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Renamed-file protection: inspect the uploaded object's magic bytes before
+  // creating a report, so a script/image renamed to .webm/.mp4 is rejected.
+  try {
+    const detected = await sniffRemoteVideo(publicUrl, baseType);
+    console.log(`[ConfirmUpload] Magic bytes OK — declared=${baseType}, detected=${detected.mime}`);
+  } catch (sniffErr) {
+    try { await deleteFromR2(key); } catch {}
+    throw sniffErr;
   }
 
   // Submit gate (duration + size) before creating report
@@ -512,13 +625,21 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       throw error;
     }
 
-    // Validate MIME type
-    const baseType = file.mimetype.split(';')[0].trim();
-    if (!ALLOWED_VIDEO_TYPES.includes(baseType)) {
+    const authId = user.id; // JWT contains auth._id as 'id'
+    const phone = user.phone;
+    const strippedPhone = phone.replace(/^(\+91|91)/, "");
+    let safeFilename;
+    let baseType;
+
+    try {
+      const validated = validateVideoNameAndMime(file.originalname, file.mimetype);
+      safeFilename = validated.safeFilename;
+      baseType = validated.baseType;
+    } catch (validationErr) {
       securityFlags.push('mime_mismatch');
       await UploadAudit.logUpload({
         userId: authId, // Use authId for audit logs
-        phone: user.phone,
+        phone,
         uploadType: 'direct',
         fileName: file.originalname,
         fileSize: file.size,
@@ -531,24 +652,19 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       });
       
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-      const error = new Error("Invalid file type. Only video files are allowed.");
-      error.statusCode = 400;
-      throw error;
+      throw validationErr;
     }
 
     videoPath = file.path;
-    const authId = user.id; // JWT contains auth._id as 'id'
-    const phone = user.phone;
-    const strippedPhone = phone.replace(/^(\+91|91)/, "");
 
-    console.log(`[VideoService] ${file.originalname} (${(file.size/1024/1024).toFixed(1)}MB) user=${phone}`);
+    console.log(`[VideoService] ${safeFilename} (${(file.size/1024/1024).toFixed(1)}MB) user=${phone}`);
 
     fs.mkdirSync(path.dirname(videoPath), { recursive: true });
 
     // Magic byte validation
     try {
       const fileType = await fileTypeFromFile(videoPath);
-      if (!fileType || !fileType.mime.startsWith('video/')) {
+      if (!fileType || !isDetectedVideoCompatible(baseType, fileType.mime)) {
         securityFlags.push('magic_byte_fail');
         await UploadAudit.logUpload({
           userId: authId, phone, uploadType: 'direct',
@@ -688,8 +804,8 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
 
     // Upload to R2
     try {
-      videoKey = getR2Key(authId.toString(), file.originalname); // Use authId for R2 key
-      videoUrl = await uploadToR2(videoPath, videoKey, file.mimetype);
+      videoKey = getR2Key(authId.toString(), safeFilename); // Use authId for R2 key
+      videoUrl = await uploadToR2(videoPath, videoKey, baseType);
       console.log(`[VideoService] Video saved: ${videoUrl}`);
     } catch (r2Err) {
       console.error(`[VideoService] R2 upload failed:`, r2Err);
@@ -724,7 +840,7 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
     const report = await VideoReport.create({
       userId,
       phone,
-      videoFileName: file.originalname,
+      videoFileName: safeFilename,
       videoDuration: duration,
       status: "processing",
       videoUrl,
@@ -742,9 +858,9 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       userId: authId, // Use authId for audit logs
       phone,
       uploadType: 'direct',
-      fileName: file.originalname,
+      fileName: safeFilename,
       fileSize: file.size,
-      mimeType: file.mimetype,
+      mimeType: baseType,
       duration,
       videoCodec: 'unknown',
       audioCodec: 'unknown',
