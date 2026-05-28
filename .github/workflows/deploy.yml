@@ -110,6 +110,6 @@ jobs:
             echo "================================="
             docker image rm speak-shine-app:rollback >/dev/null 2>&1 || true
             docker image prune -f || true
-            docker builder prune -af --filter "until=24h" || true
+            docker builder prune -af || true
 
             echo "Deployment completed"

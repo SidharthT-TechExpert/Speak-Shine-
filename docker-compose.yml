@@ -17,6 +17,12 @@ services:
     depends_on:
       - mongodb
 
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
     networks:
       - speakshine-network
 
@@ -32,6 +38,12 @@ services:
 
     volumes:
       - mongodb_data:/data/db
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
 
     networks:
       - speakshine-network
@@ -53,6 +65,12 @@ services:
 
     depends_on:
       - app
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
 
     networks:
       - speakshine-network
