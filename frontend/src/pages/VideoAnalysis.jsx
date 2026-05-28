@@ -694,6 +694,48 @@ function ProcessingProgress({ stage, stageKey, completedSteps = [], percent = 0,
 // ── Client-side video compression ────────────────────────────────────────────
 const COMPRESS_THRESHOLD = 50 * 1024 * 1024; // 50 MB
 
+function readVideoBlobDuration(blob) {
+  return new Promise((resolve) => {
+    if (!blob || blob.size <= 0) {
+      resolve(null);
+      return;
+    }
+
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(blob);
+    let settled = false;
+    let fallbackTimer = null;
+
+    const finish = (duration) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(fallbackTimer);
+      URL.revokeObjectURL(url);
+      const rounded = isFinite(duration) && duration > 0 ? Math.round(duration) : null;
+      resolve(rounded);
+    };
+
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.onerror = () => finish(null);
+    fallbackTimer = setTimeout(() => finish(null), 8000);
+
+    video.onloadedmetadata = () => {
+      if (isFinite(video.duration) && video.duration > 0) {
+        finish(video.duration);
+        return;
+      }
+
+      // Some MediaRecorder WebM blobs report Infinity/NaN until the browser seeks.
+      video.ontimeupdate = () => finish(video.duration);
+      video.currentTime = Number.MAX_SAFE_INTEGER;
+    };
+
+    video.src = url;
+  });
+}
+
 function compressVideo(file, onProgress) {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
@@ -891,16 +933,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
     if (f.size > 500 * 1024 * 1024) { setError("File size must be less than 500MB."); return; }
     setFile(f);
     setFileDuration(null);
-    const v = document.createElement("video");
-    v.preload = "metadata";
-    const url = URL.createObjectURL(f);
-    v.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      const d = v.duration;
-      setFileDuration(isFinite(d) && d > 0 ? Math.round(d) : null);
-    };
-    v.onerror = () => { URL.revokeObjectURL(url); };
-    v.src = url;
+    readVideoBlobDuration(f).then(setFileDuration);
   };
 
   const uploadGate = file
@@ -1058,21 +1091,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
       setStage("confirming");
 
       // Get video duration from the browser before confirming
-      let fileDuration = null;
-      try {
-        fileDuration = await new Promise((resolve) => {
-          const video = document.createElement("video");
-          video.preload = "metadata";
-          const url = URL.createObjectURL(fileToUpload);
-          video.onloadedmetadata = () => {
-            URL.revokeObjectURL(url);
-            const d = video.duration;
-            resolve(isFinite(d) && d > 0 ? Math.round(d) : null);
-          };
-          video.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-          video.src = url;
-        });
-      } catch { /* non-critical */ }
+      const fileDuration = await readVideoBlobDuration(fileToUpload);
 
       const { data } = await api.post("/video/confirm", {
         key:       presign.key,
@@ -1250,20 +1269,11 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
           pendingBlobRef.current = draft.blob;
           setRecordedBlob(draft.blob);
 
-          // If saved elapsed is 0 or missing (stale-closure bug), read actual duration from blob
+          // If saved elapsed is 0 or missing, read actual duration from the blob.
           let restoredElapsed = draft.elapsed || 0;
           if (restoredElapsed <= 0) {
-            try {
-              restoredElapsed = await new Promise((resolve) => {
-                const v = document.createElement("video");
-                v.preload = "metadata";
-                const url = URL.createObjectURL(draft.blob);
-                v.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(isFinite(v.duration) && v.duration > 0 ? Math.round(v.duration) : 0); };
-                v.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
-                v.src = url;
-              });
-              console.log(`[VideoDraft] Measured blob duration: ${restoredElapsed}s`);
-            } catch { restoredElapsed = 0; }
+            restoredElapsed = await readVideoBlobDuration(draft.blob) || 0;
+            console.log(`[VideoDraft] Measured blob duration: ${restoredElapsed}s`);
           }
 
           elapsedRef.current = restoredElapsed;
@@ -1317,12 +1327,37 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     }
   }, [step, syncPreviewAspect]);
 
-  // Attach blob URL to preview video once preview step renders the element
+  // Attach blob URL to preview video once preview step renders the element.
+  // Production builds can hit a timer/state race after MediaRecorder stops, so
+  // re-read the blob duration here and use it as the source of truth for submit.
   useEffect(() => {
-    if (step === "preview" && previewVideoRef.current && pendingBlobRef.current) {
-      const url = URL.createObjectURL(pendingBlobRef.current);
-      previewVideoRef.current.src = url;
-      previewVideoRef.current.load();
+    if (step !== "preview" || !previewVideoRef.current || !recordedBlob) return;
+
+    const url = URL.createObjectURL(recordedBlob);
+    let cancelled = false;
+
+    previewVideoRef.current.src = url;
+    previewVideoRef.current.load();
+
+    readVideoBlobDuration(recordedBlob).then((duration) => {
+      if (cancelled || !duration) return;
+      if (Math.abs(duration - elapsedRef.current) <= 1) return;
+
+      elapsedRef.current = duration;
+      setElapsed(duration);
+      saveDraft({ blob: recordedBlob, mimeType: mimeTypeRef.current, elapsed: duration })
+        .catch(err => console.warn("[VideoDraft] Could not update measured duration:", err));
+      console.log(`[Recording] Preview duration synced from blob: ${duration}s`);
+    });
+
+    return () => {
+      cancelled = true;
+      URL.revokeObjectURL(url);
+    };
+  }, [step, recordedBlob]);
+
+  useEffect(() => {
+    if (step === "preview" && pendingBlobRef.current) {
       pendingBlobRef.current = null;
     }
   }, [step]);

@@ -16,8 +16,9 @@ function fmtDuration(sec) {
 export function evaluateSubmitGate({ durationSeconds, fileSizeBytes, frameCount, flags }) {
   const { minSeconds, maxSeconds, minLabel, maxLabel } = getDurationLimits(flags);
   const checks = [];
+  const hasDuration = !!durationSeconds && durationSeconds > 0;
 
-  if (!durationSeconds || durationSeconds <= 0) {
+  if (!hasDuration) {
     checks.push({ id: "duration", label: "Video length", status: "warn", message: "Length unknown — wait for preview to load." });
   } else if (durationSeconds < minSeconds) {
     checks.push({ id: "duration", label: "Video length", status: "fail", message: `Too short (${fmtDuration(durationSeconds)}). Need at least ${minLabel}.` });
@@ -46,5 +47,6 @@ export function evaluateSubmitGate({ durationSeconds, fileSizeBytes, frameCount,
   }
 
   const failed = checks.some((c) => c.status === "fail");
-  return { passed: !failed, readyToSubmit: !failed, checks, limits: { minSeconds, maxSeconds } };
+  const passed = !failed && hasDuration;
+  return { passed, readyToSubmit: passed, checks, limits: { minSeconds, maxSeconds } };
 }
