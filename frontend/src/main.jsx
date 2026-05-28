@@ -22,10 +22,19 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 // Unregister any existing service workers to prevent stale cache blank screens.
 // Re-enable once a proper cache-busting strategy is in place.
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
+  navigator.serviceWorker.getRegistrations().then(async (registrations) => {
     for (const reg of registrations) {
-      reg.unregister();
+      await reg.unregister();
       console.log("[SW] Unregistered:", reg.scope);
     }
-  });
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+
+    if (navigator.serviceWorker.controller && !sessionStorage.getItem("sw-cache-cleared")) {
+      sessionStorage.setItem("sw-cache-cleared", "1");
+      window.location.reload();
+    }
+  }).catch(() => {});
 }

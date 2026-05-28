@@ -4,202 +4,91 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: speak-shine-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout Source
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build Docker Image
-        run: |
-            docker build \
-            --platform linux/amd64 \
-            -t speak-shine .
-
-      - name: Tag Docker Image
-        run: |
-          docker tag speak-shine:latest \
-          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
-
-      - name: Push Docker Image to Amazon ECR
-        run: |
-          docker push \
-          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
-
-      - name: Deploy to AWS EC2
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@master
-
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-
           script: |
+            set -euo pipefail
 
-            set -e
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="$HOME/Speak-Shine-"
+            fi
 
-            cd ~/Speak-Shine-
+            cd "$APP_DIR"
 
+            echo "================================="
+            echo "Sync latest source"
+            echo "================================="
             git fetch origin main
             git reset --hard origin/main
-            git clean -fd
-
-            git pull origin main
 
             echo "================================="
-            echo "Backup current compose file"
+            echo "Backup compose file"
             echo "================================="
-
             cp docker-compose.yml docker-compose.backup.yml
 
             echo "================================="
-            echo "Login to AWS ECR"
+            echo "Build fresh app image"
             echo "================================="
-
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-            docker login --username AWS --password-stdin \
-            ${{ steps.login-ecr.outputs.registry }}
+            docker compose build --no-cache app
 
             echo "================================="
-            echo "Cleaning old Docker data"
+            echo "Restart app and nginx"
             echo "================================="
-
-            docker system prune -af || true
-            docker builder prune -af || true
-            docker image prune -af || true
-            docker container prune -f || true
-            docker volume prune -f || true
+            docker compose up -d --force-recreate --remove-orphans app nginx
 
             echo "================================="
-            echo "Pull latest Docker image"
+            echo "Wait for app health"
             echo "================================="
+            for i in $(seq 1 30); do
+              if curl -fsS http://localhost:3001/api/health >/dev/null; then
+                echo "Health check passed"
+                break
+              fi
 
-            docker pull \
-            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+              if [ "$i" -eq 30 ]; then
+                echo "Health check failed"
+                docker compose ps
+                docker compose logs --tail=150 app
 
-            echo "================================="
-            echo "Backup current running containers"
-            echo "================================="
+                echo "================================="
+                echo "Rolling back compose file"
+                echo "================================="
+                cp docker-compose.backup.yml docker-compose.yml
+                docker compose up -d --force-recreate app nginx
+                exit 1
+              fi
 
-            docker compose down || true
-
-            echo "================================="
-            echo "Start updated containers"
-            echo "================================="
-
-            docker compose down
-            docker compose pull
-            docker compose up -d --force-recreate
-
-            echo "================================="
-            echo "Waiting for containers"
-            echo "================================="
-
-            sleep 25
+              sleep 5
+            done
 
             echo "================================="
-            echo "Container Status"
+            echo "Deployment status"
             echo "================================="
-
-            docker ps -a
-
-            echo "================================="
-            echo "Checking App Health"
-            echo "================================="
-
-            if docker ps | grep speak-shine-app
-            then
-
-              echo "================================="
-              echo "Deployment Successful"
-              echo "================================="
-
-              docker image prune -af || true
-            
-
-            else
-
-              echo "================================="
-              echo "Deployment Failed"
-              echo "================================="
-
-              echo "================================="
-              echo "Container Logs"
-              echo "================================="
-
-              docker compose logs --tail=100
-
-              echo "================================="
-              echo "Rolling Back"
-              echo "================================="
-
-              docker compose down || true
-
-              cp docker-compose.backup.yml docker-compose.yml
-
-              docker compose up -d --force-recreate
-
-              exit 1
-
-            fi
-
-            echo "================================="
-            echo "Running Containers"
-            echo "================================="
-
-            docker ps
-
-            echo "================================="
-            echo "Docker Usage"
-            echo "================================="
-
+            docker compose ps
             docker system df
 
             echo "================================="
-            echo "Deployment Completed"
+            echo "Cleanup unused images only"
             echo "================================="
+            docker image prune -f || true
 
-            
-# name: Speak-Shine Deployment
-
-# on:
-#   push:
-#     branches:
-#       - main
-
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Deploy to AWS EC2
-#         uses: appleboy/ssh-action@master
-
-#         with:
-#           host: ${{ secrets.HOST }}
-#           username: ${{ secrets.USERNAME }}
-#           key: ${{ secrets.SSH_KEY }}
-
-#           script: |
-#             cd ~/Speak-Shine-
-
-#             git pull origin main
-
-#             npm install
-
-#             pm2 restart speak-shine
+            echo "Deployment completed"

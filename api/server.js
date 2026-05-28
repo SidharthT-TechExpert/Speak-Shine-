@@ -371,10 +371,10 @@ if (isProd) {
     console.log("📁 Dist contents:", files);
     console.log("📦 Serving frontend from:", distPath);
     
-    // Serve static assets with correct MIME types and long-term caching
+    // Serve static assets with correct MIME types.
+    // Only hashed assets should be cached long-term; index.html and sw.js must
+    // revalidate so deployments are visible immediately.
     app.use(express.static(distPath, {
-      maxAge: "1y",
-      immutable: true,
       setHeaders(res, filePath) {
         // Ensure JS modules get the correct MIME type
         if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
@@ -382,9 +382,22 @@ if (isProd) {
         } else if (filePath.endsWith(".css")) {
           res.setHeader("Content-Type", "text/css; charset=utf-8");
         }
-        // index.html should never be cached
-        if (filePath.endsWith("index.html")) {
+
+        const normalizedPath = filePath.replace(/\\/g, "/");
+        const isHashedAsset = normalizedPath.includes("/assets/");
+        const mustRevalidate =
+          filePath.endsWith("index.html") ||
+          filePath.endsWith("sw.js") ||
+          filePath.endsWith("manifest.json");
+
+        if (mustRevalidate) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        } else if (isHashedAsset) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=3600");
         }
       },
     }));
@@ -399,6 +412,9 @@ if (isProd) {
       if (req.path.match(/\.(js|css|png|jpg|svg|ico|wasm|json)$/)) {
         return res.status(404).send("Not found");
       }
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(distPath, "index.html"));
     });
   } else {

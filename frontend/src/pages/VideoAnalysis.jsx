@@ -1247,9 +1247,30 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const pendingBlobRef  = useRef(null); // holds blob until preview video mounts
   const mimeTypeRef     = useRef("video/webm"); // store the actual MIME type used
   const uploadStartRef  = useRef(null);
+  const recordingStartedAtRef = useRef(null);
+  const accumulatedRecordingMsRef = useRef(0);
 
   // Keep elapsedRef in sync with elapsed state so callbacks always read the latest value
   useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
+
+  const getWallClockElapsed = useCallback(() => {
+    let ms = accumulatedRecordingMsRef.current;
+    if (recordingStartedAtRef.current) {
+      ms += Date.now() - recordingStartedAtRef.current;
+    }
+    return Math.max(elapsedRef.current, Math.round(ms / 1000));
+  }, []);
+
+  const closeActiveRecordingSegment = useCallback(() => {
+    if (recordingStartedAtRef.current) {
+      accumulatedRecordingMsRef.current += Date.now() - recordingStartedAtRef.current;
+      recordingStartedAtRef.current = null;
+    }
+    const seconds = Math.max(elapsedRef.current, Math.round(accumulatedRecordingMsRef.current / 1000));
+    elapsedRef.current = seconds;
+    setElapsed(seconds);
+    return seconds;
+  }, []);
 
   // Dynamic time limits based on question type
   const MAX_SECONDS = isMonthlyReflection || isMonthlyGoals 
@@ -1478,8 +1499,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         return;
       }
       
-      // More aggressive size validation — use elapsedRef.current (not stale closure `elapsed`)
-      const finalElapsed = elapsedRef.current;
+      // More aggressive size validation using the finalized recording duration.
+      const finalElapsed = closeActiveRecordingSegment();
       const expectedMinSize = finalElapsed * 3000; // ~3KB per second (very conservative)
       const expectedMaxSize = finalElapsed * 500000; // ~500KB per second (generous)
       
@@ -1513,14 +1534,16 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       }
 
       // ── Persist to IndexedDB so a refresh doesn't lose the recording ──
-      // Use elapsedRef.current — `elapsed` state is a stale closure and would be 0 here
-      const elapsedSnapshot = elapsedRef.current;
+      // Use finalized duration — `elapsed` state can be stale in this callback.
+      const elapsedSnapshot = finalElapsed;
       saveDraft({ blob, mimeType: mimeTypeRef.current, elapsed: elapsedSnapshot })
         .then(() => console.log(`[VideoDraft] Draft saved — ${elapsedSnapshot}s`))
         .catch(err => console.warn("[VideoDraft] Could not save draft:", err));
       
       pendingBlobRef.current = blob;
       setRecordedBlob(blob);
+      elapsedRef.current = finalElapsed;
+      setElapsed(finalElapsed);
       setDraftRestored(false); // this is a fresh recording, not a restore
       setStep("preview");
       cleanup();
@@ -1551,15 +1574,15 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     
     setStep("recording");
     elapsedRef.current = 0;
+    accumulatedRecordingMsRef.current = 0;
+    recordingStartedAtRef.current = Date.now();
     setElapsed(0);
     setIsPaused(false);
     timerRef.current = setInterval(() => {
-      setElapsed(prev => {
-        const next = prev + 1;
-        elapsedRef.current = next;
-        if (next >= MAX_SECONDS) { stopRecording(); return next; }
-        return next;
-      });
+      const next = getWallClockElapsed();
+      elapsedRef.current = next;
+      setElapsed(next);
+      if (next >= MAX_SECONDS) stopRecording();
     }, 1000);
   };
 
@@ -1568,6 +1591,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       console.log(`[Recording] Stopping recorder in state: ${recorderRef.current.state}`);
       try {
+        closeActiveRecordingSegment();
         recorderRef.current.stop();
       } catch (err) {
         console.error(`[Recording] Error stopping recorder:`, err);
@@ -1581,18 +1605,18 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const togglePause = () => {
     if (!recorderRef.current) return;
     if (recorderRef.current.state === "recording") {
+      closeActiveRecordingSegment();
       recorderRef.current.pause();
       clearInterval(timerRef.current);
       setIsPaused(true);
     } else if (recorderRef.current.state === "paused") {
       recorderRef.current.resume();
+      recordingStartedAtRef.current = Date.now();
       timerRef.current = setInterval(() => {
-        setElapsed(prev => {
-          const next = prev + 1;
-          elapsedRef.current = next;
-          if (next >= MAX_SECONDS) { stopRecording(); return next; }
-          return next;
-        });
+        const next = getWallClockElapsed();
+        elapsedRef.current = next;
+        setElapsed(next);
+        if (next >= MAX_SECONDS) stopRecording();
       }, 1000);
       setIsPaused(false);
     }
@@ -1603,6 +1627,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     clearDraft().catch(() => {});
     setRecordedBlob(null);
     setElapsed(0);
+    elapsedRef.current = 0;
+    recordingStartedAtRef.current = null;
+    accumulatedRecordingMsRef.current = 0;
     setDraftRestored(false);
     setStep("setup");
     cleanup();

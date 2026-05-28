@@ -1,4 +1,4 @@
-const CACHE_NAME = "speak-shine-v5";
+const CACHE_NAME = "speak-shine-v6";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -30,6 +30,7 @@ self.addEventListener("activate", (e) => {
 // - API calls: always network, never cache
 // - JS/CSS chunks (/assets/): network-first, fall back to cache
 //   (prevents stale chunks from breaking the app after deploys)
+// - Navigation/index: network-first so deployments are picked up immediately
 // - Everything else: cache-first with network fallback
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
@@ -58,6 +59,21 @@ self.addEventListener("fetch", (e) => {
           return response;
         })
         .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  if (e.request.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html") {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          if (response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match("/index.html"))
     );
     return;
   }
