@@ -11,26 +11,26 @@ import fetch from "node-fetch";
 import { getTextKey, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 
 export const STORY_THEMES = [
-  "a surprising act of kindness",
-  "a lesson learned from a mistake",
-  "an unexpected friendship",
-  "a challenge that changed someone",
-  "a moment of courage",
-  "an adventure that went wrong",
-  "a small decision with a big impact",
-  "helping a stranger",
-  "losing something valuable and finding something better",
-  "a misunderstanding that turned into something good",
-  "overcoming a fear",
-  "an act of honesty that was difficult",
-  "a second chance that changed everything",
-  "finding strength in a difficult moment",
-  "a childhood memory with a lesson",
-  "a journey that taught something unexpected",
-  "making a sacrifice for someone else",
-  "a dream that finally came true",
-  "learning to forgive",
-  "standing up for what is right",
+  "a first day at a new job",
+  "a last-minute weekend plan",
+  "a forgotten phone at an important moment",
+  "a side project that almost failed",
+  "meeting someone on a train",
+  "a small lie that became awkward",
+  "a wrong delivery at the perfect time",
+  "a friend who needed honest advice",
+  "a missed bus before an important event",
+  "trying something new with friends",
+  "a flatmate disagreement solved over dinner",
+  "a lost wallet and an unexpected message",
+  "a video call that changed a plan",
+  "a mistake during a college presentation",
+  "a surprise opportunity from a stranger",
+  "a rainy day that became memorable",
+  "helping a teammate under pressure",
+  "a family celebration with a small problem",
+  "a new hobby that brought people together",
+  "choosing between comfort and a new experience",
 ];
 
 // ── Character pools ───────────────────────────────────────────────────────────
@@ -73,12 +73,29 @@ const CHARACTER_POOL = [
   { type: "a curious student",    name: "Zoe",     pronoun: "she" },
 ];
 
+// Keep the default cast close to the users' real lives: college, first jobs,
+// shared homes, and personal projects.
+const YOUNG_ADULT_CHARACTER_POOL = [
+  { type: "a 22-year-old design student", name: "Aisha", pronoun: "she" },
+  { type: "a 25-year-old software trainee", name: "Rohan", pronoun: "he" },
+  { type: "a 20-year-old college student", name: "Maya", pronoun: "she" },
+  { type: "a 28-year-old café manager", name: "Daniel", pronoun: "he" },
+  { type: "a 24-year-old freelance photographer", name: "Leila", pronoun: "she" },
+  { type: "a 27-year-old nurse", name: "Mateo", pronoun: "he" },
+  { type: "a 21-year-old music student", name: "Zara", pronoun: "she" },
+  { type: "a 29-year-old event planner", name: "Omar", pronoun: "he" },
+  { type: "a 23-year-old marketing intern", name: "Sofia", pronoun: "she" },
+  { type: "a 26-year-old travel blogger", name: "Arjun", pronoun: "he" },
+  { type: "a 19-year-old first-year student", name: "Nina", pronoun: "she" },
+  { type: "a 30-year-old small business owner", name: "Ethan", pronoun: "he" },
+];
+
 /**
  * Pick a random character, optionally avoiding reuse.
  */
 function pickCharacter(usedNames = []) {
-  const available = CHARACTER_POOL.filter(c => !usedNames.includes(c.name));
-  const pool = available.length > 0 ? available : CHARACTER_POOL;
+  const available = YOUNG_ADULT_CHARACTER_POOL.filter(c => !usedNames.includes(c.name));
+  const pool = available.length > 0 ? available : YOUNG_ADULT_CHARACTER_POOL;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -113,7 +130,7 @@ export async function generateListeningStory({ wordCount = 200, usedThemes = [],
   };
   const levelDesc = levelDescriptions[level] || levelDescriptions["B1"];
 
-  const prompt = `Write a short English listening story for ${levelDesc} learners on the theme: "${theme}".
+  const prompt = `Write an interesting, modern English listening story for ${levelDesc} learners aged 18–30 on the theme: "${theme}".
 
 Main character: ${character.name} — ${character.type}. Use the pronoun "${character.pronoun}" for this character.
 
@@ -121,11 +138,15 @@ Requirements:
 - Length: ${minWords}–${maxWords} words (keep it strictly within this range)
 - Vocabulary and sentence complexity must match the ${level} CEFR level
 - Has a clear beginning, middle, and end
-- Has a moral or lesson at the end
+- Has a believable problem, a turning point, and a satisfying ending
+- Ends with a practical insight or realisation, not a childish moral
 - Written in third person (narrating about ${character.name})
-- Natural spoken English style — like a narrator telling a story aloud
-- Minimal or no dialogue — pure narration preferred
-- The character's non-human nature (if applicable) should be woven naturally into the story
+- Natural spoken English style — like a friend telling an interesting true-to-life story aloud
+- Use a small amount of natural dialogue when it makes the story more vivid, but keep it easy to follow
+- Use a modern setting such as college, a first job, shared housing, public transport, a café, a family event, travel, or a personal project
+- Make the character feel like a young adult with realistic goals, friendships, small problems, and decisions
+- Avoid childish fairy-tale plots, old-fashioned settings, famous people, politics, violence, trauma, romance as the only plot, and overly dramatic clichés
+- Avoid preaching. Show the character's choice and what they learn through the events
 
 After the story, provide:
 1. topic: A short 3–6 word title for the story

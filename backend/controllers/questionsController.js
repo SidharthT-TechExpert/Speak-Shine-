@@ -239,12 +239,23 @@ export async function cleanGenericQuestions(req, res) {
       /^how do you usually get to/i,
     ];
 
+    const ADVANCED_OR_UNRELATABLE_TERMS = [
+      "artificial intelligence", "blockchain", "cryptocurrency", "cryptocurrencies",
+      "climate policy", "geopolitics", "geopolitical", "globalization",
+      "macroeconomics", "socioeconomic", "constitutional", "legislation",
+      "philosophy", "metaphysics", "ethics of", "cultural appropriation",
+      "quantum", "neuroscience", "genetic engineering", "renewable energy policy",
+      "tax reform", "political ideology", "foreign policy", "economic inequality",
+      "academic research", "existential", "theoretical", "urban planning",
+    ];
+
     const toDelete = all.filter(q => {
       const topicLower = (q.topic || "").toLowerCase().trim();
       const questionLower = (q.question || "").toLowerCase().trim();
 
       if (GENERIC_TOPICS.some(t => topicLower === t || topicLower.includes(t))) return true;
       if (GENERIC_PATTERNS.some(p => p.test(questionLower))) return true;
+      if (ADVANCED_OR_UNRELATABLE_TERMS.some(term => `${topicLower} ${questionLower}`.includes(term))) return true;
       if (q.question.trim().length < 40) return true;
       // Short yes/no questions
       if (/^(are|is|do|did|have|can|would|could)\s/i.test(questionLower) && q.question.trim().length < 80) return true;

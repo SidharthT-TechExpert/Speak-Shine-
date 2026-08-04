@@ -139,6 +139,24 @@ const GENERIC_TOPICS = [
   "english media", "language learning tips", "personal challenges",
 ];
 
+// Keep generated prompts useful for both beginners and intermediate learners.
+// Reject academic, specialist, and debate-heavy subjects that are difficult
+// to answer in everyday spoken English.
+const ADVANCED_OR_UNRELATABLE_TERMS = [
+  "artificial intelligence", "blockchain", "cryptocurrency", "cryptocurrencies",
+  "climate policy", "geopolitics", "geopolitical", "globalization",
+  "macroeconomics", "socioeconomic", "constitutional", "legislation",
+  "philosophy", "metaphysics", "ethics of", "cultural appropriation",
+  "quantum", "neuroscience", "genetic engineering", "renewable energy policy",
+  "tax reform", "political ideology", "foreign policy", "economic inequality",
+  "academic research", "existential", "theoretical", "urban planning",
+];
+
+function isAdvancedOrUnrelatable(q) {
+  const text = `${q.topic || ""} ${q.question || ""}`.toLowerCase();
+  return ADVANCED_OR_UNRELATABLE_TERMS.some(term => text.includes(term));
+}
+
 // Question patterns that are too simple/generic — yes/no, factual, or shallow
 const GENERIC_QUESTION_PATTERNS = [
   /^what (is|are) your (favorite|hobby|hobbies|dream|go-to|quickest)/i,
@@ -172,8 +190,8 @@ function isGenericQuestion(q) {
   // Reject if question matches generic patterns
   if (GENERIC_QUESTION_PATTERNS.some(p => p.test(questionLower))) return true;
 
-  // Reject if question is too short (under 40 chars — not enough depth)
-  if (q.question.trim().length < 40) return true;
+  // Reject only extremely short prompts; everyday questions can be simple.
+  if (q.question.trim().length < 35) return true;
 
   // Reject yes/no questions that start with "Are", "Is", "Do", "Did", "Have", "Can"
   // unless they have enough follow-up context (over 80 chars)
@@ -270,7 +288,7 @@ async function generateWithAI(categories, existingTopics, countPerCategory) {
 
   const totalCount = categories.length * countPerCategory;
 
-  const prompt = `You are creating spoken English practice questions for a WhatsApp group of intermediate English learners (B1-B2 level).
+  const prompt = `You are creating spoken English practice questions for a WhatsApp group with beginner and intermediate English learners (A2-B1 level).
 
 Generate exactly ${totalCount} questions — one for each entry below.
 ${existingList}
@@ -278,51 +296,42 @@ CATEGORIES TO GENERATE FOR:
 ${categoryList}
 
 STYLE RULES — questions must sound like a real person asking a friend, NOT a formal exam:
-✅ GOOD examples (specific, vivid, memorable):
-- "What's the weirdest food you've ever tried and actually liked?"
-- "If you could swap jobs with anyone for a week, who would it be and what's the first thing you'd do?"
-- "What's one habit you keep trying to build but always give up on after a few days?"
-- "Tell me about a time you were completely lost — literally or figuratively."
-- "Which do you prefer: working early morning or late at night, and why does it suit you?"
-- "What's a movie or show you watched recently that you can't stop thinking about?"
-- "If your best friend described you in 3 words, what would they say?"
-- "What's something you believed as a kid that turned out to be completely wrong?"
+✅ GOOD examples (familiar, easy to understand, and open enough for a short story):
+- "What do you usually do after work or class, and which part do you enjoy most?"
+- "Tell me about a meal you made recently. What went well, and what would you change?"
+- "What is one small thing that made you happy this week?"
+- "Describe a place near your home that you like visiting. What do you do there?"
+- "When you have a busy day, how do you decide what to do first?"
+- "Tell me about a useful thing someone taught you recently."
+- "What kind of day feels relaxing to you, from morning to evening?"
+- "What is one simple goal you have for this month, and how will you work on it?"
 
-❌ BAD examples — TOO GENERIC, TOO SIMPLE, TOO VAGUE (NEVER write like these):
-- "What do you do to relax?" ← too simple, everyone knows the answer
-- "What are you doing this weekend?" ← too casual, no depth
-- "What's your favorite food?" ← too basic
-- "Do you like music?" ← yes/no, no depth
-- "What is your hobby?" ← too vague
-- "Tell me about yourself." ← too open-ended
-- "What do you think about technology?" ← too broad
-- "How was your day?" ← not a practice question
-- "What's your favorite movie?" ← too simple
-- "What's a secret talent you have?" ← shallow, no story
-- "What show have you binge-watched recently?" ← too casual
-- "What's your favorite childhood game?" ← too basic
-- "What's the best gift you've ever received?" ← generic
-- "Are audiobooks better than e-books?" ← yes/no, no depth
-- "Are beach or city vacations better?" ← yes/no, no depth
-- "What's your go-to morning coffee order?" ← trivial
-- "How do you usually get to work?" ← factual, no story
-- "How do you learn new vocabulary?" ← too direct
-- "How often do you watch English TV shows?" ← frequency question, no depth
-- "What's your dream job in 10 years?" ← overused, generic
-- "What's your guilty pleasure TV show?" ← too casual
+COMMUNICATION PRACTICE GOAL:
+- Every question must help the learner practise speaking, not just give a one-word answer.
+- Ask them to describe a familiar experience, explain a choice, tell a short story, compare two simple options, or talk about a plan.
+- Include a natural follow-up when useful: what happened, how, when, who, or what they learned.
+- Questions should be answerable in about 60-90 seconds with simple sentences and personal examples.
+
+❌ BAD examples — avoid prompts that are only yes/no, too vague, or too advanced:
+- "Do you like music?"
+- "Tell me about yourself."
+- "What do you think about artificial intelligence?"
+- "How should governments solve economic inequality?"
+- "Explain your political views."
 
 HARD RULES:
 - NO phrases: "share your thoughts", "elaborate", "reflect on", "in what ways", "to what extent", "in today's world/society", "what are your thoughts on", "explain your reasoning", "why or why not"
 - NO questions ending with "and why?" or "explain your answer"
 - Keep questions under 140 characters
-- Minimum 40 characters — questions must have enough context to spark a real story
+- Minimum 35 characters, with simple everyday vocabulary
 - Vary the openers — don't start more than 2 questions with the same word
-- topic: a SPECIFIC 3-6 word title (NOT generic like "Hobbies" or "Food" — be specific like "Embarrassing Cooking Fails" or "Unexpected Travel Moments")
-- question: the actual question — must be SPECIFIC and INTERESTING, require a personal story or opinion with context, not something a 5-year-old would ask
+- topic: a clear 3-6 word title about a familiar situation (for example "After Work Routine" or "Helpful Advice")
+- question: easy for a beginner to understand and answer, but with enough detail for an intermediate learner to add examples
 - Every question MUST be completely unique — no two questions should be about the same thing
-- Questions should make the speaker think and share a real personal story or opinion
-- NEVER ask yes/no questions unless they have a strong follow-up built in (e.g. "Have you ever done X — what happened?")
-- NEVER ask "what is your favorite X" or "do you like X" — these are too shallow
+- Questions must encourage complete sentences, useful details, and connected speech (beginning, middle, and end where appropriate)
+- Prefer common topics: home, work, school, food, free time, friends, family, shopping, travel plans, simple goals, routines, and small everyday experiences
+- Avoid politics, religion, controversial issues, academic debates, specialist subjects, abstract theory, and sensitive private experiences
+- NEVER ask a bare yes/no question; add a simple follow-up such as "What happened?" or "What do you usually do?"
 
 Return ONLY a valid JSON array, no markdown, no extra text:
 [
@@ -398,7 +407,12 @@ function validateAndDedup(candidates, existingTopics, existingQuestions) {
       skipped.push({ reason: "too generic/shallow", q });
       continue;
     }
-    // 4. Topic uniqueness
+    // 4. Too advanced or unrelated to normal daily conversation
+    if (isAdvancedOrUnrelatable(q)) {
+      skipped.push({ reason: "too advanced/unrelatable", q });
+      continue;
+    }
+    // 5. Topic uniqueness
     if (topicIsDuplicate(q.topic, acceptedTopics)) {
       skipped.push({ reason: "duplicate topic", q });
       continue;
