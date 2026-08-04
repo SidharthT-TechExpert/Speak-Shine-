@@ -284,8 +284,17 @@ async function processJob(job) {
       browserFrames
     );
 
-    // Persist the actual duration so retries can skip detection
-    const durationToSave = result.duration;
+    // Persist the actual duration so retries can skip detection. The browser
+    // duration is a safe fallback when media probing returns no duration.
+    const durationToSave = Number(result.duration || knownDuration) || null;
+
+    // The report was created with the canonical User._id. Use that identity
+    // for profile writes instead of relying on the upload phone format (which
+    // may be 10 digits, 91-prefixed, or +91-prefixed).
+    const reportOwner = await VideoReport.findById(reportId)
+      .select("userId")
+      .lean();
+    const userFilter = reportOwner?.userId ? { _id: reportOwner.userId } : { phone };
 
     // ── Vocabulary matching ──────────────────────────────────────────────────
     // Check which of today's vocabulary words appear in the transcript
@@ -374,7 +383,7 @@ async function processJob(job) {
 
     if (fluency != null || grammar != null) {
       await User.findOneAndUpdate(
-        { phone },
+        userFilter,
         {
           $push: {
             feedbackScores: {
@@ -418,14 +427,14 @@ async function processJob(job) {
       }
 
       // Fetch current user state
-      const userDoc = await User.findOne({ phone }).lean();
+      const userDoc = await User.findOne(userFilter).lean();
       const alreadyScoredToday = userDoc?.lastScoreDate === todayIST;
       const prevScore = alreadyScoredToday ? (userDoc?.todayScore ?? 0) : null;
 
       if (!alreadyScoredToday) {
         // Case 1: first submission today — add score
         await User.findOneAndUpdate(
-          { phone },
+          userFilter,
           {
             $inc: { monthlyScore: effectiveScore },
             $set: { lastScoreDate: todayIST, todayScore: effectiveScore },
@@ -437,7 +446,7 @@ async function processJob(job) {
         // Case 2: better score — replace today's contribution
         const improvement = effectiveScore - prevScore;
         await User.findOneAndUpdate(
-          { phone },
+          userFilter,
           {
             $inc: { monthlyScore: improvement },
             $set: { todayScore: effectiveScore },

@@ -793,6 +793,10 @@ export default function UserDashboard() {
 
   const profile = data?.profile;
   const scores = profile?.feedbackScores || [];
+  // The API retains the most recent 30 sessions. Keep the trend and its
+  // recorded-time summary on the same window, including sessions whose points
+  // are not plotted (for example Sunday bonus entries).
+  const recentScores = scores.slice(-30);
   const latest = scores.slice(-1)[0];
   const chartData = scores.map((s, i) => ({ session: `#${i + 1}`, Fluency: s.fluency, Grammar: s.grammar, Confidence: s.confidence, Vocabulary: s.vocabulary }));
   const isSundayScore = (score) => {
@@ -800,7 +804,7 @@ export default function UserDashboard() {
     if (!score.date) return false;
     return new Date(score.date).toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" }) === "Sun";
   };
-  const graphScores = scores.filter(score => !isSundayScore(score));
+  const graphScores = recentScores.filter(score => !isSundayScore(score));
   const pointsData = graphScores.map((s, i) => ({ session: `#${i + 1}`, pts: s.points != null ? Math.round(s.points) : null })).filter(d => d.pts != null);
   const parseDurationToSeconds = (value) => {
     if (value == null || value === "") return null;
@@ -829,7 +833,7 @@ export default function UserDashboard() {
     const secs = Math.round(seconds % 60);
     return `${mins}m ${String(secs).padStart(2, "0")}s`;
   };
-  const totalRecordedSeconds = scores.reduce((sum, score) => {
+  const totalRecordedSeconds = recentScores.reduce((sum, score) => {
     const durationValue = parseDurationToSeconds(score.duration ?? score.videoDuration ?? score.recordedDuration ?? score.durationSeconds);
     return sum + (durationValue ?? 0);
   }, 0);
@@ -1598,7 +1602,7 @@ export default function UserDashboard() {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", marginBottom: "0.95rem", flexWrap: "wrap" }}>
                 <div>
                   <div className="section-title" style={{ marginBottom: "0.25rem" }}>📈 Daily Points Trend</div>
-                  <div style={{ color: "var(--muted)", fontSize: "0.74rem" }}>Your consistency over the last {pointsData.length} sessions · Sunday bonuses excluded</div>
+                  <div style={{ color: "var(--muted)", fontSize: "0.74rem" }}>Your consistency over the last {recentScores.length} sessions · Sunday bonuses excluded</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                   <div style={{ padding: "0.4rem 0.7rem", borderRadius: 999, background: "rgba(34,211,238,0.12)", color: "#67e8f9", fontSize: "0.74rem", fontWeight: 700 }}>
