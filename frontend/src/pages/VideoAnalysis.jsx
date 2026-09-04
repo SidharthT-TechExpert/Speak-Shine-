@@ -25,16 +25,16 @@ export default function VideoAnalysis() {
   const isGuest = !user;
 
   const [mode, setMode] = useState(() => {
-    return location.pathname === "/record" ? "record" : "upload";
+    return location.pathname === "/video-analysis" && !location.search.includes("record") ? "upload" : "record";
   });
 
   useEffect(() => {
-    if (location.pathname === "/record") {
-      setMode("record");
-    } else {
+    if (location.pathname === "/video-analysis" && !location.search.includes("record")) {
       setMode("upload");
+    } else {
+      setMode("record");
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const [todayQuestion, setTodayQuestion] = useState(null);
   const [todayVocabulary, setTodayVocabulary] = useState([]);
@@ -669,19 +669,19 @@ export default function VideoAnalysis() {
         {/* Mode switcher */}
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
           <button
-            className={`tab-btn${mode === "upload" ? " active" : ""}`}
-            onClick={() => {
-              setMode("upload");
-              navigate("/video-analysis");
-            }}
-          >📁 Upload Video</button>
-          <button
             className={`tab-btn${mode === "record" ? " active" : ""}`}
             onClick={() => {
               setMode("record");
               navigate("/record");
             }}
           >🎥 Record Now</button>
+          <button
+            className={`tab-btn${mode === "upload" ? " active" : ""}`}
+            onClick={() => {
+              setMode("upload");
+              navigate("/video-analysis");
+            }}
+          >📁 Upload Video</button>
         </div>
 
         {mode === "upload"

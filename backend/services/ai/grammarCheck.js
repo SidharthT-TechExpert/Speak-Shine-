@@ -92,7 +92,7 @@ export async function checkGrammar(transcript, aiErrors = []) {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
-      timeout: 8000, // 8s max — never block the pipeline waiting for LT
+      timeout: 2500, // 2.5s max — never block speech scoring pipeline
     });
 
     if (!res.ok) {

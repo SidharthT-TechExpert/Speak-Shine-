@@ -128,33 +128,33 @@ export default function Layout({ children, title }) {
 
   const navLinks = () => {
     if (!user) return [
-      { to: "/dashboard",      label: "📊 Preview" },
-      { to: "/video-analysis", label: "📹 Try It" },
-      { to: "/community",      label: "👥 Community" },
+      { to: "/dashboard", label: "📊 Preview" },
+      { to: "/record",    label: "📹 Try It" },
+      { to: "/community", label: "👥 Community" },
     ];
     if (user?.role === "admin" || user?.role === "admins") return [
       { to: "/admin",     label: "🛡️ Admin" },
       { to: "/trainer",   label: "🎓 Trainer" },
       { to: "/dashboard", label: "👤 User View" },
-      { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/record",    label: "📹 Video Analysis" },
       { to: "/community", label: "👥 Community" },
     ];
     if (user?.role === "viewer") return [
       { to: "/admin",     label: "🛡️ Admin" },
       { to: "/trainer",   label: "🎓 Trainer" },
       { to: "/dashboard", label: "👤 User View" },
-      { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/record",    label: "📹 Video Analysis" },
       { to: "/community", label: "👥 Community" },
     ];
     if (user?.role === "trainer") return [
       { to: "/trainer",   label: "🎓 Dashboard" },
       { to: "/dashboard", label: "👤 User View" },
-      { to: "/video-analysis", label: "📹 Video Analysis" },
+      { to: "/record",    label: "📹 Video Analysis" },
       { to: "/community", label: "👥 Community" },
     ];
     return [
       { to: "/dashboard",       label: "📊 Dashboard" },
-      { to: "/video-analysis",  label: "📹 Video Analysis" },
+      { to: "/record",          label: "📹 Video Analysis" },
       { to: "/community",       label: "👥 Community" },
       { to: "/payment-history", label: "💳 Payments" },
     ];

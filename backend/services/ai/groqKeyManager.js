@@ -181,7 +181,7 @@ export function keyStatus() {
  * @returns {string}
  */
 export function getTextModel() {
-  return process.env.GROQ_TEXT_MODEL || process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+  return process.env.GROQ_TEXT_MODEL || process.env.GROQ_MODEL || "openai/gpt-oss-20b";
 }
 
 /**
