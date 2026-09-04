@@ -162,10 +162,11 @@ function DetailedReport({ a }) {
 
   const improvementTips = [];
   if (bd) {
-    const lenGap = isPictureBd ? (bd.maxDuration || 20) - (bd.duration || 0) : (bd.maxLength || 33.33) - (bd.length || 0);
-    const vocGap = isPictureBd ? (bd.maxVocabulary || 10) - (bd.vocabulary || 0) : (bd.maxVocab || 33.33) - (bd.vocabUsed || 0);
-    const topGap = isPictureBd ? (bd.maxContent || 40) - (bd.content || 0) : (bd.maxTopic || 16.67) - (bd.topic || 0);
-    const comGap = isPictureBd ? (bd.maxCommunication || 30) - (bd.communication || 0) : (bd.maxComm || 16.67) - (bd.comm || 0);
+    const lenGap = isPictureBd ? (bd.maxDuration || 20) - (bd.duration || 0) : (bd.maxLength || 30) - (bd.length || 0);
+    const vocGap = isPictureBd ? (bd.maxVocabulary || 10) - (bd.vocabulary || 0) : (bd.maxVocab || 30) - (bd.vocabUsed || 0);
+    const topGap = isPictureBd ? (bd.maxContent || 35) - (bd.content || 0) : (bd.maxTopic || 15) - (bd.topic || 0);
+    const comGap = isPictureBd ? (bd.maxCommunication || 20) - (bd.communication || 0) : (bd.maxComm || (bd.isSpecialDay ? 25 : 10)) - (bd.comm || 0);
+    const groGap = (bd.maxGrowth || 15) - (bd.growth || 0);
     if (lenGap > 2) improvementTips.push({ icon: "⏱️", label: "Record longer",          detail: `+${lenGap.toFixed(1)} pts possible — speak closer to the full-score time`,                      gap: lenGap });
     if (vocGap > 2) {
       const requiredVocabWords = bd.requiredVocabWords || 3;
@@ -183,11 +184,34 @@ function DetailedReport({ a }) {
       });
     }
     if (comGap > 2) improvementTips.push({ icon: "🗣️", label: "Improve communication",  detail: `+${comGap.toFixed(1)} pts possible — work on fluency, grammar, confidence & eye contact`,     gap: comGap });
+    if (groGap > 2) improvementTips.push({ icon: "🌱", label: "Aim for personal growth", detail: `+${groGap.toFixed(1)} pts possible — speak with slightly clearer pacing and flow to beat your baseline`, gap: groGap });
     improvementTips.sort((x, y) => y.gap - x.gap);
   }
 
   return (
     <div style={{ fontSize: "0.85rem" }}>
+
+      {/* ── Personal Growth Banner ── */}
+      {bd?.growthDelta != null && bd.growthDelta > 0 && (bd.growth ?? 0) >= 9 && (
+        <div style={{
+          marginBottom: "0.85rem",
+          padding: "0.65rem 0.85rem",
+          borderRadius: 10,
+          background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(74,222,128,0.08))",
+          border: "1px solid rgba(16,185,129,0.45)",
+          display: "flex", alignItems: "center", gap: "0.65rem",
+        }}>
+          <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>🌱</span>
+          <div>
+            <div style={{ fontWeight: 800, color: "#10b981", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+              Personal Growth Bonus! +{bd.growth} pts
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>
+              Beat baseline ({bd.baselineComm != null ? `${bd.baselineComm.toFixed(1)} avg` : "past attempts"}) by <strong style={{ color: "#34d399" }}>+{bd.growthDelta.toFixed(1)}</strong>!
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Today's Score Card ── */}
       {cs != null && (
@@ -226,19 +250,52 @@ function DetailedReport({ a }) {
           {bd && (
             <div style={{ padding: "0 1.1rem 0.85rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {(isPictureBd ? [
-                { label: "🗣️ Communication & Fluency", earned: bd.communication || 0, max: bd.maxCommunication || 30, color: "#60a5fa" },
-                { label: "🧠 Content & Relevance",      earned: bd.content       || 0, max: bd.maxContent       || 40, color: "#a78bfa" },
+                { label: "🗣️ Communication", earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
+                { label: "🧠 Content & Relevance",      earned: bd.content       || 0, max: bd.maxContent       || 35, color: "#a78bfa" },
                 { label: "📚 Vocabulary",               earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 10, color: "#34d399" },
                 { label: "⏱️ Duration",                 earned: bd.duration      || 0, max: bd.maxDuration      || 20, color: "#fbbf24" },
+                ...(bd.growth != null || bd.maxGrowth != null ? [{
+                  label: "🌱 Personal Growth",
+                  earned: bd.growth || 0,
+                  max: bd.maxGrowth || 15,
+                  color: "#10b981",
+                  subtext: bd.isCalibration
+                    ? "Establishing baseline"
+                    : bd.growthDelta > 0
+                    ? `+${bd.growthDelta.toFixed(1)} vs baseline`
+                    : bd.growthDelta === 0
+                    ? "Matches baseline"
+                    : `${bd.growthDelta.toFixed(1)} vs baseline`,
+                }] : []),
               ] : [
-                { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || 33.33, color: "#60a5fa" },
-                { label: "📚 Vocab used", earned: bd.vocabUsed || 0, max: bd.maxVocab || 33.33, color: "#a78bfa" },
-                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "🎯 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || 16.67, color: "#34d399" }] : []),
-                { label: "🗣️ Communication", earned: bd.comm || 0, max: bd.maxComm || 16.67, color: "#fbbf24" },
-              ]).map(({ label, earned, max, color }) => (
+                { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || 30, color: "#60a5fa" },
+                { label: "📚 Vocab used", earned: bd.vocabUsed || 0, max: bd.maxVocab || 30, color: "#a78bfa" },
+                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "🎯 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || 15, color: "#34d399" }] : []),
+                { label: "🗣️ Communication", earned: bd.comm || 0, max: bd.maxComm || (bd.isSpecialDay ? 25 : 10), color: "#fbbf24" },
+                ...(bd.growth != null || bd.maxGrowth != null ? [{
+                  label: "🌱 Personal Growth",
+                  earned: bd.growth || 0,
+                  max: bd.maxGrowth || 15,
+                  color: "#10b981",
+                  subtext: bd.isCalibration
+                    ? "Establishing baseline"
+                    : bd.growthDelta > 0
+                    ? `+${bd.growthDelta.toFixed(1)} vs baseline`
+                    : bd.growthDelta === 0
+                    ? "Matches baseline"
+                    : `${bd.growthDelta.toFixed(1)} vs baseline`,
+                }] : []),
+              ]).map(({ label, earned, max, color, subtext }) => (
                 <div key={label}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "0.18rem" }}>
-                    <span style={{ color: "var(--muted)" }}>{label}</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.72rem", marginBottom: "0.18rem" }}>
+                    <span style={{ color: "var(--muted)" }}>
+                      {label}
+                      {subtext && (
+                        <span style={{ marginLeft: "0.35rem", color: color, fontSize: "0.68rem", fontWeight: 600 }}>
+                          ({subtext})
+                        </span>
+                      )}
+                    </span>
                     <span style={{ color: "var(--text)", fontWeight: 600 }}>{earned.toFixed(1)} / {max.toFixed(1)}</span>
                   </div>
                   <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 99, height: 5, overflow: "hidden" }}>

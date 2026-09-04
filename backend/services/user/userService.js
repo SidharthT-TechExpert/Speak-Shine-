@@ -101,8 +101,10 @@ async function sendSmsOTP(phone, otp) {
  * web-only users (userId like "web:STRIPPED_PHONE").
  */
 export async function getAllUsers() {
-  const users = await User.find().lean();
-  const auths = await Auth.find().lean();
+  const [users, auths] = await Promise.all([
+    User.find().lean(),
+    Auth.find().select("phone role name isActive").lean(),
+  ]);
 
   // Build lookup maps for fast joining
   const authByPhone = {};
@@ -136,14 +138,16 @@ export async function getAllUsers() {
  * Get current user's profile
  */
 export async function getUserProfile(userId) {
-  const auth = await Auth.findById(userId).lean();
+  const auth = await Auth.findById(userId).select("-password -refreshTokens").lean();
   if (!auth) {
     const error = new Error("Not found");
     error.statusCode = 404;
     throw error;
   }
 
-  const user = await User.findOne({ phone: auth.phone }).lean();
+  const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "") : "";
+  const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
+  const user = await User.findOne({ phone: { $in: phoneCandidates } }).select("name phone paid streak earnedBadges monthlyScore weeklySubmissions").lean();
   return { auth, user: user || null };
 }
 

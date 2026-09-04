@@ -11,6 +11,7 @@
     "dev:api": "npm run dev:backend",
     "dev:web": "cd frontend && npm run dev",
     "dev:infisical": "infisical run --env=dev -- npm run dev:backend",
+    "dev:nodemon": "nodemon --watch api --exec \"npm run dev:infisical\"",
     "setup": "node scripts/setup.cjs",
     "build": "cd frontend && npm install --prefer-offline --no-audit --no-fund && npm run build",
     "build:frontend": "cd frontend && npm ci --prefer-offline --no-audit --no-fund && npm run build",

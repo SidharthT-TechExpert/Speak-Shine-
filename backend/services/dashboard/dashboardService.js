@@ -46,8 +46,10 @@ export async function getTodayOverview() {
     // non-fatal
   }
 
-  const status = await Status.findOne().lean();
-  const users = await User.find().lean();
+  const [status, users] = await Promise.all([
+    Status.findOne().lean(),
+    User.find().select("name userId streak weeklySubmissions completed earnedBadges").lean(),
+  ]);
 
   const completed = users.filter(u => u.completed);
   const pending = users.filter(u => !u.completed);
@@ -95,7 +97,7 @@ export async function getTodayOverview() {
  * Get weekly report summary (admin/trainer only)
  */
 export async function getWeeklyReport() {
-  const users = await User.find().lean();
+  const users = await User.find().select("name userId weeklySubmissions streak streakFreeze monthlyScore").lean();
   const sorted = [...users].sort((a, b) => (b.weeklySubmissions || 0) - (a.weeklySubmissions || 0));
   
   return sorted.map(u => ({
@@ -112,7 +114,7 @@ export async function getWeeklyReport() {
  * Get monthly report summary (admin/trainer only)
  */
 export async function getMonthlyReport() {
-  const users = await User.find().lean();
+  const users = await User.find().select("name userId monthlySubmissions monthlyScore streak streakFreeze").lean();
   const sorted = [...users].sort((a, b) => (b.monthlyScore ?? 0) - (a.monthlyScore ?? 0));
   
   return sorted.map(u => ({
@@ -129,40 +131,36 @@ export async function getMonthlyReport() {
  * Get full profile for logged-in user
  */
 export async function getUserProfile(phone) {
-  // phone may be null when the auth account has no linked WhatsApp number yet
-  let user = null;
-  if (phone) {
-    // Match by phone field — try with and without country code prefix
-    user = await User.findOne({ 
-      phone: { $in: [phone, phone.replace(/^91/, ""), `91${phone}`] } 
-    }).lean();
-  }
+  const strippedPhone = phone ? phone.replace(/^91/, "") : "";
+  const phoneCandidates = phone ? [phone, strippedPhone, `91${phone}`] : [];
 
-  // If no WhatsApp user found, create a basic profile from auth data
-  if (!user) {
-    user = {
-      name: "User",
-      phone: phone,
-      feedbackScores: [],
-      streak: 0,
-      fine: 0,
-      completed: false,
-      weeklySubmissions: 0,
-      monthlySubmissions: 0,
-      monthlyScore: 0,
-      streakFreeze: 0,
-    };
-  }
+  const [user, status, allUsers, existingStreakRecord] = await Promise.all([
+    phone ? User.findOne({ phone: { $in: phoneCandidates } }).lean() : Promise.resolve(null),
+    Status.findOne().lean(),
+    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges").lean(),
+    StreakRecord.findOne().lean(),
+  ]);
 
-  const status = await Status.findOne().lean();
-  const allUsers = await User.find().lean();
-  const recentCompletedReport = user?._id
-    ? await VideoReport.findOne({ userId: user._id, status: "completed", videoDuration: { $gt: 0 } })
+  const profileUser = user || {
+    name: "User",
+    phone: phone,
+    feedbackScores: [],
+    streak: 0,
+    fine: 0,
+    completed: false,
+    weeklySubmissions: 0,
+    monthlySubmissions: 0,
+    monthlyScore: 0,
+    streakFreeze: 0,
+  };
+
+  const recentCompletedReport = profileUser._id
+    ? await VideoReport.findOne({ userId: profileUser._id, status: "completed", videoDuration: { $gt: 0 } })
         .sort({ submittedAt: -1 })
         .select("videoDuration submittedAt")
         .lean()
     : null;
-  const feedbackScores = [...(user.feedbackScores || [])];
+  const feedbackScores = [...(profileUser.feedbackScores || [])];
   const lastFeedback = feedbackScores[feedbackScores.length - 1];
   // Older completed reports may predate duration persistence. Enrich the latest
   // score from the still-available report so today's recorded time is visible.
@@ -247,33 +245,33 @@ export async function getUserProfile(phone) {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       
-      if (user && user._id) {
+      if (profileUser && profileUser._id) {
         dailyReport = await DailyReport.findOne({
-          userId: user._id,
+          userId: profileUser._id,
           date: todayStart,
         }).lean();
       }
     }
   }
 
-  const allTimeSessions = Math.max(user.totalSessions || 0, feedbackScores.length);
+  const allTimeSessions = Math.max(profileUser.totalSessions || 0, feedbackScores.length);
   const feedbackDurationSum = feedbackScores.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
-  const allTimeRecordedSeconds = Math.max(user.totalRecordedSeconds || 0, feedbackDurationSum);
+  const allTimeRecordedSeconds = Math.max(profileUser.totalRecordedSeconds || 0, feedbackDurationSum);
 
   return {
     profile: {
-      name: user.name,
+      name: profileUser.name,
       feedbackScores,
       totalSessions: allTimeSessions,
       totalRecordedSeconds: allTimeRecordedSeconds,
-      streak: user.streak || 0,
-      streakFreeze: user.streakFreeze || 0,
-      monthlyScore: user.monthlyScore || 0,
-      completed: user.completed || false,
-      weeklySubmissions: user.weeklySubmissions || 0,
-      monthlySubmissions: user.monthlySubmissions || 0,
-      linkedPhone: user.phone || null,
-      ...serializeStreakBadges(user),
+      streak: profileUser.streak || 0,
+      streakFreeze: profileUser.streakFreeze || 0,
+      monthlyScore: profileUser.monthlyScore || 0,
+      completed: profileUser.completed || false,
+      weeklySubmissions: profileUser.weeklySubmissions || 0,
+      monthlySubmissions: profileUser.monthlySubmissions || 0,
+      linkedPhone: profileUser.phone || null,
+      ...serializeStreakBadges(profileUser),
     },
     today: {
       questionSent: status?.questionSentToday || false,
@@ -337,7 +335,7 @@ export async function getUserProfile(phone) {
     streakRecord: await (async () => {
       // Always check if current top user beats the stored record
       const topUser = sortedByStreak[0];
-      const existing = await StreakRecord.findOne().lean();
+      const existing = existingStreakRecord;
       if (topUser && (topUser.streak || 0) > 0) {
         if (!existing || topUser.streak > existing.streak) {
           return await StreakRecord.findOneAndUpdate(

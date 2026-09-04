@@ -190,6 +190,6 @@ export function getTextModel() {
  * @returns {string}
  */
 export function getVisionModel() {
-  return process.env.GROQ_VISION_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+  return process.env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b";
 }
 

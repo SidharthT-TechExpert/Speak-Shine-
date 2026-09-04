@@ -366,41 +366,30 @@ export async function analyzeVideoFromBrowserFrames(frameBase64Array) {
     frameIndex: index,
   }));
 
-  // Process batches SEQUENTIALLY to keep peak memory at 4 frames max
+  // Process all batches concurrently with Promise.all (as frames are already in memory)
   const totalBatches = Math.ceil(frames.length / GROQ_BATCH_LIMIT);
-  // Process 2 batches in parallel to cut visual analysis time roughly in half.
-  // Browser frames are already in memory so no extra disk I/O cost.
-  const PARALLEL_BATCHES = 2;
-  console.log(`[Visual] ${frames.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, processing ${PARALLEL_BATCHES} at a time`);
+  console.log(`[Visual] ${frames.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, running concurrently with Promise.all`);
 
-  const batchResults = new Array(totalBatches).fill(null);
+  const batchPromises = Array.from({ length: totalBatches }, async (_, batchIdx) => {
+    const batchFrames = frames.slice(
+      batchIdx * GROQ_BATCH_LIMIT,
+      (batchIdx + 1) * GROQ_BATCH_LIMIT
+    );
+    if (batchFrames.length === 0) return null;
 
-  for (let start = 0; start < totalBatches; start += PARALLEL_BATCHES) {
-    const chunk = [];
-    for (let batchIdx = start; batchIdx < Math.min(start + PARALLEL_BATCHES, totalBatches); batchIdx++) {
-      const batchFrames = frames.slice(
-        batchIdx * GROQ_BATCH_LIMIT,
-        (batchIdx + 1) * GROQ_BATCH_LIMIT
-      );
-      if (batchFrames.length === 0) continue;
+    const startSec = batchFrames[0].timestamp;
+    const endSec = batchFrames[batchFrames.length - 1].timestamp;
 
-      const startSec = batchFrames[0].timestamp;
-      const endSec = batchFrames[batchFrames.length - 1].timestamp;
+    const result = await analyzeFrameBatch(
+      batchFrames,
+      `batch${batchIdx + 1}/${totalBatches}`,
+      { index: batchIdx, total: totalBatches, startSec, endSec }
+    );
+    batchFrames.forEach(f => { f.base64 = null; });
+    return result;
+  });
 
-      chunk.push(
-        analyzeFrameBatch(
-          batchFrames,
-          `batch${batchIdx + 1}/${totalBatches}`,
-          { index: batchIdx, total: totalBatches, startSec, endSec }
-        ).then(result => {
-          batchFrames.forEach(f => { f.base64 = null; });
-          batchResults[batchIdx] = result;
-        })
-      );
-    }
-    await Promise.all(chunk);
-    if (global.gc) global.gc();
-  }
+  const batchResults = await Promise.all(batchPromises);
 
   // Merge all batch results with 60/40 second-half weighting
   const merged = mergeWeightedBatchResults(batchResults);
@@ -453,46 +442,43 @@ export async function analyzeVideo(videoPath, browserFrames = null) {
     return null;
   }
 
-  // Process batches SEQUENTIALLY to keep peak memory at 4 frames max.
-  // Each batch: extract 4 frames → send to Groq → free base64 → next batch.
+  // 16 frames divided into batches of 4.
+  // Execute all batches concurrently with Promise.all for maximum speed.
   const totalBatches = Math.ceil(timestamps.length / GROQ_BATCH_LIMIT);
-  const PARALLEL_BATCHES = 2;
-  console.log(`[Visual] ${timestamps.length} frames → ${totalBatches} batches, ${PARALLEL_BATCHES} parallel`);
+  console.log(`[Visual] ${timestamps.length} frames → ${totalBatches} batches of ${GROQ_BATCH_LIMIT}, running concurrently with Promise.all`);
 
-  const batchResults = new Array(totalBatches).fill(null);
-  for (let start = 0; start < totalBatches; start += PARALLEL_BATCHES) {
-    const chunk = [];
-    for (let batchIdx = start; batchIdx < Math.min(start + PARALLEL_BATCHES, totalBatches); batchIdx++) {
-      const batchTimestamps = timestamps.slice(
-        batchIdx * GROQ_BATCH_LIMIT,
-        (batchIdx + 1) * GROQ_BATCH_LIMIT
-      );
+  const batchPromises = Array.from({ length: totalBatches }, async (_, batchIdx) => {
+    const batchTimestamps = timestamps.slice(
+      batchIdx * GROQ_BATCH_LIMIT,
+      (batchIdx + 1) * GROQ_BATCH_LIMIT
+    );
 
-      chunk.push((async () => {
-        const frames = [];
-        for (let i = 0; i < batchTimestamps.length; i++) {
-          const globalIdx = batchIdx * GROQ_BATCH_LIMIT + i;
-          const frame = await extractFrame(videoPath, batchTimestamps[i], globalIdx);
-          if (frame) frames.push(frame);
-        }
-        if (frames.length === 0) {
-          batchResults[batchIdx] = null;
-          return;
-        }
-        const startSec = frames[0].timestamp;
-        const endSec = frames[frames.length - 1].timestamp;
-        const result = await analyzeFrameBatch(
-          frames,
-          `batch${batchIdx + 1}/${totalBatches}`,
-          { index: batchIdx, total: totalBatches, startSec, endSec }
-        );
-        frames.forEach(f => { f.base64 = null; });
-        batchResults[batchIdx] = result;
-      })());
+    // Extract batch frames concurrently
+    const framePromises = batchTimestamps.map((ts, i) => {
+      const globalIdx = batchIdx * GROQ_BATCH_LIMIT + i;
+      return extractFrame(videoPath, ts, globalIdx);
+    });
+
+    const rawFrames = await Promise.all(framePromises);
+    const frames = rawFrames.filter(Boolean);
+
+    if (frames.length === 0) {
+      return null;
     }
-    await Promise.all(chunk);
-    if (global.gc) global.gc();
-  }
+
+    const startSec = frames[0].timestamp;
+    const endSec = frames[frames.length - 1].timestamp;
+    const result = await analyzeFrameBatch(
+      frames,
+      `batch${batchIdx + 1}/${totalBatches}`,
+      { index: batchIdx, total: totalBatches, startSec, endSec }
+    );
+    frames.forEach(f => { f.base64 = null; });
+    return result;
+  });
+
+  const batchResults = await Promise.all(batchPromises);
+  if (global.gc) global.gc();
 
   // Merge all batch results with 60/40 second-half weighting
   const merged = mergeWeightedBatchResults(batchResults);

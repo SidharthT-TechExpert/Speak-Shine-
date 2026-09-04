@@ -325,7 +325,10 @@ async function processJob(job) {
     let challengeType = reportMeta?.challengeType || null;
     let gateFlags = null;
     try {
-      const status = await Status.findOne().lean();
+      const [status, userDoc] = await Promise.all([
+        Status.findOne().lean(),
+        User.findOne({ phone }).lean(),
+      ]);
       challengeType = challengeType || (
         status?.isMonthlyReflectionDay ? "monthly_reflection"
         : (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
@@ -364,23 +367,26 @@ async function processJob(job) {
         analysis:           result.analysis,
         isPictureDescription: gateFlags.isPictureDescription || false,
         isStorySummary:     gateFlags.isStorySummary || false,
+        userHistory:        userDoc?.feedbackScores || [],
       });
       compositeScore = score;
       // Attach breakdown + maxes to analysis so the report UI can show it
       result.analysis._compositeScore = score;
       result.analysis._scoreBreakdown = breakdown.isPictureDescription ? {
         ...breakdown,
-        // Picture Description category weights for UI
-        maxCommunication: 30,
-        maxContent:       40,
+        // Picture Description category weights for UI (Option B)
+        maxCommunication: 20,
+        maxContent:       35,
         maxVocabulary:    10,
         maxDuration:      20,
+        maxGrowth:        15,
       } : {
         ...breakdown,
-        maxLength:    33.33,
-        maxVocab:     33.33,
-        maxTopic:     breakdown.isSpecialDay ? 0    : 16.67,
-        maxComm:      breakdown.isSpecialDay ? 33.34 : 16.67,
+        maxLength:    30,
+        maxVocab:     30,
+        maxTopic:     breakdown.isSpecialDay ? 0  : 15,
+        maxComm:      breakdown.isSpecialDay ? 25 : 10,
+        maxGrowth:    15,
       };
     } catch (scoreErr) {
       console.warn("[Queue] Composite score calculation failed (non-fatal):", scoreErr.message);

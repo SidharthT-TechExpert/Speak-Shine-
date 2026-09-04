@@ -715,13 +715,13 @@ const tt = { background: "#16162a", border: "1px solid #252545", borderRadius: 1
 const avg = (arr, k) => { const v = arr.filter(s => s[k] != null).map(s => s[k]); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : "—"; };
 const scoreColor = v => v >= 7 ? "var(--success)" : v >= 5 ? "var(--warning)" : "var(--danger)";
 
-const CACHE_KEY = "dashboard_cache_v4"; // bump version to bust stale sort order
-const CACHE_TTL = 30 * 1000; // 30s — always refetch quickly so scores stay fresh
+const CACHE_KEY = "dashboard_cache_v5"; // bump version for stale-while-revalidate
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache with background revalidation
 
 function getCachedDashboard() {
   try {
     // Also clear all old cache versions on read
-    ["dashboard_cache_v1", "dashboard_cache_v2", "dashboard_cache_v3"].forEach(k => {
+    ["dashboard_cache_v1", "dashboard_cache_v2", "dashboard_cache_v3", "dashboard_cache_v4"].forEach(k => {
       try { localStorage.removeItem(k); } catch { }
     });
     const raw = localStorage.getItem(CACHE_KEY);

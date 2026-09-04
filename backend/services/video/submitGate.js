@@ -216,6 +216,78 @@ export function evaluateSubmitGate(input, settings = {}) {
  * @param {object}   params.analysis            - full analysis object for comm scores + speech stats
  * @returns {{ score: number, breakdown: object }}
  */
+/**
+ * Calculates a personal growth & improvement bonus (0–15 pts) based on the user's
+ * recent communication scores vs today's communication score.
+ *
+ * @param {object} params
+ * @param {number} params.currentCommScore - Today's communication average (0-10)
+ * @param {Array}  params.history          - Recent submissions from user.feedbackScores
+ * @returns {{ growthScore: number, baselineComm: number|null, growthDelta: number, isCalibration: boolean }}
+ */
+export function calculateGrowthScore({ currentCommScore = 5, history = [] }) {
+  if (!Array.isArray(history) || history.length === 0) {
+    // New user with no history: Calibration bonus (+8 pts out of 15)
+    return {
+      growthScore: 8,
+      baselineComm: null,
+      growthDelta: 0,
+      isCalibration: true,
+    };
+  }
+
+  // Extract communication averages from valid historical entries
+  const validScores = history
+    .map(entry => {
+      if (!entry) return null;
+      const scores = [entry.fluency, entry.grammar, entry.confidence, entry.vocabulary]
+        .filter(n => typeof n === "number" && !Number.isNaN(n));
+      return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+    })
+    .filter(s => typeof s === "number" && !Number.isNaN(s));
+
+  // If fewer than 2 valid historical submissions, still calibrating
+  if (validScores.length < 2) {
+    const singleBaseline = validScores.length === 1 ? Math.round(validScores[0] * 10) / 10 : null;
+    return {
+      growthScore: 8,
+      baselineComm: singleBaseline,
+      growthDelta: 0,
+      isCalibration: true,
+    };
+  }
+
+  // Use the last 7 submissions to establish the rolling baseline
+  const recentScores = validScores.slice(-7);
+  const baseline = recentScores.reduce((a, b) => a + b, 0) / recentScores.length;
+  const roundedBaseline = Math.round(baseline * 10) / 10;
+  const delta = Math.round((currentCommScore - baseline) * 10) / 10;
+
+  let growthScore = 0;
+  if (delta >= 1.0) {
+    growthScore = 15; // Breakthrough Growth (+1.0 or higher)
+  } else if (delta >= 0.5) {
+    growthScore = 12; // Strong Progress (+0.5 to +0.9)
+  } else if (delta >= 0.2) {
+    growthScore = 9;  // Steady Improvement (+0.2 to +0.4)
+  } else if (delta >= -0.3) {
+    // Maintained baseline (-0.3 to +0.1)
+    // If user already maintains a high mastery baseline (>= 8.0), reward 10 pts
+    growthScore = baseline >= 8.0 ? 10 : 6;
+  } else if (delta >= -0.7) {
+    growthScore = 3;  // Minor dip (-0.4 to -0.7)
+  } else {
+    growthScore = 0;  // Significant drop (< -0.7)
+  }
+
+  return {
+    growthScore,
+    baselineComm: roundedBaseline,
+    growthDelta: delta,
+    isCalibration: false,
+  };
+}
+
 export function calculateCompositeScore({
   durationSeconds,
   maxDurationSeconds,
@@ -226,14 +298,14 @@ export function calculateCompositeScore({
   analysis = {},
   isPictureDescription = false,
   isStorySummary = false,
+  userHistory = [],
 }) {
   const challengeType = analysis?.challengeType || null;
   const isStoryTask = Boolean(isStorySummary || challengeType === "story_summary");
 
-  // ── Picture Description: four-category weighted formula ──────────────────
-  // Communication & Fluency 30 | Content & Relevance 40 |
-  // Vocabulary 10 | Duration 20 = 100.
-  // Keep this branch isolated so TOPIC/STORY_SUMMARY scoring below is unchanged.
+  // ── Picture Description: five-category weighted formula ──────────────────
+  // Communication 20 | Content & Relevance 35 |
+  // Vocabulary 10 | Duration 20 | Personal Growth 15 = 100.
   if (isPictureDescription || challengeType === "picture_description") {
     const statsObj = analysis._stats || analysis.stats || {};
     const rawSpeechRatio = statsObj?.rhythm?.speechRatio;
@@ -243,9 +315,6 @@ export function calculateCompositeScore({
     const pauseCount = Number(statsObj?.pauses) || 0;
     const wordCount = Number(statsObj?.wordCount) || Math.round((Number(wpm) || 0) * (Number(durationSeconds) || 0) / 60);
 
-    // Duration measures a reasonable speaking attempt, not talking until the
-    // maximum. Picture tasks get full duration credit at 60 seconds (or the
-    // configured maximum if it is shorter).
     const maxDur = maxDurationSeconds || 180;
     const minDur = 30;
     const reasonableDur = Math.min(maxDur, 60);
@@ -287,16 +356,14 @@ export function calculateCompositeScore({
     const objectiveRhythm = (objectiveFlow * 0.45) + (paceScore * 0.2) + (pauseScore * 0.2) + (fillerScore * 0.15);
     const languageScore = (fluency * 0.4) + (confidence * 0.3) + (grammar * 0.2) + (rhythmScore * 0.1);
 
-    // Communication is primarily grounded in measured speech behaviour from
-    // transcription/timestamps. Grammar and LLM judgement remain useful but
-    // cannot dominate a score when transcription is imperfect.
+    // Communication: max 20 pts
     const communicationBase = objectiveRhythm * 0.8 + languageScore * 0.2;
-    const communicationScore = (communicationBase / 10) * 30 * speechMult;
+    const communicationScore = (communicationBase / 10) * 20 * speechMult;
+    // Content & Relevance: max 35 pts
     const contentBase        = coherence * 0.60 + contentRel * 0.40;
-    const contentScore       = (contentBase / 10) * 40;
-    // Picture vocabulary is challenge-based: use the transcript-matched
-    // words, and award the full 10 points once the configured required count
-    // is met. This makes a required count of 1 behave as intended.
+    const contentScore       = (contentBase / 10) * 35;
+
+    // Vocabulary: max 10 pts
     const configuredTotalWords = Number(totalVocabWords) || 0;
     const requiredTargetWords = Math.max(1, Math.min(
       Number(requiredVocabWords) || 1,
@@ -307,8 +374,16 @@ export function calculateCompositeScore({
       ? Math.min(10, (usedTargetWords / requiredTargetWords) * 10)
       : (vocabulary / 10) * 10;
 
+    // Personal Growth: max 15 pts
+    const currentComm = (fluency + grammar + confidence + vocabulary) / 4;
+    const growthResult = calculateGrowthScore({
+      currentCommScore: currentComm,
+      history: userHistory,
+    });
+    const growthScore = growthResult.growthScore;
+
     const total100 = Math.min(100, Math.round(
-      (communicationScore + contentScore + vocabularyScore + durationScore) * 100
+      (communicationScore + contentScore + vocabularyScore + durationScore + growthScore) * 100
     ) / 100);
 
     return {
@@ -318,8 +393,13 @@ export function calculateCompositeScore({
         content:         Math.round(contentScore       * 100) / 100,
         vocabulary:      Math.round(vocabularyScore    * 100) / 100,
         duration:        Math.round(durationScore       * 100) / 100,
-        maxCommunication: 30,
-        maxContent:       40,
+        growth:          Math.round(growthScore         * 100) / 100,
+        maxGrowth:       15,
+        growthDelta:     growthResult.growthDelta,
+        baselineComm:    growthResult.baselineComm,
+        isCalibration:   growthResult.isCalibration,
+        maxCommunication: 20,
+        maxContent:       35,
         maxVocabulary:    10,
         maxDuration:      20,
         speechMultiplier: Math.round(speechMult * 100),
@@ -347,31 +427,20 @@ export function calculateCompositeScore({
 
   const isSpecialDay = !isTargetedTask && effectiveTopicRelevance == null;
 
-  // ── Part 1: Effective speaking time ─────────────────────────────────────
-  // speechRatio: % of video time actually speaking (0–100), from Whisper timestamps.
-  // If not available, estimate from wpm (words per minute from transcription).
-  // A silent or mostly-silent video gets near-zero duration pts even if long.
-  // Note: analyzeSpeech stores stats under analysis.stats (not analysis._stats)
+  // ── Part 1: Effective speaking time (max 30 pts) ───────────────────────────
   const statsObj = analysis._stats || analysis.stats || {};
-  const rawSpeechRatio = statsObj?.rhythm?.speechRatio; // 0–100 or null
-  const wpm = statsObj?.wpm; // words per minute or null
+  const rawSpeechRatio = statsObj?.rhythm?.speechRatio;
+  const wpm = statsObj?.wpm;
 
   let speechMultiplier;
   if (typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0) {
-    // Direct measurement from Whisper: 0% = total silence, 100% = constant speech
-    // Apply a minimum floor of 20% so partial credit isn't wiped out for natural pauses
-    // Curve: 0%→0, 30%→0.25, 60%→0.7, 75%→0.88, 85%→1.0 (full multiplier)
     const r = rawSpeechRatio / 100;
     speechMultiplier = r >= 0.85 ? 1.0
       : r <= 0     ? 0
-      : Math.min(1, r / 0.85); // linear scale to 85% being "full"
+      : Math.min(1, r / 0.85);
   } else if (typeof wpm === "number" && wpm > 0) {
-    // Fallback: estimate from wpm — if someone spoke 50+ wpm they were talking
-    // 0 wpm = 0, 50 wpm = 0.5, 100+ wpm = 1.0
     speechMultiplier = Math.min(1, wpm / 100);
   } else {
-    // No speech data available (no transcript) — give 0 on duration
-    // This catches truly silent/no-audio videos
     speechMultiplier = 0;
   }
 
@@ -382,18 +451,12 @@ export function calculateCompositeScore({
     ? Math.max(0, (actualDur - minDur) / (maxDur - minDur))
     : 1;
   const baseLengthScore = actualDur >= minDur
-    ? (0.5 + 0.5 * rangeScore) * 33.33
-    : (actualDur / minDur) * 0.5 * 33.33;
+    ? (0.5 + 0.5 * rangeScore) * 30
+    : (actualDur / minDur) * 0.5 * 30;
 
-  // Multiply by speech ratio — silent video = 0 pts, fully speaking = full pts
   const lengthScore = baseLengthScore * speechMultiplier;
 
-  // ── Part 2: Vocabulary used ──────────────────────────────────────────────
-  // Users see totalVocabWords but only need requiredVocabWords for full credit.
-  //   0 words used       → 0 pts
-  //   1 word used        → base 50% (16.67) — rewarded for trying
-  //   required words met → full 33.33 (extra words beyond required don't add bonus)
-  // If no vocab words exist today (special days), award full marks automatically.
+  // ── Part 2: Vocabulary used (max 30 pts) ──────────────────────────────────
   const usedCount = Array.isArray(vocabularyUsed) ? vocabularyUsed.length : 0;
   const total = totalVocabWords > 0 ? totalVocabWords : 0;
   const required = requiredVocabWords > 0
@@ -401,43 +464,49 @@ export function calculateCompositeScore({
     : total;
   let vocabUsedScore;
   if (total === 0) {
-    // No vocab challenge today (special day) — full marks, not penalised
-    vocabUsedScore = 33.33;
+    vocabUsedScore = 30;
   } else if (usedCount === 0) {
     vocabUsedScore = 0;
   } else if (usedCount >= required) {
-    vocabUsedScore = 33.33;
+    vocabUsedScore = 30;
   } else {
-    // base 50% for using at least 1 word + proportional bonus up to required count
     const rangeScore = required > 1
       ? (usedCount - 1) / (required - 1)
       : 1;
-    vocabUsedScore = (0.5 + 0.5 * rangeScore) * 33.33;
+    vocabUsedScore = (0.5 + 0.5 * rangeScore) * 30;
   }
 
-  // ── Communication scores (fluency, grammar, confidence, vocabulary AI,
-  //    eyeContact, bodyLanguage, facialExpression, overallPresence) ─────────
+  // ── Part 3 & 4: Communication & Topic ─────────────────────────────────────
   const commFields = [
     analysis.fluency, analysis.grammar, analysis.confidence, analysis.vocabulary,
     analysis.eyeContact, analysis.bodyLanguage, analysis.facialExpression, analysis.overallPresence,
   ].filter(n => typeof n === "number" && !Number.isNaN(n));
   const commAvg = commFields.length
     ? commFields.reduce((a, b) => a + b, 0) / commFields.length
-    : 0;
+    : 5;
+
+  // ── Part 5: Personal Growth Bonus (max 15 pts) ─────────────────────────────
+  const growthResult = calculateGrowthScore({
+    currentCommScore: commAvg,
+    history: userHistory,
+  });
+  const growthScore = growthResult.growthScore;
 
   let topicScore = 0;
   let commScore = 0;
+  const maxTopic = isSpecialDay ? 0 : 15;
+  const maxComm  = isSpecialDay ? 25 : 10;
 
   if (isSpecialDay) {
-    // 3-part: comm gets the remaining 33.34
-    commScore = (commAvg / 10) * 33.34;
+    // Special day (no topic): comm gets 25 pts
+    commScore = (commAvg / 10) * 25;
   } else {
-    // 4-part (including Story Summary tasks)
-    topicScore = (Math.max(0, Math.min(10, effectiveTopicRelevance)) / 10) * 16.67;
-    commScore  = (commAvg / 10) * 16.67;
+    // Normal / Story task: topic 15 pts, comm 10 pts
+    topicScore = (Math.max(0, Math.min(10, effectiveTopicRelevance)) / 10) * 15;
+    commScore  = (commAvg / 10) * 10;
   }
 
-  const total100 = Math.min(100, Math.round((lengthScore + vocabUsedScore + topicScore + commScore) * 100) / 100);
+  const total100 = Math.min(100, Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100);
 
   return {
     score: total100,
@@ -446,6 +515,11 @@ export function calculateCompositeScore({
       vocabUsed:       Math.round(vocabUsedScore * 100) / 100,
       topic:           Math.round(topicScore     * 100) / 100,
       comm:            Math.round(commScore      * 100) / 100,
+      growth:          Math.round(growthScore    * 100) / 100,
+      maxGrowth:       15,
+      growthDelta:     growthResult.growthDelta,
+      baselineComm:    growthResult.baselineComm,
+      isCalibration:   growthResult.isCalibration,
       speechRatio:     typeof rawSpeechRatio === "number" ? rawSpeechRatio : null,
       speechMultiplier: Math.round(speechMultiplier * 100), // 0–100 %
       fullScoreDurationSeconds: maxDur,
@@ -454,10 +528,10 @@ export function calculateCompositeScore({
       isSpecialDay,
       isStorySummary:  isStoryTask,
       isPictureDescription: false,
-      maxLength:       33.33,
-      maxVocab:        33.33,
-      maxTopic:        isSpecialDay ? 0 : 16.67,
-      maxComm:         isSpecialDay ? 33.34 : 16.67,
+      maxLength:       30,
+      maxVocab:        30,
+      maxTopic,
+      maxComm,
     },
   };
 }

@@ -26,11 +26,12 @@ describe("Story Task Composite Scoring", () => {
     expect(result.score).toBeGreaterThan(0);
     expect(result.breakdown.isStorySummary).toBe(true);
     expect(result.breakdown.isSpecialDay).toBe(false);
-    expect(result.breakdown.topic).toBeCloseTo((8 / 10) * 16.67, 1);
-    expect(result.breakdown.maxTopic).toBe(16.67);
-    expect(result.breakdown.maxComm).toBe(16.67);
-    expect(result.breakdown.maxLength).toBe(33.33);
-    expect(result.breakdown.maxVocab).toBe(33.33);
+    expect(result.breakdown.topic).toBeCloseTo((8 / 10) * 15, 1);
+    expect(result.breakdown.maxTopic).toBe(15);
+    expect(result.breakdown.maxComm).toBe(10);
+    expect(result.breakdown.maxLength).toBe(30);
+    expect(result.breakdown.maxVocab).toBe(30);
+    expect(result.breakdown.maxGrowth).toBe(15);
   });
 
   it("should self-heal topic relevance if raw topicRelevance is null on a story summary task", () => {
@@ -59,7 +60,7 @@ describe("Story Task Composite Scoring", () => {
     expect(result.breakdown.isSpecialDay).toBe(false);
     expect(result.breakdown.isStorySummary).toBe(true);
     expect(result.breakdown.topic).toBeGreaterThan(0);
-    expect(result.breakdown.maxTopic).toBe(16.67);
+    expect(result.breakdown.maxTopic).toBe(15);
   });
 
   it("should keep special days (monthly reflection) without topic as 3-part score", () => {
@@ -87,10 +88,11 @@ describe("Story Task Composite Scoring", () => {
     expect(result.breakdown.isSpecialDay).toBe(true);
     expect(result.breakdown.topic).toBe(0);
     expect(result.breakdown.maxTopic).toBe(0);
-    expect(result.breakdown.maxComm).toBe(33.34);
+    expect(result.breakdown.maxComm).toBe(25);
+    expect(result.breakdown.maxGrowth).toBe(15);
   });
 
-  it("should keep picture description as isolated 4-category score", () => {
+  it("should calculate picture description with Option B 5-category score", () => {
     const result = calculateCompositeScore({
       durationSeconds: 60,
       maxDurationSeconds: 180,
@@ -113,9 +115,10 @@ describe("Story Task Composite Scoring", () => {
     });
 
     expect(result.breakdown.isPictureDescription).toBe(true);
-    expect(result.breakdown.maxCommunication).toBe(30);
-    expect(result.breakdown.maxContent).toBe(40);
+    expect(result.breakdown.maxCommunication).toBe(20);
+    expect(result.breakdown.maxContent).toBe(35);
     expect(result.breakdown.maxVocabulary).toBe(10);
     expect(result.breakdown.maxDuration).toBe(20);
+    expect(result.breakdown.maxGrowth).toBe(15);
   });
 });

@@ -97,7 +97,12 @@ const videoReportSchema = new mongoose.Schema({
       maxComm:      { type: Number, default: 16.67 },
       speechRatio:     { type: Number, default: null }, // % of time speaking
       speechMultiplier: { type: Number, default: null }, // 0–100 effective multiplier
-      // Picture-description scoring (Communication 30 + Content 40 + Vocabulary 10 + Duration 20 = 100)
+      // Option B: Personal Growth & Improvement Scoring
+      growth:       { type: Number, default: null }, // personal growth points (0–15)
+      maxGrowth:    { type: Number, default: 15 },
+      growthDelta:  { type: Number, default: null }, // todayComm - baselineComm (+/-)
+      baselineComm: { type: Number, default: null }, // user's 7-submission communication average
+      // Picture-description scoring (Communication 20 + Content 35 + Vocabulary 10 + Duration 20 + Growth 15 = 100)
       communication: { type: Number, default: null },
       content:      { type: Number, default: null },
       maxCommunication: { type: Number, default: null },

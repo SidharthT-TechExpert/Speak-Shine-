@@ -186,12 +186,12 @@ describe("Dynamic Duration Settings & Gating", () => {
         isStorySummary: true,
       });
 
-      expect(result.breakdown.length).toBeCloseTo(33.33, 2);
-      expect(result.breakdown.maxLength).toBe(33.33);
-      expect(result.score).toBeGreaterThan(80);
+      expect(result.breakdown.length).toBeCloseTo(30, 2);
+      expect(result.breakdown.maxLength).toBe(30);
+      expect(result.score).toBeGreaterThan(75);
     });
 
-    it("gives full duration credit (33.33) to exactly 180s video when full score target is 180s", () => {
+    it("gives full duration credit (30) to exactly 180s video when full score target is 180s", () => {
       const result = calculateCompositeScore({
         durationSeconds: 180,
         maxDurationSeconds: 180,
@@ -206,12 +206,12 @@ describe("Dynamic Duration Settings & Gating", () => {
         isStorySummary: true,
       });
 
-      expect(result.breakdown.length).toBeCloseTo(33.33, 2);
+      expect(result.breakdown.length).toBeCloseTo(30, 2);
     });
 
-    it("gives proportional duration credit (25.0) to a 120s video when full score target is 180s", () => {
+    it("gives proportional duration credit (22.5) to a 120s video when full score target is 180s", () => {
       // min = 60s (50%), max = 180s (100%). At 120s, rangeScore = (120-60)/(180-60) = 0.5.
-      // baseLengthScore = (0.5 + 0.5 * 0.5) * 33.33 = 0.75 * 33.33 = 24.9975 ≈ 25.0
+      // baseLengthScore = (0.5 + 0.5 * 0.5) * 30 = 0.75 * 30 = 22.5
       const result = calculateCompositeScore({
         durationSeconds: 120,
         maxDurationSeconds: 180,
@@ -226,10 +226,10 @@ describe("Dynamic Duration Settings & Gating", () => {
         isStorySummary: true,
       });
 
-      expect(result.breakdown.length).toBeCloseTo(25.0, 1);
+      expect(result.breakdown.length).toBeCloseTo(22.5, 1);
     });
 
-    it("gives 50% duration credit (16.67) to minimum duration video (60s)", () => {
+    it("gives 50% duration credit (15.0) to minimum duration video (60s)", () => {
       const result = calculateCompositeScore({
         durationSeconds: 60,
         maxDurationSeconds: 180,
@@ -244,7 +244,7 @@ describe("Dynamic Duration Settings & Gating", () => {
         isStorySummary: true,
       });
 
-      expect(result.breakdown.length).toBeCloseTo(16.67, 1);
+      expect(result.breakdown.length).toBeCloseTo(15.0, 1);
     });
 
     it("gives 0 duration credit for silent videos even if duration is 300s", () => {

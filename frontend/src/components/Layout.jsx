@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { io } from "socket.io-client";
+import api from "../api/client.js";
+import { getSharedSocket } from "../hooks/useSocket.js";
 
 const Modal = lazy(() => import("./Modal.jsx"));
 const NotificationBell = lazy(() => import("./NotificationBell.jsx"));
@@ -13,18 +14,26 @@ function LiveSessionBanner() {
 
   useEffect(() => {
     // Check if there's already a live session on mount
-    fetch("/api/live-sessions?status=live", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    })
-      .then(r => r.json())
-      .then(sessions => { if (sessions.length > 0) setLiveSession(sessions[0]); })
+    api.get("/live-sessions?status=live")
+      .then(r => {
+        const sessions = r.data || [];
+        if (sessions.length > 0) setLiveSession(sessions[0]);
+      })
       .catch(() => {});
 
-    // Listen for real-time events
-    const socket = io({ path: "/socket.io", transports: ["websocket"] });
-    socket.on("session:live", (data) => setLiveSession(data));
-    socket.on("session:ended", () => setLiveSession(null));
-    return () => socket.disconnect();
+    // Listen for real-time events via shared socket
+    const socket = getSharedSocket();
+    if (!socket) return;
+    const handleLive = (data) => setLiveSession(data);
+    const handleEnded = () => setLiveSession(null);
+
+    socket.on("session:live", handleLive);
+    socket.on("session:ended", handleEnded);
+
+    return () => {
+      socket.off("session:live", handleLive);
+      socket.off("session:ended", handleEnded);
+    };
   }, []);
 
   if (!liveSession) return null;

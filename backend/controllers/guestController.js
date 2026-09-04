@@ -89,12 +89,13 @@ function buildDemoReport(memberIdx, seed) {
   const bodyLanguage = +(6.0 + r(7) * 3.0).toFixed(1);
   const wpm = Math.round(110 + r(8) * 50);
 
-  // Score breakdown (composite out of 100)
-  const bdLength   = +(15 + r(9) * 18).toFixed(1);
-  const bdVocab    = +(18 + r(10) * 15).toFixed(1);
-  const bdTopic    = +(10 + r(11) * 6).toFixed(1);
-  const bdComm     = +(10 + r(12) * 6).toFixed(1);
-  const composite  = Math.round(bdLength + bdVocab + bdTopic + bdComm);
+  // Score breakdown (composite out of 100 - Option B)
+  const bdLength   = +(18 + r(9) * 12).toFixed(1);
+  const bdVocab    = +(18 + r(10) * 12).toFixed(1);
+  const bdTopic    = +(9 + r(11) * 6).toFixed(1);
+  const bdComm     = +(6 + r(12) * 4).toFixed(1);
+  const bdGrowth   = +(8 + r(13) * 6).toFixed(1);
+  const composite  = Math.min(100, Math.round(bdLength + bdVocab + bdTopic + bdComm + bdGrowth));
 
   return {
     _id: `demo-${memberIdx}-${seed}`,
@@ -138,10 +139,13 @@ function buildDemoReport(memberIdx, seed) {
       qualityWarning: null,
       compositeScore: Math.min(100, composite),
       scoreBreakdown: {
-        length: bdLength, maxLength: 33.33,
-        vocabUsed: bdVocab, maxVocab: 33.33,
-        topic: bdTopic, maxTopic: 16.67,
-        comm: bdComm, maxComm: 16.67,
+        length: bdLength, maxLength: 30,
+        vocabUsed: bdVocab, maxVocab: 30,
+        topic: bdTopic, maxTopic: 15,
+        comm: bdComm, maxComm: 10,
+        growth: bdGrowth, maxGrowth: 15,
+        growthDelta: +(bdGrowth >= 12 ? 0.8 : bdGrowth >= 9 ? 0.3 : 0).toFixed(1),
+        baselineComm: +(overall - 0.4).toFixed(1),
         isSpecialDay: false,
       },
       stats: {

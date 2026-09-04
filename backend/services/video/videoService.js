@@ -1034,6 +1034,8 @@ async function prepareReportAnalysis(report) {
   // fields were persisted. Do not change the stored score; only hydrate the
   // display payload exactly as the individual report endpoint does.
   const status = analysis ? await Status.findOne().lean() : null;
+  const user = (analysis && report.phone) ? await User.findOne({ phone: report.phone }).lean() : null;
+  const userHistory = user?.feedbackScores || [];
   const isPicTask = challengeType === "picture_description" || status?.isPictureDescriptionDay;
   const isStoryTask = challengeType === "story_summary" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
 
@@ -1056,6 +1058,7 @@ async function prepareReportAnalysis(report) {
       topicRelevance: source.topicRelevance ?? null,
       analysis: source,
       isPictureDescription: true,
+      userHistory,
     });
     analysis = { ...source, scoreBreakdown: breakdown };
   }
@@ -1078,18 +1081,20 @@ async function prepareReportAnalysis(report) {
       topicRelevance: source.topicRelevance ?? null,
       analysis: source,
       isStorySummary: true,
+      userHistory,
     });
 
     source.compositeScore = score;
     source.scoreBreakdown = {
       ...breakdown,
-      maxLength: 33.33,
-      maxVocab: 33.33,
-      maxTopic: 16.67,
-      maxComm: 16.67,
+      maxLength: 30,
+      maxVocab: 30,
+      maxTopic: 15,
+      maxComm: 10,
+      maxGrowth: 15,
     };
     if (source.topicRelevance == null) {
-      source.topicRelevance = typeof breakdown.topic === "number" ? Math.round((breakdown.topic / 16.67) * 10 * 10) / 10 : 7.0;
+      source.topicRelevance = typeof breakdown.topic === "number" ? Math.round((breakdown.topic / 15) * 10 * 10) / 10 : 7.0;
     }
 
     // Persist self-healed story score
@@ -1149,21 +1154,24 @@ async function prepareReportAnalysis(report) {
         analysis: source,
         isPictureDescription: isPic || false,
         isStorySummary: isStory || false,
+        userHistory,
       });
 
       source.compositeScore = score;
       source.scoreBreakdown = isPic ? {
         ...breakdown,
-        maxCommunication: 30,
-        maxContent: 40,
+        maxCommunication: 20,
+        maxContent: 35,
         maxVocabulary: 10,
         maxDuration: 20,
+        maxGrowth: 15,
       } : {
         ...breakdown,
-        maxLength: 33.33,
-        maxVocab: 33.33,
-        maxTopic: breakdown.isSpecialDay ? 0 : 16.67,
-        maxComm: breakdown.isSpecialDay ? 33.34 : 16.67,
+        maxLength: 30,
+        maxVocab: 30,
+        maxTopic: breakdown.isSpecialDay ? 0 : 15,
+        maxComm: breakdown.isSpecialDay ? 25 : 10,
+        maxGrowth: 15,
       };
 
       // Persist the corrected analysis in database asynchronously
@@ -1248,7 +1256,7 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
       ...(feedUserIds.length ? [{ _id: { $in: feedUserIds } }] : []),
       ...(feedPhones.length ? [{ phone: { $in: feedPhones } }] : []),
     ],
-  }).lean();
+  }).select("name phone streak earnedBadges").lean();
   const userById = new Map(feedUsers.map(user => [String(user._id), user]));
   const userByPhone = new Map(feedUsers.filter(user => user.phone).map(user => [user.phone, user]));
 
@@ -1660,6 +1668,8 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   };
   const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
 
+  const user = report.phone ? await User.findOne({ phone: report.phone }).lean() : null;
+
   const { score, breakdown } = calculateCompositeScore({
     durationSeconds: report.videoDuration || 0,
     maxDurationSeconds: fullScoreSeconds,
@@ -1670,24 +1680,27 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     analysis: report.analysis,
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
+    userHistory: user?.feedbackScores || [],
   });
 
   if (isStory && report.analysis.topicRelevance == null) {
-    report.analysis.topicRelevance = typeof breakdown.topic === "number" ? Math.round((breakdown.topic / 16.67) * 10 * 10) / 10 : 7.0;
+    report.analysis.topicRelevance = typeof breakdown.topic === "number" ? Math.round((breakdown.topic / 15) * 10 * 10) / 10 : 7.0;
   }
 
   const updatedBreakdown = isPic ? {
     ...breakdown,
-    maxCommunication: 30,
-    maxContent: 40,
+    maxCommunication: 20,
+    maxContent: 35,
     maxVocabulary: 10,
     maxDuration: 20,
+    maxGrowth: 15,
   } : {
     ...breakdown,
-    maxLength: 33.33,
-    maxVocab: 33.33,
-    maxTopic: breakdown.isSpecialDay ? 0 : 16.67,
-    maxComm: breakdown.isSpecialDay ? 33.34 : 16.67,
+    maxLength: 30,
+    maxVocab: 30,
+    maxTopic: breakdown.isSpecialDay ? 0 : 15,
+    maxComm: breakdown.isSpecialDay ? 25 : 10,
+    maxGrowth: 15,
   };
 
   const requiredCount = Math.min(configuredRequiredCount, todayVocab.length || 1);
