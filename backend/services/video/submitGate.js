@@ -236,19 +236,29 @@ export function calculateGrowthScore({ currentCommScore = 5, history = [] }) {
     };
   }
 
+  const effectiveCurrentComm = typeof currentCommScore === "number" && !Number.isNaN(currentCommScore)
+    ? Math.max(0, Math.min(10, currentCommScore))
+    : 5;
+
   // Extract communication averages from valid historical entries
   const validScores = history
     .map(entry => {
       if (!entry) return null;
       const scores = [entry.fluency, entry.grammar, entry.confidence, entry.vocabulary]
-        .filter(n => typeof n === "number" && !Number.isNaN(n));
+        .filter(n => typeof n === "number" && !Number.isNaN(n))
+        .map(n => {
+          // Normalize legacy 0-100 scale, sum-based entries, or corrupted values:
+          if (n > 40) return Math.min(10, n / 10);
+          if (n > 10) return Math.min(10, n / 4);
+          return Math.max(0, Math.min(10, n));
+        });
       return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     })
     .filter(s => typeof s === "number" && !Number.isNaN(s));
 
   // If fewer than 2 valid historical submissions, still calibrating
   if (validScores.length < 2) {
-    const singleBaseline = validScores.length === 1 ? Math.round(validScores[0] * 10) / 10 : null;
+    const singleBaseline = validScores.length === 1 ? Math.min(10, Math.max(0, Math.round(validScores[0] * 10) / 10)) : null;
     return {
       growthScore: 8,
       baselineComm: singleBaseline,
@@ -260,8 +270,8 @@ export function calculateGrowthScore({ currentCommScore = 5, history = [] }) {
   // Use the last 7 submissions to establish the rolling baseline
   const recentScores = validScores.slice(-7);
   const baseline = recentScores.reduce((a, b) => a + b, 0) / recentScores.length;
-  const roundedBaseline = Math.round(baseline * 10) / 10;
-  const delta = Math.round((currentCommScore - baseline) * 10) / 10;
+  const roundedBaseline = Math.min(10, Math.max(0, Math.round(baseline * 10) / 10));
+  const delta = Math.round((effectiveCurrentComm - roundedBaseline) * 10) / 10;
 
   let growthScore = 0;
   if (delta >= 1.0) {

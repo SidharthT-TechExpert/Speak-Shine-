@@ -1111,6 +1111,75 @@ async function prepareReportAnalysis(report) {
     analysis = source;
   }
 
+  // Self-heal reports with corrupted/legacy baseline or erroneous negative growth deltas
+  const hasCorruptedGrowth = analysis && analysis.scoreBreakdown && (
+    analysis.scoreBreakdown.baselineComm > 10 ||
+    analysis.scoreBreakdown.growthDelta < -5
+  );
+  if (analysis && hasCorruptedGrowth) {
+    const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+    const todayVocab = status?.todayVocabulary || [];
+    const configuredWordCount = isPicTask
+      ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+      : isStoryTask
+      ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+      : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5);
+    const configuredRequiredCount = isPicTask
+      ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
+      : isStoryTask
+      ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
+      : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
+    const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
+    const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+
+    const scoreGateFlags = {
+      isPictureDescription: isPicTask || false,
+      isStorySummary: isStoryTask || false,
+      isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+      isMonthlyGoals: status?.isMonthlyGoalsDay || false,
+    };
+    const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
+
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: report.videoDuration || 0,
+      maxDurationSeconds: fullScoreSeconds,
+      vocabularyUsed: source.vocabularyUsed || [],
+      totalVocabWords: effectiveTotalWords,
+      requiredVocabWords: effectiveRequiredWords,
+      topicRelevance: source.topicRelevance ?? null,
+      analysis: source,
+      isPictureDescription: isPicTask || false,
+      isStorySummary: isStoryTask || false,
+      userHistory,
+    });
+
+    source.compositeScore = score;
+    source.scoreBreakdown = isPicTask ? {
+      ...breakdown,
+      maxCommunication: 20,
+      maxContent: 35,
+      maxVocabulary: 10,
+      maxDuration: 20,
+      maxGrowth: 15,
+    } : {
+      ...breakdown,
+      maxLength: 30,
+      maxVocab: 30,
+      maxTopic: breakdown.isSpecialDay ? 0 : 15,
+      maxComm: breakdown.isSpecialDay ? 25 : 10,
+      maxGrowth: 15,
+    };
+
+    VideoReport.findByIdAndUpdate(report._id, {
+      $set: {
+        "analysis.compositeScore": score,
+        "analysis.scoreBreakdown": source.scoreBreakdown,
+      }
+    }).catch(err => console.warn("[VideoService] Failed to persist self-healed growth score:", err.message));
+
+    analysis = source;
+  }
+
   // Self-heal vocabulary matching if transcript exists and today's vocabulary has words
   if (analysis && analysis.transcription && status?.todayVocabulary?.length > 0) {
     const todayVocab = status.todayVocabulary || [];

@@ -379,10 +379,10 @@ export async function adjustUserPoints(phone, { amount, mode = "add", reason = "
   if (delta !== 0) {
     user.feedbackScores = user.feedbackScores || [];
     user.feedbackScores.push({
-      fluency: 100,
-      grammar: 100,
-      confidence: 100,
-      vocabulary: 100,
+      fluency: 7,
+      grammar: 7,
+      confidence: 7,
+      vocabulary: 7,
       points: delta,
       date: new Date(),
     });
