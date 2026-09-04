@@ -36,11 +36,10 @@ async function refreshAccessToken() {
     try { reconnectSocketWithNewToken(); } catch {}
     return true;
   } catch (error) {
-    // Refresh failed — clear any stale localStorage leftovers and redirect
+    // Refresh failed — clear any stale localStorage leftovers
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
-    window.location.href = "/login";
     throw error;
   }
 }
@@ -108,12 +107,17 @@ api.interceptors.response.use(
       }
     }
 
-    // Other 401 after retry failed — session truly gone, redirect to login
+    // Other 401 after retry failed — session truly gone, clear auth
     if (err.response?.status === 401 && originalRequest._retry) {
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
-      window.location.href = "/login";
+      // Only redirect to login if currently on an explicitly protected path
+      const path = window.location.pathname;
+      const isPublicPath = ["/", "/dashboard", "/record", "/video-analysis", "/community", "/login", "/register", "/forgot-password"].includes(path) || path.startsWith("/admin/login") || path.startsWith("/trainer/login");
+      if (!isPublicPath) {
+        window.location.href = "/login";
+      }
     }
 
     // Account disabled by admin

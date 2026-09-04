@@ -9,10 +9,12 @@ const NotificationBell = lazy(() => import("./NotificationBell.jsx"));
 
 // ── Live session banner (shown on all pages when a session goes live) ────────
 function LiveSessionBanner() {
+  const { user } = useAuth();
   const [liveSession, setLiveSession] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user) return;
     // Check if there's already a live session on mount
     api.get("/live-sessions?status=live")
       .then(r => {
@@ -34,7 +36,7 @@ function LiveSessionBanner() {
       socket.off("session:live", handleLive);
       socket.off("session:ended", handleEnded);
     };
-  }, []);
+  }, [user]);
 
   if (!liveSession) return null;
 
