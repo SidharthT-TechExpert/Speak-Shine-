@@ -312,7 +312,7 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
     // Content moderation (if enabled)
     if (process.env.ENABLE_CONTENT_MODERATION === "true") {
       securityChecks.push(
-        moderateVideo(tempPath).then(modResult => {
+        moderateVideo(tempPath, browserFrames).then(modResult => {
           checksRun.contentSafe = modResult.approved || modResult.skipped;
           if (!modResult.approved && !modResult.skipped) {
             const reason = modResult.flags?.length

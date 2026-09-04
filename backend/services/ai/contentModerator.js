@@ -1,206 +1,182 @@
-/**
- * contentModerator.js — AI-based content moderation for videos
- * Detects inappropriate content using frame analysis
- */
-
 import { execFile } from "child_process";
 import { promisify } from "util";
-import fs from "fs";
-import path from "path";
-import Groq from "groq-sdk";
-import { getVisionModel } from "./groqKeyManager.js";
+import fetch from "node-fetch";
+import { getVisionModel, getVisionKey, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 
 const execFileAsync = promisify(execFile);
 
-let groq = null;
-
-function getGroqClient() {
-  if (!groq && process.env.GROQ_API_KEY) {
-    groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
-  }
-  return groq;
-}
-
 /**
- * Extract frames from video for content analysis
- * @param {string} videoPath - Path to video file
- * @param {number} numFrames - Number of frames to extract (default: 5)
- * @returns {Promise<string[]>} - Array of frame file paths
+ * Extract a single frame directly into memory as base64 via ffmpeg pipe
  */
-async function extractFrames(videoPath, numFrames = 5) {
-  const tempDir = './tmp/moderation';
-  fs.mkdirSync(tempDir, { recursive: true });
-  
-  const framePattern = path.join(tempDir, `frame-${Date.now()}-%03d.jpg`);
-  
+async function extractFrameInMemory(videoPath, timestamp) {
   try {
-    // Extract frames at regular intervals
-    // -vf fps=1/N extracts 1 frame every N seconds
-    await execFileAsync('ffmpeg', [
-      '-i', videoPath,
-      '-vf', `select='not(mod(n\\,${Math.floor(100/numFrames)}))'`,
-      '-vsync', 'vfr',
-      '-frames:v', String(numFrames),
-      '-q:v', '2', // High quality
-      framePattern,
-      '-y'
-    ], { timeout: 30000 });
+    const { stdout } = await execFileAsync("ffmpeg", [
+      "-ss", String(timestamp),
+      "-i", videoPath,
+      "-frames:v", "1",
+      "-q:v", "3",
+      "-vf", "scale=640:-1",
+      "-f", "image2",
+      "pipe:1",
+    ], { encoding: "buffer", maxBuffer: 5 * 1024 * 1024, timeout: 10000 });
 
-    // Get list of extracted frames
-    const files = fs.readdirSync(tempDir)
-      .filter(f => f.startsWith('frame-') && f.endsWith('.jpg'))
-      .map(f => path.join(tempDir, f));
-
-    return files;
-  } catch (err) {
-    console.error('[ContentModerator] Frame extraction failed:', err.message);
-    return [];
+    if (!stdout || stdout.length < 500) return null;
+    return stdout.toString("base64");
+  } catch {
+    return null;
   }
 }
 
 /**
- * Analyze frame for inappropriate content using vision AI
- * @param {string} framePath - Path to frame image
- * @returns {Promise<{safe: boolean, categories: string[], confidence: number}>}
+ * Extract 2-3 sample frames across the video duration directly in memory
  */
-async function analyzeFrame(framePath) {
+async function getSampleFrameBase64s(videoPath, count = 2) {
+  let duration = 30;
   try {
-    // Read frame as base64
-    const imageBuffer = fs.readFileSync(framePath);
-    const base64Image = imageBuffer.toString('base64');
+    const { stdout } = await execFileAsync("ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      videoPath,
+    ], { timeout: 8000 });
+    const dur = parseFloat((stdout || "").trim());
+    if (!isNaN(dur) && dur > 0) duration = dur;
+  } catch {}
 
-    // Use Groq's vision model for content analysis
-    const groqClient = getGroqClient();
-    if (!groqClient) {
-      throw new Error('Groq API key not configured');
-    }
-    
-    const response = await groqClient.chat.completions.create({
-      model: getVisionModel(),
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze this image for inappropriate content. Check for:
+  const timestamps = [];
+  for (let i = 1; i <= count; i++) {
+    timestamps.push(Math.max(1, Math.floor((duration / (count + 1)) * i)));
+  }
+
+  const framePromises = timestamps.map(ts => extractFrameInMemory(videoPath, ts));
+  const frames = await Promise.all(framePromises);
+  return frames.filter(Boolean);
+}
+
+/**
+ * Analyze multiple frames in a SINGLE Vision API call
+ * @param {string[]} base64Frames
+ */
+async function checkFramesWithVisionAI(base64Frames) {
+  if (!base64Frames || base64Frames.length === 0) {
+    return { approved: true, skipped: true, flags: [], confidence: 0 };
+  }
+
+  const apiKey = getVisionKey();
+  if (!apiKey) {
+    console.log("[ContentModerator] No vision API key available — skipping check");
+    return { approved: true, skipped: true, flags: [], confidence: 0 };
+  }
+
+  const imageContents = base64Frames.slice(0, 3).map(b64 => ({
+    type: "image_url",
+    image_url: { url: `data:image/jpeg;base64,${b64}` }
+  }));
+
+  const prompt = `Analyze all attached images for inappropriate content:
 - Violence or gore
 - Nudity or sexual content
 - Hate symbols or offensive gestures
-- Illegal activities
-- Self-harm content
+- Illegal activities or weapons
 
 Respond with JSON only:
-{
-  "safe": true/false,
-  "categories": ["category1", "category2"],
-  "confidence": 0.0-1.0,
-  "reason": "brief explanation"
-}`
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`
-              }
-            }
-          ]
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 1000,
+{"safe": true, "categories": []} or {"safe": false, "categories": ["category_name"], "reason": "brief"}`;
+
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: getVisionModel(),
+        messages: [{
+          role: "user",
+          content: [{ type: "text", text: prompt }, ...imageContents]
+        }],
+        temperature: 0.1,
+        max_tokens: 150
+      })
     });
 
-    const content = response.choices[0]?.message?.content || '{}';
-    
-    // Parse JSON response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return { safe: true, categories: [], confidence: 0, reason: 'Parse error' };
+    if (res.status === 429) {
+      const txt = await res.text();
+      const wait = parseRetryAfter(txt) || 5000;
+      markKeyExhausted(apiKey, wait);
+      console.warn("[ContentModerator] 429 rate limit hit — allowing video");
+      return { approved: true, skipped: true, flags: [] };
     }
-    
-    const result = JSON.parse(jsonMatch[0]);
-    return {
-      safe: result.safe !== false, // Default to safe if unclear
-      categories: result.categories || [],
-      confidence: result.confidence || 0,
-      reason: result.reason || '',
-    };
 
+    if (!res.ok) {
+      console.warn(`[ContentModerator] Vision API HTTP ${res.status} — bypassing safety check`);
+      return { approved: true, skipped: true, flags: [] };
+    }
+
+    const data = await res.json();
+    const raw = data?.choices?.[0]?.message?.content?.trim() || "{}";
+
+    let jsonStr = raw;
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) jsonStr = match[0];
+
+    const result = JSON.parse(jsonStr);
+    const approved = result.safe !== false;
+    const flags = result.categories || [];
+
+    return {
+      approved,
+      flags,
+      confidence: result.confidence || 0.9,
+      reason: result.reason || (approved ? "Safe" : "Safety violation")
+    };
   } catch (err) {
-    console.error('[ContentModerator] Frame analysis error:', err.message);
-    // On error, default to safe (don't block legitimate content)
-    return { safe: true, categories: [], confidence: 0, error: err.message };
+    console.error("[ContentModerator] Vision API call error:", err.message);
+    return { approved: true, skipped: true, flags: [] };
   }
 }
 
 /**
- * Moderate video content
+ * Moderate video content — accelerated with in-memory single-request checks
  * @param {string} videoPath - Path to video file
- * @returns {Promise<{approved: boolean, flags: string[], confidence: number, details: object}>}
+ * @param {Array<string|object>} [browserFrames] - Optional pre-extracted browser frames
+ * @returns {Promise<{approved: boolean, flags: string[], confidence: number, details?: object}>}
  */
-export async function moderateVideo(videoPath) {
+export async function moderateVideo(videoPath, browserFrames = null) {
   const startTime = Date.now();
-  
+
   try {
-    // Extract sample frames
-    console.log('[ContentModerator] Extracting frames...');
-    const frames = await extractFrames(videoPath, 5);
-    
-    if (frames.length === 0) {
-      console.warn('[ContentModerator] No frames extracted - skipping moderation');
-      return {
-        approved: true,
-        flags: [],
-        confidence: 0,
-        skipped: true,
-        reason: 'Frame extraction failed'
-      };
+    let base64List = [];
+
+    if (browserFrames && browserFrames.length > 0) {
+      // Pick 2-3 spread-out frames already in memory from browser!
+      const step = Math.max(1, Math.floor(browserFrames.length / 3));
+      for (let i = 0; i < browserFrames.length && base64List.length < 3; i += step) {
+        const item = browserFrames[i];
+        const b64 = typeof item === "string" ? item : item?.base64;
+        if (b64) base64List.push(b64);
+      }
+      console.log(`[ContentModerator] ⚡ Using ${base64List.length} pre-extracted frames (zero ffmpeg overhead)`);
+    } else {
+      // Extract 2 frames concurrently into memory without disk files
+      console.log("[ContentModerator] Extracting 2 sample frames in memory...");
+      base64List = await getSampleFrameBase64s(videoPath, 2);
     }
 
-    // Analyze each frame
-    console.log(`[ContentModerator] Analyzing ${frames.length} frames...`);
-    const analyses = await Promise.all(
-      frames.map(frame => analyzeFrame(frame))
-    );
+    if (base64List.length === 0) {
+      console.warn("[ContentModerator] No frames available - skipping moderation");
+      return { approved: true, flags: [], confidence: 0, skipped: true, reason: "No frames" };
+    }
 
-    // Clean up frames
-    frames.forEach(frame => {
-      try { fs.unlinkSync(frame); } catch {}
-    });
-
-    // Aggregate results
-    const unsafeFrames = analyses.filter(a => !a.safe);
-    const allCategories = [...new Set(analyses.flatMap(a => a.categories))];
-    const avgConfidence = analyses.reduce((sum, a) => sum + a.confidence, 0) / analyses.length;
-
-    const approved = unsafeFrames.length === 0;
+    // Single Vision API call evaluating all sample frames at once
+    console.log(`[ContentModerator] Performing single-pass safety analysis on ${base64List.length} frames...`);
+    const result = await checkFramesWithVisionAI(base64List);
     const moderationTime = Date.now() - startTime;
 
-    console.log(`[ContentModerator] Result: ${approved ? 'APPROVED' : 'REJECTED'} (${moderationTime}ms)`);
-
+    console.log(`[ContentModerator] Result: ${result.approved ? "APPROVED" : "REJECTED"} (${moderationTime}ms)`);
     return {
-      approved,
-      flags: allCategories,
-      confidence: avgConfidence,
-      unsafeFrameCount: unsafeFrames.length,
-      totalFrames: frames.length,
+      ...result,
       moderationTime,
-      details: {
-        analyses: analyses.map((a, i) => ({
-          frame: i + 1,
-          safe: a.safe,
-          categories: a.categories,
-          reason: a.reason,
-        }))
-      }
     };
-
   } catch (err) {
-    console.error('[ContentModerator] Error:', err.message);
-    // On error, default to approved (don't block legitimate content)
+    console.error("[ContentModerator] Error:", err.message);
     return {
       approved: true,
       flags: [],
