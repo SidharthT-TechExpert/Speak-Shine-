@@ -286,6 +286,13 @@ export default function Login({ loginFor = "user" }) {
             New here? <Link to="/register">Create an account</Link>
           </p>
         )}
+        {loginFor === "user" && (
+          <p style={{ textAlign: "center", marginTop: "0.85rem", fontSize: "0.82rem" }}>
+            <Link to="/dashboard" style={{ color: "var(--muted)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+              <span>👀 Explore preview without logging in →</span>
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

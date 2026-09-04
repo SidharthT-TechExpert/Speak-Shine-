@@ -68,7 +68,8 @@ import { isMonthlyGracePeriod } from "./utils/gracePeriodUtils.js";
 // Initial 2 days of each month (1st & 2nd in IST) are open to all users without payment.
 function PaidRoute({ children }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
+  // Guests can view and try in preview mode (submitting prompts to register)
+  if (!user) return children;
   const bypass = ["admin", "admins", "trainer", "viewer"].includes(user.role);
   if (bypass) return children;
   if (isMonthlyGracePeriod()) return children;
