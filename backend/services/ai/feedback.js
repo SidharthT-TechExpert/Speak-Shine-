@@ -107,43 +107,48 @@ export async function generateFeedback(
     let transcription = null;
     let speechResult = null;
     let transcriptionError = null;
+    let speechScoringError = null;
 
     const speechChainPromise = withTimeout(
       transcribe(audioPath, { meanVolume }),
       transcribeTimeout,
       "transcription"
-    ).then(async (t) => {
-      transcription = t;
+    )
+      .catch((err) => {
+        transcriptionError = err;
+        return null;
+      })
+      .then(async (t) => {
+        if (!t) return;
+        transcription = t;
 
-      if (!t.text || t.text.length < 10) return; // caught below
+        if (!t.text || t.text.length < 10) return; // caught below
 
-      const actualDuration = t.duration > 0 ? t.duration : durationSeconds;
-      await onProgress("Scoring your speech…");
+        const actualDuration = t.duration > 0 ? t.duration : durationSeconds;
+        await onProgress("Scoring your speech…");
 
-      const speechStage = startStage("analyzeSpeech");
-      try {
-        speechResult = await withTimeout(
-          analyzeSpeech(
-            t.text,
-            actualDuration,
-            t.words,
-            questionTopic,
-            questionText,
-            t.pronunciationIssues || [],
-            t.rhythm || null,
-            opts.challengeType || null
-          ),
-          speechTimeout,
-          "speech"
-        );
-        speechStage.end();
-      } catch (err) {
-        speechStage.end(err);
-        throw err;
-      }
-    }).catch((err) => {
-      transcriptionError = err;
-    });
+        const speechStage = startStage("analyzeSpeech");
+        try {
+          speechResult = await withTimeout(
+            analyzeSpeech(
+              t.text,
+              actualDuration,
+              t.words,
+              questionTopic,
+              questionText,
+              t.pronunciationIssues || [],
+              t.rhythm || null,
+              opts.challengeType || null
+            ),
+            speechTimeout,
+            "speech"
+          );
+          speechStage.end();
+        } catch (err) {
+          speechStage.end(err);
+          speechScoringError = err;
+        }
+      });
 
     // Wait for both chains to finish
     const [, visualSettled] = await Promise.all([
@@ -165,7 +170,7 @@ export async function generateFeedback(
 
     // Handle transcription/speech failures
     if (transcriptionError) {
-      console.log("[PIPELINE] transcription/speech FAIL elapsed=" + (Date.now() - pipelineStart), "error=" + (transcriptionError?.message ?? String(transcriptionError)));
+      console.log("[PIPELINE] transcription FAIL elapsed=" + (Date.now() - pipelineStart), "error=" + (transcriptionError?.message ?? String(transcriptionError)));
       if (visual === null) {
         console.log("[PIPELINE] total failure elapsed=" + (Date.now() - pipelineStart));
         return "⚠️ _Sorry, we could not analyse your video. Please try resubmitting — if the problem persists, the service may be temporarily unavailable._";
@@ -177,8 +182,9 @@ export async function generateFeedback(
       return "⚠️ _Could not detect speech in the video._";
     }
 
-    if (!speechResult) {
-      return "⚠️ _The scoring service is currently unavailable. Please try resubmitting your video._";
+    if (speechScoringError || !speechResult) {
+      console.log("[PIPELINE] speech scoring FAIL elapsed=" + (Date.now() - pipelineStart), "error=" + (speechScoringError?.message ?? "empty result"));
+      return "⚠️ _The speech scoring service is currently unavailable. Please try resubmitting your video._";
     }
 
     // -----------------------------------------------------------------------

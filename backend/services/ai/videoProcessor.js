@@ -138,45 +138,52 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     let transcription = null;
     let speechResult = null;
     let transcriptionError = null;
+    let speechScoringError = null;
 
     const speechChainPromise = withTimeout(
       transcribe(audioPath, { meanVolume }),
       Number(process.env.TRANSCRIBE_TIMEOUT_MS) || TRANSCRIBE_TIMEOUT_MS,
       "transcription"
-    ).then(async (t) => {
-      transcription = t;
-      if (!t?.text || t.text.length < 10) return;
+    )
+      .catch((err) => {
+        transcriptionError = err;
+        return null;
+      })
+      .then(async (t) => {
+        if (!t) return;
+        transcription = t;
+        if (!t.text || t.text.length < 10) return;
 
-      await onProgress("Scoring your speech…");
+        await onProgress("Scoring your speech…");
 
-      const speechStage = startStage("analyzeSpeech");
-      const isStoryActive = status?.todayContentType === "story_audio"
-        || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-      const isPictureActive = status?.todayContentType === "picture_description"
-        || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-      const challengeType = isPictureActive ? "picture_description" : isStoryActive ? "story_summary" : null;
+        const speechStage = startStage("analyzeSpeech");
+        const isStoryActive = status?.todayContentType === "story_audio"
+          || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+        const isPictureActive = status?.todayContentType === "picture_description"
+          || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+        const challengeType = isPictureActive ? "picture_description" : isStoryActive ? "story_summary" : null;
 
-      try {
-        speechResult = await withTimeout(
-          analyzeSpeech(
-            t.text,
-            t.duration > 0 ? t.duration : duration,
-            t.words,
-            questionTopic || (isStoryActive ? "Story Summary" : null),
-            questionText,
-            t.pronunciationIssues || [],
-            t.rhythm || null,
-            challengeType
-          ),
-          Number(process.env.SPEECH_TIMEOUT_MS) || SPEECH_TIMEOUT_MS,
-          "speech"
-        );
-        speechStage.end();
-      } catch (err) {
-        speechStage.end(err);
-        throw err;
-      }
-    }).catch(err => { transcriptionError = err; });
+        try {
+          speechResult = await withTimeout(
+            analyzeSpeech(
+              t.text,
+              t.duration > 0 ? t.duration : duration,
+              t.words,
+              questionTopic || (isStoryActive ? "Story Summary" : null),
+              questionText,
+              t.pronunciationIssues || [],
+              t.rhythm || null,
+              challengeType
+            ),
+            Number(process.env.SPEECH_TIMEOUT_MS) || SPEECH_TIMEOUT_MS,
+            "speech"
+          );
+          speechStage.end();
+        } catch (err) {
+          speechStage.end(err);
+          speechScoringError = err;
+        }
+      });
 
     const [, visualSettled] = await Promise.all([
       speechChainPromise,
@@ -194,6 +201,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
 
     if (transcriptionError) throw new Error("Transcription failed: " + transcriptionError.message);
     if (!transcription?.text || transcription.text.length < 10) throw new Error("Could not detect speech in the video.");
+    if (speechScoringError) throw new Error("Speech scoring failed: " + speechScoringError.message);
     if (!speechResult) throw new Error("Speech scoring failed.");
 
     await onProgress("Generating feedback…");

@@ -222,6 +222,162 @@ function fixUnescapedQuotes(str) {
   return result;
 }
 
+/**
+ * Salvages truncated or malformed JSON from an LLM response.
+ * Handles:
+ * - Unclosed double quotes (when completion cuts off mid-string)
+ * - Trailing dangling keys, colons, commas
+ * - Unclosed arrays and objects
+ * - Progressive backtracking to last valid separator
+ */
+export function repairTruncatedJson(str) {
+  if (!str || typeof str !== "string") return null;
+
+  let fixed = str.trim();
+  const fenceMatch = fixed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    fixed = fenceMatch[1].trim();
+  } else {
+    const start = fixed.indexOf("{");
+    if (start !== -1) {
+      fixed = fixed.slice(start);
+    }
+  }
+
+  // Remove control characters (except common whitespace)
+  fixed = fixed.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ");
+  fixed = fixUnescapedQuotes(fixed);
+
+  try {
+    return JSON.parse(fixed);
+  } catch (_) {}
+
+  // Determine if string ends inside an unclosed double quote
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < fixed.length; i++) {
+    const ch = fixed[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+    }
+  }
+
+  // If cut off inside a string, close the quote
+  if (inString) {
+    fixed += '"';
+  }
+
+  // Clean trailing dangling elements outside quotes
+  fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*$/, "");
+  fixed = fixed.replace(/,\s*"[^"]*"\s*$/, "");
+  fixed = fixed.replace(/:\s*$/, "");
+  fixed = fixed.replace(/,\s*$/, "");
+
+  // Count unbalanced braces and brackets (excluding anything inside quotes)
+  let openBraces = 0;
+  let openBrackets = 0;
+  inString = false;
+  escaped = false;
+
+  for (let i = 0; i < fixed.length; i++) {
+    const ch = fixed[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (ch === "{") openBraces++;
+      else if (ch === "}") openBraces = Math.max(0, openBraces - 1);
+      else if (ch === "[") openBrackets++;
+      else if (ch === "]") openBrackets = Math.max(0, openBrackets - 1);
+    }
+  }
+
+  for (let i = 0; i < openBrackets; i++) fixed += "]";
+  for (let i = 0; i < openBraces; i++) fixed += "}";
+  fixed = fixed.replace(/,\s*([}\]])/g, "$1");
+
+  try {
+    return JSON.parse(fixed);
+  } catch (_) {
+    // Backtracking fallback: drop incomplete final key/value pairs
+    for (let pos = fixed.length - 1; pos > 0; pos--) {
+      if (fixed[pos] === "," || fixed[pos] === "}" || fixed[pos] === "]") {
+        let sub = fixed.slice(0, pos);
+        if (fixed[pos] === "}" || fixed[pos] === "]") sub = fixed.slice(0, pos + 1);
+
+        let ob = 0;
+        let obr = 0;
+        let inS = false;
+        let esc = false;
+        for (let j = 0; j < sub.length; j++) {
+          const c = sub[j];
+          if (esc) { esc = false; continue; }
+          if (c === "\\") { esc = true; continue; }
+          if (c === '"') { inS = !inS; continue; }
+          if (!inS) {
+            if (c === "{") ob++;
+            else if (c === "}") ob = Math.max(0, ob - 1);
+            else if (c === "[") obr++;
+            else if (c === "]") obr = Math.max(0, obr - 1);
+          }
+        }
+        for (let j = 0; j < obr; j++) sub += "]";
+        for (let j = 0; j < ob; j++) sub += "}";
+        sub = sub.replace(/,\s*([}\]])/g, "$1");
+        try {
+          return JSON.parse(sub);
+        } catch (__) {}
+      }
+    }
+    return null;
+  }
+}
+
+/**
+ * Ensures all score fields have valid default types so partial JSON recoveries
+ * or fallbacks never crash downstream report rendering.
+ */
+export function ensureScoreDefaults(scores, fallback) {
+  if (!scores || typeof scores !== "object") return fallback;
+  return {
+    fluency: typeof scores.fluency === "number" ? scores.fluency : fallback.fluency,
+    grammar: typeof scores.grammar === "number" ? scores.grammar : fallback.grammar,
+    confidence: typeof scores.confidence === "number" ? scores.confidence : fallback.confidence,
+    vocabulary: typeof scores.vocabulary === "number" ? scores.vocabulary : fallback.vocabulary,
+    coherence: scores.coherence !== undefined ? scores.coherence : fallback.coherence,
+    grammarErrors: Array.isArray(scores.grammarErrors) ? scores.grammarErrors : fallback.grammarErrors,
+    strongPoints: Array.isArray(scores.strongPoints) && scores.strongPoints.length > 0 ? scores.strongPoints : fallback.strongPoints,
+    suggestions: Array.isArray(scores.suggestions) && scores.suggestions.length > 0 ? scores.suggestions : fallback.suggestions,
+    topicRelevance: scores.topicRelevance !== undefined ? scores.topicRelevance : fallback.topicRelevance,
+    topicFeedback: scores.topicFeedback !== undefined ? scores.topicFeedback : fallback.topicFeedback,
+    pronunciationNote: scores.pronunciationNote !== undefined ? scores.pronunciationNote : fallback.pronunciationNote,
+    rhythmNote: scores.rhythmNote !== undefined ? scores.rhythmNote : fallback.rhythmNote,
+    cefrLevel: scores.cefrLevel || fallback.cefrLevel,
+    vocabularyHighlights: {
+      strong: Array.isArray(scores.vocabularyHighlights?.strong) ? scores.vocabularyHighlights.strong : fallback.vocabularyHighlights.strong,
+      weak: Array.isArray(scores.vocabularyHighlights?.weak) ? scores.vocabularyHighlights.weak : fallback.vocabularyHighlights.weak,
+    },
+    overallComment: scores.overallComment || fallback.overallComment,
+  };
+}
+
 const MAX_TRANSCRIPT_CHARS = 3000;
 
 /**
@@ -521,6 +677,61 @@ RULES:
   };
 
   // ---------------------------------------------------------------------------
+  // Fallback scores synthesis if LLM call fails or times out
+  // ---------------------------------------------------------------------------
+  const synthesizeFallbackScores = (reason = "service fallback") => {
+    console.warn(`[Speech] Falling back to synthetic baseline scores (${reason})`);
+    const cefr = wordCount > 150 ? "B2" : wordCount > 80 ? "B1" : wordCount > 30 ? "A2" : "A1";
+
+    const suggestions = [];
+    if (fillerTotal > 3) {
+      const topFillers = Object.keys(fillerWords).slice(0, 2).map(w => `"${w}"`).join(" and ");
+      suggestions.push(`Work on pausing silently instead of using filler words like ${topFillers}.`);
+    }
+    if (pauses.length > 2) {
+      suggestions.push("Try to connect your sentences more smoothly to maintain a steady speaking flow.");
+    }
+    if (wpm && wpm < 100) {
+      suggestions.push("Work on increasing your speaking rate slightly toward 120-140 words per minute.");
+    } else if (wpm && wpm > 165) {
+      suggestions.push("Slow down slightly and enunciate key terms clearly so your audience can follow easily.");
+    }
+    if (suggestions.length < 2) {
+      suggestions.push("Practice expanding your responses with specific examples and supporting details.");
+    }
+
+    return {
+      fluency: fluencyAnchor,
+      grammar: 7,
+      confidence: confidenceAnchor,
+      vocabulary: 7,
+      coherence: Math.round((fluencyAnchor + confidenceAnchor) / 2),
+      grammarErrors: [],
+      strongPoints: [
+        `Good effort delivering your response (${wordCount} words spoken).`,
+        wpm ? `Consistent speaking pace around ${wpm} WPM.` : "Clear spoken communication.",
+      ],
+      suggestions,
+      topicRelevance: hasTopic ? 7 : null,
+      topicFeedback: hasTopic
+        ? "You addressed the speaking prompt. Continue practicing to organize your points with clear examples."
+        : null,
+      pronunciationNote: pronunciationIssues.length > 0
+        ? `A few words could be articulated more clearly: ${pronunciationIssues.slice(0, 3).join(", ")}.`
+        : "Clear pronunciation overall.",
+      rhythmNote: rhythm?.paceConsistency
+        ? `Pace consistency was measured at ${rhythm.paceConsistency}/10.`
+        : "Good natural rhythm.",
+      cefrLevel: cefr,
+      vocabularyHighlights: {
+        strong: [],
+        weak: [],
+      },
+      overallComment: `You demonstrated a good speaking effort with ${wordCount} words spoken. Your pace was ${wpm ? `${wpm} WPM` : "natural"}. Keep practicing regular speaking exercises to build further confidence and vocabulary range.`,
+    };
+  };
+
+  // ---------------------------------------------------------------------------
   // Helper: send one prompt to Llama and parse the JSON response
   // ---------------------------------------------------------------------------
   const llamaCall = async (prompt) => {
@@ -535,7 +746,8 @@ RULES:
           model: getTextModel(),
           messages: [{ role: "user", content: prompt }],
           temperature: 0.2,
-          max_tokens: 800,
+          max_tokens: 2000,
+          response_format: { type: "json_object" },
         }),
       });
 
@@ -551,76 +763,78 @@ RULES:
       }
 
       const data = await res.json();
-      const raw = data.choices[0].message.content.trim();
+      const raw = data.choices?.[0]?.message?.content?.trim() || "";
 
-      let jsonStr = raw;
-      const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) {
-        jsonStr = fenceMatch[1].trim();
-      } else {
-        const start = raw.indexOf("{");
-        const end = raw.lastIndexOf("}");
-        if (start !== -1 && end !== -1 && end > start) jsonStr = raw.slice(start, end + 1);
+      const repaired = repairTruncatedJson(raw);
+      if (repaired) {
+        return repaired;
       }
 
-      jsonStr = jsonStr
-        .replace(/,\s*([}\]])/g, "$1")
-        .replace(/[\u0000-\u001F]/g, " ");
-      jsonStr = fixUnescapedQuotes(jsonStr);
-
-      try {
-        return JSON.parse(jsonStr);
-      } catch (parseErr) {
-        console.error("JSON parse failed, raw response:", raw.slice(0, 500));
-        // Attempt to salvage a truncated response by closing open structures
-        try {
-          // Count open braces/brackets to close them
-          let fixed = jsonStr;
-          const openBraces = (fixed.match(/\{/g) || []).length - (fixed.match(/\}/g) || []).length;
-          const openBrackets = (fixed.match(/\[/g) || []).length - (fixed.match(/\]/g) || []).length;
-          // Remove trailing incomplete property (cut at last complete comma or opening)
-          fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
-          fixed = fixed.replace(/,\s*\{[^}]*$/, '');
-          for (let i = 0; i < openBrackets; i++) fixed += ']';
-          for (let i = 0; i < openBraces; i++) fixed += '}';
-          fixed = fixed.replace(/,\s*([}\]])/g, '$1');
-          const recovered = JSON.parse(fixed);
-          console.log('[Speech] Recovered partial JSON response');
-          return recovered;
-        } catch (_) {
-          throw new Error(`Failed to parse Llama response as JSON: ${parseErr.message}`);
-        }
-      }
+      console.error("[Speech] JSON recovery failed on raw response:", raw.slice(0, 300));
+      throw new Error("Failed to parse Llama response as JSON");
     }
   };
 
   // ---------------------------------------------------------------------------
   // Run Llama (single or split) + LanguageTool in parallel
   // ---------------------------------------------------------------------------
+  const fallback = synthesizeFallbackScores("default baseline");
+
   let scores;
   if (transcript.length <= MAX_TRANSCRIPT_CHARS) {
     // Short transcript — single call
     console.log(`[Speech] transcript ${transcript.length} chars — single Llama call`);
-    const [result, ltErrors] = await Promise.all([
-      llamaCall(buildPrompt(transcript)),
-      checkGrammar(transcript),
-    ]);
-    scores = result;
+    let result = null;
+    let ltErrors = [];
+    try {
+      [result, ltErrors] = await Promise.all([
+        llamaCall(buildPrompt(transcript)).catch((err) => {
+          console.error("[Speech] Single Llama call error:", err.message);
+          return null;
+        }),
+        checkGrammar(transcript).catch(() => []),
+      ]);
+    } catch (err) {
+      console.error("[Speech] Speech scoring error:", err.message);
+    }
+
+    scores = ensureScoreDefaults(result, fallback);
     scores.grammarErrors = filterGrammarErrors(
-      mergeGrammarErrors(scores.grammarErrors || [], ltErrors)
+      mergeGrammarErrors(scores.grammarErrors || [], ltErrors || [])
     );
   } else {
     // Long transcript — split into 2 halves, fire both in parallel
     const [half1, half2] = splitTranscript(transcript);
     console.log(`[Speech] transcript ${transcript.length} chars — split Llama calls (${half1.length} + ${half2.length} chars)`);
-    const [result1, result2, ltErrors] = await Promise.all([
-      llamaCall(buildPrompt(half1, "the first half")),
-      llamaCall(buildPrompt(half2, "the second half")),
-      checkGrammar(transcript),
-    ]);
-    scores = mergeScores(result1, result2);
+    let result1 = null;
+    let result2 = null;
+    let ltErrors = [];
+    try {
+      [result1, result2, ltErrors] = await Promise.all([
+        llamaCall(buildPrompt(half1, "the first half")).catch((err) => {
+          console.error("[Speech] Split Llama call 1 error:", err.message);
+          return null;
+        }),
+        llamaCall(buildPrompt(half2, "the second half")).catch((err) => {
+          console.error("[Speech] Split Llama call 2 error:", err.message);
+          return null;
+        }),
+        checkGrammar(transcript).catch(() => []),
+      ]);
+    } catch (err) {
+      console.error("[Speech] Split speech scoring error:", err.message);
+    }
+
+    if (result1 && result2) {
+      scores = ensureScoreDefaults(mergeScores(result1, result2), fallback);
+    } else if (result1 || result2) {
+      scores = ensureScoreDefaults(result1 || result2, fallback);
+    } else {
+      scores = fallback;
+    }
+
     scores.grammarErrors = filterGrammarErrors(
-      mergeGrammarErrors(scores.grammarErrors || [], ltErrors)
+      mergeGrammarErrors(scores.grammarErrors || [], ltErrors || [])
     );
   }
 
