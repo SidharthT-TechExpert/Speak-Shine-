@@ -1379,6 +1379,38 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
   const [ttsWarning, setTtsWarning] = useState(null);
   const audioFallbackRef = useRef(null);
 
+  // ── LocalStorage 16-hour TTL for Planned Vocabulary ──────────────────────────
+  const VOCAB_STORAGE_KEY = "speakshine_planned_vocab_v1";
+  const SIXTEEN_HOURS_MS = 16 * 60 * 60 * 1000;
+
+  const [plannedWords, setPlannedWords] = useState(() => {
+    try {
+      const saved = localStorage.getItem(VOCAB_STORAGE_KEY);
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      if (Date.now() - (parsed.timestamp || 0) > SIXTEEN_HOURS_MS) {
+        localStorage.removeItem(VOCAB_STORAGE_KEY);
+        return {};
+      }
+      return parsed.planned || {};
+    } catch {
+      return {};
+    }
+  });
+
+  const togglePlanned = (idx) => {
+    setPlannedWords(prev => {
+      const next = { ...prev, [idx]: !prev[idx] };
+      try {
+        localStorage.setItem(VOCAB_STORAGE_KEY, JSON.stringify({
+          planned: next,
+          timestamp: Date.now(),
+        }));
+      } catch {}
+      return next;
+    });
+  };
+
   const parseVocabItem = (item) => {
     if (!item) return { word: "", meaning: "", example: "" };
     if (typeof item === "string") {
@@ -1611,9 +1643,28 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
                     onClick={() => handleSpeak(w.word, w.meaning, w.example, i)}
                     className="vocab-listen-btn"
                     title="Listen to full pronunciation and example sentence"
-                    style={isSpeaking ? { background: "#7c6fff", color: "#fff", transform: "scale(1.15)" } : {}}
+                    style={isSpeaking ? { background: "var(--primary)", color: "#fff", transform: "scale(1.15)" } : {}}
                   >
                     {isSpeaking ? "🔊" : "🔈"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => togglePlanned(i)}
+                    className="vocab-plan-btn"
+                    style={{
+                      background: plannedWords[i] ? "rgba(74, 222, 128, 0.2)" : "var(--card2)",
+                      border: `1px solid ${plannedWords[i] ? "rgba(74, 222, 128, 0.4)" : "var(--border)"}`,
+                      color: plannedWords[i] ? "var(--success)" : "var(--text2)",
+                      borderRadius: 8,
+                      padding: "4px 8px",
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    title="Mark if you plan to use this word in your recording"
+                  >
+                    {plannedWords[i] ? "✓ Planned" : "+ Plan to use"}
                   </button>
                 </div>
               </div>

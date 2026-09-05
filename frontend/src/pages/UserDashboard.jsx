@@ -431,9 +431,28 @@ function VocabularyWords({ words, requiredCount, totalCount, isPictureDescriptio
   const total = totalCount ?? words.length;
   const maxPts = isPictureDescription ? 10 : 30;
   const [speakingIndex, setSpeakingIndex] = useState(null);
-  const [plannedWords, setPlannedWords] = useState({});
   const [ttsWarning, setTtsWarning] = useState(null);
   const audioFallbackRef = useRef(null);
+
+  // ── LocalStorage 16-hour TTL for Planned Vocabulary ──────────────────────────
+  const VOCAB_STORAGE_KEY = "speakshine_planned_vocab_v1";
+  const SIXTEEN_HOURS_MS = 16 * 60 * 60 * 1000;
+
+  const [plannedWords, setPlannedWords] = useState(() => {
+    try {
+      const saved = localStorage.getItem(VOCAB_STORAGE_KEY);
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      // Check if expired (stored timestamp older than 16 hours)
+      if (Date.now() - (parsed.timestamp || 0) > SIXTEEN_HOURS_MS) {
+        localStorage.removeItem(VOCAB_STORAGE_KEY);
+        return {};
+      }
+      return parsed.planned || {};
+    } catch {
+      return {};
+    }
+  });
 
   const parseVocabItem = (item) => {
     if (!item) return { word: "", meaning: "", example: "" };
@@ -546,7 +565,16 @@ function VocabularyWords({ words, requiredCount, totalCount, isPictureDescriptio
   };
 
   const togglePlanned = (idx) => {
-    setPlannedWords(prev => ({ ...prev, [idx]: !prev[idx] }));
+    setPlannedWords(prev => {
+      const next = { ...prev, [idx]: !prev[idx] };
+      try {
+        localStorage.setItem(VOCAB_STORAGE_KEY, JSON.stringify({
+          planned: next,
+          timestamp: Date.now(),
+        }));
+      } catch {}
+      return next;
+    });
   };
 
   const plannedCount = Object.values(plannedWords).filter(Boolean).length;
