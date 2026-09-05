@@ -1692,7 +1692,7 @@ export default function UserDashboard() {
                   borderRadius: 10,
                   padding: "0.65rem 0.85rem",
                   fontSize: "0.82rem",
-                  color: "rgba(255,255,255,0.85)",
+                  color: "var(--text)",
                   lineHeight: 1.5,
                 }}
               >
@@ -1729,7 +1729,7 @@ export default function UserDashboard() {
                   borderRadius: 10,
                   padding: "0.65rem 0.85rem",
                   fontSize: "0.82rem",
-                  color: "rgba(255,255,255,0.82)",
+                  color: "var(--text)",
                   lineHeight: 1.5,
                 }}
               >
@@ -1764,8 +1764,8 @@ export default function UserDashboard() {
                       display: "flex",
                       gap: "0.75rem",
                       alignItems: "flex-start",
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(167,139,250,0.2)",
+                      background: "var(--card2)",
+                      border: "1px solid var(--border)",
                       borderRadius: 10,
                       padding: "0.65rem 0.85rem",
                     }}
@@ -1775,8 +1775,8 @@ export default function UserDashboard() {
                         minWidth: 24,
                         height: 24,
                         borderRadius: "50%",
-                        background: "rgba(139,92,246,0.3)",
-                        border: "1px solid rgba(139,92,246,0.5)",
+                        background: "rgba(139,92,246,0.2)",
+                        border: "1px solid rgba(139,92,246,0.4)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1791,7 +1791,7 @@ export default function UserDashboard() {
                     <div
                       style={{
                         fontSize: "0.85rem",
-                        color: "rgba(255,255,255,0.9)",
+                        color: "var(--text)",
                         lineHeight: 1.5,
                       }}
                     >
@@ -1803,12 +1803,12 @@ export default function UserDashboard() {
               <div
                 style={{
                   marginTop: "0.85rem",
-                  background: "rgba(139,92,246,0.1)",
-                  border: "1px solid rgba(139,92,246,0.25)",
+                  background: "rgba(139,92,246,0.08)",
+                  border: "1px solid rgba(139,92,246,0.2)",
                   borderRadius: 10,
                   padding: "0.65rem 0.85rem",
                   fontSize: "0.78rem",
-                  color: "rgba(255,255,255,0.65)",
+                  color: "var(--text2)",
                 }}
               >
                 💡 Record a video answering all 6 questions. Same rules apply —
@@ -1843,8 +1843,8 @@ export default function UserDashboard() {
                       display: "flex",
                       gap: "0.75rem",
                       alignItems: "flex-start",
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(74,222,128,0.2)",
+                      background: "var(--card2)",
+                      border: "1px solid var(--border)",
                       borderRadius: 10,
                       padding: "0.65rem 0.85rem",
                     }}
@@ -1854,8 +1854,8 @@ export default function UserDashboard() {
                         minWidth: 24,
                         height: 24,
                         borderRadius: "50%",
-                        background: "rgba(34,197,94,0.25)",
-                        border: "1px solid rgba(74,222,128,0.5)",
+                        background: "rgba(34,197,94,0.2)",
+                        border: "1px solid rgba(74,222,128,0.4)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1870,7 +1870,7 @@ export default function UserDashboard() {
                     <div
                       style={{
                         fontSize: "0.85rem",
-                        color: "rgba(255,255,255,0.9)",
+                        color: "var(--text)",
                         lineHeight: 1.5,
                       }}
                     >
@@ -1883,11 +1883,11 @@ export default function UserDashboard() {
                 style={{
                   marginTop: "0.85rem",
                   background: "rgba(34,197,94,0.08)",
-                  border: "1px solid rgba(74,222,128,0.25)",
+                  border: "1px solid rgba(74,222,128,0.2)",
                   borderRadius: 10,
                   padding: "0.65rem 0.85rem",
                   fontSize: "0.78rem",
-                  color: "rgba(255,255,255,0.65)",
+                  color: "var(--text2)",
                 }}
               >
                 💡 Be specific and speak from the heart. Your goals drive your
@@ -1919,12 +1919,12 @@ export default function UserDashboard() {
                     onClick={() => handleCopyPrompt(data.today.question)}
                     style={{
                       background: copiedPrompt
-                        ? "rgba(74, 222, 128, 0.2)"
-                        : "rgba(255, 255, 255, 0.08)",
-                      border: `1px solid ${copiedPrompt ? "rgba(74, 222, 128, 0.4)" : "rgba(255, 255, 255, 0.15)"}`,
+                        ? "rgba(16, 185, 129, 0.15)"
+                        : "var(--card2)",
+                      border: `1px solid ${copiedPrompt ? "rgba(16, 185, 129, 0.4)" : "var(--border2)"}`,
                       color: copiedPrompt
-                        ? "#4ade80"
-                        : "rgba(255, 255, 255, 0.75)",
+                        ? "var(--success)"
+                        : "var(--text2)",
                       padding: "3px 8px",
                       borderRadius: 8,
                       fontSize: "0.7rem",

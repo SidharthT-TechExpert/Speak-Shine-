@@ -5,40 +5,41 @@
 
 /* ── Design Tokens ── */
 :root,
+:root,
 [data-theme="dark"] {
-  /* Backgrounds — deep space feel */
-  --bg:      #05050f;
-  --bg2:     #0a0a1a;
-  --card:    #0f0f22;
-  --card2:   #141430;
-  --card3:   #1a1a3a;
+  /* Backgrounds — deep space obsidian */
+  --bg:      #07080f;
+  --bg2:     #0d0f1a;
+  --card:    #111322;
+  --card2:   #16192d;
+  --card3:   #1c2039;
 
-  /* Borders */
-  --border:  #1c1c3e;
-  --border2: #28285a;
-  --border3: #3535708a;
+  /* Borders — luminous micro-borders */
+  --border:  rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.14);
+  --border3: rgba(129, 140, 248, 0.25);
 
-  /* Brand colors */
-  --primary:  #8b5cf6;
-  --primary2: #7c3aed;
-  --primary3: #6d28d9;
-  --cyan:     #06b6d4;
-  --cyan2:    #0891b2;
-  --pink:     #ec4899;
-  --pink2:    #db2777;
+  /* Brand colors — electric neon glow */
+  --primary:  #818cf8;
+  --primary2: #6366f1;
+  --primary3: #4f46e5;
+  --cyan:     #22d3ee;
+  --cyan2:    #06b6d4;
+  --pink:     #f43f5e;
+  --pink2:    #e11d48;
 
   /* Semantic */
-  --success: #10b981;
-  --success2:#059669;
-  --warning: #f59e0b;
-  --warning2:#d97706;
-  --danger:  #ef4444;
-  --danger2: #dc2626;
-  --info:    #3b82f6;
+  --success: #34d399;
+  --success2:#10b981;
+  --warning: #fbbf24;
+  --warning2:#f59e0b;
+  --danger:  #f87171;
+  --danger2: #ef4444;
+  --info:    #38bdf8;
 
   /* Text */
-  --text:    #f0f0ff;
-  --text2:   #9494b8;
+  --text:    #f8fafc;
+  --text2:   #94a3b8;
   --muted:   #64748b;
 
   /* Radii */
@@ -49,13 +50,13 @@
   /* Shadows & glows */
   --shadow:       0 8px 32px rgba(0,0,0,0.6);
   --shadow-lg:    0 20px 60px rgba(0,0,0,0.7);
-  --glow-purple:  0 0 40px rgba(139,92,246,0.2);
-  --glow-cyan:    0 0 40px rgba(6,182,212,0.15);
-  --glow-pink:    0 0 40px rgba(236,72,153,0.15);
+  --glow-purple:  0 0 40px rgba(129,140,248,0.22);
+  --glow-cyan:    0 0 40px rgba(34,211,238,0.18);
+  --glow-pink:    0 0 40px rgba(244,63,94,0.18);
 
-  --header-bg:     rgba(5,5,15,0.85);
-  --header-border: rgba(139,92,246,0.15);
-  --header-shadow: 0 1px 0 rgba(139,92,246,0.1), 0 4px 20px rgba(0,0,0,0.4);
+  --header-bg:     rgba(7,8,15,0.85);
+  --header-border: rgba(129,140,248,0.15);
+  --header-shadow: 0 1px 0 rgba(129,140,248,0.1), 0 4px 20px rgba(0,0,0,0.5);
 }
 
 [data-theme="light"] {
@@ -66,19 +67,19 @@
   --card2:   #f8fafc;
   --card3:   #f1f5f9;
 
-  /* Borders */
+  /* Borders — crisp micro-borders */
   --border:  #e2e8f0;
   --border2: #cbd5e1;
-  --border3: #94a3b830;
+  --border3: rgba(148, 163, 184, 0.3);
 
-  /* Brand colors */
-  --primary:  #7c3aed;
-  --primary2: #6d28d9;
-  --primary3: #5b21b6;
+  /* Brand colors — royal indigo violet */
+  --primary:  #6366f1;
+  --primary2: #4f46e5;
+  --primary3: #4338ca;
   --cyan:     #0284c7;
   --cyan2:    #0369a1;
-  --pink:     #db2777;
-  --pink2:    #be185d;
+  --pink:     #e11d48;
+  --pink2:    #be123c;
 
   /* Semantic */
   --success: #059669;
@@ -89,21 +90,21 @@
   --danger2: #b91c1c;
   --info:    #2563eb;
 
-  /* Text */
+  /* Text — deep high-contrast charcoal typography */
   --text:    #0f172a;
-  --text2:   #475569;
-  --muted:   #94a3b8;
+  --text2:   #334155;
+  --muted:   #64748b;
 
   /* Shadows & glows */
-  --shadow:       0 4px 20px -2px rgba(15,23,42,0.06), 0 2px 6px -1px rgba(15,23,42,0.03);
-  --shadow-lg:    0 20px 40px -4px rgba(15,23,42,0.1), 0 8px 16px -2px rgba(15,23,42,0.05);
-  --glow-purple:  0 0 30px rgba(124,58,237,0.1);
+  --shadow:       0 1px 3px rgba(15,23,42,0.03), 0 4px 20px -2px rgba(15,23,42,0.06);
+  --shadow-lg:    0 20px 40px -4px rgba(15,23,42,0.1), 0 8px 16px -2px rgba(15,23,42,0.04);
+  --glow-purple:  0 0 30px rgba(99,102,241,0.12);
   --glow-cyan:    0 0 30px rgba(2,132,199,0.08);
-  --glow-pink:    0 0 30px rgba(219,39,119,0.08);
+  --glow-pink:    0 0 30px rgba(225,29,72,0.08);
 
   --header-bg:     rgba(255, 255, 255, 0.88);
   --header-border: rgba(226, 232, 240, 0.85);
-  --header-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03);
+  --header-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.03);
 }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -4045,4 +4046,91 @@ button[aria-label="Toggle Chat"] {
   border-color: #e2e8f0;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
+
+/* Vocabulary Cards in Light Mode */
+[data-theme="light"] .vocab-container-pro {
+  background: #ffffff !important;
+  border: 1px solid rgba(99, 102, 241, 0.22) !important;
+  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.06) !important;
+}
+[data-theme="light"] .vocab-card-pro {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+[data-theme="light"] .vocab-card-pro:hover {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05) !important;
+}
+[data-theme="light"] .vocab-word-title {
+  color: #1e1b4b !important;
+  font-weight: 800 !important;
+}
+[data-theme="light"] .vocab-example-bubble {
+  background: #f1f5f9 !important;
+  border-left: 2px solid #6366f1 !important;
+  color: #334155 !important;
+}
+[data-theme="light"] .vocab-listen-btn {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #4f46e5 !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
+}
+[data-theme="light"] .vocab-listen-btn:hover {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+}
+
+/* Readiness Strip in Light Mode */
+[data-theme="light"] .readiness-strip .readiness-chip {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02) !important;
+}
+
+/* Buttons in Light Mode */
+[data-theme="light"] .btn-hero-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35) !important;
+}
+[data-theme="light"] .btn-hero-secondary {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+}
+[data-theme="light"] .btn-hero-secondary:hover {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+/* Audio Player */
+audio {
+  border-radius: 12px;
+}
+[data-theme="light"] audio {
+  filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.06));
+}
+
+/* Universal Typography & Contrast Guard: ensure zero white-on-white text in light mode */
+[data-theme="light"] .daily-poster [style*="color: rgba(255,255,255"],
+[data-theme="light"] .daily-poster [style*="color:rgba(255,255,255"],
+[data-theme="light"] .daily-poster [style*="color: rgba(255, 255, 255"],
+[data-theme="light"] .daily-poster [style*="color:rgba(255, 255, 255"],
+[data-theme="light"] .card [style*="color: rgba(255,255,255"],
+[data-theme="light"] .card [style*="color:rgba(255,255,255"],
+[data-theme="light"] .card [style*="color: rgba(255, 255, 255"],
+[data-theme="light"] .card [style*="color:rgba(255, 255, 255"] {
+  color: var(--text2) !important;
+}
+
+[data-theme="light"] .daily-poster [style*="color: #fff"]:not(button):not(.btn-hero-primary):not(.badge):not(.vocab-num-badge),
+[data-theme="light"] .daily-poster [style*="color:#fff"]:not(button):not(.btn-hero-primary):not(.badge):not(.vocab-num-badge),
+[data-theme="light"] .card [style*="color: #fff"]:not(button):not(.btn-hero-primary):not(.badge):not(.vocab-num-badge),
+[data-theme="light"] .card [style*="color:#fff"]:not(button):not(.btn-hero-primary):not(.badge):not(.vocab-num-badge) {
+  color: var(--text) !important;
+}
+
 
