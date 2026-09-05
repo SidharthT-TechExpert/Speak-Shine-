@@ -649,11 +649,11 @@ function VocabularyWords({ words, requiredCount, totalCount, isPictureDescriptio
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                     <div className="vocab-num-badge">0{i + 1}</div>
-                    <span className="vocab-word-title" style={{ color: "#ffffff", fontWeight: 800, fontSize: "0.98rem" }}>
+                    <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
                       {w.word}
                     </span>
                     {w.meaning && (
-                      <span style={{ fontSize: "0.8rem", color: "#cbd5e1", fontWeight: 500, lineHeight: 1.4 }}>
+                      <span className="vocab-meaning-text" style={{ fontSize: "0.82rem", fontWeight: 500, lineHeight: 1.4 }}>
                         — {w.meaning}
                       </span>
                     )}
@@ -672,20 +672,21 @@ function VocabularyWords({ words, requiredCount, totalCount, isPictureDescriptio
                     onClick={() => handleSpeak(w.word, w.meaning, w.example, i)}
                     className="vocab-listen-btn"
                     title="Listen to full pronunciation and example sentence"
-                    style={isSpeaking ? { background: "#7c6fff", color: "#fff", transform: "scale(1.15)" } : {}}
+                    style={isSpeaking ? { background: "var(--primary)", color: "#fff", transform: "scale(1.15)" } : {}}
                   >
                     {isSpeaking ? "🔊" : "🔈"}
                   </button>
                   <button
                     type="button"
                     onClick={() => togglePlanned(i)}
+                    className="vocab-plan-btn"
                     style={{
-                      background: isPlanned ? "rgba(74, 222, 128, 0.2)" : "rgba(255, 255, 255, 0.06)",
-                      border: `1px solid ${isPlanned ? "rgba(74, 222, 128, 0.4)" : "rgba(255, 255, 255, 0.15)"}`,
-                      color: isPlanned ? "#4ade80" : "rgba(255, 255, 255, 0.75)",
-                      borderRadius: 6,
-                      padding: "3px 7px",
-                      fontSize: "0.7rem",
+                      background: isPlanned ? "rgba(74, 222, 128, 0.2)" : "var(--card2)",
+                      border: `1px solid ${isPlanned ? "rgba(74, 222, 128, 0.4)" : "var(--border)"}`,
+                      color: isPlanned ? "var(--success)" : "var(--text2)",
+                      borderRadius: 8,
+                      padding: "4px 8px",
+                      fontSize: "0.72rem",
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
@@ -701,10 +702,10 @@ function VocabularyWords({ words, requiredCount, totalCount, isPictureDescriptio
         })}
       </div>
 
-      <div style={{ marginTop: "0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem", fontSize: "0.74rem", color: "rgba(255, 255, 255, 0.65)" }}>
+      <div style={{ marginTop: "0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem", fontSize: "0.74rem", color: "var(--muted)" }}>
         <span>✨ Speak naturally: past tense & plurals are automatically recognized!</span>
         {plannedCount > 0 && (
-          <span style={{ color: plannedCount >= required ? "#4ade80" : "#fbbf24", fontWeight: 700 }}>
+          <span style={{ color: plannedCount >= required ? "var(--success)" : "var(--warning)", fontWeight: 700 }}>
             {plannedCount} of {required} words planned
           </span>
         )}
@@ -713,7 +714,7 @@ function VocabularyWords({ words, requiredCount, totalCount, isPictureDescriptio
   );
 }
 
-const tt = { background: "#16162a", border: "1px solid #252545", borderRadius: 10, fontSize: 12, color: "#f0f0ff" };
+const tt = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, color: "var(--text)" };
 const avg = (arr, k) => { const v = arr.filter(s => s[k] != null).map(s => s[k]); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : "—"; };
 const scoreColor = v => v >= 7 ? "var(--success)" : v >= 5 ? "var(--warning)" : "var(--danger)";
 
@@ -2607,11 +2608,10 @@ export default function UserDashboard() {
                   style={
                     isMe
                       ? {
-                          background: "rgba(124,111,255,0.13)",
-                          border: "1px solid rgba(124,111,255,0.35)",
-                          borderRadius: 10,
-                          padding: "0.45rem 0.6rem",
-                          margin: "0 -0.1rem",
+                          background: "var(--card2)",
+                          border: "1.5px solid var(--primary)",
+                          borderRadius: 12,
+                          padding: "0.6rem 0.85rem",
                         }
                       : {}
                   }
@@ -2621,7 +2621,7 @@ export default function UserDashboard() {
                   </span>
                   <span
                     className="streak-name"
-                    style={isMe ? { color: "#a78bfa", fontWeight: 700 } : {}}
+                    style={isMe ? { color: "var(--primary)", fontWeight: 700 } : {}}
                   >
                     {u.name || u.userId?.split("@")[0]}
                     {u.currentBadge && (
@@ -2630,10 +2630,10 @@ export default function UserDashboard() {
                     {isMe && (
                       <span
                         style={{
-                          fontSize: "0.62rem",
-                          color: "#7c6fff",
-                          marginLeft: "0.3rem",
-                          opacity: 0.85,
+                          fontSize: "0.65rem",
+                          color: "var(--primary)",
+                          marginLeft: "0.35rem",
+                          fontWeight: 700,
                         }}
                       >
                         (you)
@@ -2644,35 +2644,15 @@ export default function UserDashboard() {
                   <span className="streak-val">🔥 {u.streak}d</span>
                   <span className="streak-sub">{u.weeklySubmissions}/7</span>
                   {u.monthlyScore > 0 ? (
-                    <span
-                      style={{
-                        fontSize: "0.78rem",
-                        fontWeight: 700,
-                        padding: "0.2rem 0.55rem",
-                        borderRadius: 20,
-                        background: "rgba(124,111,255,0.18)",
-                        color: "#c4b5fd",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <span className="streak-pts">
                       {Math.round(u.monthlyScore)} pts
                     </span>
                   ) : (
                     <span className="streak-pts-placeholder" />
                   )}
                   <span
-                    style={{
-                      marginLeft: "0.4rem",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      padding: "0.2rem 0.6rem",
-                      borderRadius: 20,
-                      background: u.completed
-                        ? "rgba(74,222,128,0.15)"
-                        : "rgba(248,113,113,0.12)",
-                      color: u.completed ? "#4ade80" : "#f87171",
-                      whiteSpace: "nowrap",
-                    }}
+                    className={`streak-badge ${u.completed ? "streak-badge--done" : "streak-badge--pending"}`}
+                    style={{ marginLeft: "0.4rem" }}
                   >
                     {u.completed ? "✅ Done" : "⏳ Pending"}
                   </span>
@@ -2710,21 +2690,21 @@ export default function UserDashboard() {
               <div
                 className="streak-row"
                 style={{
-                  background: "rgba(124,111,255,0.07)",
-                  border: "1px solid rgba(124,111,255,0.2)",
-                  borderRadius: 10,
-                  padding: "0.5rem 0.75rem",
+                  background: "var(--card2)",
+                  border: "1.5px solid var(--primary)",
+                  borderRadius: 12,
+                  padding: "0.6rem 0.85rem",
                 }}
               >
                 <span
                   className="streak-rank"
-                  style={{ color: "#a78bfa", minWidth: 28 }}
+                  style={{ color: "var(--primary)", minWidth: 28, fontWeight: 800 }}
                 >
                   #{data.myStreakEntry.rank}
                 </span>
                 <span
                   className="streak-name"
-                  style={{ color: "#a78bfa", fontWeight: 700 }}
+                  style={{ color: "var(--primary)", fontWeight: 700 }}
                 >
                   {data.myStreakEntry.name || "You"}{" "}
                   {data.myStreakEntry.currentBadge && (
@@ -2733,7 +2713,7 @@ export default function UserDashboard() {
                       compact
                     />
                   )}{" "}
-                  <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>
+                  <span style={{ fontSize: "0.65rem", opacity: 0.8 }}>
                     (you)
                   </span>
                 </span>
@@ -2744,35 +2724,15 @@ export default function UserDashboard() {
                   {data.myStreakEntry.weeklySubmissions}/7
                 </span>
                 {data.myStreakEntry.monthlyScore > 0 ? (
-                  <span
-                    style={{
-                      fontSize: "0.78rem",
-                      fontWeight: 700,
-                      padding: "0.2rem 0.55rem",
-                      borderRadius: 20,
-                      background: "rgba(124,111,255,0.18)",
-                      color: "#c4b5fd",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <span className="streak-pts">
                     {Math.round(data.myStreakEntry.monthlyScore)} pts
                   </span>
                 ) : (
                   <span className="streak-pts-placeholder" />
                 )}
                 <span
-                  style={{
-                    marginLeft: "0.4rem",
-                    fontSize: "0.75rem",
-                    fontWeight: 600,
-                    padding: "0.2rem 0.6rem",
-                    borderRadius: 20,
-                    background: data.myStreakEntry.completed
-                      ? "rgba(74,222,128,0.15)"
-                      : "rgba(248,113,113,0.12)",
-                    color: data.myStreakEntry.completed ? "#4ade80" : "#f87171",
-                    whiteSpace: "nowrap",
-                  }}
+                  className={`streak-badge ${data.myStreakEntry.completed ? "streak-badge--done" : "streak-badge--pending"}`}
+                  style={{ marginLeft: "0.4rem" }}
                 >
                   {data.myStreakEntry.completed ? "✅ Done" : "⏳ Pending"}
                 </span>
@@ -2840,9 +2800,9 @@ export default function UserDashboard() {
             </div>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#252545" />
-                <XAxis dataKey="session" stroke="#8888aa" fontSize={11} />
-                <YAxis domain={[0, 10]} stroke="#8888aa" fontSize={11} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.6} />
+                <XAxis dataKey="session" stroke="var(--muted)" fontSize={11} />
+                <YAxis domain={[0, 10]} stroke="var(--muted)" fontSize={11} />
                 <Tooltip contentStyle={tt} />
                 <Legend />
                 {Object.entries(SCORES).map(([k, c]) => (
@@ -2958,11 +2918,10 @@ export default function UserDashboard() {
               {/* Motivational Insight Banner */}
               {pointsSummary.performance?.motivationalTip && (
                 <div
+                  className="points-motivational-tip"
                   style={{
                     padding: "0.65rem 0.9rem",
                     borderRadius: 10,
-                    background: pointsSummary.performance.badgeBg,
-                    border: `1px solid ${pointsSummary.performance.color}33`,
                     marginBottom: "0.9rem",
                     display: "flex",
                     alignItems: "center",
@@ -2975,9 +2934,9 @@ export default function UserDashboard() {
                   <span
                     style={{
                       fontSize: "0.78rem",
-                      color: "#e2e8f0",
+                      color: "var(--text)",
                       lineHeight: 1.4,
-                      fontWeight: 500,
+                      fontWeight: 600,
                     }}
                   >
                     {pointsSummary.performance.motivationalTip}
@@ -2993,21 +2952,15 @@ export default function UserDashboard() {
                   marginBottom: "0.9rem",
                 }}
               >
-                <div
-                  style={{
-                    padding: "0.8rem 0.9rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.16)",
-                    background: "rgba(15,23,42,0.6)",
-                  }}
-                >
+                <div className="points-trend-stat-box">
                   <div
                     style={{
                       fontSize: "0.7rem",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
-                      color: "#94a3b8",
+                      color: "var(--muted)",
                       marginBottom: "0.25rem",
+                      fontWeight: 700,
                     }}
                   >
                     Latest
@@ -3016,7 +2969,7 @@ export default function UserDashboard() {
                     style={{
                       fontSize: "1.2rem",
                       fontWeight: 800,
-                      color: "#f8fafc",
+                      color: "var(--text)",
                     }}
                   >
                     {pointsSummary.latest} pts
@@ -3024,28 +2977,22 @@ export default function UserDashboard() {
                   <div
                     style={{
                       fontSize: "0.68rem",
-                      color: "#64748b",
+                      color: "var(--muted)",
                       marginTop: "0.2rem",
                     }}
                   >
                     Session #{pointsSummary.sessionCount}
                   </div>
                 </div>
-                <div
-                  style={{
-                    padding: "0.8rem 0.9rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.16)",
-                    background: "rgba(15,23,42,0.6)",
-                  }}
-                >
+                <div className="points-trend-stat-box">
                   <div
                     style={{
                       fontSize: "0.7rem",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
-                      color: "#94a3b8",
+                      color: "var(--muted)",
                       marginBottom: "0.25rem",
+                      fontWeight: 700,
                     }}
                   >
                     Performance
@@ -3066,28 +3013,22 @@ export default function UserDashboard() {
                   <div
                     style={{
                       fontSize: "0.68rem",
-                      color: "#94a3b8",
+                      color: "var(--text2)",
                       marginTop: "0.2rem",
                     }}
                   >
                     {pointsSummary.performance.trendText}
                   </div>
                 </div>
-                <div
-                  style={{
-                    padding: "0.8rem 0.9rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.16)",
-                    background: "rgba(15,23,42,0.6)",
-                  }}
-                >
+                <div className="points-trend-stat-box">
                   <div
                     style={{
                       fontSize: "0.7rem",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
-                      color: "#94a3b8",
+                      color: "var(--muted)",
                       marginBottom: "0.25rem",
+                      fontWeight: 700,
                     }}
                   >
                     Last 30 Sessions
@@ -3096,7 +3037,7 @@ export default function UserDashboard() {
                     style={{
                       fontSize: "1.1rem",
                       fontWeight: 800,
-                      color: "#f8fafc",
+                      color: "var(--text)",
                     }}
                   >
                     {pointsSummary.last30RecordedLabel}
@@ -3104,7 +3045,7 @@ export default function UserDashboard() {
                   <div
                     style={{
                       fontSize: "0.68rem",
-                      color: "#64748b",
+                      color: "var(--muted)",
                       marginTop: "0.25rem",
                     }}
                   >
@@ -3113,21 +3054,15 @@ export default function UserDashboard() {
                       : "Last 30 sessions"}
                   </div>
                 </div>
-                <div
-                  style={{
-                    padding: "0.8rem 0.9rem",
-                    borderRadius: 12,
-                    border: "1px solid rgba(148,163,184,0.16)",
-                    background: "rgba(15,23,42,0.6)",
-                  }}
-                >
+                <div className="points-trend-stat-box">
                   <div
                     style={{
                       fontSize: "0.7rem",
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
-                      color: "#94a3b8",
+                      color: "var(--muted)",
                       marginBottom: "0.25rem",
+                      fontWeight: 700,
                     }}
                   >
                     Momentum
@@ -3148,7 +3083,7 @@ export default function UserDashboard() {
                   <div
                     style={{
                       fontSize: "0.68rem",
-                      color: "#94a3b8",
+                      color: "var(--text2)",
                       marginTop: "0.2rem",
                     }}
                   >
@@ -3210,13 +3145,12 @@ export default function UserDashboard() {
                   <Tooltip
                     contentStyle={{
                       ...tt,
-                      border: "1px solid rgba(34,211,238,0.35)",
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+                      boxShadow: "var(--shadow)",
                     }}
-                    cursor={{ stroke: "rgba(34,211,238,0.35)", strokeWidth: 1 }}
+                    cursor={{ stroke: "var(--border3)", strokeWidth: 1 }}
                     formatter={(v) => [`${v} pts`, "Daily points"]}
-                    itemStyle={{ color: "#67e8f9", fontWeight: 700 }}
-                    labelStyle={{ color: "#cbd5e1", marginBottom: "0.2rem" }}
+                    itemStyle={{ color: "var(--primary)", fontWeight: 700 }}
+                    labelStyle={{ color: "var(--muted)", marginBottom: "0.2rem" }}
                   />
                   <Area
                     type="monotone"

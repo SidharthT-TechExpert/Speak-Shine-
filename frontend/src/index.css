@@ -60,51 +60,51 @@
 }
 
 [data-theme="light"] {
-  /* Backgrounds — warm ivory pearl, not cold white */
-  --bg:      #faf9f7;
-  --bg2:     #f4f2ee;
+  /* Backgrounds — luxurious alabaster & ivory */
+  --bg:      #faf9f6;
+  --bg2:     #f4f1ea;
   --card:    #ffffff;
-  --card2:   #faf9f7;
-  --card3:   #f4f2ee;
+  --card2:   #faf9f6;
+  --card3:   #f4f1ea;
 
-  /* Borders — warm sand, not cold slate */
-  --border:  #e8e3db;
-  --border2: #d5cec5;
-  --border3: rgba(109, 40, 217, 0.18);
+  /* Borders — crisp, delicate warm micro-borders */
+  --border:  #e4dfd5;
+  --border2: #cfc8bb;
+  --border3: rgba(109, 40, 217, 0.22);
 
-  /* Brand colors — rich deep violet / amethyst */
+  /* Brand colors — regal royal violet & vibrant amethyst */
   --primary:  #6d28d9;
   --primary2: #5b21b6;
   --primary3: #4c1d95;
-  --cyan:     #0c4a6e;
-  --cyan2:    #075985;
-  --pink:     #9d174d;
-  --pink2:    #831843;
+  --cyan:     #0284c7;
+  --cyan2:    #0369a1;
+  --pink:     #db2777;
+  --pink2:    #be185d;
 
-  /* Semantic — deep, rich jewel tones */
-  --success: #064e3b;
-  --success2:#065f46;
-  --warning: #78350f;
-  --warning2:#92400e;
-  --danger:  #7f1d1d;
-  --danger2: #991b1b;
-  --info:    #1e3a8a;
+  /* Semantic — high-contrast jewel tones */
+  --success: #059669;
+  --success2:#047857;
+  --warning: #d97706;
+  --warning2:#b45309;
+  --danger:  #dc2626;
+  --danger2: #b91c1c;
+  --info:    #2563eb;
 
-  /* Text — warm charcoal, not cold slate */
-  --text:    #1c1917;
-  --text2:   #44403c;
-  --muted:   #78716c;
+  /* Text — deep high-contrast graphite typography */
+  --text:    #111827;
+  --text2:   #374151;
+  --muted:   #6b7280;
 
-  /* Shadows — warm-tinted depth */
-  --shadow:       0 1px 2px rgba(28,25,23,0.04), 0 4px 16px -2px rgba(28,25,23,0.08);
-  --shadow-lg:    0 20px 40px -4px rgba(28,25,23,0.12), 0 8px 16px -2px rgba(28,25,23,0.06);
+  /* Shadows — clean layered ambient depth */
+  --shadow:       0 1px 3px rgba(17,24,39,0.04), 0 4px 16px -2px rgba(17,24,39,0.06);
+  --shadow-lg:    0 20px 40px -4px rgba(17,24,39,0.1), 0 8px 16px -2px rgba(17,24,39,0.04);
   --glow-purple:  0 0 24px rgba(109,40,217,0.12);
-  --glow-cyan:    0 0 24px rgba(12,74,110,0.08);
-  --glow-pink:    0 0 24px rgba(157,23,77,0.08);
+  --glow-cyan:    0 0 24px rgba(2,132,199,0.08);
+  --glow-pink:    0 0 24px rgba(219,39,119,0.08);
 
-  --header-bg:     rgba(250, 249, 247, 0.92);
-  --header-border: rgba(232, 227, 219, 0.9);
-  --header-shadow: 0 1px 3px rgba(28,25,23,0.06), 0 4px 16px rgba(28,25,23,0.04);
+  --header-bg:     rgba(250, 249, 246, 0.94);
+  --header-border: rgba(228, 223, 213, 0.9);
+  --header-shadow: 0 1px 3px rgba(17,24,39,0.04), 0 4px 16px rgba(17,24,39,0.03);
 }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -4078,6 +4078,20 @@ button[aria-label="Toggle Chat"] {
   color: #1c1917 !important;
   font-weight: 800 !important;
 }
+[data-theme="light"] .daily-poster .vocab-meaning-text {
+  color: #57534e !important;
+  font-weight: 500 !important;
+}
+[data-theme="light"] .daily-poster .vocab-plan-btn {
+  background: #ffffff !important;
+  border: 1px solid #d5cec5 !important;
+  color: #44403c !important;
+}
+[data-theme="light"] .daily-poster .vocab-plan-btn:hover {
+  background: #faf9f7 !important;
+  border-color: #6d28d9 !important;
+  color: #6d28d9 !important;
+}
 [data-theme="light"] .daily-poster .vocab-example-bubble {
   background: #f4f2ee !important;
   border-left: 2px solid #6d28d9 !important;
@@ -4092,6 +4106,7 @@ button[aria-label="Toggle Chat"] {
   background: #6d28d9 !important;
   color: #ffffff !important;
 }
+
 
 /* Readiness chips inside poster */
 [data-theme="light"] .daily-poster .readiness-chip {
@@ -4258,6 +4273,20 @@ button[aria-label="Toggle Chat"] {
   color: #1c1917 !important;
   font-weight: 800 !important;
 }
+[data-theme="light"] .vocab-meaning-text {
+  color: #57534e !important;
+  font-weight: 500 !important;
+}
+[data-theme="light"] .vocab-plan-btn {
+  background: #ffffff !important;
+  border: 1px solid #d5cec5 !important;
+  color: #44403c !important;
+}
+[data-theme="light"] .vocab-plan-btn:hover {
+  background: #faf9f7 !important;
+  border-color: #6d28d9 !important;
+  color: #6d28d9 !important;
+}
 [data-theme="light"] .vocab-example-bubble {
   background: #f4f2ee !important;
   border-left: 2px solid #6d28d9 !important;
@@ -4272,6 +4301,7 @@ button[aria-label="Toggle Chat"] {
   background: #6d28d9 !important;
   color: #ffffff !important;
 }
+
 
 /* ── Readiness Strip ── */
 [data-theme="light"] .readiness-strip .readiness-chip {
@@ -4410,11 +4440,42 @@ audio { border-radius: 12px; }
 }
 
 /* Mini stat boxes inside points trend card */
-[data-theme="light"] .points-trend-card div[style*="background: rgba(15,23,42"],
-[data-theme="light"] .points-trend-card div[style*="background:rgba(15,23,42"] {
+.points-trend-stat-box {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.6);
+  transition: all 0.2s ease;
+}
+.points-trend-stat-box:hover {
+  border-color: rgba(34, 211, 238, 0.3);
+  transform: translateY(-2px);
+}
+
+.points-motivational-tip {
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+[data-theme="light"] .points-trend-stat-box {
   background: #faf9f7 !important;
   border: 1px solid #e8e3db !important;
+  box-shadow: 0 1px 3px rgba(28, 25, 23, 0.03);
 }
+[data-theme="light"] .points-trend-stat-box:hover {
+  background: #ffffff !important;
+  border-color: #d5cec5 !important;
+  box-shadow: 0 4px 12px rgba(28, 25, 23, 0.06);
+}
+
+[data-theme="light"] .points-motivational-tip {
+  background: #fffbeb !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+}
+[data-theme="light"] .points-motivational-tip span {
+  color: #78350f !important;
+}
+
 [data-theme="light"] .points-trend-card [style*="color: #f8fafc"],
 [data-theme="light"] .points-trend-card [style*="color:#f8fafc"] {
   color: #1c1917 !important;
@@ -4432,6 +4493,7 @@ audio { border-radius: 12px; }
   color: #78716c !important;
 }
 
+
 /* Badge pills inside points trend card */
 [data-theme="light"] .points-trend-card div[style*="color: #67e8f9"],
 [data-theme="light"] .points-trend-card div[style*="color:#67e8f9"] {
@@ -4447,11 +4509,22 @@ audio { border-radius: 12px; }
 }
 
 /* Recharts grid lines & axes in light mode */
-[data-theme="light"] .points-trend-card .recharts-cartesian-grid line {
+[data-theme="light"] .recharts-cartesian-grid line {
   stroke: #e8e3db !important;
 }
-[data-theme="light"] .points-trend-card .recharts-text {
+[data-theme="light"] .recharts-text {
   fill: #78716c !important;
+}
+[data-theme="light"] .recharts-legend-item-text {
+  color: #44403c !important;
+  font-weight: 600 !important;
+}
+[data-theme="light"] .recharts-default-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #e8e3db !important;
+  color: #1c1917 !important;
+  box-shadow: 0 10px 30px rgba(28, 25, 23, 0.12) !important;
+  border-radius: 10px !important;
 }
 
 /* Smooth micro-interactions & polished layout */
