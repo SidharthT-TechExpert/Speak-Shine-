@@ -182,47 +182,23 @@ function SubmitNudge({ name, streak, navigate, specialDay }) {
   const timeLabel = remaining ? `${remaining.hrs}h ${pad(remaining.mins)}m ${pad(remaining.secs)}s` : "--";
 
   return (
-    <div style={{
-      background: urgency === "high"
-        ? "linear-gradient(135deg, rgba(127,29,29,0.5) 0%, rgba(153,27,27,0.3) 100%)"
-        : urgency === "medium"
-          ? "linear-gradient(135deg, rgba(120,53,15,0.5) 0%, rgba(146,64,14,0.3) 100%)"
-          : "linear-gradient(135deg, rgba(30,58,138,0.5) 0%, rgba(30,64,175,0.3) 100%)",
-      border: urgency === "high"
-        ? "1px solid rgba(248,113,113,0.4)"
-        : urgency === "medium"
-          ? "1px solid rgba(251,191,36,0.4)"
-          : "1px solid rgba(96,165,250,0.35)",
-      borderRadius: 14,
-      padding: "1rem 1.25rem",
-      marginBottom: "1rem",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: "1rem",
-      flexWrap: "wrap",
-    }}>
+    <div className={`urgency-countdown-banner urgency-${urgency}`}>
       <div style={{ flex: 1, minWidth: 260 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem", flexWrap: "wrap" }}>
-          <span style={{
-            fontSize: "0.68rem", fontWeight: 800, padding: "0.2rem 0.55rem", borderRadius: 20,
-            background: urgency === "high" ? "#f87171" : urgency === "medium" ? "#fbbf24" : "#60a5fa",
-            color: urgency === "high" ? "#7f1d1d" : urgency === "medium" ? "#78350f" : "#1e3a8a",
-            textTransform: "uppercase", letterSpacing: "0.06em",
-          }}>
+          <span className={`urgency-pill urgency-pill-${urgency}`}>
             {urgency === "high" ? "⚠️ Urgent" : urgency === "medium" ? "⏰ Due Tonight" : "📌 Pending"}
           </span>
-          <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fff" }}>
+          <span className="urgency-time-label">
             ⏰ {timeLabel} until midnight
           </span>
         </div>
-        <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.85)", lineHeight: 1.4 }}>
+        <div className="urgency-subtext">
           {specialDay === "goals" ? (
-            <span>🎯 <strong style={{ color: "#4ade80" }}>Monthly Goal Setting:</strong> Speak your goals before midnight!</span>
+            <span>🎯 <strong style={{ color: "var(--success)" }}>Monthly Goal Setting:</strong> Speak your goals before midnight!</span>
           ) : specialDay === "reflection" ? (
-            <span>🌟 <strong style={{ color: "#c4b5fd" }}>Monthly Reflection:</strong> Submit your monthly reflection before midnight!</span>
+            <span>🌟 <strong style={{ color: "var(--primary)" }}>Monthly Reflection:</strong> Submit your monthly reflection before midnight!</span>
           ) : streak > 0 ? (
-            <span>🔥 <strong style={{ color: "#fb923c" }}>{streak}-day streak at risk!</strong> Submit your video before midnight to keep it alive.</span>
+            <span>🔥 <strong style={{ color: "var(--warning)" }}>{streak}-day streak at risk!</strong> Submit your video before midnight to keep it alive.</span>
           ) : (
             <span>Today's challenge is live! Record and submit your video before midnight.</span>
           )}
@@ -231,23 +207,7 @@ function SubmitNudge({ name, streak, navigate, specialDay }) {
 
       <button
         onClick={() => navigate('/record')}
-        style={{
-          background: urgency === "high"
-            ? "linear-gradient(135deg, #ef4444, #dc2626)"
-            : urgency === "medium"
-              ? "linear-gradient(135deg, #f59e0b, #d97706)"
-              : "linear-gradient(135deg, #3b82f6, #2563eb)",
-          color: "#fff",
-          border: "none",
-          borderRadius: 10,
-          padding: "0.65rem 1.15rem",
-          fontSize: "0.85rem",
-          fontWeight: 700,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-          flexShrink: 0,
-        }}
+        className={`urgency-record-btn urgency-record-btn-${urgency}`}
       >
         🎥 Record Now
       </button>
