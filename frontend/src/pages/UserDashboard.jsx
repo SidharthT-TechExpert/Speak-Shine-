@@ -2340,11 +2340,9 @@ export default function UserDashboard() {
       {/* ── Hall of Fame — always visible ── */}
       {data?.streakRecord && (
         <div
+          className="streak-record-banner"
           style={{
             marginBottom: "1rem",
-            background:
-              "linear-gradient(135deg, #2a1f00 0%, #3d2e00 50%, #2a1f00 100%)",
-            border: "1.5px solid rgba(251,191,36,0.55)",
             borderRadius: 14,
             padding: "0.75rem 1rem",
             display: "flex",
@@ -2439,17 +2437,13 @@ export default function UserDashboard() {
       {/* ── Today's Top Scorer ── */}
       {data?.todayTopScorer && (
         <div
+          className="today-top-scorer-banner"
           style={{
             marginBottom: "1rem",
             borderRadius: 18,
             padding: "0.85rem 1.25rem",
             position: "relative",
             overflow: "hidden",
-            background:
-              "linear-gradient(135deg, #0a2a30 0%, #082028 60%, #061a20 100%)",
-            border: "1px solid rgba(6,182,212,0.3)",
-            boxShadow:
-              "0 8px 32px rgba(6,182,212,0.1), inset 0 1px 0 rgba(6,182,212,0.15)",
           }}
         >
           {/* shimmer line at top */}
@@ -2882,13 +2876,9 @@ export default function UserDashboard() {
 
           {pointsData.length > 0 && pointsSummary && (
             <div
-              className="card"
+              className="card points-trend-card"
               style={{
                 marginTop: "1rem",
-                border: "1px solid rgba(34,211,238,0.18)",
-                boxShadow: "0 16px 40px rgba(2,8,23,0.24)",
-                background:
-                  "linear-gradient(135deg, rgba(15,23,42,0.98) 0%, rgba(15,23,42,0.9) 100%)",
               }}
             >
               <div
