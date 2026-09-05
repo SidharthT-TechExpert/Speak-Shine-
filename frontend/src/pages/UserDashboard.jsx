@@ -2140,26 +2140,40 @@ export default function UserDashboard() {
         )}
       </div>
 
-      <div className="stat-grid">
-        <StatCard
-          icon="👥"
-          label="Group Members"
-          value={data?.stats?.total || 0}
-          color="#7c6fff"
-        />
-        <StatCard
-          icon="✅"
-          label="Submitted Today"
-          value={data?.stats?.completed || 0}
-          color="#4ade80"
-        />
-        <StatCard
-          icon="⏳"
-          label="Pending Today"
-          value={data?.stats?.pending || 0}
-          color="#f87171"
-        />
-      </div>
+      {/* ── Group Stats (Paid Members Only) ── */}
+      {(() => {
+        const paidList = Array.isArray(data?.topStreak) ? data.topStreak : [];
+        const paidTotal = data?.stats?.total !== undefined && (!paidList.length || data.stats.total <= paidList.length)
+          ? data.stats.total
+          : paidList.length;
+        const paidCompleted = data?.stats?.completed !== undefined && (!paidList.length || data.stats.completed <= paidList.length)
+          ? (paidList.length ? paidList.filter(u => u.completed).length : data.stats.completed)
+          : (paidList.length ? paidList.filter(u => u.completed).length : 0);
+        const paidPending = Math.max(0, paidTotal - paidCompleted);
+
+        return (
+          <div className="stat-grid">
+            <StatCard
+              icon="👥"
+              label="Group Members"
+              value={paidTotal}
+              color="#7c6fff"
+            />
+            <StatCard
+              icon="✅"
+              label="Submitted Today"
+              value={paidCompleted}
+              color="#4ade80"
+            />
+            <StatCard
+              icon="⏳"
+              label="Pending Today"
+              value={paidPending}
+              color="#f87171"
+            />
+          </div>
+        );
+      })()}
 
       {/* ── Hall of Fame — always visible ── */}
       {data?.streakRecord && (

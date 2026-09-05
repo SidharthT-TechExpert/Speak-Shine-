@@ -137,7 +137,7 @@ export async function getUserProfile(phone) {
   const [user, status, allUsers, existingStreakRecord] = await Promise.all([
     phone ? User.findOne({ phone: { $in: phoneCandidates } }).lean() : Promise.resolve(null),
     Status.findOne().lean(),
-    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid").lean(),
+    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze").lean(),
     StreakRecord.findOne().lean(),
   ]);
 
@@ -173,8 +173,11 @@ export async function getUserProfile(phone) {
       };
     }
   }
-  const completed = allUsers.filter(u => u.completed).length;
-  const sortedByStreak = [...allUsers].sort((a, b) => (b.streak || 0) - (a.streak || 0));
+  // ── Paid Members Only ───────────────────────────────────────────────────
+  // Only paid active students count in group stats, leaderboard, and streak records.
+  const paidUsers = allUsers.filter(u => u.paid === true);
+  const completed = paidUsers.filter(u => u.completed).length;
+  const sortedByStreak = [...paidUsers].sort((a, b) => (b.streak || 0) - (a.streak || 0));
 
   // Lazy-generate vocabulary if missing (non-blocking — resolves in parallel)
   const vocabularyPromise = (status?.questionSentToday && status?.todayQuestion)
@@ -182,11 +185,9 @@ export async function getUserProfile(phone) {
     : Promise.resolve(status?.todayVocabulary || []);
 
   // ── Leaderboard sort (Paid Members Only) ──────────────────────────────────
-  // Only paid active students appear on the public competitive leaderboard.
   // Primary sort: monthlyScore desc (highest pts first, always)
   // Secondary sort: streak desc (tiebreaker when scores are equal)
   // Submitted today floats above non-submitted at equal score
-  const paidUsers = allUsers.filter(u => u.paid === true);
   const leaderboardSorted = [...paidUsers].sort((a, b) => {
     const scoreA = a.monthlyScore ?? 0;
     const scoreB = b.monthlyScore ?? 0;
@@ -206,10 +207,10 @@ export async function getUserProfile(phone) {
     }));
 
   // ── Today's top scorer ──────────────────────────────────────────────────
-  // Find the user with the highest todayScore who actually scored today
+  // Find the paid user with the highest todayScore who actually scored today
   const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const todayIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth()+1).padStart(2,"0")}-${String(nowIST.getDate()).padStart(2,"0")}`;
-  const todayScoredUsers = allUsers.filter(u => u.lastScoreDate === todayIST && u.todayScore != null);
+  const todayScoredUsers = paidUsers.filter(u => u.lastScoreDate === todayIST && u.todayScore != null);
   const topScorerToday = todayScoredUsers.length > 0
     ? todayScoredUsers.reduce((best, u) => (u.todayScore > best.todayScore ? u : best))
     : null;
@@ -326,10 +327,10 @@ export async function getUserProfile(phone) {
     reportExpiresAt: showReport ? status.reportExpiresAt : null,
     posterSendTime: status?.posterSendTime || "08:00",
     stats: {
-      total: allUsers.length,
+      total: paidUsers.length,
       completed,
-      pending: allUsers.length - completed,
-      totalFreeze: allUsers.reduce((sum, u) => sum + (u.streakFreeze || 0), 0),
+      pending: Math.max(0, paidUsers.length - completed),
+      totalFreeze: paidUsers.reduce((sum, u) => sum + (u.streakFreeze || 0), 0),
     },
     topStreak,
     myStreakEntry,
