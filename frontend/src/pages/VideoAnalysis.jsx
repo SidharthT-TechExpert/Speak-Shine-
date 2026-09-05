@@ -601,14 +601,14 @@ export default function VideoAnalysis() {
 
         {/* ── Story Summary Card ── */}
         {todayQuestion && isStorySummary && (
-          <div style={{
-            background: "linear-gradient(135deg, #10231f 0%, #173d35 50%, #10231f 100%)",
-            border: "2px solid rgba(45,212,191,0.45)",
-            borderRadius: 18,
-            padding: "1.5rem",
-            marginBottom: "1rem",
-            boxShadow: "0 8px 40px rgba(20,184,166,0.2)",
-          }}>
+          <div
+            className="listening-practice-card"
+            style={{
+              borderRadius: 18,
+              padding: "1.5rem",
+              marginBottom: "1rem",
+            }}
+          >
             <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1rem" }}>
               <div style={{ fontSize:"2.5rem" }}>🎧</div>
               <div>

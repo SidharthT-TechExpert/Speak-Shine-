@@ -3977,15 +3977,16 @@ button[aria-label="Toggle Chat"] {
 
 [data-theme="light"] .stat-card {
   background: #ffffff;
-  border-color: #e8e3db;
-  box-shadow: 0 2px 8px rgba(28,25,23,0.04);
+  border-color: #e4dfd5;
+  box-shadow: 0 1px 3px rgba(17,24,39,0.03), 0 6px 18px -2px rgba(17,24,39,0.05);
 }
 [data-theme="light"] .stat-card:hover {
-  border-color: #d5cec5;
-  box-shadow: 0 8px 28px rgba(28,25,23,0.08);
+  border-color: #cfc8bb;
+  box-shadow: 0 12px 32px -4px rgba(17,24,39,0.08);
 }
-[data-theme="light"] .stat-label { color: #78716c; }
-[data-theme="light"] .stat-value { color: #1c1917; }
+[data-theme="light"] .stat-label { color: #4b5563; font-weight: 700; }
+[data-theme="light"] .stat-value { color: #111827; font-weight: 800; }
+
 
 /* ── Tabs ── */
 [data-theme="light"] .tab-btn {
@@ -4250,8 +4251,22 @@ button[aria-label="Toggle Chat"] {
 [data-theme="light"] .admin-command-bar,
 [data-theme="light"] .admin-kpi-card {
   background: #ffffff;
-  border-color: #e8e3db;
-  box-shadow: 0 2px 8px rgba(28,25,23,0.04);
+  border-color: #e4dfd5;
+  box-shadow: 0 1px 3px rgba(17,24,39,0.04), 0 4px 16px -2px rgba(17,24,39,0.06);
+}
+[data-theme="light"] .admin-kpi-value {
+  color: #111827 !important;
+}
+[data-theme="light"] .admin-kpi-label {
+  color: #4b5563 !important;
+}
+[data-theme="light"] .admin-kpi-sub {
+  color: #6b7280 !important;
+}
+[data-theme="light"] .admin-kpi-trend.neu {
+  background: rgba(107, 114, 128, 0.12);
+  color: #374151;
+  border-color: rgba(107, 114, 128, 0.25);
 }
 
 /* ── Vocabulary Cards ── */
@@ -4527,13 +4542,72 @@ audio { border-radius: 12px; }
   border-radius: 10px !important;
 }
 
-/* Smooth micro-interactions & polished layout */
-.stat-grid {
-  align-items: stretch;
+/* ── Listening Practice Card ── */
+.listening-practice-card {
+  background: linear-gradient(135deg, #10231f 0%, #173d35 50%, #10231f 100%);
+  border: 2px solid rgba(45, 212, 191, 0.45);
+  box-shadow: 0 8px 40px rgba(20, 184, 166, 0.2);
 }
-.stat-card {
-  box-shadow: var(--shadow);
+
+[data-theme="light"] .listening-practice-card {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 40%, #ffffff 100%) !important;
+  border: 1.5px solid rgba(13, 148, 136, 0.3) !important;
+  box-shadow: 0 4px 20px rgba(13, 148, 136, 0.08), 0 1px 3px rgba(17, 24, 39, 0.04) !important;
 }
-[data-theme="light"] .stat-card {
-  box-shadow: 0 1px 3px rgba(28,25,23,0.03), 0 4px 14px rgba(28,25,23,0.04);
+[data-theme="light"] .listening-practice-card [style*="color: #fff"],
+[data-theme="light"] .listening-practice-card [style*="color:#fff"] {
+  color: #111827 !important;
 }
+[data-theme="light"] .listening-practice-card [style*="color: #ccfbf1"],
+[data-theme="light"] .listening-practice-card [style*="color:#ccfbf1"] {
+  color: #0f766e !important;
+}
+[data-theme="light"] .listening-practice-card [style*="color: rgba(94,234,212"],
+[data-theme="light"] .listening-practice-card [style*="color:rgba(94,234,212"] {
+  color: #0d9488 !important;
+}
+[data-theme="light"] .listening-practice-card [style*="color: rgba(255,255,255"],
+[data-theme="light"] .listening-practice-card [style*="color:rgba(255,255,255"] {
+  color: #374151 !important;
+}
+[data-theme="light"] .listening-practice-card div[style*="background: rgba(255,255,255"],
+[data-theme="light"] .listening-practice-card div[style*="background:rgba(255,255,255"] {
+  background: #ffffff !important;
+  border-color: #d5cec5 !important;
+  color: #111827 !important;
+}
+
+/* Challenge Type Poster Modifiers (Dark Mode Defaults) */
+.daily-poster.poster-reflection {
+  background: linear-gradient(135deg, #1a0a2e 0%, #2d1060 50%, #1a0a2e 100%);
+  border: 2px solid rgba(167, 139, 250, 0.5);
+  box-shadow: 0 8px 40px rgba(139, 92, 246, 0.25);
+}
+.daily-poster.poster-goals {
+  background: linear-gradient(135deg, #0a1f0a 0%, #0d3d1a 50%, #0a2e12 100%);
+  border: 2px solid rgba(74, 222, 128, 0.45);
+  box-shadow: 0 8px 40px rgba(34, 197, 94, 0.2);
+}
+.daily-poster.poster-story {
+  background: linear-gradient(135deg, #10231f 0%, #173d35 50%, #10231f 100%);
+  border: 2px solid rgba(45, 212, 191, 0.45);
+  box-shadow: 0 8px 40px rgba(20, 184, 166, 0.2);
+}
+.daily-poster.poster-picture {
+  background: linear-gradient(135deg, #0f1a2e 0%, #1a2d4a 50%, #0f1a2e 100%);
+  border: 2px solid rgba(99, 179, 237, 0.45);
+  box-shadow: 0 8px 40px rgba(66, 153, 225, 0.2);
+}
+
+/* Light Mode Overrides for all poster variants */
+[data-theme="light"] .daily-poster.poster-reflection,
+[data-theme="light"] .daily-poster.poster-goals,
+[data-theme="light"] .daily-poster.poster-story,
+[data-theme="light"] .daily-poster.poster-picture,
+[data-theme="light"] .daily-poster[style*="background"] {
+  background: linear-gradient(145deg, #ffffff 0%, #faf9f6 55%, #f4f1ea 100%) !important;
+  border-color: rgba(109, 40, 217, 0.22) !important;
+  box-shadow: 0 8px 32px -4px rgba(109, 40, 217, 0.08), 0 2px 8px rgba(17, 24, 39, 0.04) !important;
+}
+
+

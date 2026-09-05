@@ -1520,38 +1520,17 @@ export default function UserDashboard() {
       {/* Show Question (8 AM onwards) — hide if already completed */}
       {!data?.showReport && data?.today?.question && !profile?.completed && (
         <div
-          className="daily-poster gsap-stagger-card"
-          style={
+          className={`daily-poster gsap-stagger-card ${
             data?.today?.isMonthlyReflection
-              ? {
-                  background:
-                    "linear-gradient(135deg, #1a0a2e 0%, #2d1060 50%, #1a0a2e 100%)",
-                  border: "2px solid rgba(167,139,250,0.5)",
-                  boxShadow: "0 8px 40px rgba(139,92,246,0.25)",
-                }
+              ? "poster-reflection"
               : data?.today?.isMonthlyGoals
-                ? {
-                    background:
-                      "linear-gradient(135deg, #0a1f0a 0%, #0d3d1a 50%, #0a2e12 100%)",
-                    border: "2px solid rgba(74,222,128,0.45)",
-                    boxShadow: "0 8px 40px rgba(34,197,94,0.2)",
-                  }
+                ? "poster-goals"
                 : data?.today?.isStorySummary
-                  ? {
-                      background:
-                        "linear-gradient(135deg, #10231f 0%, #173d35 50%, #10231f 100%)",
-                      border: "2px solid rgba(45,212,191,0.45)",
-                      boxShadow: "0 8px 40px rgba(20,184,166,0.2)",
-                    }
+                  ? "poster-story"
                   : data?.today?.isPictureDescription
-                    ? {
-                        background:
-                          "linear-gradient(135deg, #0f1a2e 0%, #1a2d4a 50%, #0f1a2e 100%)",
-                        border: "2px solid rgba(99,179,237,0.45)",
-                        boxShadow: "0 8px 40px rgba(66,153,225,0.2)",
-                      }
-                    : {}
-          }
+                    ? "poster-picture"
+                    : ""
+          }`}
         >
           {/* Header */}
           <div className="daily-poster-header">
