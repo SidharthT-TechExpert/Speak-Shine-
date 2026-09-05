@@ -3868,9 +3868,9 @@ button[aria-label="Toggle Chat"] {
 
 /* ── Daily Poster in Light Mode ── */
 [data-theme="light"] .daily-poster {
-  background: linear-gradient(145deg, #ffffff 0%, #faf9f7 55%, #f4f2ee 100%);
-  border-color: rgba(109,40,217,0.2);
-  box-shadow: 0 8px 32px -4px rgba(109,40,217,0.08), 0 2px 8px rgba(28,25,23,0.04);
+  background: linear-gradient(145deg, #ffffff 0%, #faf9f7 55%, #f4f2ee 100%) !important;
+  border-color: rgba(109,40,217,0.2) !important;
+  box-shadow: 0 8px 32px -4px rgba(109,40,217,0.08), 0 2px 8px rgba(28,25,23,0.04) !important;
 }
 [data-theme="light"] .daily-poster:hover {
   border-color: rgba(109,40,217,0.35);
@@ -3907,9 +3907,65 @@ button[aria-label="Toggle Chat"] {
   background: #ffffff;
   border-color: #d5cec5;
 }
-[data-theme="light"] .daily-poster-topic,
-[data-theme="light"] .daily-poster-question { color: #1c1917; }
-[data-theme="light"] .daily-poster-section-label { color: #6d28d9; }
+[data-theme="light"] .daily-poster-topic    { color: #1c1917 !important; }
+[data-theme="light"] .daily-poster-question {
+  color: #1c1917 !important;
+  text-shadow: none !important;
+}
+[data-theme="light"] .daily-poster-section-label { color: #6d28d9 !important; }
+[data-theme="light"] .daily-poster-question-wrap {
+  background: #ffffff !important;
+  border-color: #e8e3db !important;
+  border-left: 4px solid #6d28d9 !important;
+  box-shadow: 0 2px 8px rgba(28,25,23,0.04) !important;
+}
+[data-theme="light"] .daily-poster-question-wrap .daily-poster-section-label { color: #6d28d9 !important; }
+
+/* Vocab inside poster */
+[data-theme="light"] .daily-poster .vocab-container-pro {
+  background: #faf9f7 !important;
+  border: 1px solid rgba(109,40,217,0.15) !important;
+}
+[data-theme="light"] .daily-poster .vocab-card-pro {
+  background: #ffffff !important;
+  border: 1px solid #e8e3db !important;
+}
+[data-theme="light"] .daily-poster .vocab-card-pro:hover {
+  background: #ffffff !important;
+  border-color: #d5cec5 !important;
+  box-shadow: 0 4px 16px rgba(109,40,217,0.06) !important;
+}
+[data-theme="light"] .daily-poster .vocab-word-title {
+  color: #1c1917 !important;
+  font-weight: 800 !important;
+}
+[data-theme="light"] .daily-poster .vocab-example-bubble {
+  background: #f4f2ee !important;
+  border-left: 2px solid #6d28d9 !important;
+  color: #44403c !important;
+}
+[data-theme="light"] .daily-poster .vocab-listen-btn {
+  background: rgba(109,40,217,0.08) !important;
+  color: #5b21b6 !important;
+  border-color: rgba(109,40,217,0.22) !important;
+}
+[data-theme="light"] .daily-poster .vocab-listen-btn:hover {
+  background: #6d28d9 !important;
+  color: #ffffff !important;
+}
+
+/* Readiness chips inside poster */
+[data-theme="light"] .daily-poster .readiness-chip {
+  background: #ffffff !important;
+  border: 1px solid #e8e3db !important;
+  color: #44403c !important;
+}
+
+/* Hint text inside poster */
+[data-theme="light"] .daily-poster .vocab-hint,
+[data-theme="light"] .daily-poster .hint-text {
+  color: #78716c !important;
+}
 
 /* ── Student Hero Banner ── */
 [data-theme="light"] .student-hero-banner {
