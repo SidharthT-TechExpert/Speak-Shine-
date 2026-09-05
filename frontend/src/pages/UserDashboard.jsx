@@ -1559,47 +1559,15 @@ export default function UserDashboard() {
               </div>
             )}
             {data.today.category && (
-              <div
-                className="daily-poster-badge"
-                style={
-                  data?.today?.isMonthlyReflection
-                    ? {
-                        background: "rgba(139,92,246,0.3)",
-                        border: "1px solid rgba(167,139,250,0.5)",
-                        color: "#c4b5fd",
-                      }
-                    : data?.today?.isMonthlyGoals
-                      ? {
-                          background: "rgba(34,197,94,0.25)",
-                          border: "1px solid rgba(74,222,128,0.5)",
-                          color: "#4ade80",
-                        }
-                      : data?.today?.isStorySummary
-                        ? {
-                            background: "rgba(20,184,166,0.25)",
-                            border: "1px solid rgba(45,212,191,0.5)",
-                            color: "#5eead4",
-                          }
-                        : data?.today?.isPictureDescription
-                          ? {
-                              background: "rgba(66,153,225,0.25)",
-                              border: "1px solid rgba(99,179,237,0.5)",
-                              color: "#90cdf4",
-                            }
-                          : {}
-                }
-              >
+              <div className="daily-poster-badge">
                 {data.today.category}
               </div>
             )}
           </div>
 
-          {/* Monthly Reflection questions */}
+          {/* Picture Description challenge */}
           {data?.today?.isPictureDescription ? (
             <div style={{ marginTop: "1rem" }}>
-              <div className="daily-poster-section-label">
-                🖼️ PICTURE DESCRIPTION
-              </div>
               {data.today.topic && (
                 <div className="daily-poster-topic-wrap">
                   <div className="daily-poster-section-label">SCENE</div>
@@ -1610,9 +1578,10 @@ export default function UserDashboard() {
                 <div
                   style={{
                     margin: "0.75rem 0",
-                    borderRadius: 12,
+                    borderRadius: 14,
                     overflow: "hidden",
                     position: "relative",
+                    border: "1px solid var(--border)",
                   }}
                 >
                   <img
@@ -1622,9 +1591,9 @@ export default function UserDashboard() {
                       width: "100%",
                       maxHeight: 300,
                       objectFit: "contain",
-                      background: "#0a0a14",
+                      background: "var(--card2)",
                       display: "block",
-                      borderRadius: 12,
+                      borderRadius: 14,
                     }}
                     loading="lazy"
                   />
@@ -1638,10 +1607,10 @@ export default function UserDashboard() {
                         padding: "0.4rem 0.65rem",
                         background:
                           "linear-gradient(to top, rgba(0,0,0,0.65), transparent)",
-                        borderBottomLeftRadius: 12,
-                        borderBottomRightRadius: 12,
-                        fontSize: "0.62rem",
-                        color: "rgba(255,255,255,0.75)",
+                        borderBottomLeftRadius: 14,
+                        borderBottomRightRadius: 14,
+                        fontSize: "0.65rem",
+                        color: "rgba(255,255,255,0.85)",
                       }}
                     >
                       📷 Photo by {data.today.imagePhotographer}
@@ -1652,31 +1621,20 @@ export default function UserDashboard() {
                   )}
                 </div>
               )}
-              <div
-                style={{
-                  marginTop: "0.75rem",
-                  background: "rgba(66,153,225,0.08)",
-                  border: "1px solid rgba(99,179,237,0.25)",
-                  borderRadius: 10,
-                  padding: "0.65rem 0.85rem",
-                  fontSize: "0.82rem",
-                  color: "var(--text)",
-                  lineHeight: 1.5,
-                }}
-              >
-                {data.today.imageInstructions ||
-                  data.today.question ||
-                  "Look at the image carefully. Describe what you see, what might be happening, and what you think about it."}
+              <div className="daily-poster-question-wrap">
+                <div className="daily-poster-section-label">❓ TASK</div>
+                <div className="daily-poster-question" style={{ fontSize: "1.05rem" }}>
+                  {data.today.imageInstructions ||
+                    data.today.question ||
+                    "Look at the image carefully. Describe what you see, what might be happening, and what you think about it."}
+                </div>
               </div>
             </div>
           ) : data?.today?.isStorySummary ? (
             <div style={{ marginTop: "1rem" }}>
-              <div className="daily-poster-section-label">
-                🎧 LISTENING PRACTICE
-              </div>
               {data.today.topic && (
                 <div className="daily-poster-topic-wrap">
-                  <div className="daily-poster-section-label">STORY</div>
+                  <div className="daily-poster-section-label">STORY TITLE</div>
                   <div className="daily-poster-topic">"{data.today.topic}"</div>
                 </div>
               )}
@@ -1686,29 +1644,21 @@ export default function UserDashboard() {
                   controlsList="nodownload nofullscreen noremoteplayback"
                   onContextMenu={(e) => e.preventDefault()}
                   src={data.today.audioUrl}
-                  style={{ width: "100%", marginTop: "0.75rem" }}
+                  style={{ width: "100%", margin: "0.75rem 0", borderRadius: 12 }}
                 />
               )}
-              <div
-                style={{
-                  marginTop: "0.85rem",
-                  background: "rgba(20,184,166,0.08)",
-                  border: "1px solid rgba(45,212,191,0.25)",
-                  borderRadius: 10,
-                  padding: "0.65rem 0.85rem",
-                  fontSize: "0.82rem",
-                  color: "var(--text)",
-                  lineHeight: 1.5,
-                }}
-              >
-                {data.today.question ||
-                  "Listen to the story audio. Then record a clear video summary in your own words."}
+              <div className="daily-poster-question-wrap">
+                <div className="daily-poster-section-label">❓ TASK</div>
+                <div className="daily-poster-question" style={{ fontSize: "1.05rem" }}>
+                  {data.today.question ||
+                    "Listen to the story audio. Then record a clear video summary in your own words."}
+                </div>
               </div>
             </div>
           ) : data?.today?.isMonthlyReflection ? (
             <div style={{ marginTop: "1rem" }}>
               <div className="daily-poster-section-label">
-                📋 REFLECTION QUESTIONS
+                🌟 REFLECTION QUESTIONS
               </div>
               <div
                 style={{
@@ -1726,61 +1676,14 @@ export default function UserDashboard() {
                   "What did you do this month to improve your communication skill?",
                   "What is your communication skill level now compared to last month?",
                 ].map((q, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      gap: "0.75rem",
-                      alignItems: "flex-start",
-                      background: "var(--card2)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                      padding: "0.65rem 0.85rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        minWidth: 24,
-                        height: 24,
-                        borderRadius: "50%",
-                        background: "rgba(139,92,246,0.2)",
-                        border: "1px solid rgba(139,92,246,0.4)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.72rem",
-                        fontWeight: 800,
-                        color: "#a78bfa",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "var(--text)",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {q}
-                    </div>
+                  <div key={i} className="daily-poster-step-item">
+                    <div className="daily-poster-step-num">{i + 1}</div>
+                    <div className="daily-poster-step-text">{q}</div>
                   </div>
                 ))}
               </div>
-              <div
-                style={{
-                  marginTop: "0.85rem",
-                  background: "rgba(139,92,246,0.08)",
-                  border: "1px solid rgba(139,92,246,0.2)",
-                  borderRadius: 10,
-                  padding: "0.65rem 0.85rem",
-                  fontSize: "0.78rem",
-                  color: "var(--text2)",
-                }}
-              >
-                💡 Record a video answering all 6 questions. Same rules apply —
-                counts as your daily submission.
+              <div className="daily-poster-tip" style={{ marginTop: "0.85rem" }}>
+                💡 <strong>Tip:</strong> Record a video answering all 6 questions in order. Counts as your daily submission.
               </div>
             </div>
           ) : /* Monthly Goals questions */
@@ -1805,61 +1708,14 @@ export default function UserDashboard() {
                   "How many reviews are you planning to attend this month?",
                   "What will you do differently this month to grow faster?",
                 ].map((q, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      gap: "0.75rem",
-                      alignItems: "flex-start",
-                      background: "var(--card2)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                      padding: "0.65rem 0.85rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        minWidth: 24,
-                        height: 24,
-                        borderRadius: "50%",
-                        background: "rgba(34,197,94,0.2)",
-                        border: "1px solid rgba(74,222,128,0.4)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.72rem",
-                        fontWeight: 800,
-                        color: "#4ade80",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "var(--text)",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {q}
-                    </div>
+                  <div key={i} className="daily-poster-step-item">
+                    <div className="daily-poster-step-num">{i + 1}</div>
+                    <div className="daily-poster-step-text">{q}</div>
                   </div>
                 ))}
               </div>
-              <div
-                style={{
-                  marginTop: "0.85rem",
-                  background: "rgba(34,197,94,0.08)",
-                  border: "1px solid rgba(74,222,128,0.2)",
-                  borderRadius: 10,
-                  padding: "0.65rem 0.85rem",
-                  fontSize: "0.78rem",
-                  color: "var(--text2)",
-                }}
-              >
-                💡 Be specific and speak from the heart. Your goals drive your
-                growth — say them out loud with confidence!
+              <div className="daily-poster-tip" style={{ marginTop: "0.85rem" }}>
+                💡 <strong>Tip:</strong> Be specific and speak from the heart. Your goals drive your growth — say them out loud with confidence!
               </div>
             </div>
           ) : (

@@ -305,364 +305,317 @@ export default function VideoAnalysis() {
         )}
 
 
-        {/* ── Monthly Goals Card (1st of month) ── */}
-        {isMonthlyGoals && (
-          <div style={{
-            background: "linear-gradient(135deg, #0a1f0a 0%, #0d3d1a 50%, #0a2e12 100%)",
-            border: "2px solid rgba(74,222,128,0.45)",
-            borderRadius: 18,
-            padding: "1.5rem",
-            marginBottom: "1rem",
-            position: "relative",
-            overflow: "hidden",
-            boxShadow: "0 8px 40px rgba(34,197,94,0.2)",
-          }}>
-            <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"radial-gradient(circle, rgba(74,222,128,0.18) 0%, transparent 70%)", pointerEvents:"none" }} />
-
-            <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1.25rem" }}>
-              <div style={{ fontSize:"2.5rem" }}>🎯</div>
-              <div>
-                <div style={{ fontSize:"0.7rem", color:"rgba(74,222,128,0.8)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em" }}>
-                  New Month — New Goals
-                </div>
-                <div style={{ fontSize:"1.3rem", fontWeight:800, color:"#fff", lineHeight:1.2 }}>
-                  Monthly Goal Setting
-                </div>
-                <div style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.6)", marginTop:"0.2rem" }}>
-                  Speak your plan, dreams &amp; goals for this month
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display:"flex", flexDirection:"column", gap:"0.6rem", marginBottom:"1.25rem" }}>
-              {[
-                { n:"1", q:"What is your main goal for this month in the program?" },
-                { n:"2", q:"What is your dream or target you are working toward right now?" },
-                { n:"3", q:"What specific steps will you take this month to improve your communication?" },
-                { n:"4", q:"What was your biggest challenge last month and how will you overcome it this month?" },
-                { n:"5", q:"How many reviews are you planning to attend this month?" },
-                { n:"6", q:"What will you do differently this month to grow faster?" },
-              ].map(({ n, q }) => (
-                <div key={n} style={{
-                  display:"flex", gap:"0.75rem", alignItems:"flex-start",
-                  background:"rgba(255,255,255,0.06)",
-                  border:"1px solid rgba(74,222,128,0.2)",
-                  borderRadius:12, padding:"0.75rem 1rem",
-                }}>
-                  <div style={{
-                    minWidth:26, height:26, borderRadius:"50%",
-                    background:"rgba(34,197,94,0.25)", border:"1px solid rgba(74,222,128,0.5)",
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:"0.75rem", fontWeight:800, color:"#4ade80", flexShrink:0,
-                  }}>{n}</div>
-                  <div style={{ fontSize:"0.88rem", color:"rgba(255,255,255,0.9)", lineHeight:1.5 }}>{q}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{
-              background:"rgba(34,197,94,0.1)", border:"1px solid rgba(74,222,128,0.25)",
-              borderRadius:10, padding:"0.75rem 1rem",
-              fontSize:"0.8rem", color:"rgba(255,255,255,0.7)", lineHeight:1.5,
-            }}>
-              💡 <strong style={{ color:"#4ade80" }}>Tip:</strong> Be specific and speak from the heart. Your goals drive your growth — say them out loud with confidence!
-            </div>
-          </div>
-        )}
-
-        {/* ── Monthly Reflection Card (last day of month) ── */}
-        {isMonthlyReflection && (
-          <div style={{
-            background: "linear-gradient(135deg, #1a0a2e 0%, #2d1060 50%, #1a0a2e 100%)",
-            border: "2px solid rgba(167,139,250,0.5)",
-            borderRadius: 18,
-            padding: "1.5rem",
-            marginBottom: "1rem",
-            position: "relative",
-            overflow: "hidden",
-            boxShadow: "0 8px 40px rgba(139,92,246,0.25)",
-          }}>
-            {/* Glow */}
-            <div style={{ position:"absolute", top:-60, right:-60, width:200, height:200, borderRadius:"50%", background:"radial-gradient(circle, rgba(167,139,250,0.2) 0%, transparent 70%)", pointerEvents:"none" }} />
-
-            {/* Header */}
-            <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1.25rem" }}>
-              <div style={{ fontSize:"2.5rem" }}>🌟</div>
-              <div>
-                <div style={{ fontSize:"0.7rem", color:"rgba(167,139,250,0.8)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em" }}>
-                  End of Month
-                </div>
-                <div style={{ fontSize:"1.3rem", fontWeight:800, color:"#fff", lineHeight:1.2 }}>
-                  Monthly Reflection
-                </div>
-                <div style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.6)", marginTop:"0.2rem" }}>
-                  Record a video answering all questions below
-                </div>
-              </div>
-            </div>
-
-            {/* Questions list */}
-            <div style={{ display:"flex", flexDirection:"column", gap:"0.6rem", marginBottom:"1.25rem" }}>
-              {[
-                { n:"1", q:"How many reviews did you attend this month?" },
-                { n:"2", q:"How many reviews passed and how many failed? Why did you fail?" },
-                { n:"3", q:"How many extensions did you take this month?" },
-                { n:"4", q:"What is your current growth and progress in the program?" },
-                { n:"5", q:"What did you do this month to improve your communication skill?" },
-                { n:"6", q:"What is your communication skill level now compared to last month?" },
-              ].map(({ n, q }) => (
-                <div key={n} style={{
-                  display:"flex", gap:"0.75rem", alignItems:"flex-start",
-                  background:"rgba(255,255,255,0.06)",
-                  border:"1px solid rgba(167,139,250,0.2)",
-                  borderRadius:12, padding:"0.75rem 1rem",
-                }}>
-                  <div style={{
-                    minWidth:26, height:26, borderRadius:"50%",
-                    background:"rgba(139,92,246,0.3)", border:"1px solid rgba(139,92,246,0.5)",
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:"0.75rem", fontWeight:800, color:"#a78bfa", flexShrink:0,
-                  }}>{n}</div>
-                  <div style={{ fontSize:"0.88rem", color:"rgba(255,255,255,0.9)", lineHeight:1.5 }}>{q}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Tip */}
-            <div style={{
-              background:"rgba(139,92,246,0.12)", border:"1px solid rgba(139,92,246,0.25)",
-              borderRadius:10, padding:"0.75rem 1rem",
-              fontSize:"0.8rem", color:"rgba(255,255,255,0.7)", lineHeight:1.5,
-            }}>
-              💡 <strong style={{ color:"#a78bfa" }}>Tip:</strong> Speak clearly and answer each question in order. This counts as your daily submission — same rules apply.
-            </div>
-          </div>
-        )}
-
-        {/* ── Picture Description Card ── */}
-        {todayQuestion && isPictureDescription && (
-          <div style={{
-            background: "linear-gradient(135deg, #0f1a2e 0%, #1a2d4a 50%, #0f1a2e 100%)",
-            border: "2px solid rgba(99,179,237,0.45)",
-            borderRadius: 18,
-            padding: "1.5rem",
-            marginBottom: "1rem",
-            boxShadow: "0 8px 40px rgba(66,153,225,0.2)",
-          }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-              <div style={{ fontSize: "2.5rem" }}>🖼️</div>
-              <div>
-                <div style={{ fontSize: "0.7rem", color: "rgba(147,197,253,0.85)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Picture Description</div>
-                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>
-                  {todayQuestion.topic || "Describe What You See"}
-                </div>
-                <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", marginTop: "0.2rem" }}>
-                  Look at the image carefully, then record your response.
-                </div>
-              </div>
-            </div>
-
-            {/* Image */}
-            {todayQuestion.imageUrl && (
-              <div style={{ marginBottom: "1rem", borderRadius: 12, overflow: "hidden", position: "relative" }}>
-                <img
-                  src={todayQuestion.imageUrl}
-                  alt={todayQuestion.topic || "Picture description challenge"}
-                  style={{
-                    width: "100%",
-                    maxHeight: 400,
-                    objectFit: "contain",
-                    background: "#0a0a14",
-                    display: "block",
-                    borderRadius: 12,
-                  }}
-                  loading="lazy"
-                />
-                <button
-                  type="button"
-                  onClick={() => setPicturePreviewOpen(true)}
-                  aria-label="View picture full screen"
-                  style={{
-                    position: "absolute", top: "0.75rem", right: "0.75rem",
-                    border: "1px solid rgba(255,255,255,0.35)", borderRadius: 10,
-                    padding: "0.5rem 0.7rem", background: "rgba(0,0,0,0.7)",
-                    color: "#fff", fontSize: "0.8rem", fontWeight: 700,
-                    cursor: "pointer", backdropFilter: "blur(6px)",
-                  }}
-                >⛶ View Full Screen</button>
-                {/* Photographer attribution */}
-                {todayQuestion.imagePhotographer && (
-                  <div style={{
-                    position: "absolute", bottom: 0, left: 0, right: 0,
-                    padding: "0.5rem 0.75rem",
-                    background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)",
-                    borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
-                    fontSize: "0.65rem", color: "rgba(255,255,255,0.75)",
-                    display: "flex", alignItems: "center", gap: "0.25rem",
-                  }}>
-                    <span>📷</span>
-                    <span>
-                      Photo by{" "}
-                      {todayQuestion.imagePhotographerUrl
-                        ? <a href={todayQuestion.imagePhotographerUrl} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.9)", textDecoration: "underline" }}>{todayQuestion.imagePhotographer}</a>
-                        : todayQuestion.imagePhotographer
-                      }
-                      {todayQuestion.imageSource && (
-                        <>
-                          {" on "}
-                          {todayQuestion.imagePageUrl
-                            ? <a href={todayQuestion.imagePageUrl} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.9)", textDecoration: "underline" }}>{todayQuestion.imageSource}</a>
-                            : todayQuestion.imageSource
-                          }
-                        </>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {picturePreviewOpen && todayQuestion.imageUrl && createPortal(
-              <div
-                role="dialog"
-                aria-modal="true"
-                aria-label="Full screen picture preview"
-                onClick={() => setPicturePreviewOpen(false)}
-                style={{
-                  position: "fixed", inset: 0, zIndex: 2000,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  padding: "2rem", background: "rgba(0,0,0,0.92)",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setPicturePreviewOpen(false)}
-                  aria-label="Close full screen picture preview"
-                  style={{
-                    position: "fixed", top: "1.5rem", right: "1.5rem", zIndex: 2001,
-                    width: 42, height: 42, borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.65)",
-                    background: "rgba(255,255,255,0.12)", color: "#fff",
-                    fontSize: "1.4rem", cursor: "pointer",
-                    boxShadow: "0 3px 16px rgba(0,0,0,0.45)",
-                  }}
-                >×</button>
-                <a
-                  href={todayQuestion.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={event => event.stopPropagation()}
-                  style={{
-                    position: "fixed", top: "1.5rem", left: "1.5rem", zIndex: 2001,
-                    border: "2px solid rgba(255,255,255,0.55)", borderRadius: 10,
-                    padding: "0.55rem 0.8rem", background: "rgba(255,255,255,0.12)",
-                    color: "#fff", fontSize: "0.8rem", fontWeight: 700,
-                    textDecoration: "none", backdropFilter: "blur(6px)",
-                    boxShadow: "0 3px 16px rgba(0,0,0,0.45)",
-                  }}
-                >🔍 Open Original Image</a>
-                <img
-                  src={todayQuestion.imageUrl}
-                  alt={todayQuestion.topic || "Picture description challenge"}
-                  onClick={event => event.stopPropagation()}
-                  style={{
-                    maxWidth: "96vw", maxHeight: "92vh", objectFit: "contain",
-                    borderRadius: 10, boxShadow: "0 12px 60px rgba(0,0,0,0.55)",
-                  }}
-                />
-              </div>,
-              document.body
-            )}
-
-            {/* Instructions */}
-            <div style={{
-              background: "rgba(99,179,237,0.08)", border: "1px solid rgba(99,179,237,0.25)",
-              borderRadius: 12, padding: "0.85rem 1rem",
-              color: "rgba(255,255,255,0.9)", fontSize: "0.9rem", lineHeight: 1.6,
-            }}>
-              {todayQuestion.imageInstructions || todayQuestion.question || "Describe what you see in the image."}
-            </div>
-            <div style={{
-              background: "rgba(99,179,237,0.12)", border: "2px solid rgba(99,179,237,0.42)",
-              borderRadius: 14, padding: "1rem 1.1rem", marginTop: "0.85rem",
-              color: "rgba(255,255,255,0.9)", fontSize: "0.88rem", lineHeight: 1.55,
-              boxShadow: "0 4px 18px rgba(66,153,225,0.12)",
-            }}>
-              <strong style={{ color: "#b9e3ff", fontSize: "0.95rem" }}>💬 Guiding questions — use these in your response</strong>
-              <ol style={{ margin: "0.65rem 0 0", paddingLeft: "1.45rem", display: "grid", gap: "0.45rem" }}>
-                {["What do you see?", "What do you think is happening?", "What is the atmosphere like?", "What do you think might happen next?"].map(question => (
-                  <li key={question} style={{ paddingLeft: "0.25rem", fontWeight: 600 }}>{question}</li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        )}
-
-        {/* ── Story Summary Card ── */}
-        {todayQuestion && isStorySummary && (
+        {/* ── Unified Daily Challenge / Question Card (All Types) ── */}
+        {(todayQuestion || isMonthlyGoals || isMonthlyReflection) && (
           <div
-            className="listening-practice-card"
-            style={{
-              borderRadius: 18,
-              padding: "1.5rem",
-              marginBottom: "1rem",
-            }}
+            className={`daily-poster ${
+              isMonthlyReflection
+                ? "poster-reflection"
+                : isMonthlyGoals
+                ? "poster-goals"
+                : isStorySummary
+                ? "poster-story"
+                : isPictureDescription
+                ? "poster-picture"
+                : ""
+            }`}
+            style={{ marginBottom: "1rem" }}
           >
-            <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", marginBottom:"1rem" }}>
-              <div style={{ fontSize:"2.5rem" }}>🎧</div>
-              <div>
-                <div style={{ fontSize:"0.7rem", color:"rgba(94,234,212,0.85)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em" }}>Listening Practice</div>
-                <div style={{ fontSize:"1.3rem", fontWeight:800, color:"#fff", lineHeight:1.2 }}>Story Summary</div>
-                <div style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.65)", marginTop:"0.2rem" }}>Listen carefully, then summarize the story in your own words.</div>
-              </div>
-            </div>
-
-            {todayQuestion.topic && (
-              <div style={{ fontSize:"1rem", fontWeight:700, color:"#ccfbf1", marginBottom:"0.85rem" }}>{todayQuestion.topic}</div>
-            )}
-
-            {todayQuestion.audioUrl && (
-              <audio controls controlsList="nodownload nofullscreen noremoteplayback" onContextMenu={e => e.preventDefault()} src={todayQuestion.audioUrl} style={{ width:"100%", marginBottom:"1rem" }} />
-            )}
-
-            <div style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(45,212,191,0.25)", borderRadius:12, padding:"0.85rem 1rem", color:"rgba(255,255,255,0.9)", fontSize:"0.9rem", lineHeight:1.5 }}>
-              {todayQuestion.question || "Listen to the story audio and record a short video summary in your own words."}
-            </div>
-          </div>
-        )}
-
-        {/* ── Today's Question Card — regular days only ── */}
-        {todayQuestion && !isMonthlyReflection && !isMonthlyGoals && !isStorySummary && !isPictureDescription && (
-          <div className="daily-poster" style={{ marginBottom: "1rem" }}>
+            {/* Header */}
             <div className="daily-poster-header">
-              <div className="daily-poster-brand">✦ Speak &amp; Shine</div>
-              <div className="daily-poster-sub">DAILY SPEAKING CHALLENGE</div>
-              {todayQuestion.category && (
+              <div className="daily-poster-brand">
+                {isMonthlyReflection
+                  ? "🌟 Speak & Shine"
+                  : isMonthlyGoals
+                  ? "🎯 Speak & Shine"
+                  : isStorySummary
+                  ? "🎧 Speak & Shine"
+                  : isPictureDescription
+                  ? "🖼️ Speak & Shine"
+                  : "✦ Speak & Shine"}
+              </div>
+              <div className="daily-poster-sub">
+                {isMonthlyReflection
+                  ? "MONTHLY REFLECTION"
+                  : isMonthlyGoals
+                  ? "MONTHLY GOAL SETTING"
+                  : isStorySummary
+                  ? "STORY SUMMARY"
+                  : isPictureDescription
+                  ? "PICTURE DESCRIPTION"
+                  : "DAILY SPEAKING CHALLENGE"}
+              </div>
+              {todayQuestion?.category && (
                 <div className="daily-poster-badge">{todayQuestion.category}</div>
               )}
             </div>
 
-            {todayQuestion.topic && (
-              <div className="daily-poster-topic-wrap">
-                <div className="daily-poster-section-label">TOPIC</div>
-                <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
-              </div>
+            {/* 1. Monthly Goals Content */}
+            {isMonthlyGoals && (
+              <>
+                <div className="daily-poster-topic-wrap">
+                  <div className="daily-poster-section-label">🎯 NEW MONTH — NEW GOALS</div>
+                  <div className="daily-poster-topic">Speak your plan, dreams &amp; goals for this month</div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.25rem" }}>
+                  {[
+                    { n: "1", q: "What is your main goal for this month in the program?" },
+                    { n: "2", q: "What is your dream or target you are working toward right now?" },
+                    { n: "3", q: "What specific steps will you take this month to improve your communication?" },
+                    { n: "4", q: "What was your biggest challenge last month and how will you overcome it this month?" },
+                    { n: "5", q: "How many reviews are you planning to attend this month?" },
+                    { n: "6", q: "What will you do differently this month to grow faster?" },
+                  ].map(({ n, q }) => (
+                    <div key={n} className="daily-poster-step-item">
+                      <div className="daily-poster-step-num">{n}</div>
+                      <div className="daily-poster-step-text">{q}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="daily-poster-tip">
+                  💡 <strong>Tip:</strong> Be specific and speak from the heart. Your goals drive your growth — say them out loud with confidence!
+                </div>
+              </>
             )}
 
-            <div className="daily-poster-question-wrap">
-              <div className="daily-poster-section-label">❓ QUESTION</div>
-              <div className="daily-poster-question">{todayQuestion.question}</div>
-            </div>
+            {/* 2. Monthly Reflection Content */}
+            {isMonthlyReflection && (
+              <>
+                <div className="daily-poster-topic-wrap">
+                  <div className="daily-poster-section-label">🌟 END OF MONTH</div>
+                  <div className="daily-poster-topic">Record a video answering all reflection questions below</div>
+                </div>
 
-            {/* Vocabulary words */}
-            {todayVocabulary.length > 0 && (
-              <VocabularyWords
-                words={todayVocabulary}
-                requiredCount={vocabRequiredCount}
-                totalCount={vocabWordCount}
-                isPictureDescription={isPictureDescription}
-              />
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.25rem" }}>
+                  {[
+                    { n: "1", q: "How many reviews did you attend this month?" },
+                    { n: "2", q: "How many reviews passed and how many failed? Why did you fail?" },
+                    { n: "3", q: "How many extensions did you take this month?" },
+                    { n: "4", q: "What is your current growth and progress in the program?" },
+                    { n: "5", q: "What did you do this month to improve your communication skill?" },
+                    { n: "6", q: "What is your communication skill level now compared to last month?" },
+                  ].map(({ n, q }) => (
+                    <div key={n} className="daily-poster-step-item">
+                      <div className="daily-poster-step-num">{n}</div>
+                      <div className="daily-poster-step-text">{q}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="daily-poster-tip">
+                  💡 <strong>Tip:</strong> Speak clearly and answer each question in order. This counts as your daily submission — same rules apply.
+                </div>
+              </>
+            )}
+
+            {/* 3. Picture Description Content */}
+            {todayQuestion && isPictureDescription && (
+              <>
+                {todayQuestion.topic && (
+                  <div className="daily-poster-topic-wrap">
+                    <div className="daily-poster-section-label">🖼️ SCENE</div>
+                    <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
+                  </div>
+                )}
+
+                {todayQuestion.imageUrl && (
+                  <div style={{ marginBottom: "1rem", borderRadius: 14, overflow: "hidden", position: "relative", border: "1px solid var(--border)" }}>
+                    <img
+                      src={todayQuestion.imageUrl}
+                      alt={todayQuestion.topic || "Picture description challenge"}
+                      style={{
+                        width: "100%",
+                        maxHeight: 400,
+                        objectFit: "contain",
+                        background: "var(--card2)",
+                        display: "block",
+                        borderRadius: 14,
+                      }}
+                      loading="lazy"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPicturePreviewOpen(true)}
+                      aria-label="View picture full screen"
+                      style={{
+                        position: "absolute", top: "0.75rem", right: "0.75rem",
+                        border: "1px solid rgba(255,255,255,0.35)", borderRadius: 10,
+                        padding: "0.5rem 0.75rem", background: "rgba(0,0,0,0.7)",
+                        color: "#fff", fontSize: "0.8rem", fontWeight: 700,
+                        cursor: "pointer", backdropFilter: "blur(6px)",
+                      }}
+                    >⛶ View Full Screen</button>
+                    {todayQuestion.imagePhotographer && (
+                      <div style={{
+                        position: "absolute", bottom: 0, left: 0, right: 0,
+                        padding: "0.5rem 0.75rem",
+                        background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+                        borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
+                        fontSize: "0.68rem", color: "rgba(255,255,255,0.85)",
+                        display: "flex", alignItems: "center", gap: "0.25rem",
+                      }}>
+                        <span>📷</span>
+                        <span>
+                          Photo by{" "}
+                          {todayQuestion.imagePhotographerUrl
+                            ? <a href={todayQuestion.imagePhotographerUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", textDecoration: "underline" }}>{todayQuestion.imagePhotographer}</a>
+                            : todayQuestion.imagePhotographer
+                          }
+                          {todayQuestion.imageSource && (
+                            <>
+                              {" on "}
+                              {todayQuestion.imagePageUrl
+                                ? <a href={todayQuestion.imagePageUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", textDecoration: "underline" }}>{todayQuestion.imageSource}</a>
+                                : todayQuestion.imageSource
+                              }
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {picturePreviewOpen && todayQuestion.imageUrl && createPortal(
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Full screen picture preview"
+                    onClick={() => setPicturePreviewOpen(false)}
+                    style={{
+                      position: "fixed", inset: 0, zIndex: 2000,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "2rem", background: "rgba(0,0,0,0.92)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setPicturePreviewOpen(false)}
+                      aria-label="Close full screen picture preview"
+                      style={{
+                        position: "fixed", top: "1.5rem", right: "1.5rem", zIndex: 2001,
+                        width: 42, height: 42, borderRadius: "50%",
+                        border: "2px solid rgba(255,255,255,0.65)",
+                        background: "rgba(255,255,255,0.12)", color: "#fff",
+                        fontSize: "1.4rem", cursor: "pointer",
+                        boxShadow: "0 3px 16px rgba(0,0,0,0.45)",
+                      }}
+                    >×</button>
+                    <a
+                      href={todayQuestion.imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={event => event.stopPropagation()}
+                      style={{
+                        position: "fixed", top: "1.5rem", left: "1.5rem", zIndex: 2001,
+                        border: "2px solid rgba(255,255,255,0.55)", borderRadius: 10,
+                        padding: "0.55rem 0.8rem", background: "rgba(255,255,255,0.12)",
+                        color: "#fff", fontSize: "0.8rem", fontWeight: 700,
+                        textDecoration: "none", backdropFilter: "blur(6px)",
+                        boxShadow: "0 3px 16px rgba(0,0,0,0.45)",
+                      }}
+                    >🔍 Open Original Image</a>
+                    <img
+                      src={todayQuestion.imageUrl}
+                      alt={todayQuestion.topic || "Picture description challenge"}
+                      onClick={event => event.stopPropagation()}
+                      style={{
+                        maxWidth: "96vw", maxHeight: "92vh", objectFit: "contain",
+                        borderRadius: 10, boxShadow: "0 12px 60px rgba(0,0,0,0.55)",
+                      }}
+                    />
+                  </div>,
+                  document.body
+                )}
+
+                <div className="daily-poster-question-wrap">
+                  <div className="daily-poster-section-label">❓ TASK</div>
+                  <div className="daily-poster-question">
+                    {todayQuestion.imageInstructions || todayQuestion.question || "Look at the image carefully, then record your response."}
+                  </div>
+                </div>
+
+                <div className="daily-poster-guiding-wrap">
+                  <div className="daily-poster-guiding-title">💬 Guiding questions — use these in your response</div>
+                  <ol className="daily-poster-guiding-list">
+                    {["What do you see?", "What do you think is happening?", "What is the atmosphere like?", "What do you think might happen next?"].map(question => (
+                      <li key={question} style={{ fontWeight: 600 }}>{question}</li>
+                    ))}
+                  </ol>
+                </div>
+
+                {todayVocabulary.length > 0 && (
+                  <VocabularyWords
+                    words={todayVocabulary}
+                    requiredCount={vocabRequiredCount}
+                    totalCount={vocabWordCount}
+                    isPictureDescription={isPictureDescription}
+                  />
+                )}
+              </>
+            )}
+
+            {/* 4. Story Summary Content */}
+            {todayQuestion && isStorySummary && (
+              <>
+                {todayQuestion.topic && (
+                  <div className="daily-poster-topic-wrap">
+                    <div className="daily-poster-section-label">📖 STORY TITLE</div>
+                    <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
+                  </div>
+                )}
+
+                {todayQuestion.audioUrl && (
+                  <div style={{ marginBottom: "1rem" }}>
+                    <audio
+                      controls
+                      controlsList="nodownload nofullscreen noremoteplayback"
+                      onContextMenu={e => e.preventDefault()}
+                      src={todayQuestion.audioUrl}
+                      style={{ width: "100%", borderRadius: 12 }}
+                    />
+                  </div>
+                )}
+
+                <div className="daily-poster-question-wrap">
+                  <div className="daily-poster-section-label">❓ TASK</div>
+                  <div className="daily-poster-question">
+                    {todayQuestion.question || "Listen to the story audio and record a short video summary in your own words."}
+                  </div>
+                </div>
+
+                <div className="daily-poster-tip">
+                  💡 <strong>Tip:</strong> Listen carefully to the key events and characters. Summarize the story in your own words with good pacing!
+                </div>
+              </>
+            )}
+
+            {/* 5. Regular Day Question Content */}
+            {todayQuestion && !isMonthlyReflection && !isMonthlyGoals && !isStorySummary && !isPictureDescription && (
+              <>
+                {todayQuestion.topic && (
+                  <div className="daily-poster-topic-wrap">
+                    <div className="daily-poster-section-label">TOPIC</div>
+                    <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
+                  </div>
+                )}
+
+                <div className="daily-poster-question-wrap">
+                  <div className="daily-poster-section-label">❓ QUESTION</div>
+                  <div className="daily-poster-question">{todayQuestion.question}</div>
+                </div>
+
+                {todayVocabulary.length > 0 && (
+                  <VocabularyWords
+                    words={todayVocabulary}
+                    requiredCount={vocabRequiredCount}
+                    totalCount={vocabWordCount}
+                    isPictureDescription={isPictureDescription}
+                  />
+                )}
+              </>
             )}
           </div>
         )}
@@ -2841,29 +2794,29 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
             <div style={{
               background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)",
               borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "1.25rem",
-              fontSize: "0.82rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6,
+              fontSize: "0.84rem", color: "var(--text)", lineHeight: 1.6,
             }}>
-              ⚠️ <strong style={{ color: "#f59e0b" }}>Long Recording Notice:</strong> For recordings over 5 minutes, ensure stable internet and avoid switching apps. If you experience issues, try recording in shorter segments or use the upload option instead.
+              ⚠️ <strong style={{ color: "#d97706" }}>Long Recording Notice:</strong> For recordings over 5 minutes, ensure stable internet and avoid switching apps. If you experience issues, try recording in shorter segments or use the upload option instead.
             </div>
           )}
           
           {/* Browser compatibility notice */}
           <div style={{
-            background: "rgba(14,165,233,0.08)", border: "1px solid rgba(56,189,248,0.25)",
+            background: "rgba(109,40,217,0.06)", border: "1px solid rgba(109,40,217,0.2)",
             borderRadius: 10, padding: "0.75rem 1rem", marginBottom: "1.25rem",
-            fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.5,
+            fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5,
           }}>
-            💡 <strong style={{ color: "#38bdf8" }}>For best results:</strong> Use Chrome or Edge browsers. Recording uses advanced browser features that work best in modern browsers.
+            💡 <strong style={{ color: "var(--primary)" }}>For best results:</strong> Use Chrome or Edge browsers. Recording uses advanced browser features that work best in modern browsers.
           </div>
 
           {/* Monthly reflection reminder inside record card */}
           {isMonthlyReflection && (
             <div style={{
-              background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)",
+              background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.25)",
               borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "1.25rem",
-              fontSize: "0.82rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6,
+              fontSize: "0.84rem", color: "var(--text)", lineHeight: 1.6,
             }}>
-              🌟 <strong style={{ color: "#a78bfa" }}>Monthly Reflection Day!</strong> Answer all 6 questions in your video:
+              🌟 <strong style={{ color: "var(--primary)" }}>Monthly Reflection Day!</strong> Answer all 6 questions in your video:
               <ol style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <li>How many reviews did you attend this month?</li>
                 <li>How many passed / failed? Why did you fail?</li>
@@ -2878,11 +2831,11 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
           {/* Monthly goals reminder inside record card */}
           {isMonthlyGoals && (
             <div style={{
-              background: "rgba(34,197,94,0.08)", border: "1px solid rgba(74,222,128,0.3)",
+              background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.25)",
               borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "1.25rem",
-              fontSize: "0.82rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6,
+              fontSize: "0.84rem", color: "var(--text)", lineHeight: 1.6,
             }}>
-              🎯 <strong style={{ color: "#4ade80" }}>Monthly Goal Setting Day!</strong> Speak your goals for this month:
+              🎯 <strong style={{ color: "var(--primary)" }}>Monthly Goal Setting Day!</strong> Speak your goals for this month:
               <ol style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <li>What is your main goal for this month?</li>
                 <li>What is your dream or target right now?</li>
@@ -2897,22 +2850,22 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
           {/* Story summary reminder inside record card */}
           {isStorySummary && (
             <div style={{
-              background: "rgba(20,184,166,0.08)", border: "1px solid rgba(45,212,191,0.3)",
+              background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.25)",
               borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "1.25rem",
-              fontSize: "0.82rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6,
+              fontSize: "0.84rem", color: "var(--text)", lineHeight: 1.6,
             }}>
-              🎧 <strong style={{ color: "#2dd4bf" }}>Story Summary Day!</strong> Listen to the audio first, then retell the story clearly in your own words.
+              🎧 <strong style={{ color: "var(--primary)" }}>Story Summary Day!</strong> Listen to the audio first, then retell the story clearly in your own words.
             </div>
           )}
 
           {/* Picture description reminder inside record card */}
           {isPictureDescription && (
             <div style={{
-              background: "rgba(66,153,225,0.08)", border: "1px solid rgba(99,179,237,0.3)",
+              background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.25)",
               borderRadius: 12, padding: "0.85rem 1rem", marginBottom: "1.25rem",
-              fontSize: "0.82rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.6,
+              fontSize: "0.84rem", color: "var(--text)", lineHeight: 1.6,
             }}>
-              🖼️ <strong style={{ color: "#90cdf4" }}>Picture Description!</strong> Look at the image above, then describe what you see and share your thoughts.
+              🖼️ <strong style={{ color: "var(--primary)" }}>Picture Description!</strong> Look at the image above, then describe what you see and share your thoughts.
             </div>
           )}
 
@@ -3747,7 +3700,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ fontWeight: 800, color: "#fbbf24", fontSize: "1rem", marginBottom: "0.2rem" }}>
               Sunday Bonus! Points Doubled
             </div>
-            <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5 }}>
               Base score: <strong>{Math.round(a.baseScore ?? 0)} pts</strong> → Bonus score: <strong style={{ color: "#fbbf24" }}>{Math.round(cs ?? 0)} pts</strong>.
               Every Sunday submission earns double points! 🔥
             </div>
@@ -3770,7 +3723,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ fontWeight: 700, color: "#fbbf24", marginBottom: "0.2rem" }}>
               Previous score kept — {(a.previousScore ?? 0).toFixed(1)} pts
             </div>
-            <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5 }}>
               This submission scored <strong>{Math.round(cs ?? 0)} pts</strong>, which is lower than your earlier attempt today.
               Your best score of <strong>{(a.previousScore ?? 0).toFixed(1)} pts</strong> is still counted in your monthly total.
             </div>
@@ -3792,7 +3745,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ fontWeight: 700, color: "#4ade80", marginBottom: "0.2rem" }}>
               New best! Score improved to {Math.round(cs ?? 0)} pts
             </div>
-            <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5 }}>
               Your monthly total has been updated — previous score was <strong>{(a.previousScore ?? 0).toFixed(1)} pts</strong>,
               now replaced with <strong>{Math.round(cs ?? 0)} pts</strong> (+{((cs ?? 0) - (a.previousScore ?? 0)).toFixed(1)}).
             </div>
@@ -3815,7 +3768,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ fontWeight: 800, color: "#10b981", fontSize: "1rem", marginBottom: "0.2rem" }}>
               Personal Growth Bonus! +{bd.growth} pts
             </div>
-            <div style={{ fontSize: "0.82rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5 }}>
               You beat your recent communication baseline ({bd.baselineComm != null ? `${bd.baselineComm.toFixed(1)} avg` : "past attempts"}) by <strong style={{ color: "#34d399" }}>+{bd.growthDelta.toFixed(1)}</strong>! Your progress and effort earned you high-tier leaderboard points. 🔥
             </div>
           </div>
