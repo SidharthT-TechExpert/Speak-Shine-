@@ -1166,7 +1166,7 @@ export default function UserDashboard() {
                 </div>
                 <div
                   className="student-stat-pill score"
-                  title="Monthly Leaderboard Points"
+                  title="Leaderboard Points"
                 >
                   <span style={{ fontSize: "1rem" }}>⭐</span>
                   <span><AnimatedNumber value={Math.round(profile.monthlyScore || 0)} /> Pts</span>

@@ -4242,10 +4242,37 @@ button[aria-label="Toggle Chat"] {
   background: #f4f2ee;
   color: #1c1917;
 }
-[data-theme="light"] .admin-sidebar-item.active {
-  background: rgba(109,40,217,0.08);
-  color: #6d28d9;
-  border-left-color: #6d28d9;
+[data-theme="light"] .admin-brand-title { color: #111827 !important; }
+[data-theme="light"] .admin-brand-tag { color: #6d28d9 !important; }
+[data-theme="light"] .admin-sidebar-header { border-bottom-color: #e4dfd5 !important; }
+
+/* Status pills & Command bar in light mode */
+[data-theme="light"] .status-pill {
+  background: rgba(5, 150, 105, 0.09) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(5, 150, 105, 0.28) !important;
+  box-shadow: 0 1px 2px rgba(5, 150, 105, 0.08) !important;
+}
+[data-theme="light"] .status-pill.offline {
+  background: rgba(220, 38, 38, 0.08) !important;
+  color: #b91c1c !important;
+  border: 1px solid rgba(220, 38, 38, 0.28) !important;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.08) !important;
+}
+[data-theme="light"] .live-dot {
+  background: #059669 !important;
+}
+[data-theme="light"] .live-dot.red {
+  background: #dc2626 !important;
+}
+[data-theme="light"] .cmd-refresh-btn {
+  background: rgba(109, 40, 217, 0.08) !important;
+  color: #6d28d9 !important;
+  border-color: rgba(109, 40, 217, 0.25) !important;
+}
+[data-theme="light"] .cmd-refresh-btn:hover {
+  background: rgba(109, 40, 217, 0.15) !important;
+  color: #5b21b6 !important;
 }
 [data-theme="light"] .admin-table-card,
 [data-theme="light"] .admin-command-bar,
@@ -4267,6 +4294,58 @@ button[aria-label="Toggle Chat"] {
   background: rgba(107, 114, 128, 0.12);
   color: #374151;
   border-color: rgba(107, 114, 128, 0.25);
+}
+[data-theme="light"] .admin-chip {
+  background: #f4f2ee !important;
+  color: #57534e !important;
+  border-color: #e4dfd5 !important;
+}
+[data-theme="light"] .admin-chip:hover {
+  background: #ebe7e0 !important;
+  color: #1c1917 !important;
+}
+[data-theme="light"] .admin-chip.active {
+  background: rgba(109, 40, 217, 0.12) !important;
+  border-color: rgba(109, 40, 217, 0.35) !important;
+  color: #6d28d9 !important;
+}
+[data-theme="light"] .admin-chip-count {
+  background: rgba(109, 40, 217, 0.08) !important;
+  color: #6d28d9 !important;
+}
+[data-theme="light"] .admin-mobile-tab-pill {
+  background: #f4f2ee !important;
+  border-color: #e4dfd5 !important;
+  color: #57534e !important;
+}
+[data-theme="light"] .admin-mobile-tab-pill:hover {
+  background: #ebe7e0 !important;
+  color: #1c1917 !important;
+}
+[data-theme="light"] .admin-mobile-tab-pill.active {
+  background: #6d28d9 !important;
+  border-color: #5b21b6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(109, 40, 217, 0.3) !important;
+}
+[data-theme="light"] .admin-table-wrap {
+  background: #ffffff !important;
+  border-color: #e4dfd5 !important;
+  box-shadow: 0 4px 16px -2px rgba(17, 24, 39, 0.05) !important;
+}
+[data-theme="light"] .admin-table thead tr {
+  background: #faf9f7 !important;
+  border-bottom-color: #e4dfd5 !important;
+}
+[data-theme="light"] .admin-table th {
+  color: #6b7280 !important;
+}
+[data-theme="light"] .admin-table td {
+  border-bottom-color: #f0ece1 !important;
+  color: #1f2937 !important;
+}
+[data-theme="light"] .admin-table tbody tr:hover td {
+  background: #fdfbf7 !important;
 }
 
 /* ── Vocabulary Cards ── */

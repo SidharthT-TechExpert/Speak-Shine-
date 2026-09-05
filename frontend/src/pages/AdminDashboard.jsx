@@ -2262,11 +2262,11 @@ export default function AdminDashboard() {
             
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               {waStatus?.isConnected ? (
-                <span title="WhatsApp Connected" style={{ fontSize: "0.66rem", padding: "3px 7px", borderRadius: 12, background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)", display: "flex", alignItems: "center", gap: 4, fontWeight: 700 }}>
+                <span className="status-pill" title="WhatsApp Connected" style={{ fontSize: "0.66rem", padding: "3px 8px" }}>
                   <span className="live-dot" /> Live
                 </span>
               ) : (
-                <span title="WhatsApp Offline" style={{ fontSize: "0.66rem", padding: "3px 7px", borderRadius: 12, background: "rgba(248,113,113,0.12)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)", display: "flex", alignItems: "center", gap: 4, fontWeight: 700 }}>
+                <span className="status-pill offline" title="WhatsApp Offline" style={{ fontSize: "0.66rem", padding: "3px 8px" }}>
                   <span className="live-dot red" /> Off
                 </span>
               )}
@@ -3088,7 +3088,7 @@ export default function AdminDashboard() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.85rem" }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#f8fafc", letterSpacing: "-0.02em" }}>
+                  <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>
                     Students Directory
                   </div>
                   <span style={{ fontSize: "0.72rem", background: "rgba(99,102,241,0.15)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.3)", padding: "2px 8px", borderRadius: 12, fontWeight: 700 }}>
@@ -3172,7 +3172,7 @@ export default function AdminDashboard() {
                     <tr>
                       <td colSpan={10} style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--muted)" }}>
                         <div style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>🔍</div>
-                        <div style={{ fontWeight: 600, color: "#f8fafc" }}>No matching students found</div>
+                        <div style={{ fontWeight: 600, color: "var(--text)" }}>No matching students found</div>
                         <div style={{ fontSize: "0.78rem", marginTop: "0.2rem" }}>Try adjusting your search query or filter chips.</div>
                       </td>
                     </tr>

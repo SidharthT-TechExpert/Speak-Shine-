@@ -48,7 +48,7 @@ export async function getTodayOverview() {
 
   const [status, users] = await Promise.all([
     Status.findOne().lean(),
-    User.find().select("name userId streak weeklySubmissions completed earnedBadges").lean(),
+    User.find({ paid: true }).select("name userId streak weeklySubmissions completed earnedBadges paid").lean(),
   ]);
 
   const completed = users.filter(u => u.completed);
@@ -137,7 +137,7 @@ export async function getUserProfile(phone) {
   const [user, status, allUsers, existingStreakRecord] = await Promise.all([
     phone ? User.findOne({ phone: { $in: phoneCandidates } }).lean() : Promise.resolve(null),
     Status.findOne().lean(),
-    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges").lean(),
+    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid").lean(),
     StreakRecord.findOne().lean(),
   ]);
 
@@ -181,11 +181,13 @@ export async function getUserProfile(phone) {
     ? getTodayVocabulary().catch(() => [])
     : Promise.resolve(status?.todayVocabulary || []);
 
-  // ── Leaderboard sort ─────────────────────────────────────────────────────
+  // ── Leaderboard sort (Paid Members Only) ──────────────────────────────────
+  // Only paid active students appear on the public competitive leaderboard.
   // Primary sort: monthlyScore desc (highest pts first, always)
   // Secondary sort: streak desc (tiebreaker when scores are equal)
   // Submitted today floats above non-submitted at equal score
-  const leaderboardSorted = [...allUsers].sort((a, b) => {
+  const paidUsers = allUsers.filter(u => u.paid === true);
+  const leaderboardSorted = [...paidUsers].sort((a, b) => {
     const scoreA = a.monthlyScore ?? 0;
     const scoreB = b.monthlyScore ?? 0;
     if (scoreB !== scoreA) return scoreB - scoreA;          // higher pts first
