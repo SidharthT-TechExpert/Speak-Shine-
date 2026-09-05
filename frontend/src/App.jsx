@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { lazy, Suspense, useState, useEffect } from "react";
 import { ToastProvider } from "./components/Toast.jsx";
 import { ConfirmProvider } from "./components/ConfirmDialog.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
 const ChatLauncher = lazy(() => import("./components/ChatLauncher.jsx"));
 const InstallPrompt = lazy(() => import("./components/InstallPrompt.jsx"));
 const WakeUpScreen  = lazy(() => import("./components/WakeUpScreen.jsx"));
@@ -115,13 +116,15 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <ConfirmProvider>
-          <AppRoutes />
-        </ConfirmProvider>
-      </ToastProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <ConfirmProvider>
+            <AppRoutes />
+          </ConfirmProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

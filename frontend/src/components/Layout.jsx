@@ -6,6 +6,7 @@ import { getSharedSocket } from "../hooks/useSocket.js";
 
 const Modal = lazy(() => import("./Modal.jsx"));
 const NotificationBell = lazy(() => import("./NotificationBell.jsx"));
+import ThemeToggle from "./ThemeToggle.jsx";
 
 // ── Live session banner (shown on all pages when a session goes live) ────────
 function LiveSessionBanner() {
@@ -390,6 +391,9 @@ export default function Layout({ children, title }) {
             </div>
           )}
 
+          {/* Theme Toggle — Always available */}
+          <ThemeToggle compact />
+
           {user && (
             <Suspense fallback={<div style={{ width: 36, height: 36 }} />}>
               <NotificationBell token={localStorage.getItem("token")} />
@@ -422,6 +426,25 @@ export default function Layout({ children, title }) {
               {l.label}
             </Link>
           ))}
+
+          {/* Mobile Theme Switcher */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              marginTop: "0.5rem",
+              paddingTop: "0.75rem",
+              borderTop: "1px solid var(--border)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.4rem",
+            }}
+          >
+            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Appearance
+            </span>
+            <ThemeToggle />
+          </div>
+
           {user ? (
             <button
               onClick={handleLogout}

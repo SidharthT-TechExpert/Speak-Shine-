@@ -6,6 +6,7 @@ import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import GuestBanner from "../components/GuestBanner.jsx";
 import StreakBadge from "../components/StreakBadge.jsx";
+import { useGsapEntrance, AnimatedNumber } from "../hooks/useGsapStagger.jsx";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend, Area, AreaChart,
@@ -813,6 +814,7 @@ export default function UserDashboard() {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const badgeStateInitialized = useRef(false);
   const navigate = useNavigate();
+  const entranceRef = useGsapEntrance({ selector: ".gsap-stagger-card", y: 22, stagger: 0.08, deps: [loading] });
 
   const handleCopyPrompt = (text) => {
     if (!text) return;
@@ -1126,65 +1128,63 @@ export default function UserDashboard() {
       {/* Guest banner — shown to unauthenticated visitors */}
       {isGuest && <GuestBanner />}
 
-      {/* Modern Student Hero Banner */}
-      <div className="student-hero-banner">
-        <div>
-          <div className="student-hero-greeting">
-            <span>
-              {getGreeting() === "morning"
-                ? "🌅"
-                : getGreeting() === "afternoon"
-                  ? "☀️"
-                  : "🌙"}
-            </span>
-            <span>
-              Good {getGreeting()}
-              {profile?.name ? `, ${profile.name.split(" ")[0]}` : ""}!
-            </span>
-            <span style={{ fontSize: "1.15rem" }}>✨</span>
+      <div ref={entranceRef}>
+        {/* Modern Student Hero Banner */}
+        <div className="student-hero-banner gsap-stagger-card">
+          <div>
+            <div className="student-hero-greeting">
+              <span>
+                {getGreeting() === "morning"
+                  ? "🌅"
+                  : getGreeting() === "afternoon"
+                    ? "☀️"
+                    : "🌙"}
+              </span>
+              <span>
+                Good {getGreeting()}
+                {profile?.name ? `, ${profile.name.split(" ")[0]}` : ""}!
+              </span>
+              <span style={{ fontSize: "1.15rem" }}>✨</span>
+            </div>
+            <div className="student-hero-sub">
+              {profile?.completed
+                ? "🎉 You've completed today's challenge! Great job keeping the momentum."
+                : "🔥 Today's speaking challenge is live — record your video and claim your daily points!"}
+            </div>
           </div>
-          <div className="student-hero-sub">
-            {profile?.completed
-              ? "🎉 You've completed today's challenge! Great job keeping the momentum."
-              : "🔥 Today's speaking challenge is live — record your video and claim your daily points!"}
-          </div>
-        </div>
 
-        <div className="student-hero-stats">
-          {profile && (
-            <>
-              <div
-                className="student-stat-pill flame"
-                title="Current Daily Streak"
-              >
-                <span style={{ fontSize: "1rem" }}>🔥</span>
-                <span>{profile.streak || 0} Day Streak</span>
-              </div>
-              <div
-                className="student-stat-pill score"
-                title="Monthly Leaderboard Points"
-              >
-                <span style={{ fontSize: "1rem" }}>⭐</span>
-                <span>{Math.round(profile.monthlyScore || 0)} Pts</span>
-              </div>
-              <div
-                className="student-stat-pill freeze"
-                title="Available Streak Freezes"
-              >
-                <span style={{ fontSize: "1rem" }}>🧊</span>
-                <span>{profile.streakFreeze || 0} Freezes</span>
-              </div>
-            </>
-          )}
+          <div className="student-hero-stats">
+            {profile && (
+              <>
+                <div
+                  className="student-stat-pill flame"
+                  title="Current Daily Streak"
+                >
+                  <span style={{ fontSize: "1rem" }}>🔥</span>
+                  <span><AnimatedNumber value={profile.streak || 0} /> Day Streak</span>
+                </div>
+                <div
+                  className="student-stat-pill score"
+                  title="Monthly Leaderboard Points"
+                >
+                  <span style={{ fontSize: "1rem" }}>⭐</span>
+                  <span><AnimatedNumber value={Math.round(profile.monthlyScore || 0)} /> Pts</span>
+                </div>
+                <div
+                  className="student-stat-pill freeze"
+                  title="Available Streak Freezes"
+                >
+                  <span style={{ fontSize: "1rem" }}>🧊</span>
+                  <span><AnimatedNumber value={profile.streakFreeze || 0} /> Freezes</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
       {data?.showReport && data?.dailyReport && (
         <div
-          className="daily-poster"
-          style={{
-            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
-          }}
+          className="daily-poster gsap-stagger-card"
         >
           <div className="daily-poster-header">
             <div className="daily-poster-brand">📊 Yesterday's Performance</div>
@@ -1519,7 +1519,7 @@ export default function UserDashboard() {
       {/* Show Question (8 AM onwards) — hide if already completed */}
       {!data?.showReport && data?.today?.question && !profile?.completed && (
         <div
-          className="daily-poster"
+          className="daily-poster gsap-stagger-card"
           style={
             data?.today?.isMonthlyReflection
               ? {
@@ -3541,6 +3541,7 @@ export default function UserDashboard() {
           </div>
         </div>
       )}
+      </div>
     </Layout>
   );
 }
