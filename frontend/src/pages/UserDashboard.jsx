@@ -464,10 +464,11 @@ function getGreeting() {
 }
 
 // ── Vocabulary Words Card (Enhanced Pro) ────────────────────────────────────
-function VocabularyWords({ words, requiredCount, totalCount }) {
+function VocabularyWords({ words, requiredCount, totalCount, isPictureDescription = false }) {
   if (!words || words.length === 0) return null;
   const required = requiredCount ?? 3;
   const total = totalCount ?? words.length;
+  const maxPts = isPictureDescription ? 10 : 30;
   const [speakingIndex, setSpeakingIndex] = useState(null);
   const [plannedWords, setPlannedWords] = useState({});
   const [ttsWarning, setTtsWarning] = useState(null);
@@ -608,7 +609,7 @@ function VocabularyWords({ words, requiredCount, totalCount }) {
           color: plannedCount >= required ? "#4ade80" : "#c4b5fd",
           padding: "2px 8px", borderRadius: 99,
         }}>
-          🎯 Goal: {required} / {total} words (+33.3 pts)
+          🎯 Goal: {required} / {total} words (+{maxPts} pts)
         </div>
       </div>
 
@@ -1953,6 +1954,7 @@ export default function UserDashboard() {
                 words={data.today.vocabulary}
                 requiredCount={data.today.vocabRequiredCount}
                 totalCount={data.today.vocabWordCount}
+                isPictureDescription={data.today.isPictureDescriptionDay || data.today.todayContentType === "picture_description"}
               />
             )}
 

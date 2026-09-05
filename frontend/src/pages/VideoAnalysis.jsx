@@ -661,6 +661,7 @@ export default function VideoAnalysis() {
                 words={todayVocabulary}
                 requiredCount={vocabRequiredCount}
                 totalCount={vocabWordCount}
+                isPictureDescription={isPictureDescription}
               />
             )}
           </div>
@@ -1362,10 +1363,11 @@ function SubmitGatePanel({ gate }) {
 // ── Vocabulary Words Component ───────────────────────────────────────────────
 // compact=true → chips only (used during active recording)
 // compact=false (default) → full card with word + meaning + example
-function VocabularyWords({ words, compact = false, requiredCount, totalCount }) {
+function VocabularyWords({ words, compact = false, requiredCount, totalCount, isPictureDescription = false }) {
   if (!words || words.length === 0) return null;
   const required = requiredCount ?? 3;
   const total = totalCount ?? words.length;
+  const maxPts = isPictureDescription ? 10 : 30;
   const hint = total > required
     ? `Use at least ${required} of today's ${total} vocabulary words in your video!`
     : "Try to use these words in your video today!";
@@ -1548,7 +1550,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount }) 
           color: "#c4b5fd",
           padding: "2px 8px", borderRadius: 99,
         }}>
-          🎯 Goal: {required} / {total} words (+33.3 pts)
+          🎯 Goal: {required} / {total} words (+{maxPts} pts)
         </div>
       </div>
 
@@ -1959,7 +1961,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
         {uploadGate && <SubmitGatePanel gate={uploadGate} />}
         {/* Vocabulary challenge */}
         {vocabulary.length > 0 && (
-          <VocabularyWords words={vocabulary} requiredCount={vocabRequiredCount} totalCount={vocabWordCount} />
+          <VocabularyWords words={vocabulary} requiredCount={vocabRequiredCount} totalCount={vocabWordCount} isPictureDescription={isPictureDescription} />
         )}
         {allowPrivateVideos && file && !uploading && (
           <div style={{
@@ -2992,7 +2994,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
 
           {/* Vocabulary challenge */}
           {vocabulary.length > 0 && (
-            <VocabularyWords words={vocabulary} requiredCount={vocabRequiredCount} totalCount={vocabWordCount} />
+            <VocabularyWords words={vocabulary} requiredCount={vocabRequiredCount} totalCount={vocabWordCount} isPictureDescription={isPictureDescription} />
           )}
 
           <button className="btn-primary" onClick={startCountdown} style={{ width: "100%" }}>
@@ -3608,10 +3610,10 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       if (durGap > 0.5) improvementTips.push({ icon: "⏱️", label: "Make a complete attempt", detail: `+${durGap.toFixed(1)} pts possible — speak for a reasonable amount of time`, gap: durGap });
     } else {
       // Normal / Story summary tips
-      const lenGap  = (bd.maxLength  || 33.33) - (bd.length   || 0);
-      const vocGap  = (bd.maxVocab   || 33.33) - (bd.vocabUsed || 0);
-      const topGap  = (bd.maxTopic   || 16.67) - (bd.topic     || 0);
-      const comGap  = (bd.maxComm    || 16.67) - (bd.comm      || 0);
+      const lenGap  = (bd.maxLength  || 30) - (bd.length   || 0);
+      const vocGap  = (bd.maxVocab   || 30) - (bd.vocabUsed || 0);
+      const topGap  = (bd.maxTopic   || 15) - (bd.topic     || 0);
+      const comGap  = (bd.maxComm    || 10) - (bd.comm      || 0);
       if (bd.speechMultiplier != null && bd.speechMultiplier < 85) {
         improvementTips.push({ icon: "🎙️", label: "Speak more actively", detail: `Your speech ratio was ${bd.speechRatio ?? "?"}% — keep talking throughout the video for full duration points`, gap: lenGap });
       } else if (lenGap > 2) {
