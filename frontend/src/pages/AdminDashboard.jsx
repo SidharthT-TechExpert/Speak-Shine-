@@ -12,6 +12,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import api from "../api/client.js";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
 import StreakBadge from "../components/StreakBadge.jsx";
+import ThemeToggle from "../components/ThemeToggle.jsx";
 import { getSharedSocket } from "../hooks/useSocket.js";
 
 const InvoiceModal = lazy(() => import("../components/InvoiceModal.jsx"));
@@ -2491,6 +2492,7 @@ export default function AdminDashboard() {
                       <span className="live-dot" />
                       API Synced
                     </span>
+                    <ThemeToggle compact />
                     <button
                       className={`cmd-refresh-btn${refreshing ? " spinning" : ""}`}
                       onClick={async () => {

@@ -59,7 +59,8 @@
   --header-shadow: 0 1px 0 rgba(129,140,248,0.1), 0 4px 20px rgba(0,0,0,0.5);
 }
 
-[data-theme="light"] {
+[data-theme="light"],
+.light {
   /* Backgrounds — luxurious alabaster & ivory */
   --bg:      #faf9f6;
   --bg2:     #f4f1ea;
@@ -70,41 +71,41 @@
   /* Borders — crisp, delicate warm micro-borders */
   --border:  #e4dfd5;
   --border2: #cfc8bb;
-  --border3: rgba(109, 40, 217, 0.22);
+  --border3: rgba(96, 96, 239, 0.25);
 
-  /* Brand colors — regal royal violet & vibrant amethyst */
-  --primary:  #6d28d9;
-  --primary2: #5b21b6;
-  --primary3: #4c1d95;
-  --cyan:     #0284c7;
-  --cyan2:    #0369a1;
-  --pink:     #db2777;
-  --pink2:    #be185d;
+  /* Brand colors — Adobe Leonardo CAM16 Perceptually Paired from Dark #818cf8 */
+  --primary:  #6060ef;
+  --primary2: #473fcc;
+  --primary3: #342899;
+  --cyan:     #0279b7;
+  --cyan2:    #015b88;
+  --pink:     #df1d49;
+  --pink2:    #a61551;
 
-  /* Semantic — high-contrast jewel tones */
-  --success: #059669;
-  --success2:#047857;
-  --warning: #d97706;
-  --warning2:#b45309;
-  --danger:  #dc2626;
-  --danger2: #b91c1c;
-  --info:    #2563eb;
+  /* Semantic — Leonardo calibrated 4.5:1 & 7:1 contrast tokens */
+  --success: #06835e;
+  --success2:#036247;
+  --warning: #b85709;
+  --warning2:#8b4007;
+  --danger:  #d73333;
+  --danger2: #a91a1a;
+  --info:    #0279b7;
 
-  /* Text — deep high-contrast graphite typography */
-  --text:    #111827;
-  --text2:   #374151;
-  --muted:   #6b7280;
+  /* Text — deep high-contrast graphite & slate typography */
+  --text:    #1e283c;
+  --text2:   #48576c;
+  --muted:   #65748b;
 
   /* Shadows — clean layered ambient depth */
-  --shadow:       0 1px 3px rgba(17,24,39,0.04), 0 4px 16px -2px rgba(17,24,39,0.06);
-  --shadow-lg:    0 20px 40px -4px rgba(17,24,39,0.1), 0 8px 16px -2px rgba(17,24,39,0.04);
-  --glow-purple:  0 0 24px rgba(109,40,217,0.12);
-  --glow-cyan:    0 0 24px rgba(2,132,199,0.08);
-  --glow-pink:    0 0 24px rgba(219,39,119,0.08);
+  --shadow:       0 1px 3px rgba(30,40,60,0.04), 0 4px 16px -2px rgba(30,40,60,0.06);
+  --shadow-lg:    0 20px 40px -4px rgba(30,40,60,0.1), 0 8px 16px -2px rgba(30,40,60,0.04);
+  --glow-purple:  0 0 24px rgba(96,96,239,0.15);
+  --glow-cyan:    0 0 24px rgba(2,121,183,0.12);
+  --glow-pink:    0 0 24px rgba(223,29,73,0.12);
 
   --header-bg:     rgba(250, 249, 246, 0.94);
   --header-border: rgba(228, 223, 213, 0.9);
-  --header-shadow: 0 1px 3px rgba(17,24,39,0.04), 0 4px 16px rgba(17,24,39,0.03);
+  --header-shadow: 0 1px 3px rgba(30,40,60,0.04), 0 4px 16px rgba(30,40,60,0.03);
 }
 
 html { -webkit-text-size-adjust: 100%; }
