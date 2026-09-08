@@ -21,7 +21,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Warm & Conversational",
     description: "Natural, relatable, young female voice. Feels like a close friend telling a personal story.",
-    defaultSettings: { stability: 0.34, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true },
+    defaultSettings: { stability: 0.30, similarity_boost: 0.72, style: 0.12, use_speaker_boost: true },
   },
   domi: {
     key: "domi",
@@ -31,7 +31,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Energetic & Expressive",
     description: "Upbeat, lively, confident young female voice. Great for fast-paced, humorous, or social stories.",
-    defaultSettings: { stability: 0.30, similarity_boost: 0.75, style: 0.50, use_speaker_boost: true },
+    defaultSettings: { stability: 0.28, similarity_boost: 0.70, style: 0.15, use_speaker_boost: true },
   },
   bella: {
     key: "bella",
@@ -41,7 +41,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Gentle Storyteller",
     description: "Thoughtful, gentle, intimate storytelling voice. Ideal for reflective, heartfelt, or calming narratives.",
-    defaultSettings: { stability: 0.40, similarity_boost: 0.75, style: 0.35, use_speaker_boost: true },
+    defaultSettings: { stability: 0.28, similarity_boost: 0.70, style: 0.10, use_speaker_boost: true },
   },
   elli: {
     key: "elli",
@@ -51,7 +51,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Bright & Cheerful",
     description: "Bright, youthful, clear voice. Great for student and college campus stories.",
-    defaultSettings: { stability: 0.35, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true },
+    defaultSettings: { stability: 0.30, similarity_boost: 0.72, style: 0.12, use_speaker_boost: true },
   },
   josh: {
     key: "josh",
@@ -61,7 +61,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Casual & Relatable",
     description: "Young adult male, friendly, easygoing, and down-to-earth.",
-    defaultSettings: { stability: 0.35, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true },
+    defaultSettings: { stability: 0.30, similarity_boost: 0.72, style: 0.12, use_speaker_boost: true },
   },
   sam: {
     key: "sam",
@@ -71,7 +71,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Dynamic & Expressive",
     description: "Expressive, confident male voice with natural dynamic range and conversational energy.",
-    defaultSettings: { stability: 0.32, similarity_boost: 0.75, style: 0.50, use_speaker_boost: true },
+    defaultSettings: { stability: 0.28, similarity_boost: 0.70, style: 0.14, use_speaker_boost: true },
   },
   antoni: {
     key: "antoni",
@@ -81,7 +81,7 @@ export const STORY_VOICES = {
     age: "young_adult",
     vibe: "Warm Storyteller",
     description: "Pleasant, well-rounded, natural male voice. Perfect for relatable everyday experiences.",
-    defaultSettings: { stability: 0.38, similarity_boost: 0.75, style: 0.40, use_speaker_boost: true },
+    defaultSettings: { stability: 0.32, similarity_boost: 0.72, style: 0.10, use_speaker_boost: true },
   },
   adam: {
     key: "adam",
@@ -91,7 +91,7 @@ export const STORY_VOICES = {
     age: "adult",
     vibe: "Deep Narrator",
     description: "Classic deep narrative voice. Grounded, articulate, and authoritative.",
-    defaultSettings: { stability: 0.42, similarity_boost: 0.75, style: 0.35, use_speaker_boost: true },
+    defaultSettings: { stability: 0.35, similarity_boost: 0.72, style: 0.10, use_speaker_boost: true },
   },
 };
 
@@ -195,8 +195,8 @@ Determine:
 4. mood: The overall emotional tone of the story (e.g. "Warm & conversational", "Relieved & humorous", "Thoughtful & reflective", "Upbeat & excited")
 5. selectedVoiceKey: Pick the SINGLE best voice key from the available list: rachel, domi, bella, elli, josh, sam, antoni, adam
 6. reason: 1 concise sentence explaining why this voice creates the most natural, human listening experience for this character and story.
-7. stability: A number between 0.28 and 0.45. (Use lower ~0.30 for emotional, funny, or dramatic stories to add natural human pitch swings; use higher ~0.42 for calm/steady stories).
-8. style: A number between 0.35 and 0.55. (Higher ~0.50 for lively conversational storytelling; ~0.35 for subtle calm narration).
+7. stability: A number between 0.26 and 0.35. (Use ~0.28 for lively, emotional, or humorous stories for natural human pitch variation; ~0.34 for calm, steady reflections).
+8. style: A number between 0.06 and 0.16. (Keep low ~0.10 for natural grounded human conversational flow; never above 0.20 to avoid robotic metallic distortion).
 
 Return ONLY valid JSON matching this schema:
 {
@@ -206,8 +206,8 @@ Return ONLY valid JSON matching this schema:
   "mood": "...",
   "selectedVoiceKey": "rachel" | "domi" | "bella" | "elli" | "josh" | "sam" | "antoni" | "adam",
   "reason": "...",
-  "stability": 0.34,
-  "style": 0.45
+  "stability": 0.30,
+  "style": 0.12
 }`;
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -221,7 +221,7 @@ Return ONLY valid JSON matching this schema:
         body: JSON.stringify({
           model: getTextModel(),
           messages: [{ role: "user", content: prompt }],
-          temperature: 0.3,
+          temperature: 0.75,
           max_tokens: 600,
           response_format: { type: "json_object" },
         }),
@@ -236,7 +236,7 @@ Return ONLY valid JSON matching this schema:
       if (!res.ok) continue;
 
       const data = await res.json();
-      const raw = data.choices?.[0]?.message?.content?.trim();
+      const raw = data?.choices?.[0]?.message?.content?.trim();
       if (!raw) continue;
 
       let jsonStr = raw;
@@ -247,13 +247,13 @@ Return ONLY valid JSON matching this schema:
       const voiceKey = (parsed.selectedVoiceKey || "").toLowerCase();
       const matchedVoice = STORY_VOICES[voiceKey] || heuristicMatch(storyText, characterHint);
 
-      const stability = typeof parsed.stability === "number" && parsed.stability >= 0.25 && parsed.stability <= 0.6
+      const stability = typeof parsed.stability === "number" && parsed.stability >= 0.22 && parsed.stability <= 0.45
         ? parsed.stability
-        : (matchedVoice.defaultSettings?.stability ?? 0.35);
+        : (matchedVoice.defaultSettings?.stability ?? 0.30);
 
-      const style = typeof parsed.style === "number" && parsed.style >= 0.2 && parsed.style <= 0.7
+      const style = typeof parsed.style === "number" && parsed.style >= 0.05 && parsed.style <= 0.25
         ? parsed.style
-        : (matchedVoice.defaultSettings?.style ?? 0.45);
+        : (matchedVoice.defaultSettings?.style ?? 0.12);
 
       return {
         characterName: parsed.characterName || characterHint?.name || matchedVoice.name,
@@ -267,7 +267,7 @@ Return ONLY valid JSON matching this schema:
         reason: parsed.reason || `Best suited for ${parsed.characterName || "the character"} based on tone and style.`,
         voiceSettings: {
           stability,
-          similarity_boost: 0.75,
+          similarity_boost: matchedVoice.defaultSettings?.similarity_boost ?? 0.72,
           style,
           use_speaker_boost: true,
         },

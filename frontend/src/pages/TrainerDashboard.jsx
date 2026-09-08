@@ -973,7 +973,7 @@ function ManualQuestionsPanel() {
         storyText: form.storyTranscript,
         topic: form.topic || "story",
         voiceId: selectedVoiceId || voiceRecommendation?.voiceId || undefined,
-        voiceSettings: voiceRecommendation?.voiceSettings || undefined,
+        voiceSettings: (selectedVoiceId === voiceRecommendation?.voiceId) ? voiceRecommendation?.voiceSettings : undefined,
       });
       setForm(f => ({ ...f, audioUrl: res.data.audioUrl }));
       const voiceLabel = res.data.voiceUsed?.name ? ` with voice ${res.data.voiceUsed.name}` : "";
@@ -1471,13 +1471,13 @@ function ManualQuestionsPanel() {
                     onChange={e => setSelectedVoiceId(e.target.value)}
                     style={{ fontSize: "0.82rem", background: "#0f172a", borderColor: "rgba(167, 139, 250, 0.4)", color: "#f8fafc" }}
                   >
-                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Warm & Conversational (Female, 20s)</option>
-                    <option value="AZnzlk1XvdvUeBnXmlld">Domi — Energetic & Expressive (Female, 20s)</option>
-                    <option value="EXAVITQu4vr4xnSDxMaL">Bella — Gentle Storyteller (Female, Soft)</option>
-                    <option value="MF3mGyEYCl7XYWbV9V6O">Elli — Bright & Youthful (Female, Clear)</option>
-                    <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Casual & Relatable (Male, 20s)</option>
+                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Warm & Conversational (Female, Most Natural)</option>
+                    <option value="AZnzlk1XvdvUeBnXmlld">Domi — Energetic & Expressive (Female, Lively)</option>
+                    <option value="EXAVITQu4vr4xnSDxMaL">Bella — Gentle Storyteller (Female, Soft & Calming)</option>
+                    <option value="MF3mGyEYCl7XYWbV9V6O">Elli — Bright & Youthful (Female, Student)</option>
+                    <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Casual & Relatable (Male, Most Natural)</option>
                     <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Dynamic & Expressive (Male, Confident)</option>
-                    <option value="ErXwobaYiN019PkySvjV">Antoni — Warm Storyteller (Male, Pleasant)</option>
+                    <option value="ErXwobaYiN019PkySvjV">Antoni — Warm Storyteller (Male, Balanced)</option>
                     <option value="pNInz6obpgDQGcFmaJgB">Adam — Deep Classic Narrator (Male)</option>
                   </select>
 

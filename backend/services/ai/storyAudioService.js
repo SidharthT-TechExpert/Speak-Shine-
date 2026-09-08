@@ -32,7 +32,71 @@ const DEFAULT_VOICE_ID = STORY_VOICES.adam.id;
 const MAX_ATTEMPTS = 8; // try up to 8 key-switches before giving up
 
 /**
+ * Conditions raw story text for authentic, human-sounding speech delivery:
+ * 1. Normalizes abbreviations to full spoken words so TTS doesn't stumble or spell out letters.
+ * 2. Formats paragraph breaks into rhythmic narrative pauses (adding breath room).
+ * 3. Softens rigid semicolons into natural pause commas.
+ * 4. Ensures dialogue and conversational punctuation have natural breathing room.
+ */
+export function formatTextForHumanSpeech(rawText) {
+  if (!rawText) return "";
+
+  let t = rawText.trim();
+
+  // Normalize common written abbreviations to spoken English words
+  const abbreviations = [
+    [/\bMr\.\s*/gi, "Mister "],
+    [/\bMrs\.\s*/gi, "Missus "],
+    [/\bMs\.\s*/gi, "Miz "],
+    [/\bDr\.\s*/gi, "Doctor "],
+    [/\be\.g\.,?\s*/gi, "for example, "],
+    [/\bi\.e\.,?\s*/gi, "that is, "],
+    [/\betc\.\s*/gi, "etcetera. "],
+    [/\bapt\.\s*/gi, "apartment "],
+    [/\bmin\.\s*/gi, "minutes "],
+    [/\bsec\.\s*/gi, "seconds "],
+    [/\bhr\.\s*/gi, "hour "],
+    [/\bhrs\.\s*/gi, "hours "],
+    [/\bvs\.\s*/gi, "versus "],
+    [/\bprof\.\s*/gi, "Professor "],
+  ];
+  for (const [pattern, replacement] of abbreviations) {
+    t = t.replace(pattern, replacement);
+  }
+
+  // Convert number suffixes: "1st" -> "first", "2nd" -> "second", etc.
+  t = t.replace(/\b1st\b/gi, "first")
+       .replace(/\b2nd\b/gi, "second")
+       .replace(/\b3rd\b/gi, "third")
+       .replace(/\b4th\b/gi, "fourth")
+       .replace(/\b5th\b/gi, "fifth");
+
+  // Soften rigid semicolons into natural pauses
+  t = t.replace(/;/g, ",");
+
+  // Clean multiple dashes into an em dash with spaces for breath pause
+  t = t.replace(/\s*--+\s*/g, " — ");
+
+  // Ensure dialogue quotes have natural breath spacing
+  t = t.replace(/([,?!])"([A-Za-z])/g, '$1" $2');
+  t = t.replace(/([A-Za-z])"([A-Za-z])/g, '$1 "$2');
+
+  // Paragraph breaks: In storytelling, scene shifts need a 0.4s breath pause.
+  // Replacing \n\n with " ... \n\n" signals a natural human breath pause.
+  t = t.split(/\n\s*\n/).map(p => {
+    let para = p.trim();
+    if (!para) return "";
+    if (!/[.!?]$/.test(para)) para += ".";
+    return para;
+  }).filter(Boolean).join(" ...\n\n");
+
+  return t;
+}
+
+/**
  * Convert text to an MP3 Buffer using ElevenLabs TTS.
+ * Uses eleven_turbo_v2_5 for conversational human cadence and breath realism,
+ * with automatic fallback to eleven_multilingual_v2.
  * Rotates keys automatically on 429 / 401 / 403 / 5xx.
  *
  * @param {string} text - The script to read
@@ -42,16 +106,20 @@ const MAX_ATTEMPTS = 8; // try up to 8 key-switches before giving up
 async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSettings = null) {
   let lastError = null;
 
+  // Format text for natural human speech (breathing pauses, full words)
+  const speechText = formatTextForHumanSpeech(text);
+
   // Selected voice configuration
   const voiceMeta = findVoice(voiceId);
   const settings = {
-    stability: customVoiceSettings?.stability ?? voiceMeta?.defaultSettings?.stability ?? 0.35,
-    similarity_boost: customVoiceSettings?.similarity_boost ?? 0.75,
-    style: customVoiceSettings?.style ?? voiceMeta?.defaultSettings?.style ?? 0.45,
+    stability: customVoiceSettings?.stability ?? voiceMeta?.defaultSettings?.stability ?? 0.30,
+    similarity_boost: customVoiceSettings?.similarity_boost ?? voiceMeta?.defaultSettings?.similarity_boost ?? 0.72,
+    style: customVoiceSettings?.style ?? voiceMeta?.defaultSettings?.style ?? 0.12,
     use_speaker_boost: true,
   };
 
   let targetVoiceId = voiceId || DEFAULT_VOICE_ID;
+  let currentModel = "eleven_turbo_v2_5"; // Flagship conversational model with human cadence
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const apiKey = getKey();
@@ -73,8 +141,8 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
           "Accept": "audio/mpeg",
         },
         body: JSON.stringify({
-          text,
-          model_id: "eleven_multilingual_v2",
+          text: speechText,
+          model_id: currentModel,
           voice_settings: settings,
         }),
       });
@@ -96,6 +164,13 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
     let detail = errText;
     try { detail = JSON.parse(errText)?.detail?.message || errText; } catch {}
 
+    // If turbo_v2_5 is unsupported on this tier/account, fall back to eleven_multilingual_v2
+    if (res.status === 400 && currentModel === "eleven_turbo_v2_5") {
+      console.warn(`[StoryAudio] Turbo v2.5 model failed (${detail}). Falling back to eleven_multilingual_v2...`);
+      currentModel = "eleven_multilingual_v2";
+      continue; // retry with multilingual_v2 using same key
+    }
+
     if (res.status === 429) {
       // Rate limited — use Retry-After header if present
       const retryAfter = parseRetryAfter(res.headers.get("Retry-After")) || 60;
@@ -110,8 +185,8 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
       if (targetVoiceId !== DEFAULT_VOICE_ID) {
         console.warn(`[StoryAudio] Voice "${targetVoiceId}" is restricted on free tier. Automatically retrying with Adam (${DEFAULT_VOICE_ID})...`);
         targetVoiceId = DEFAULT_VOICE_ID;
-        settings.stability = 0.42;
-        settings.style = 0.35;
+        settings.stability = 0.35;
+        settings.style = 0.10;
         continue; // Retry with Adam using the same key
       }
       // If Adam also fails with 402, this key's monthly free characters are exhausted
@@ -172,7 +247,10 @@ export async function generateAndUploadStoryAudio(
 
   if (selectedVoiceId) {
     voiceProfile = findVoice(selectedVoiceId);
-    if (voiceProfile) selectedVoiceId = voiceProfile.id;
+    if (voiceProfile) {
+      selectedVoiceId = voiceProfile.id;
+      selectedSettings = selectedSettings || voiceProfile.defaultSettings;
+    }
   } else {
     // Automatically analyze character and select the most adaptable voice
     console.log(`[StoryAudio] Analyzing story to pick optimal character voice…`);
