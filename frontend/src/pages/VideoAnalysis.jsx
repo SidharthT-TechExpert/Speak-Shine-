@@ -20,6 +20,125 @@ const WAVE_PATTERN = [
   28, 22, 18, 26, 20, 14, 18, 24, 16, 22, 26, 18, 14
 ];
 
+function formatDropTime(timeStr = "08:00") {
+  if (!timeStr) return "8:00 AM";
+  const [h, m] = timeStr.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  const minStr = String(m).padStart(2, "0");
+  return `${hour12}:${minStr} ${period}`;
+}
+
+function StudioDropCountdownTimer({ posterSendTime = "08:00" }) {
+  const calc = () => {
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const [h, m] = (posterSendTime || "08:00").split(":").map(Number);
+    const target = new Date(nowIST);
+    target.setHours(h, m, 0, 0);
+
+    const diffSec = Math.floor((target - nowIST) / 1000);
+    const isDue = diffSec <= 0;
+    const absDiff = Math.max(0, diffSec);
+
+    const hrs = String(Math.floor(absDiff / 3600)).padStart(2, "0");
+    const mins = String(Math.floor((absDiff % 3600) / 60)).padStart(2, "0");
+    const secs = String(absDiff % 60).padStart(2, "0");
+    return { hrs, mins, secs, isDue };
+  };
+
+  const [t, setT] = useState(calc);
+
+  useEffect(() => {
+    const interval = setInterval(() => setT(calc()), 1000);
+    return () => clearInterval(interval);
+  }, [posterSendTime]);
+
+  if (t.isDue) {
+    return (
+      <div style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.75rem",
+        padding: "0.85rem 1.25rem",
+        borderRadius: 12,
+        background: "rgba(249, 115, 22, 0.12)",
+        border: "1px solid rgba(249, 115, 22, 0.35)",
+        margin: "0.85rem 0",
+      }}>
+        <span style={{ fontSize: "1.4rem" }}>⚡</span>
+        <div>
+          <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#f97316" }}>
+            Mission Launching Shortly
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
+            The AI trainer is preparing today's question. Please refresh in a moment!
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", margin: "1rem 0" }}>
+      <div style={{
+        background: "#141024",
+        border: "1px solid rgba(249, 115, 22, 0.45)",
+        boxShadow: "0 4px 18px rgba(249, 115, 22, 0.12)",
+        borderRadius: 12,
+        padding: "0.75rem 1rem",
+        textAlign: "center",
+        minWidth: 60,
+      }}>
+        <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.hrs}
+        </div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          HRS
+        </div>
+      </div>
+
+      <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "12px" }}>:</span>
+
+      <div style={{
+        background: "#141024",
+        border: "1px solid rgba(249, 115, 22, 0.45)",
+        boxShadow: "0 4px 18px rgba(249, 115, 22, 0.12)",
+        borderRadius: 12,
+        padding: "0.75rem 1rem",
+        textAlign: "center",
+        minWidth: 60,
+      }}>
+        <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.mins}
+        </div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          MINS
+        </div>
+      </div>
+
+      <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "12px" }}>:</span>
+
+      <div style={{
+        background: "#141024",
+        border: "1px solid rgba(249, 115, 22, 0.45)",
+        boxShadow: "0 4px 18px rgba(249, 115, 22, 0.12)",
+        borderRadius: 12,
+        padding: "0.75rem 1rem",
+        textAlign: "center",
+        minWidth: 60,
+      }}>
+        <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.secs}
+        </div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          SECS
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
 // "record"  → new live-record flow
@@ -88,6 +207,9 @@ export default function VideoAnalysis() {
   const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
   const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
   const [durationLimits, setDurationLimits] = useState(null);
+  const [isQuestionActive, setIsQuestionActive] = useState(false);
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(true);
+  const [posterSendTime, setPosterSendTime] = useState("08:00");
 
   // ── Live Countdown to Midnight IST (Matching Dashboard Page) ────────────────
   const [timeLeft, setTimeLeft] = useState({ hrs: "09", mins: "22", secs: "50" });
@@ -356,19 +478,35 @@ export default function VideoAnalysis() {
       // Show sample question for guests from preview API
       api.get("/guest/preview").then(r => {
         const t = r.data?.today;
-        if (t?.question) setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
+        if (t?.question) {
+          setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
+          setIsQuestionActive(true);
+        }
         if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
         if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
         if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
         if (t?.durationLimits) setDurationLimits(t.durationLimits);
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => {
+        setIsLoadingQuestion(false);
+      });
       return;
     }
     loadMyReports();
     // Fetch today's question for the top card
-      api.get("/dashboard/me?_duration_refresh=" + Date.now()).then(r => {
+    api.get("/dashboard/me?_duration_refresh=" + Date.now()).then(r => {
       const t = r.data?.today;
-      if (t?.question) setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
+      const active = Boolean(
+        t?.isMonthlyReflection ||
+        t?.isMonthlyGoals ||
+        (t?.questionSent && (t?.question || t?.topic))
+      );
+      setIsQuestionActive(active);
+      if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
+      if (t?.question && active) {
+        setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
+      } else {
+        setTodayQuestion(null);
+      }
       if (t?.isMonthlyReflection) setIsMonthlyReflection(true);
       if (t?.isMonthlyGoals) setIsMonthlyGoals(true);
       if (t?.isStorySummary || t?.contentType === "story_audio") setIsStorySummary(true);
@@ -379,7 +517,11 @@ export default function VideoAnalysis() {
       if (r.data?.today?.allowPrivateVideos !== undefined) setAllowPrivateVideos(r.data.today.allowPrivateVideos);
       if (r.data?.today?.enableBackgroundBlur !== undefined) setEnableBackgroundBlur(r.data.today.enableBackgroundBlur);
       if (t?.durationLimits) setDurationLimits(t.durationLimits);
-    }).catch(() => {});
+    }).catch(() => {
+      setIsQuestionActive(false);
+    }).finally(() => {
+      setIsLoadingQuestion(false);
+    });
   }, [isGuest]);
 
   // Auto-refresh reports table when there are processing reports
@@ -1150,29 +1292,216 @@ export default function VideoAnalysis() {
           <button
             type="button"
             className={`tab-btn${mode === "record" ? " active" : ""}`}
+            disabled={!isQuestionActive && !isLoadingQuestion}
             onClick={() => {
+              if (!isQuestionActive && !isLoadingQuestion) return;
               navigate("/record");
               scrollToStudio("record");
             }}
+            style={!isQuestionActive && !isLoadingQuestion ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
           >
-            <span>🎥</span> Record Now
+            <span>🎥</span> Record Now {!isQuestionActive && !isLoadingQuestion ? "🔒" : ""}
           </button>
           <button
             type="button"
             className={`tab-btn${mode === "upload" ? " active" : ""}`}
+            disabled={!isQuestionActive && !isLoadingQuestion}
             onClick={() => {
+              if (!isQuestionActive && !isLoadingQuestion) return;
               navigate("/video-analysis");
               scrollToStudio("upload");
             }}
+            style={!isQuestionActive && !isLoadingQuestion ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
           >
-            <span>📁</span> Upload Video
+            <span>📁</span> Upload Video {!isQuestionActive && !isLoadingQuestion ? "🔒" : ""}
           </button>
         </div>
 
-        {mode === "upload"
-          ? <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} />
-          : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
-        }
+        {isLoadingQuestion ? (
+          <div className="card" style={{ padding: "3rem 1.5rem", textAlign: "center", color: "#94a3b8" }}>
+            <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⏳</div>
+            <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>Checking today's mission status...</div>
+          </div>
+        ) : !isQuestionActive ? (
+          <div className="card" style={{
+            background: "linear-gradient(145deg, #130f24 0%, #17112c 100%)",
+            border: "1px solid rgba(249, 115, 22, 0.25)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            borderRadius: 18,
+            padding: "2.2rem 2rem",
+            marginBottom: "1.75rem",
+            position: "relative",
+            overflow: "hidden",
+          }}>
+            {/* Top decorative gradient glow */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 4,
+              background: "linear-gradient(90deg, #f97316 0%, #ec4899 50%, #8b5cf6 100%)",
+            }} />
+
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: "1.25rem", marginBottom: "1.5rem" }}>
+              <div style={{ maxWidth: 620 }}>
+                <div style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "0.35rem 0.85rem",
+                  borderRadius: 9999,
+                  background: "rgba(249, 115, 22, 0.15)",
+                  border: "1px solid rgba(249, 115, 22, 0.4)",
+                  color: "#f97316",
+                  fontSize: "0.78rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  marginBottom: "0.85rem",
+                }}>
+                  <span>🔒</span> Studio Locked · Daily Reset Period
+                </div>
+
+                <h2 style={{ fontSize: "1.65rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.5rem 0", lineHeight: 1.25 }}>
+                  Recording &amp; Uploading Are Locked
+                </h2>
+                <p style={{ fontSize: "0.92rem", color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
+                  The midnight reset has cleared the previous challenge. Our AI curriculum engine is preparing today's mission, audio story, and vocabulary. Studio recording and video uploading will automatically unlock once the new mission is released.
+                </p>
+              </div>
+
+              {/* Countdown section */}
+              <div style={{
+                background: "rgba(10, 8, 20, 0.65)",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: 16,
+                padding: "1.25rem 1.5rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                minWidth: 240,
+              }}>
+                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#f97316", marginBottom: "0.25rem" }}>
+                  ⏳ Next Mission Drops In
+                </span>
+                <StudioDropCountdownTimer posterSendTime={posterSendTime} />
+                <span style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
+                  Unlocks today at <strong style={{ color: "#ffffff" }}>{formatDropTime(posterSendTime)} IST</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Info cards row */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "1rem",
+              marginTop: "1.5rem",
+              marginBottom: "1.75rem",
+            }}>
+              <div style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                borderRadius: 12,
+                padding: "1rem 1.15rem",
+              }}>
+                <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>🌙</div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                  Midnight Reset Active
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                  The 12:00 AM reset has archived yesterday's mission. Streaks and leaderboard scores are now being finalized.
+                </div>
+              </div>
+
+              <div style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                borderRadius: 12,
+                padding: "1rem 1.15rem",
+              }}>
+                <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>🎯</div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                  Fresh Mission Coming
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                  A brand-new question, audio prompt, and curated vocabulary list will drop at {formatDropTime(posterSendTime)} IST.
+                </div>
+              </div>
+
+              <div style={{
+                background: "rgba(255, 255, 255, 0.02)",
+                border: "1px solid rgba(255, 255, 255, 0.05)",
+                borderRadius: 12,
+                padding: "1rem 1.15rem",
+              }}>
+                <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>📊</div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                  Review Past Feedback
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                  Take this rest window to review your previous speech evaluations, filler word analyses, and vocabulary mastery below.
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.85rem" }}>
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                style={{
+                  background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "0.65rem 1.25rem",
+                  fontSize: "0.88rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  boxShadow: "0 4px 14px rgba(249, 115, 22, 0.3)",
+                }}
+              >
+                <span>🏠</span> Return to Dashboard
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById("report-section") || document.querySelector(".reports-table");
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth" });
+                  } else {
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+                  }
+                }}
+                style={{
+                  background: "rgba(255, 255, 255, 0.06)",
+                  color: "#cbd5e1",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  borderRadius: 10,
+                  padding: "0.65rem 1.25rem",
+                  fontSize: "0.88rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>📋</span> View Past Reports Below
+              </button>
+            </div>
+          </div>
+        ) : mode === "upload" ? (
+          <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} />
+        ) : (
+          <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
+        )}
 
         {/* Report Section */}
         {report && (

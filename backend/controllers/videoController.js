@@ -16,6 +16,31 @@ function broadcastCommunity(req, event, payload) {
   if (io) io.to(COMMUNITY_ROOM).emit(event, payload);
 }
 
+async function checkSubmissionWindowActive() {
+  const Status = (await import("../../models/statusSchema.js")).default;
+  const status = await Status.findOne().lean();
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  const todayIST = `${y}-${mo}-${d}`;
+
+  const isQuestionSentToday = Boolean(
+    status?.questionSentToday &&
+    (status?.lastPosterSentDate === todayIST || (!status?.lastResetDate && status?.lastPosterSentDate)) &&
+    (status?.todayQuestion || status?.todayTopic)
+  );
+
+  if (!isQuestionSentToday && !status?.isMonthlyGoalsDay && !status?.isMonthlyReflectionDay) {
+    const error = new Error(`Recording and uploads are locked until today's speaking challenge unlocks at ${status?.posterSendTime || "08:00"} IST.`);
+    error.statusCode = 403;
+    error.locked = true;
+    error.posterSendTime = status?.posterSendTime || "08:00";
+    throw error;
+  }
+  return status;
+}
+
 /**
  * PUT /api/video/proxy-upload
  * Streams the video body from the browser directly to R2 without buffering
@@ -24,6 +49,7 @@ function broadcastCommunity(req, event, payload) {
  */
 export async function proxyUpload(req, res) {
   try {
+    await checkSubmissionWindowActive();
     const key      = req.headers["x-r2-key"];
     const mimeType = req.headers["x-mime-type"] || "video/mp4";
 
@@ -66,6 +92,7 @@ export async function proxyUpload(req, res) {
 
 export async function getPresignedUrl(req, res) {
   try {
+    await checkSubmissionWindowActive();
     const { filename = "video.webm", mimeType = "video/webm" } = req.query;
     
     console.log("[Presign] Request - filename:", filename, "mimeType:", mimeType, "userId:", req.user?.id);
@@ -86,7 +113,7 @@ export async function getPresignedUrl(req, res) {
       user: req.user?.id
     });
     if (error.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
+      return res.status(error.statusCode).json({ error: error.message, locked: error.locked });
     }
     res.status(500).json({ error: "Failed to generate upload URL" });
   }
@@ -98,6 +125,7 @@ export async function getPresignedUrl(req, res) {
  */
 export async function uploadFrames(req, res) {
   try {
+    await checkSubmissionWindowActive();
     const { reportKey, frames } = req.body;
     
     if (!reportKey || !frames || !Array.isArray(frames)) {
@@ -114,7 +142,7 @@ export async function uploadFrames(req, res) {
     res.json(result);
   } catch (error) {
     if (error.statusCode) {
-      return res.status(error.statusCode).json({ error: error.message });
+      return res.status(error.statusCode).json({ error: error.message, locked: error.locked });
     }
     console.error("[UploadFrames] Error:", error.message);
     res.status(500).json({ error: "Failed to upload frames" });
@@ -127,9 +155,8 @@ export async function uploadFrames(req, res) {
  */
 export async function preCheckSubmit(req, res) {
   try {
+    const status = await checkSubmissionWindowActive();
     const { evaluateSubmitGate } = await import("../services/video/submitGate.js");
-    const Status = (await import("../../models/statusSchema.js")).default;
-    const status = await Status.findOne().lean();
     const isStory = req.body?.isStorySummary !== undefined
       ? !!req.body.isStorySummary
       : (status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description"));
@@ -151,6 +178,9 @@ export async function preCheckSubmit(req, res) {
     });
     res.json(gate);
   } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ error: err.message, locked: err.locked });
+    }
     console.error("[PreCheck] Error:", err.message);
     res.status(500).json({ error: "Pre-check failed" });
   }
@@ -162,6 +192,7 @@ export async function preCheckSubmit(req, res) {
  */
 export async function confirmUpload(req, res) {
   try {
+    await checkSubmissionWindowActive();
     const { key, publicUrl, mimeType = "video/webm", isPublic = true, recordedDuration, videoHash, frameKeys } = req.body;
     
     const result = await videoService.confirmDirectUpload(
