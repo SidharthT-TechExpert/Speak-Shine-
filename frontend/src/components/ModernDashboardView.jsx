@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import NotificationBell from "./NotificationBell.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import { useTheme } from "../context/ThemeContext.jsx";
 import Modal from "./Modal.jsx";
 import gsap from "gsap";
 import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
@@ -19,6 +20,7 @@ const WAVE_PATTERN = [
 
 // ── Isolated Countdown Timer (Prevents entire dashboard from re-rendering every second) ──
 function MidnightCountdownTimer() {
+  const { isDark } = useTheme();
   const calc = () => {
     const now = new Date();
     const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -43,17 +45,17 @@ function MidnightCountdownTimer() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
       <div className="speakshine-timer-box" style={{
-        background: "#161024",
-        border: "1px solid rgba(249, 115, 22, 0.35)",
+        background: isDark ? "#161024" : "#f8fafc",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.4)",
         borderRadius: 10,
         padding: "0.65rem 0.85rem",
         textAlign: "center",
         minWidth: 54,
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.hrs}
         </div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
           HRS
         </div>
       </div>
@@ -61,17 +63,17 @@ function MidnightCountdownTimer() {
       <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
       <div className="speakshine-timer-box" style={{
-        background: "#161024",
-        border: "1px solid rgba(249, 115, 22, 0.35)",
+        background: isDark ? "#161024" : "#f8fafc",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.4)",
         borderRadius: 10,
         padding: "0.65rem 0.85rem",
         textAlign: "center",
         minWidth: 54,
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.mins}
         </div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
           MINS
         </div>
       </div>
@@ -79,17 +81,17 @@ function MidnightCountdownTimer() {
       <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
       <div className="speakshine-timer-box" style={{
-        background: "#161024",
-        border: "1px solid rgba(249, 115, 22, 0.35)",
+        background: isDark ? "#161024" : "#f8fafc",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.4)",
         borderRadius: 10,
         padding: "0.65rem 0.85rem",
         textAlign: "center",
         minWidth: 54,
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.secs}
         </div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
           SECS
         </div>
       </div>
@@ -99,6 +101,7 @@ function MidnightCountdownTimer() {
 
 // ── Drop Countdown Timer for 12 AM Reset Period (Counts down to posterSendTime, e.g. 08:00 AM IST) ──
 function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
+  const { isDark } = useTheme();
   const calc = () => {
     const now = new Date();
     const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -131,16 +134,16 @@ function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
         gap: "0.85rem",
         padding: "0.85rem 1.25rem",
         borderRadius: 14,
-        background: "rgba(249, 115, 22, 0.12)",
-        border: "1px solid rgba(249, 115, 22, 0.35)",
+        background: isDark ? "rgba(249, 115, 22, 0.12)" : "rgba(249, 115, 22, 0.08)",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.3)",
         margin: "1rem 0",
       }}>
         <span style={{ fontSize: "1.5rem" }}>⚡</span>
         <div>
-          <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "#f97316" }}>
+          <div style={{ fontSize: "0.95rem", fontWeight: 800, color: isDark ? "#f97316" : "#ea580c" }}>
             Mission Launching Shortly
           </div>
-          <div style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
+          <div style={{ fontSize: "0.78rem", color: isDark ? "#cbd5e1" : "#64748b" }}>
             The AI trainer is finalizing today's topic &amp; vocabulary. Please refresh momentarily!
           </div>
         </div>
@@ -151,18 +154,18 @@ function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", margin: "1.1rem 0 1.25rem" }}>
       <div className="speakshine-timer-box" style={{
-        background: "#141024",
-        border: "1px solid rgba(249, 115, 22, 0.45)",
-        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.15)",
+        background: isDark ? "#141024" : "#f8fafc",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
+        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.15)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
         borderRadius: 12,
         padding: "0.85rem 1.15rem",
         textAlign: "center",
         minWidth: 64,
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.hrs}
         </div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
           HRS
         </div>
       </div>
@@ -170,18 +173,18 @@ function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
       <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px" }}>:</span>
 
       <div className="speakshine-timer-box" style={{
-        background: "#141024",
-        border: "1px solid rgba(249, 115, 22, 0.45)",
-        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.15)",
+        background: isDark ? "#141024" : "#f8fafc",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
+        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.15)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
         borderRadius: 12,
         padding: "0.85rem 1.15rem",
         textAlign: "center",
         minWidth: 64,
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.mins}
         </div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
           MINS
         </div>
       </div>
@@ -189,18 +192,18 @@ function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
       <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px" }}>:</span>
 
       <div className="speakshine-timer-box" style={{
-        background: "#141024",
-        border: "1px solid rgba(249, 115, 22, 0.45)",
-        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.15)",
+        background: isDark ? "#141024" : "#f8fafc",
+        border: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
+        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.15)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
         borderRadius: 12,
         padding: "0.85rem 1.15rem",
         textAlign: "center",
         minWidth: 64,
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.secs}
         </div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
           SECS
         </div>
       </div>
@@ -224,6 +227,7 @@ export default function ModernDashboardView({
   onOpenReport,
   onLogout,
 }) {
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -2210,12 +2214,12 @@ export default function ModernDashboardView({
 
             return (
               <div className="speakshine-card-box" style={{
-                background: "linear-gradient(145deg, #0d0a1b 0%, #080612 100%)",
-                border: "1px solid rgba(167, 139, 250, 0.14)",
+                background: isDark ? "linear-gradient(145deg, #0d0a1b 0%, #080612 100%)" : "#ffffff",
+                border: isDark ? "1px solid rgba(167, 139, 250, 0.14)" : "1px solid #e2e8f0",
                 borderRadius: 18,
                 padding: "1.35rem 1.6rem",
                 marginBottom: "1.25rem",
-                boxShadow: "0 10px 32px rgba(0, 0, 0, 0.45)",
+                boxShadow: isDark ? "0 10px 32px rgba(0, 0, 0, 0.45)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
                 position: "relative",
                 overflow: "hidden",
               }}>
@@ -2227,7 +2231,9 @@ export default function ModernDashboardView({
                   width: 220,
                   height: 220,
                   borderRadius: "50%",
-                  background: "radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, rgba(167, 139, 250, 0) 70%)",
+                  background: isDark
+                    ? "radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, rgba(167, 139, 250, 0) 70%)"
+                    : "radial-gradient(circle, rgba(249, 115, 22, 0.06) 0%, rgba(99, 102, 241, 0.03) 70%)",
                   pointerEvents: "none",
                 }} />
 
@@ -2245,9 +2251,9 @@ export default function ModernDashboardView({
                       fontSize: "0.68rem",
                       fontWeight: 800,
                       letterSpacing: "0.09em",
-                      color: "#f59e0b",
-                      background: "rgba(245, 158, 11, 0.12)",
-                      border: "1px solid rgba(245, 158, 11, 0.28)",
+                      color: isDark ? "#f59e0b" : "#d97706",
+                      background: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.1)",
+                      border: isDark ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid rgba(245, 158, 11, 0.25)",
                       borderRadius: 6,
                       padding: "3px 9px",
                       textTransform: "uppercase"
@@ -2255,7 +2261,7 @@ export default function ModernDashboardView({
                       STREAK ROADMAP
                     </span>
 
-                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a" }}>
                       Journey to {nextBadge ? `${nextBadge.icon} ${nextBadge.name}` : "🏆 Speech Legend"}
                     </span>
                   </div>
@@ -2265,8 +2271,8 @@ export default function ModernDashboardView({
                     {targetDays > 3 && (
                       <div style={{
                         display: "inline-flex",
-                        background: "rgba(255, 255, 255, 0.04)",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        background: isDark ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                        border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
                         borderRadius: 8,
                         padding: 2,
                         gap: 2,
@@ -2280,8 +2286,13 @@ export default function ModernDashboardView({
                             padding: "3px 9px",
                             fontSize: "0.72rem",
                             fontWeight: roadmapViewMode === "sprint" ? 700 : 500,
-                            background: roadmapViewMode === "sprint" ? "rgba(167, 139, 250, 0.2)" : "transparent",
-                            color: roadmapViewMode === "sprint" ? "#c084fc" : "#94a3b8",
+                            background: roadmapViewMode === "sprint"
+                              ? (isDark ? "rgba(167, 139, 250, 0.2)" : "#ffffff")
+                              : "transparent",
+                            color: roadmapViewMode === "sprint"
+                              ? (isDark ? "#c084fc" : "#7c3aed")
+                              : (isDark ? "#94a3b8" : "#64748b"),
+                            boxShadow: roadmapViewMode === "sprint" && !isDark ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
                             cursor: "pointer",
                             transition: "all 0.15s ease",
                           }}
@@ -2297,8 +2308,13 @@ export default function ModernDashboardView({
                             padding: "3px 9px",
                             fontSize: "0.72rem",
                             fontWeight: roadmapViewMode === "roadmap" ? 700 : 500,
-                            background: roadmapViewMode === "roadmap" ? "rgba(249, 115, 22, 0.2)" : "transparent",
-                            color: roadmapViewMode === "roadmap" ? "#f97316" : "#94a3b8",
+                            background: roadmapViewMode === "roadmap"
+                              ? (isDark ? "rgba(249, 115, 22, 0.2)" : "#ffffff")
+                              : "transparent",
+                            color: roadmapViewMode === "roadmap"
+                              ? (isDark ? "#f97316" : "#ea580c")
+                              : (isDark ? "#94a3b8" : "#64748b"),
+                            boxShadow: roadmapViewMode === "roadmap" && !isDark ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
                             cursor: "pointer",
                             transition: "all 0.15s ease",
                           }}
@@ -2312,12 +2328,12 @@ export default function ModernDashboardView({
                       type="button"
                       onClick={onOpenBadges}
                       style={{
-                        background: "rgba(167, 139, 250, 0.08)",
-                        border: "1px solid rgba(167, 139, 250, 0.25)",
+                        background: isDark ? "rgba(167, 139, 250, 0.08)" : "rgba(124, 58, 237, 0.08)",
+                        border: isDark ? "1px solid rgba(167, 139, 250, 0.25)" : "1px solid rgba(124, 58, 237, 0.25)",
                         borderRadius: 8,
                         padding: "0.35rem 0.85rem",
                         fontSize: "0.78rem",
-                        color: "#c084fc",
+                        color: isDark ? "#c084fc" : "#7c3aed",
                         fontWeight: 600,
                         cursor: "pointer",
                         display: "inline-flex",
@@ -2326,12 +2342,12 @@ export default function ModernDashboardView({
                         transition: "all 0.15s ease",
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.background = "rgba(167, 139, 250, 0.18)";
-                        e.currentTarget.style.color = "#ffffff";
+                        e.currentTarget.style.background = isDark ? "rgba(167, 139, 250, 0.18)" : "rgba(124, 58, 237, 0.15)";
+                        e.currentTarget.style.color = isDark ? "#ffffff" : "#6d28d9";
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = "rgba(167, 139, 250, 0.08)";
-                        e.currentTarget.style.color = "#c084fc";
+                        e.currentTarget.style.background = isDark ? "rgba(167, 139, 250, 0.08)" : "rgba(124, 58, 237, 0.08)";
+                        e.currentTarget.style.color = isDark ? "#c084fc" : "#7c3aed";
                       }}
                     >
                       <span>View all 20 badges</span>
@@ -2349,8 +2365,8 @@ export default function ModernDashboardView({
                 }}>
                   {/* Card 1: Current Unlocked Tier */}
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f0fdf4",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.07)" : "1px solid #bbf7d0",
                     borderRadius: 12,
                     padding: "0.75rem 1rem",
                     display: "flex",
@@ -2361,8 +2377,8 @@ export default function ModernDashboardView({
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: "rgba(74, 222, 128, 0.12)",
-                      border: "1px solid rgba(74, 222, 128, 0.3)",
+                      background: isDark ? "rgba(74, 222, 128, 0.12)" : "#dcfce7",
+                      border: isDark ? "1px solid rgba(74, 222, 128, 0.3)" : "1px solid #86efac",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -2372,13 +2388,13 @@ export default function ModernDashboardView({
                       {currentBadge ? currentBadge.icon : "🌱"}
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                         CURRENT BADGE (UNLOCKED ✓)
                       </div>
-                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
+                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginTop: "1px" }}>
                         {currentBadge ? currentBadge.name : "Starting Speaker"}
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+                      <div style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b" }}>
                         {currentBadge ? `${currentBadge.days}-Day streak achieved` : "Start speaking daily"}
                       </div>
                     </div>
@@ -2386,8 +2402,8 @@ export default function ModernDashboardView({
 
                   {/* Card 2: Target Next Milestone */}
                   <div style={{
-                    background: "rgba(249, 115, 22, 0.05)",
-                    border: "1px solid rgba(249, 115, 22, 0.25)",
+                    background: isDark ? "rgba(249, 115, 22, 0.05)" : "#fff7ed",
+                    border: isDark ? "1px solid rgba(249, 115, 22, 0.25)" : "1px solid #fed7aa",
                     borderRadius: 12,
                     padding: "0.75rem 1rem",
                     display: "flex",
@@ -2398,8 +2414,8 @@ export default function ModernDashboardView({
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: "rgba(249, 115, 22, 0.15)",
-                      border: "1px solid rgba(249, 115, 22, 0.4)",
+                      background: isDark ? "rgba(249, 115, 22, 0.15)" : "#ffedd5",
+                      border: isDark ? "1px solid rgba(249, 115, 22, 0.4)" : "1px solid #fdba74",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -2409,13 +2425,13 @@ export default function ModernDashboardView({
                       {nextBadge ? nextBadge.icon : "🏆"}
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: isDark ? "#f97316" : "#ea580c", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                         NEXT MILESTONE (TARGET)
                       </div>
-                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
+                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginTop: "1px" }}>
                         {nextBadge ? nextBadge.name : "Max Tier Unlocked"}
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: "#fdba74" }}>
+                      <div style={{ fontSize: "0.7rem", color: isDark ? "#fdba74" : "#c2410c" }}>
                         {nextBadge ? `Requires ${nextBadge.days}-day streak · ${remainingDays} days left` : "All milestones unlocked"}
                       </div>
                     </div>
@@ -2423,8 +2439,8 @@ export default function ModernDashboardView({
 
                   {/* Card 3: Exact Streak Progress Status */}
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.07)" : "1px solid #e2e8f0",
                     borderRadius: 12,
                     padding: "0.75rem 1rem",
                     display: "flex",
@@ -2435,8 +2451,8 @@ export default function ModernDashboardView({
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: "rgba(167, 139, 250, 0.12)",
-                      border: "1px solid rgba(167, 139, 250, 0.3)",
+                      background: isDark ? "rgba(167, 139, 250, 0.12)" : "#ede9fe",
+                      border: isDark ? "1px solid rgba(167, 139, 250, 0.3)" : "1px solid #ddd6fe",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -2446,13 +2462,13 @@ export default function ModernDashboardView({
                       ⚡
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                         OVERALL PROGRESS
                       </div>
-                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
+                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginTop: "1px" }}>
                         {currentDays} of {targetDays} Days ({overallPercent}%)
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+                      <div style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b" }}>
                         {remainingDays > 0 ? `${remainingDays} more consecutive days needed` : "Milestone reached!"}
                       </div>
                     </div>
@@ -2463,9 +2479,10 @@ export default function ModernDashboardView({
                 <div style={{
                   position: "relative",
                   padding: "1.2rem 1.2rem 2.8rem",
-                  background: "rgba(0, 0, 0, 0.25)",
+                  background: isDark ? "rgba(0, 0, 0, 0.25)" : "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
                   borderRadius: 14,
-                  border: "1px solid rgba(255, 255, 255, 0.04)",
+                  border: isDark ? "1px solid rgba(255, 255, 255, 0.04)" : "1px solid #e2e8f0",
+                  boxShadow: isDark ? "inset 0 2px 8px rgba(0, 0, 0, 0.2)" : "inset 0 1px 4px rgba(0, 0, 0, 0.03)",
                   overflowX: "auto",
                 }}>
                   <div style={{ minWidth: nodes.length <= 7 ? "auto" : 620, position: "relative" }}>
@@ -2476,7 +2493,7 @@ export default function ModernDashboardView({
                       right: 20,
                       top: 20,
                       height: 6,
-                      background: "rgba(255, 255, 255, 0.08)",
+                      background: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                       borderRadius: 99,
                       zIndex: 1,
                     }}>
@@ -2489,7 +2506,7 @@ export default function ModernDashboardView({
                         width: `${fillWidthPercent}%`,
                         background: "linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #f97316 100%)",
                         borderRadius: 99,
-                        boxShadow: "0 0 12px rgba(249, 115, 22, 0.6)",
+                        boxShadow: isDark ? "0 0 12px rgba(249, 115, 22, 0.6)" : "0 2px 8px rgba(249, 115, 22, 0.35)",
                         transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
                       }} />
                     </div>
@@ -2532,14 +2549,16 @@ export default function ModernDashboardView({
                               {hasBadge ? (
                                 <span style={{
                                   fontSize: "0.75rem",
-                                  filter: isDone || isCur ? "drop-shadow(0 0 4px rgba(255,255,255,0.4))" : "grayscale(0.8)",
+                                  filter: isDone || isCur
+                                    ? (isDark ? "drop-shadow(0 0 4px rgba(255,255,255,0.4))" : "drop-shadow(0 1px 2px rgba(0,0,0,0.15))")
+                                    : "grayscale(0.8)",
                                 }}>
                                   {node.badge.icon}
                                 </span>
                               ) : node.day === 1 ? (
                                 <span style={{ fontSize: "0.68rem" }}>🚩</span>
                               ) : (
-                                <span style={{ fontSize: "0.64rem", opacity: 0.4 }}>📍</span>
+                                <span style={{ fontSize: "0.64rem", opacity: isDark ? 0.4 : 0.6 }}>📍</span>
                               )}
                             </div>
 
@@ -2551,26 +2570,32 @@ export default function ModernDashboardView({
                               background: isCur
                                 ? "linear-gradient(135deg, #f97316 0%, #ea580c 100%)"
                                 : isDone
-                                ? "#064e3b"
+                                ? (isDark ? "#064e3b" : "#10b981")
                                 : isTgt
-                                ? "#1c1436"
-                                : "#120f21",
+                                ? (isDark ? "#1c1436" : "#fff7ed")
+                                : (isDark ? "#120f21" : "#ffffff"),
                               border: isCur
                                 ? "3px solid #ffffff"
                                 : isDone
-                                ? "2px solid #22c55e"
+                                ? (isDark ? "2px solid #22c55e" : "2px solid #059669")
                                 : isTgt
-                                ? "2px dashed #f59e0b"
-                                : "2px solid rgba(255, 255, 255, 0.16)",
+                                ? (isDark ? "2px dashed #f59e0b" : "2px dashed #ea580c")
+                                : (isDark ? "2px solid rgba(255, 255, 255, 0.16)" : "2px solid #cbd5e1"),
                               boxShadow: isCur
-                                ? "0 0 20px rgba(249, 115, 22, 0.8), 0 0 0 4px rgba(249, 115, 22, 0.3)"
+                                ? (isDark
+                                  ? "0 0 20px rgba(249, 115, 22, 0.8), 0 0 0 4px rgba(249, 115, 22, 0.3)"
+                                  : "0 4px 14px rgba(249, 115, 22, 0.45), 0 0 0 4px rgba(249, 115, 22, 0.2)")
                                 : isDone
-                                ? "0 0 8px rgba(34, 197, 94, 0.4)"
-                                : "none",
+                                ? (isDark ? "0 0 8px rgba(34, 197, 94, 0.4)" : "0 2px 6px rgba(16, 185, 129, 0.3)")
+                                : (isDark ? "none" : "0 1px 3px rgba(0,0,0,0.06)"),
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              color: "#ffffff",
+                              color: isCur || isDone
+                                ? "#ffffff"
+                                : isTgt
+                                ? (isDark ? "#ffffff" : "#c2410c")
+                                : (isDark ? "#94a3b8" : "#475569"),
                               fontSize: isCur ? "1.05rem" : (isDone ? "0.8rem" : "0.72rem"),
                               fontWeight: 800,
                               cursor: "default",
@@ -2585,7 +2610,13 @@ export default function ModernDashboardView({
                               marginTop: 6,
                               fontSize: isCur ? "0.78rem" : "0.72rem",
                               fontWeight: isCur ? 800 : 600,
-                              color: isCur ? "#f97316" : isDone ? "#4ade80" : isTgt ? "#f59e0b" : "#716c85",
+                              color: isCur
+                                ? (isDark ? "#f97316" : "#ea580c")
+                                : isDone
+                                ? (isDark ? "#4ade80" : "#16a34a")
+                                : isTgt
+                                ? (isDark ? "#f59e0b" : "#ea580c")
+                                : (isDark ? "#716c85" : "#64748b"),
                               whiteSpace: "nowrap",
                             }}>
                               Day {node.day}
@@ -2599,13 +2630,19 @@ export default function ModernDashboardView({
                                 fontWeight: 800,
                                 textTransform: "uppercase",
                                 letterSpacing: "0.05em",
-                                color: isCur ? "#f97316" : isTgt ? "#f59e0b" : isDone ? "#4ade80" : "#94a3b8",
-                                background: isCur
-                                  ? "rgba(249, 115, 22, 0.15)"
+                                color: isCur
+                                  ? (isDark ? "#f97316" : "#c2410c")
                                   : isTgt
-                                  ? "rgba(245, 158, 11, 0.15)"
+                                  ? (isDark ? "#f59e0b" : "#b45309")
                                   : isDone
-                                  ? "rgba(34, 197, 94, 0.12)"
+                                  ? (isDark ? "#4ade80" : "#15803d")
+                                  : (isDark ? "#94a3b8" : "#64748b"),
+                                background: isCur
+                                  ? (isDark ? "rgba(249, 115, 22, 0.15)" : "#ffedd5")
+                                  : isTgt
+                                  ? (isDark ? "rgba(245, 158, 11, 0.15)" : "#fef3c7")
+                                  : isDone
+                                  ? (isDark ? "rgba(34, 197, 94, 0.12)" : "#dcfce7")
                                   : "transparent",
                                 padding: isCur || isTgt || isDone ? "1px 5px" : "0",
                                 borderRadius: 4,
@@ -2621,7 +2658,9 @@ export default function ModernDashboardView({
                                 marginTop: 3,
                                 fontSize: "0.62rem",
                                 fontWeight: 700,
-                                color: node.badge.color || "#cbd5e1",
+                                color: isDark
+                                  ? (node.badge.color || "#cbd5e1")
+                                  : (isCur || isTgt ? "#ea580c" : isDone ? "#15803d" : "#475569"),
                                 maxWidth: 70,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -2643,17 +2682,17 @@ export default function ModernDashboardView({
                   justifyContent: "space-between",
                   alignItems: "center",
                   fontSize: "0.76rem",
-                  color: "#94a3b8",
+                  color: isDark ? "#94a3b8" : "#64748b",
                   paddingTop: "0.85rem",
                   marginTop: "0.85rem",
-                  borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+                  borderTop: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0",
                   flexWrap: "wrap",
                   gap: "0.6rem",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                    <span style={{ color: "#f97316", fontWeight: 700 }}>🔥 {currentDays}-Day Active Streak</span>
+                    <span style={{ color: isDark ? "#f97316" : "#ea580c", fontWeight: 700 }}>🔥 {currentDays}-Day Active Streak</span>
                     <span>·</span>
-                    <span style={{ color: "#cbd5e1" }}>
+                    <span style={{ color: isDark ? "#cbd5e1" : "#475569" }}>
                       {remainingDays > 0
                         ? `Practice tomorrow to reach Day ${currentDays + 1} (${remainingDays} days to ${nextBadge?.name || "next badge"})`
                         : "🎉 Target unlocked! Claim your new badge"}
@@ -2661,14 +2700,14 @@ export default function ModernDashboardView({
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span>Progress:</span>
-                    <span style={{ color: "#ffffff", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                    <span style={{ color: isDark ? "#94a3b8" : "#64748b" }}>Progress:</span>
+                    <span style={{ color: isDark ? "#ffffff" : "#0f172a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                       {currentDays} / {targetDays} Days
                     </span>
                     <div style={{
                       width: 70,
                       height: 6,
-                      background: "rgba(255, 255, 255, 0.08)",
+                      background: isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
                       borderRadius: 99,
                       overflow: "hidden",
                     }}>
@@ -2680,7 +2719,7 @@ export default function ModernDashboardView({
                       }} />
                     </div>
                     <span style={{
-                      color: "#f97316",
+                      color: isDark ? "#f97316" : "#ea580c",
                       fontWeight: 800,
                       fontSize: "0.74rem",
                     }}>
