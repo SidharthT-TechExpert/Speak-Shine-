@@ -6374,9 +6374,98 @@ audio { border-radius: 12px; }
   color: #475569 !important;
 }
 
-/* Light mode planned card */
+/* ── Vocabulary Cards & Plan Buttons ─────────────────────────────────────────*/
+.vocab-card-pro {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(124, 111, 255, 0.16);
+}
+
+.vocab-card-pro.planned {
+  background: rgba(34, 197, 94, 0.12) !important;
+  border: 1.5px solid rgba(34, 197, 94, 0.55) !important;
+  box-shadow: 0 4px 18px rgba(34, 197, 94, 0.15) !important;
+}
+
+.vocab-plan-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+}
+
+.vocab-plan-btn.planned {
+  background: rgba(34, 197, 94, 0.22) !important;
+  border: 1.5px solid rgba(74, 222, 128, 0.6) !important;
+  color: #4ade80 !important;
+}
+
+.vocab-goal-pill {
+  background: rgba(124, 111, 255, 0.15);
+  border: 1px solid rgba(124, 111, 255, 0.3);
+  color: #c4b5fd;
+}
+
+.vocab-goal-pill.goal-met {
+  background: rgba(74, 222, 128, 0.18);
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  color: #4ade80;
+}
+
+/* ── Light Mode: High-Contrast Green for Planned Vocab Cards ─────────────────*/
+[data-theme="light"] .vocab-card-pro,
+.light .vocab-card-pro {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
 [data-theme="light"] .vocab-card-pro.planned,
 .light .vocab-card-pro.planned {
-  background: rgba(34, 197, 94, 0.08) !important;
-  border: 1px solid rgba(34, 197, 94, 0.45) !important;
+  background: #f0fdf4 !important; /* Rich light emerald tint (green-50) */
+  border: 1.5px solid #16a34a !important; /* Bold, unmistakable emerald green border */
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.16) !important;
 }
+
+[data-theme="light"] .vocab-plan-btn,
+.light .vocab-plan-btn {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+[data-theme="light"] .vocab-plan-btn:hover,
+.light .vocab-plan-btn:hover {
+  background: #f8fafc !important;
+  border-color: #6366f1 !important;
+  color: #4f46e5 !important;
+}
+
+[data-theme="light"] .vocab-plan-btn.planned,
+.light .vocab-plan-btn.planned {
+  background: #dcfce7 !important; /* Bright, unmistakable green background */
+  border: 1.5px solid #16a34a !important; /* Solid emerald border */
+  color: #15803d !important; /* Bold, dark green text */
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2) !important;
+}
+
+[data-theme="light"] .vocab-plan-btn.planned:hover,
+.light .vocab-plan-btn.planned:hover {
+  background: #bbf7d0 !important;
+  border-color: #15803d !important;
+  color: #14532d !important;
+}
+
+[data-theme="light"] .vocab-goal-pill,
+.light .vocab-goal-pill {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: 1px solid rgba(99, 102, 241, 0.25) !important;
+  color: #4f46e5 !important;
+}
+
+[data-theme="light"] .vocab-goal-pill.goal-met,
+.light .vocab-goal-pill.goal-met {
+  background: #dcfce7 !important;
+  border: 1.5px solid #22c55e !important;
+  color: #15803d !important;
+}
+

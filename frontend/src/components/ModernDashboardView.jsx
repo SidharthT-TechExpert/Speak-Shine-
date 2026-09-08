@@ -867,13 +867,16 @@ export default function ModernDashboardView({
                       TODAY'S VOCABULARY CHALLENGE
                     </span>
                   </div>
-                  <div style={{
-                    fontSize: "0.72rem", fontWeight: 700,
-                    background: plannedCount >= 3 ? "rgba(74, 222, 128, 0.15)" : "rgba(124, 111, 255, 0.15)",
-                    border: `1px solid ${plannedCount >= 3 ? "rgba(74, 222, 128, 0.4)" : "rgba(124, 111, 255, 0.3)"}`,
-                    color: plannedCount >= 3 ? "#4ade80" : "#c4b5fd",
-                    padding: "2px 8px", borderRadius: 99,
-                  }}>
+                  <div
+                    className={`vocab-goal-pill ${plannedCount >= 3 ? "goal-met" : ""}`}
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 99,
+                      transition: "all 0.15s ease",
+                    }}
+                  >
                     🎯 Goal: {plannedCount} / {Math.min(3, vocabList.length)} words (+30 pts)
                   </div>
                 </div>
@@ -926,11 +929,8 @@ export default function ModernDashboardView({
                             <button
                               type="button"
                               onClick={() => togglePlanned(i)}
-                              className="vocab-plan-btn"
+                              className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
                               style={{
-                                background: isPlanned ? "rgba(74, 222, 128, 0.2)" : "rgba(255, 255, 255, 0.06)",
-                                border: `1px solid ${isPlanned ? "rgba(74, 222, 128, 0.4)" : "rgba(255, 255, 255, 0.15)"}`,
-                                color: isPlanned ? "#4ade80" : "#cbd5e1",
                                 borderRadius: 8,
                                 padding: "4px 8px",
                                 fontSize: "0.72rem",

@@ -874,11 +874,8 @@ export default function VideoAnalysis() {
                                 <button
                                   type="button"
                                   onClick={() => togglePlanned(i)}
-                                  className="vocab-plan-btn"
+                                  className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
                                   style={{
-                                    background: isPlanned ? "rgba(74, 222, 128, 0.2)" : "rgba(255, 255, 255, 0.06)",
-                                    border: `1px solid ${isPlanned ? "rgba(74, 222, 128, 0.4)" : "rgba(255, 255, 255, 0.15)"}`,
-                                    color: isPlanned ? "#4ade80" : "#cbd5e1",
                                     borderRadius: 8,
                                     padding: "4px 8px",
                                     fontSize: "0.72rem",
