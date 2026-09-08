@@ -621,21 +621,35 @@ export default function VideoAnalysis() {
         )}
 
         {/* Mode switcher */}
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+        <div style={{
+          display: "inline-flex",
+          gap: "0.35rem",
+          background: "rgba(255, 255, 255, 0.03)",
+          padding: 4,
+          borderRadius: 12,
+          border: "1px solid rgba(255, 255, 255, 0.06)",
+          marginBottom: "1.25rem",
+        }}>
           <button
+            type="button"
             className={`tab-btn${mode === "record" ? " active" : ""}`}
             onClick={() => {
               setMode("record");
               navigate("/record");
             }}
-          >🎥 Record Now</button>
+          >
+            <span>🎥</span> Record Now
+          </button>
           <button
+            type="button"
             className={`tab-btn${mode === "upload" ? " active" : ""}`}
             onClick={() => {
               setMode("upload");
               navigate("/video-analysis");
             }}
-          >📁 Upload Video</button>
+          >
+            <span>📁</span> Upload Video
+          </button>
         </div>
 
         {mode === "upload"

@@ -217,7 +217,7 @@ export default function PaymentHistory() {
         </Suspense>
       )}
 
-      <div style={{ maxWidth: 760, margin: "1.5rem auto", padding: "0 1rem" }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", width: "100%" }}>
 
         {/* ── Active Membership Card (When Paid) ── */}
         {isPaid ? (
@@ -447,20 +447,21 @@ export default function PaymentHistory() {
                   disabled={paying}
                   style={{
                     background: paying
-                      ? "rgba(124, 111, 255, 0.4)"
-                      : "linear-gradient(135deg, #7c6fff 0%, #6366f1 100%)",
+                      ? "rgba(249, 115, 22, 0.4)"
+                      : "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
                     color: "#ffffff",
                     border: "none",
                     borderRadius: 12,
-                    padding: "0.75rem 1.4rem",
+                    padding: "0.85rem 1.6rem",
                     fontSize: "0.95rem",
                     fontWeight: 800,
                     cursor: paying ? "not-allowed" : "pointer",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.5rem",
-                    boxShadow: "0 6px 20px rgba(124, 111, 255, 0.4)",
+                    boxShadow: "0 6px 20px rgba(249, 115, 22, 0.4)",
                     whiteSpace: "nowrap",
+                    transition: "transform 0.15s ease",
                   }}
                 >
                   {paying ? "Opening Checkout…" : `💳 Pay ₹${planAmount} Now`}
