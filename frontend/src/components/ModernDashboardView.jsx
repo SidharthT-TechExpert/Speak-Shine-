@@ -1772,14 +1772,10 @@ export default function ModernDashboardView({
                             <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#8e8a9f" }}>pts</span>
                           </div>
                           <div style={{
-                            fontSize: "0.7rem",
-                            color: "#7c7793",
+                            fontSize: "0.8rem",
                             marginTop: "2px",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
+                            lineHeight: 1,
                           }}>
-                            <span>{u.time || (u.isCompletedToday ? "Today" : "Yesterday")}</span>
                             <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
                               {u.isCompletedToday ? "✅" : "⏳"}
                             </span>
