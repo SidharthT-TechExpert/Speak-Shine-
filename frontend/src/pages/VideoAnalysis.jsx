@@ -221,6 +221,74 @@ export default function VideoAnalysis() {
   const plannedCount = Object.values(plannedWords).filter(Boolean).length;
   const plannedBonusPts = plannedCount * 10;
 
+  // ── Vocabulary Audio Pronunciation Handler ──────────────────────────────────
+  const [speakingVocabIndex, setSpeakingVocabIndex] = useState(null);
+  const vocabAudioRef = useRef(null);
+
+  const handleSpeakVocab = (rawWord, rawMeaning, rawExample, idx) => {
+    if (!rawWord) return;
+    const wordClean = (rawWord || "").trim();
+    const meaningClean = (rawMeaning || "").trim();
+    const exampleClean = (rawExample || "").trim();
+
+    let textToSpeak = wordClean;
+    if (meaningClean) {
+      textToSpeak += `. ${meaningClean}`;
+    }
+    if (exampleClean) {
+      textToSpeak += `. For example: ${exampleClean}`;
+    }
+
+    setSpeakingVocabIndex(idx);
+
+    if (vocabAudioRef.current) {
+      vocabAudioRef.current.pause();
+      vocabAudioRef.current = null;
+    }
+
+    const safetyTimer = setTimeout(() => {
+      setSpeakingVocabIndex(prev => prev === idx ? null : prev);
+    }, Math.max(5000, Math.min(25000, textToSpeak.length * 90)));
+
+    const audioUrl = `/api/video/tts?text=${encodeURIComponent(textToSpeak)}`;
+    const audio = new Audio(audioUrl);
+    vocabAudioRef.current = audio;
+
+    audio.onended = () => {
+      clearTimeout(safetyTimer);
+      setSpeakingVocabIndex(null);
+    };
+
+    const fallbackTTS = () => {
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(textToSpeak);
+          utterance.rate = 0.90;
+          utterance.lang = 'en-US';
+          const voices = window.speechSynthesis.getVoices();
+          const pref = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google")));
+          if (pref) utterance.voice = pref;
+          utterance.onend = () => {
+            clearTimeout(safetyTimer);
+            setSpeakingVocabIndex(null);
+          };
+          utterance.onerror = () => {
+            clearTimeout(safetyTimer);
+            setSpeakingVocabIndex(null);
+          };
+          window.speechSynthesis.speak(utterance);
+          return;
+        } catch {}
+      }
+      clearTimeout(safetyTimer);
+      setSpeakingVocabIndex(null);
+    };
+
+    audio.onerror = fallbackTTS;
+    audio.play().catch(fallbackTTS);
+  };
+
 
   // shared state
   const [reportId, setReportId]       = useState(null);
@@ -501,18 +569,42 @@ export default function VideoAnalysis() {
 
           const normalizedVocab = (todayVocabulary && todayVocabulary.length > 0)
             ? todayVocabulary.slice(0, 5).map((v, i) => {
+                let word = "";
+                let meaning = "";
+                let example = "";
                 if (typeof v === "string") {
                   const parts = v.split(/\s*[-—:]\s*/);
-                  return {
-                    word: parts[0]?.trim() || `Word ${i + 1}`,
-                    meaning: parts.slice(1).join(" — ").trim() || "",
-                    bonus: i === 1 ? "+15 pts" : "+10 pts",
-                  };
+                  word = parts[0]?.trim() || `Word ${i + 1}`;
+                  meaning = parts[1]?.trim() || "";
+                  if (parts.length >= 3) {
+                    example = parts.slice(2).join(" — ").trim();
+                  }
+                } else if (v && typeof v === "object") {
+                  word = v.word || v.Word || v.term || `Word ${i + 1}`;
+                  meaning = v.meaning || v.Meaning || v.definition || v.desc || "";
+                  example = v.example || v.Example || v.sentence || v.sampleSentence || "";
                 }
+
+                if (!example) {
+                  const wLower = word.toLowerCase();
+                  const defaults = {
+                    miscommunication: "The miscommunication caused the package to be delivered to the wrong address.",
+                    serendipity: "The serendipity of meeting her at the wrong delivery turned into a lasting friendship.",
+                    reconcile: "They reconciled after the mix-up, and their friendship grew stronger.",
+                    inevitable: "With regular practice, rapid improvement in speaking fluency is inevitable.",
+                    reluctant: "He was reluctant to speak at first, but gained confidence quickly.",
+                    articulate: "She was able to articulate her ideas clearly during the presentation.",
+                    perseverance: "Through perseverance and daily speaking drills, he mastered clear pronunciation.",
+                    cohesion: "Using linking words gave great cohesion to her story summary.",
+                  };
+                  example = defaults[wLower] || (word ? `The speaker used the word "${word}" naturally in the story summary.` : "");
+                }
+
                 return {
-                  word: v.word || v.Word || v.term || `Word ${i + 1}`,
-                  meaning: v.meaning || v.Meaning || v.definition || v.desc || "",
-                  bonus: v.bonus || (i === 1 ? "+15 pts" : "+10 pts"),
+                  word,
+                  meaning,
+                  example,
+                  bonus: i === 1 ? "+15 pts" : "+10 pts",
                 };
               })
             : [];
@@ -718,96 +810,103 @@ export default function VideoAnalysis() {
                   </div>
                 )}
 
-                {/* Target Vocabulary Section (Matching Dashboard Page) */}
+                {/* Target Vocabulary Section (Matching Screenshot) */}
                 {normalizedVocab.length > 0 && (
-                  <div style={{ marginTop: "1rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase" }}>
-                        TARGET VOCABULARY
-                      </span>
-                      <span style={{ fontSize: "0.74rem", color: "#a78bfa", fontWeight: 600 }}>
-                        {plannedCount} of {Math.min(vocabRequiredCount || 3, normalizedVocab.length)} planned · +{plannedBonusPts} pts
-                      </span>
+                  <div style={{ marginTop: "1.25rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                        <span style={{ fontSize: "1.05rem" }}>📚</span>
+                        <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase" }}>
+                          TODAY'S VOCABULARY CHALLENGE
+                        </span>
+                      </div>
+                      <div style={{
+                        fontSize: "0.72rem", fontWeight: 700,
+                        background: plannedCount >= (vocabRequiredCount || 3) ? "rgba(74, 222, 128, 0.15)" : "rgba(124, 111, 255, 0.15)",
+                        border: `1px solid ${plannedCount >= (vocabRequiredCount || 3) ? "rgba(74, 222, 128, 0.4)" : "rgba(124, 111, 255, 0.3)"}`,
+                        color: plannedCount >= (vocabRequiredCount || 3) ? "#4ade80" : "#c4b5fd",
+                        padding: "2px 8px", borderRadius: 99,
+                      }}>
+                        🎯 Goal: {plannedCount} / {Math.min(vocabRequiredCount || 3, normalizedVocab.length)} words (+30 pts)
+                      </div>
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                       {normalizedVocab.map((v, i) => {
                         const isPlanned = !!plannedWords[i];
+                        const isSpeaking = speakingVocabIndex === i;
                         return (
                           <div
                             key={i}
+                            className="vocab-card-pro"
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "0.85rem 1.1rem",
-                              borderRadius: 12,
                               background: isPlanned ? "rgba(34, 197, 94, 0.08)" : "rgba(255, 255, 255, 0.03)",
-                              border: isPlanned ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(255, 255, 255, 0.06)",
+                              border: isPlanned ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(124, 111, 255, 0.16)",
+                              borderRadius: 12,
+                              padding: "0.85rem 1rem",
                               transition: "all 0.15s ease",
                             }}
                           >
-                            <div>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", marginBottom: "0.2rem" }}>
-                                <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>
-                                  0{i + 1}
-                                </span>
-                                <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>
-                                  {v.word}
-                                </span>
-                                <span style={{
-                                  background: "rgba(34, 197, 94, 0.15)",
-                                  color: "#4ade80",
-                                  fontSize: "0.68rem",
-                                  fontWeight: 800,
-                                  padding: "2px 7px",
-                                  borderRadius: 6,
-                                  letterSpacing: "0.02em",
-                                }}>
-                                  {v.bonus || "+10 pts"}
-                                </span>
-                              </div>
-                              {v.meaning && (
-                                <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
-                                  {v.meaning}
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
+                                  <div className="vocab-num-badge">0{i + 1}</div>
+                                  <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem", color: "#ffffff" }}>
+                                    {v.word}
+                                  </span>
+                                  {v.meaning && (
+                                    <span style={{ fontSize: "0.82rem", color: "#cbd5e1", fontWeight: 500, lineHeight: 1.4 }}>
+                                      — {v.meaning}
+                                    </span>
+                                  )}
                                 </div>
-                              )}
-                            </div>
 
-                            <button
-                              type="button"
-                              onClick={() => togglePlanned(i)}
-                              style={{
-                                background: isPlanned ? "#22c55e" : "rgba(255, 255, 255, 0.06)",
-                                border: isPlanned ? "none" : "1px solid rgba(255, 255, 255, 0.15)",
-                                color: isPlanned ? "#ffffff" : "#cbd5e1",
-                                borderRadius: 99,
-                                padding: "0.4rem 0.85rem",
-                                fontSize: "0.76rem",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.35rem",
-                                whiteSpace: "nowrap",
-                                transition: "all 0.15s ease",
-                              }}
-                            >
-                              {isPlanned ? (
-                                <>
-                                  <span>✓</span>
-                                  <span>Planned</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>+</span>
-                                  <span>Mark as planned</span>
-                                </>
-                              )}
-                            </button>
+                                {v.example && (
+                                  <div className="vocab-example-bubble">
+                                    💬 <span style={{ fontStyle: "italic" }}>"{v.example}"</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0, marginTop: "2px" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSpeakVocab(v.word, v.meaning, v.example, i)}
+                                  className="vocab-listen-btn"
+                                  title="Listen to full pronunciation and example sentence"
+                                  style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
+                                >
+                                  {isSpeaking ? "🔊" : "🔈"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePlanned(i)}
+                                  className="vocab-plan-btn"
+                                  style={{
+                                    background: isPlanned ? "rgba(74, 222, 128, 0.2)" : "rgba(255, 255, 255, 0.06)",
+                                    border: `1px solid ${isPlanned ? "rgba(74, 222, 128, 0.4)" : "rgba(255, 255, 255, 0.15)"}`,
+                                    color: isPlanned ? "#4ade80" : "#cbd5e1",
+                                    borderRadius: 8,
+                                    padding: "4px 8px",
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {isPlanned ? "✓ Planned" : "+ Plan to use"}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
+                    </div>
+
+                    <div style={{ marginTop: "0.75rem", fontSize: "0.74rem", color: "#8c87a2", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span>✨</span>
+                      <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
                     </div>
                   </div>
                 )}
