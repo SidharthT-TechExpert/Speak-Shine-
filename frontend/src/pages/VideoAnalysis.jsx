@@ -2460,10 +2460,6 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
           </div>
         )}
         {uploadGate && <SubmitGatePanel gate={uploadGate} />}
-        {/* Vocabulary challenge */}
-        {vocabulary.length > 0 && (
-          <VocabularyWords words={vocabulary} requiredCount={vocabRequiredCount} totalCount={vocabWordCount} isPictureDescription={isPictureDescription} />
-        )}
         {allowPrivateVideos && file && !uploading && (
           <div style={{
             display: "flex",
@@ -3561,11 +3557,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
                 <span>Strong</span>
               </div>
             </div>
-          )}
-
-          {/* Vocabulary challenge */}
-          {vocabulary.length > 0 && (
-            <VocabularyWords words={vocabulary} requiredCount={vocabRequiredCount} totalCount={vocabWordCount} isPictureDescription={isPictureDescription} />
           )}
 
           <button className="btn-primary" onClick={startCountdown} style={{ width: "100%" }}>
