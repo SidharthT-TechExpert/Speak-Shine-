@@ -4905,3 +4905,221 @@ audio { border-radius: 12px; }
 [data-theme="light"] .urgency-subtext {
   color: #48576c !important;
 }
+
+/* ==========================================================================
+   Speak & Shine Modern Layout (Figma-Matched Dark Aesthetic)
+   ========================================================================== */
+
+.speakshine-shell {
+  display: flex;
+  min-height: 100vh;
+  background-color: #06050b;
+  color: #f1f0f5;
+}
+
+/* Sidebar */
+.speakshine-sidebar {
+  width: 230px;
+  min-width: 230px;
+  background: #090710;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 50;
+}
+
+.speakshine-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.25rem 0.5rem 1.75rem;
+  text-decoration: none;
+}
+.speakshine-sidebar-brand .brand-logo-text {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.speakshine-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.speakshine-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #8e8a9f;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.speakshine-nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+}
+.speakshine-nav-item.active {
+  color: #ffffff;
+  background: #1e192f;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.speakshine-nav-item .nav-icon {
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+}
+
+/* Freeze tokens card */
+.speakshine-freeze-box {
+  background: #0d0a18;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 1rem 0.9rem;
+  margin-top: auto;
+}
+.speakshine-freeze-box .freeze-title {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #716c85;
+  margin-bottom: 0.35rem;
+}
+.speakshine-freeze-box .freeze-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #38bdf8;
+  line-height: 1;
+  margin-bottom: 0.35rem;
+}
+.speakshine-freeze-box .freeze-desc {
+  font-size: 0.73rem;
+  color: #7c7793;
+  line-height: 1.35;
+  margin-bottom: 0.75rem;
+}
+.speakshine-freeze-box .freeze-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9d8ec9;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  cursor: pointer;
+}
+.speakshine-freeze-box .freeze-link:hover {
+  color: #c4b5fd;
+}
+
+/* Main Area */
+.speakshine-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #06050b;
+}
+
+/* Topbar */
+.speakshine-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(6, 5, 11, 0.75);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+.speakshine-topbar-left {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.speakshine-topbar-greeting {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f1f0f5;
+}
+.speakshine-topbar-subtitle {
+  font-size: 0.82rem;
+  color: #7c7793;
+}
+.speakshine-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.speakshine-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.speakshine-pill.streak {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+.speakshine-pill.points {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+.speakshine-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #c084fc;
+  color: #1e1136;
+  font-weight: 800;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Canvas padding */
+.speakshine-canvas {
+  padding: 1.75rem 2rem 3rem;
+  max-width: 1360px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+  .speakshine-sidebar {
+    display: none;
+  }
+  .speakshine-topbar {
+    padding: 0.85rem 1rem;
+  }
+  .speakshine-canvas {
+    padding: 1rem;
+  }
+}
+
