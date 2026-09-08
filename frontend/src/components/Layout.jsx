@@ -327,7 +327,7 @@ export default function Layout({ children, title, subtitle }) {
           <div className="speakshine-freeze-box">
             <div className="freeze-title">FREEZE TOKENS</div>
             <div className="freeze-val">
-              {freezeTokens} <span style={{ fontSize: "0.95rem", color: "#7c7793", fontWeight: 500 }}>/ 2 Available</span>
+              {freezeTokens} <span style={{ fontSize: "0.95rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
             </div>
             <div className="freeze-desc">
               Earn tokens by completing 7-day streak milestones.
