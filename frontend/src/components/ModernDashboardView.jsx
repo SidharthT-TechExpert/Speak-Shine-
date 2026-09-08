@@ -2073,305 +2073,477 @@ export default function ModernDashboardView({
             const targetDays = nextBadge ? nextBadge.days : (currentBadge?.days || 7);
             const startDays = currentBadge ? currentBadge.days : 0;
             const remainingDays = Math.max(0, targetDays - currentDays);
-
-            // True mathematical progress
             const overallPercent = targetDays > 0 ? Math.min(100, Math.max(0, Math.round((currentDays / targetDays) * 100))) : 100;
-            const tierSpan = Math.max(1, targetDays - startDays);
-            const tierProgress = Math.max(0, currentDays - startDays);
-            const tierPercent = Math.min(100, Math.max(0, Math.round((tierProgress / tierSpan) * 100)));
 
-            // Build accurate milestone nodes along the track
-            const dayNodes = [];
+            // Generate accurate roadmap nodes
+            // For <= 14 days, show all discrete days 1..targetDays
+            // For > 14 days, show key milestone checkpoints, current day, and target day
+            const nodes = [];
             if (targetDays <= 14) {
               for (let d = 1; d <= targetDays; d++) {
-                const isCompleted = d <= currentDays;
+                const isCompleted = d < currentDays;
                 const isCurrent = d === currentDays && currentDays > 0;
                 const isTarget = d === targetDays;
                 const badgeOnDay = STREAK_BADGES.find(b => b.days === d);
-                dayNodes.push({
+                nodes.push({
                   day: d,
                   isCompleted,
                   isCurrent,
                   isTarget,
                   badge: badgeOnDay,
+                  label: isCurrent ? "Today" : isTarget ? "Goal" : d === currentDays + 1 ? "Next" : "",
                 });
               }
             } else {
-              // For long-range goals (e.g. 21d, 30d, 45d), show start node, intermediate checkpoints, current day, and target node
-              const checkpoints = [startDays, currentDays, targetDays];
-              if (targetDays - startDays > 4) {
-                const mid = Math.round(startDays + (targetDays - startDays) / 2);
-                if (!checkpoints.includes(mid)) checkpoints.push(mid);
-              }
-              const sortedDays = Array.from(new Set(checkpoints.filter(d => d > 0))).sort((a, b) => a - b);
-              sortedDays.forEach(d => {
-                const isCompleted = d <= currentDays;
+              // Smart checkpoint spacing for higher streaks
+              const checkpoints = new Set([1, startDays > 0 ? startDays : null, currentDays, targetDays].filter(Boolean));
+              STREAK_BADGES.forEach(b => {
+                if (b.days >= startDays && b.days <= targetDays) checkpoints.add(b.days);
+              });
+              const sorted = Array.from(checkpoints).sort((a, b) => a - b);
+              sorted.forEach(d => {
+                const isCompleted = d < currentDays;
                 const isCurrent = d === currentDays && currentDays > 0;
                 const isTarget = d === targetDays;
                 const badgeOnDay = STREAK_BADGES.find(b => b.days === d);
-                dayNodes.push({
+                nodes.push({
                   day: d,
                   isCompleted,
                   isCurrent,
                   isTarget,
-                  badge: badgeOnDay || (d === startDays ? currentBadge : isTarget ? nextBadge : null),
+                  badge: badgeOnDay,
+                  label: isCurrent ? "Today" : isTarget ? "Goal" : "",
                 });
               });
             }
 
-            // Fill width calculation (percentage between first node and last node)
-            const fillPercent = targetDays > 0 ? Math.min(100, Math.max(0, (currentDays / targetDays) * 100)) : 100;
+            // Mathematical position of the progress line connecting precisely to current node
+            // Between first node (index 0) and last node (index nodes.length - 1)
+            const currentIndex = nodes.findIndex(n => n.isCurrent);
+            const fillWidthPercent = nodes.length > 1 && currentIndex >= 0
+              ? Math.min(100, Math.max(0, (currentIndex / (nodes.length - 1)) * 100))
+              : (currentDays >= targetDays ? 100 : overallPercent);
 
             return (
               <div className="speakshine-card-box" style={{
-                background: "linear-gradient(145deg, #0f0c1e 0%, #0a0815 100%)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: 16,
-                padding: "1.25rem 1.6rem",
+                background: "linear-gradient(145deg, #0d0a1b 0%, #080612 100%)",
+                border: "1px solid rgba(167, 139, 250, 0.14)",
+                borderRadius: 18,
+                padding: "1.35rem 1.6rem",
                 marginBottom: "1.25rem",
-                boxShadow: "0 8px 30px rgba(0, 0, 0, 0.4)",
+                boxShadow: "0 10px 32px rgba(0, 0, 0, 0.45)",
+                position: "relative",
+                overflow: "hidden",
               }}>
-                {/* Header Row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.1rem", flexWrap: "wrap", gap: "0.75rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                {/* Subtle decorative background glow */}
+                <div style={{
+                  position: "absolute",
+                  right: "-40px",
+                  top: "-40px",
+                  width: 220,
+                  height: 220,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, rgba(167, 139, 250, 0) 70%)",
+                  pointerEvents: "none",
+                }} />
+
+                {/* ── Header: Title & Badges Modal Link ── */}
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "1.2rem",
+                  flexWrap: "wrap",
+                  gap: "0.75rem",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
                     <span style={{
                       fontSize: "0.68rem",
                       fontWeight: 800,
-                      letterSpacing: "0.08em",
+                      letterSpacing: "0.09em",
                       color: "#f59e0b",
                       background: "rgba(245, 158, 11, 0.12)",
-                      border: "1px solid rgba(245, 158, 11, 0.3)",
+                      border: "1px solid rgba(245, 158, 11, 0.28)",
                       borderRadius: 6,
-                      padding: "3px 8px",
+                      padding: "3px 9px",
                       textTransform: "uppercase"
                     }}>
-                      BADGE ROADMAP
+                      STREAK ROADMAP
                     </span>
 
-                    {/* Current Level Pill */}
-                    <span style={{
-                      fontSize: "0.85rem",
-                      fontWeight: 700,
-                      color: currentBadge?.color || "#4ade80",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      background: "rgba(255, 255, 255, 0.04)",
-                      border: "1px solid rgba(255, 255, 255, 0.08)",
-                      borderRadius: 999,
-                      padding: "3px 10px",
-                    }}>
-                      <span>{currentBadge ? currentBadge.icon : "🌱"}</span>
-                      <span>{currentBadge ? currentBadge.name : "Starting Speaker"}</span>
-                      <span style={{ fontSize: "0.7rem", color: "#4ade80", fontWeight: 700 }}>({currentBadge ? `${currentBadge.days}d` : "0d"} ✓)</span>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff" }}>
+                      Journey to {nextBadge ? `${nextBadge.icon} ${nextBadge.name}` : "🏆 Speech Legend"}
                     </span>
-
-                    {/* Arrow */}
-                    <span style={{ color: "#716c85", fontSize: "0.8rem" }}>➔</span>
-
-                    {/* Target Milestone Pill */}
-                    {nextBadge ? (
-                      <span style={{
-                        fontSize: "0.85rem",
-                        fontWeight: 700,
-                        color: nextBadge.color || "#f97316",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                        background: "rgba(249, 115, 22, 0.1)",
-                        border: "1px solid rgba(249, 115, 22, 0.35)",
-                        borderRadius: 999,
-                        padding: "3px 10px",
-                      }}>
-                        <span>{nextBadge.icon}</span>
-                        <span>{nextBadge.name}</span>
-                        <span style={{ fontSize: "0.7rem", opacity: 0.9, fontWeight: 700 }}>({nextBadge.days}d Goal)</span>
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#facc15" }}>
-                        🏆 All 20 Badges Unlocked!
-                      </span>
-                    )}
                   </div>
 
-                  <div
+                  <button
+                    type="button"
                     onClick={onOpenBadges}
                     style={{
+                      background: "rgba(167, 139, 250, 0.08)",
+                      border: "1px solid rgba(167, 139, 250, 0.25)",
+                      borderRadius: 8,
+                      padding: "0.35rem 0.85rem",
                       fontSize: "0.78rem",
-                      color: "#a78bfa",
+                      color: "#c084fc",
                       fontWeight: 600,
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: "0.3rem",
-                      transition: "color 0.15s ease",
+                      gap: "0.35rem",
+                      transition: "all 0.15s ease",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.color = "#c084fc"}
-                    onMouseLeave={e => e.currentTarget.style.color = "#a78bfa"}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "rgba(167, 139, 250, 0.18)";
+                      e.currentTarget.style.color = "#ffffff";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "rgba(167, 139, 250, 0.08)";
+                      e.currentTarget.style.color = "#c084fc";
+                    }}
                   >
                     <span>View all 20 badges</span>
                     <span>→</span>
+                  </button>
+                </div>
+
+                {/* ── Milestone Cards: Current Tier vs Target Goal ── */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "0.85rem",
+                  marginBottom: "1.4rem",
+                }}>
+                  {/* Card 1: Current Unlocked Tier */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    borderRadius: 12,
+                    padding: "0.75rem 1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                  }}>
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: "rgba(74, 222, 128, 0.12)",
+                      border: "1px solid rgba(74, 222, 128, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.35rem",
+                      flexShrink: 0,
+                    }}>
+                      {currentBadge ? currentBadge.icon : "🌱"}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        CURRENT BADGE (UNLOCKED ✓)
+                      </div>
+                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
+                        {currentBadge ? currentBadge.name : "Starting Speaker"}
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+                        {currentBadge ? `${currentBadge.days}-Day streak achieved` : "Start speaking daily"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Target Next Milestone */}
+                  <div style={{
+                    background: "rgba(249, 115, 22, 0.05)",
+                    border: "1px solid rgba(249, 115, 22, 0.25)",
+                    borderRadius: 12,
+                    padding: "0.75rem 1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                  }}>
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: "rgba(249, 115, 22, 0.15)",
+                      border: "1px solid rgba(249, 115, 22, 0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.35rem",
+                      flexShrink: 0,
+                    }}>
+                      {nextBadge ? nextBadge.icon : "🏆"}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#f97316", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        NEXT MILESTONE (TARGET)
+                      </div>
+                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
+                        {nextBadge ? nextBadge.name : "Max Tier Unlocked"}
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: "#fdba74" }}>
+                        {nextBadge ? `Requires ${nextBadge.days}-day streak · ${remainingDays} days left` : "All milestones unlocked"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Exact Streak Progress Status */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    borderRadius: 12,
+                    padding: "0.75rem 1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                  }}>
+                    <div style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: "rgba(167, 139, 250, 0.12)",
+                      border: "1px solid rgba(167, 139, 250, 0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.25rem",
+                      flexShrink: 0,
+                    }}>
+                      ⚡
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        OVERALL PROGRESS
+                      </div>
+                      <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
+                        {currentDays} of {targetDays} Days ({overallPercent}%)
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
+                        {remainingDays > 0 ? `${remainingDays} more consecutive days needed` : "Milestone reached!"}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* ── Stepped Milestone Timeline Graph ── */}
+                {/* ── Stepped Visual Roadmap Track ── */}
                 <div style={{
                   position: "relative",
-                  padding: "1.4rem 0.5rem 1.8rem",
-                  margin: "0.5rem 0",
+                  padding: "1.2rem 1.2rem 2.8rem",
+                  background: "rgba(0, 0, 0, 0.25)",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255, 255, 255, 0.04)",
+                  overflowX: "auto",
                 }}>
-                  {/* Background Track Rail */}
-                  <div style={{
-                    position: "absolute",
-                    left: 20,
-                    right: 20,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    height: 6,
-                    background: "rgba(255, 255, 255, 0.08)",
-                    borderRadius: 99,
-                    zIndex: 1,
-                  }}>
-                    {/* Active Fill Rail with glowing gradient */}
+                  <div style={{ minWidth: targetDays <= 7 ? "auto" : 600, position: "relative" }}>
+                    {/* Connecting Rail - positioned exactly through vertical center of nodes (top: 20px) */}
                     <div style={{
                       position: "absolute",
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: `${fillPercent}%`,
-                      background: "linear-gradient(90deg, #22c55e 0%, #f59e0b 50%, #f97316 100%)",
+                      left: 20,
+                      right: 20,
+                      top: 20,
+                      height: 6,
+                      background: "rgba(255, 255, 255, 0.08)",
                       borderRadius: 99,
-                      boxShadow: "0 0 14px rgba(249, 115, 22, 0.5)",
-                      transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }} />
-                  </div>
+                      zIndex: 1,
+                    }}>
+                      {/* Active Fill Segment: Ends with pixel precision at the current active node */}
+                      <div style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${fillWidthPercent}%`,
+                        background: "linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #f97316 100%)",
+                        borderRadius: 99,
+                        boxShadow: "0 0 12px rgba(249, 115, 22, 0.6)",
+                        transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+                      }} />
+                    </div>
 
-                  {/* Milestone Day Nodes */}
-                  <div style={{
-                    position: "relative",
-                    zIndex: 2,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}>
-                    {dayNodes.map((node, i) => {
-                      const isFilled = node.isCompleted;
-                      const isCurrent = node.isCurrent;
-                      const hasBadge = Boolean(node.badge);
+                    {/* Checkpoint Nodes */}
+                    <div style={{
+                      position: "relative",
+                      zIndex: 2,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}>
+                      {nodes.map((node, i) => {
+                        const isDone = node.isCompleted;
+                        const isCur = node.isCurrent;
+                        const isTgt = node.isTarget;
+                        const hasBadge = Boolean(node.badge);
 
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            position: "relative",
-                            cursor: "default",
-                          }}
-                          title={node.badge ? `${node.badge.icon} Day ${node.day}: ${node.badge.name}` : `Day ${node.day} of streak`}
-                        >
-                          {/* Node Circle */}
-                          <div style={{
-                            width: isCurrent ? 34 : (hasBadge ? 30 : 24),
-                            height: isCurrent ? 34 : (hasBadge ? 30 : 24),
-                            borderRadius: "50%",
-                            background: isCurrent
-                              ? "linear-gradient(135deg, #f97316 0%, #ea580c 100%)"
-                              : isFilled
-                              ? "#15803d"
-                              : "#161126",
-                            border: isCurrent
-                              ? "3px solid #ffffff"
-                              : isFilled
-                              ? "2px solid #4ade80"
-                              : "2px solid rgba(255, 255, 255, 0.18)",
-                            boxShadow: isCurrent
-                              ? "0 0 18px rgba(249, 115, 22, 0.9), 0 0 0 4px rgba(249, 115, 22, 0.3)"
-                              : isFilled
-                              ? "0 0 8px rgba(74, 222, 128, 0.4)"
-                              : "none",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#ffffff",
-                            fontSize: isCurrent ? "1rem" : (hasBadge ? "0.9rem" : "0.72rem"),
-                            fontWeight: 800,
-                            transition: "all 0.25s ease",
-                            transform: isCurrent ? "scale(1.15)" : "scale(1)",
-                          }}>
-                            {isCurrent ? "🔥" : hasBadge ? node.badge.icon : isFilled ? "✓" : node.day}
-                          </div>
-
-                          {/* Day Label Below Node */}
-                          <div style={{
-                            position: "absolute",
-                            top: "100%",
-                            marginTop: 6,
-                            whiteSpace: "nowrap",
-                            textAlign: "center",
-                          }}>
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              position: "relative",
+                              width: 60,
+                              textAlign: "center",
+                            }}
+                            title={node.badge ? `${node.badge.icon} Day ${node.day}: ${node.badge.name}` : `Day ${node.day} of streak`}
+                          >
+                            {/* Milestone Icon Pill (Floating above node if milestone) */}
                             <div style={{
-                              fontSize: isCurrent ? "0.76rem" : "0.7rem",
-                              fontWeight: isCurrent ? 800 : (hasBadge ? 700 : 600),
-                              color: isCurrent ? "#f97316" : isFilled ? "#4ade80" : "#716c85",
+                              height: 18,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginBottom: 2,
                             }}>
-                              {isCurrent ? `Day ${node.day} 🔥` : `Day ${node.day}`}
+                              {hasBadge && (
+                                <span style={{
+                                  fontSize: "0.75rem",
+                                  filter: isDone || isCur ? "drop-shadow(0 0 4px rgba(255,255,255,0.4))" : "grayscale(0.8)",
+                                }}>
+                                  {node.badge.icon}
+                                </span>
+                              )}
                             </div>
+
+                            {/* Node Circle (Centered on the 20px line: 40px height centered at 20px) */}
+                            <div style={{
+                              width: isCur ? 40 : (isTgt ? 36 : 30),
+                              height: isCur ? 40 : (isTgt ? 36 : 30),
+                              borderRadius: "50%",
+                              background: isCur
+                                ? "linear-gradient(135deg, #f97316 0%, #ea580c 100%)"
+                                : isDone
+                                ? "#064e3b"
+                                : isTgt
+                                ? "#1c1436"
+                                : "#120f21",
+                              border: isCur
+                                ? "3px solid #ffffff"
+                                : isDone
+                                ? "2px solid #22c55e"
+                                : isTgt
+                                ? "2px dashed #f59e0b"
+                                : "2px solid rgba(255, 255, 255, 0.16)",
+                              boxShadow: isCur
+                                ? "0 0 20px rgba(249, 115, 22, 0.8), 0 0 0 4px rgba(249, 115, 22, 0.3)"
+                                : isDone
+                                ? "0 0 8px rgba(34, 197, 94, 0.4)"
+                                : "none",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#ffffff",
+                              fontSize: isCur ? "1.05rem" : (isDone ? "0.8rem" : "0.72rem"),
+                              fontWeight: 800,
+                              cursor: "default",
+                              transition: "all 0.25s ease",
+                              flexShrink: 0,
+                            }}>
+                              {isCur ? "🔥" : isDone ? "✓" : isTgt ? "🎯" : node.day}
+                            </div>
+
+                            {/* Day Number Label Below */}
+                            <div style={{
+                              marginTop: 6,
+                              fontSize: isCur ? "0.78rem" : "0.72rem",
+                              fontWeight: isCur ? 800 : 600,
+                              color: isCur ? "#f97316" : isDone ? "#4ade80" : isTgt ? "#f59e0b" : "#716c85",
+                              whiteSpace: "nowrap",
+                            }}>
+                              Day {node.day}
+                            </div>
+
+                            {/* Subtitle Status Tag */}
+                            {node.label && (
+                              <div style={{
+                                marginTop: 2,
+                                fontSize: "0.6rem",
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                color: isCur ? "#f97316" : isTgt ? "#f59e0b" : "#94a3b8",
+                                background: isCur
+                                  ? "rgba(249, 115, 22, 0.15)"
+                                  : isTgt
+                                  ? "rgba(245, 158, 11, 0.15)"
+                                  : "transparent",
+                                padding: isCur || isTgt ? "1px 5px" : "0",
+                                borderRadius: 4,
+                                whiteSpace: "nowrap",
+                              }}>
+                                {node.label}
+                              </div>
+                            )}
+
+                            {/* Milestone Badge Name */}
                             {hasBadge && (
                               <div style={{
-                                fontSize: "0.64rem",
+                                marginTop: 3,
+                                fontSize: "0.62rem",
                                 fontWeight: 700,
                                 color: node.badge.color || "#cbd5e1",
-                                marginTop: 1,
-                                maxWidth: 90,
+                                maxWidth: 70,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
-                              }}>
+                                whiteSpace: "nowrap",
+                              }} title={node.badge.name}>
                                 {node.badge.name}
                               </div>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Footer Details: Accurate Streak & Target breakdown */}
+                {/* ── Footer Progress Summary Bar ── */}
                 <div style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   fontSize: "0.76rem",
                   color: "#94a3b8",
-                  paddingTop: "0.65rem",
+                  paddingTop: "0.85rem",
+                  marginTop: "0.85rem",
                   borderTop: "1px solid rgba(255, 255, 255, 0.05)",
                   flexWrap: "wrap",
-                  gap: "0.5rem",
-                  marginTop: "0.75rem",
+                  gap: "0.6rem",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                    <span style={{ color: "#f97316", fontWeight: 700 }}>🔥 {currentDays}-Day Streak</span>
+                    <span style={{ color: "#f97316", fontWeight: 700 }}>🔥 {currentDays}-Day Active Streak</span>
                     <span>·</span>
                     <span style={{ color: "#cbd5e1" }}>
                       {remainingDays > 0
-                        ? `${remainingDays} ${remainingDays === 1 ? "day" : "days"} remaining to unlock ${nextBadge?.name || "next badge"}`
-                        : "Milestone achieved! 🏆"}
+                        ? `Practice tomorrow to reach Day ${currentDays + 1} (${remainingDays} days to ${nextBadge?.name || "next badge"})`
+                        : "🎉 Target unlocked! Claim your new badge"}
                     </span>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontVariantNumeric: "tabular-nums" }}>
-                    <span>
-                      Progress: <strong style={{ color: "#ffffff" }}>{currentDays}</strong> of <strong style={{ color: "#ffffff" }}>{targetDays}</strong> Days Total
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span>Progress:</span>
+                    <span style={{ color: "#ffffff", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                      {currentDays} / {targetDays} Days
                     </span>
+                    <div style={{
+                      width: 70,
+                      height: 6,
+                      background: "rgba(255, 255, 255, 0.08)",
+                      borderRadius: 99,
+                      overflow: "hidden",
+                    }}>
+                      <div style={{
+                        width: `${overallPercent}%`,
+                        height: "100%",
+                        background: "linear-gradient(90deg, #10b981, #f97316)",
+                        borderRadius: 99,
+                      }} />
+                    </div>
                     <span style={{
-                      background: "rgba(249, 115, 22, 0.15)",
                       color: "#f97316",
                       fontWeight: 800,
-                      borderRadius: 6,
-                      padding: "2px 7px",
-                      fontSize: "0.72rem",
+                      fontSize: "0.74rem",
                     }}>
                       {overallPercent}%
                     </span>
