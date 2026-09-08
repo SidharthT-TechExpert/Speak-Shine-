@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
@@ -14,12 +14,95 @@ const WAVE_PATTERN = [
   28, 22, 18, 26, 20, 14, 18, 24, 16, 22, 26, 18, 14
 ];
 
+// ── Isolated Countdown Timer (Prevents entire dashboard from re-rendering every second) ──
+function MidnightCountdownTimer() {
+  const calc = () => {
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const midnight = new Date(nowIST);
+    midnight.setDate(midnight.getDate() + 1);
+    midnight.setHours(0, 0, 0, 0);
+
+    const diffSec = Math.max(0, Math.floor((midnight - nowIST) / 1000));
+    const hrs = String(Math.floor(diffSec / 3600)).padStart(2, "0");
+    const mins = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
+    const secs = String(diffSec % 60).padStart(2, "0");
+    return { hrs, mins, secs };
+  };
+
+  const [t, setT] = useState(calc);
+
+  useEffect(() => {
+    const interval = setInterval(() => setT(calc()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
+      <div className="speakshine-timer-box" style={{
+        background: "#161024",
+        border: "1px solid rgba(249, 115, 22, 0.35)",
+        borderRadius: 10,
+        padding: "0.65rem 0.85rem",
+        textAlign: "center",
+        minWidth: 54,
+      }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.hrs}
+        </div>
+        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          HRS
+        </div>
+      </div>
+
+      <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
+
+      <div className="speakshine-timer-box" style={{
+        background: "#161024",
+        border: "1px solid rgba(249, 115, 22, 0.35)",
+        borderRadius: 10,
+        padding: "0.65rem 0.85rem",
+        textAlign: "center",
+        minWidth: 54,
+      }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.mins}
+        </div>
+        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          MINS
+        </div>
+      </div>
+
+      <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
+
+      <div className="speakshine-timer-box" style={{
+        background: "#161024",
+        border: "1px solid rgba(249, 115, 22, 0.35)",
+        borderRadius: 10,
+        padding: "0.65rem 0.85rem",
+        textAlign: "center",
+        minWidth: 54,
+      }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.secs}
+        </div>
+        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          SECS
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ModernDashboardView({
   user,
   profile = {},
   today = {},
   scores = [],
   leaderboard = [],
+  stats = {},
+  streakRecord = null,
+  myStreakEntry = null,
   badges = {},
   onOpenBadges,
   onOpenSettings,
@@ -33,29 +116,6 @@ export default function ModernDashboardView({
   const [activeTab, setActiveTab] = useState("points");
   const [sessionPage, setSessionPage] = useState(1);
   const SESSION_PAGE_SIZE = 6;
-
-  // ── Live Countdown to Midnight IST ──────────────────────────────────────────
-  const [timeLeft, setTimeLeft] = useState({ hrs: "09", mins: "22", secs: "50" });
-
-  useEffect(() => {
-    const updateCountdown = () => {
-      const now = new Date();
-      const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const midnight = new Date(nowIST);
-      midnight.setDate(midnight.getDate() + 1);
-      midnight.setHours(0, 0, 0, 0);
-
-      const diffSec = Math.max(0, Math.floor((midnight - nowIST) / 1000));
-      const h = String(Math.floor(diffSec / 3600)).padStart(2, "0");
-      const m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
-      const s = String(diffSec % 60).padStart(2, "0");
-      setTimeLeft({ hrs: h, mins: m, secs: s });
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // ── Audio Player & Waveform State ───────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -407,44 +467,125 @@ export default function ModernDashboardView({
   };
 
   const getInitials = (name) => {
-    if (!name) return "S";
-    const clean = name.replace(/\(You\)/i, "").trim();
+    if (!name) return "U";
+    const clean = name.replace(/\(You\)/i, "").replace(/[^a-zA-Z0-9\s]/g, "").trim();
+    if (!clean) return name.slice(0, 2).toUpperCase() || "U";
     const parts = clean.split(/\s+/);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return clean.slice(0, 2).toUpperCase();
   };
 
-  const defaultLeaderboard = [
-    { rank: 1, medal: "🥇", name: "Sarah M.", title: "Communication Titan · 120d", pts: 88, time: "2h ago", isUser: false, initials: "SM" },
-    { rank: 2, medal: "🥈", name: "Alex K.", title: "Speech Legend · 110d", pts: 84, time: "3h ago", isUser: false, initials: "AK" },
-    { rank: 3, medal: "🥉", name: "Priya R.", title: "Elite Communicator · 65d", pts: 82, time: "4h ago", isUser: false, initials: "PR" },
-    { rank: 4, medal: "👉", name: `${displayName} (You)`, title: "Bronze Speaker · 2d", pts: 80, time: "Yesterday", isUser: true, initials: avatarInitials || "YOU" },
-    { rank: 5, medal: "5", name: "David L.", title: "Momentum Builder · 6d", pts: 76, time: "Yesterday", isUser: false, initials: "DL" },
-  ];
+  const groupName = user?.group || profile?.group || "Group 1";
+  const memberCount = stats?.total ?? (leaderboard?.length || 7);
+  const submittedCount = stats?.completed ?? 0;
+  const pendingCount = stats?.pending ?? Math.max(0, memberCount - submittedCount);
 
-  const currentLeaderboard = (leaderboard && leaderboard.length >= 3)
-    ? leaderboard.slice(0, 5).map((l, i) => {
-        const isUser = !!l.isCurrentUser;
-        const name = isUser ? `${displayName} (You)` : l.name;
-        return {
-          rank: i + 1,
-          medal: i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : isUser ? "👉" : String(i + 1),
-          name,
-          initials: isUser ? (avatarInitials || "YOU") : getInitials(name),
-          title: l.badge || `${l.streak || 10}d streak`,
-          pts: l.points || (88 - i * 3),
-          time: l.submittedAgo || (i === 0 ? "2h ago" : i === 1 ? "3h ago" : "Yesterday"),
-          isUser,
-        };
-      })
-    : defaultLeaderboard;
+  // All-time record details
+  const recordHolder = streakRecord?.name || (leaderboard?.[0]?.name) || "~Fayiz✨";
+  const recordDate = streakRecord?.achievedAt
+    ? new Date(streakRecord.achievedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : "Sep 7";
+  const recordScore = streakRecord?.streak || streakRecord?.score || (leaderboard?.[0]?.streak || 120);
+  const recordUnit = streakRecord?.score ? "pts" : (streakRecord?.streak ? "d" : "pts");
+
+  const defaultLeaderboard = useMemo(() => [
+    { rank: 1, medal: "🥇", name: "~Fayiz✨", title: "Communication Titan · 120d", pts: 684, time: "2h ago", isUser: false, initials: "FZ" },
+    { rank: 2, medal: "🥈", name: "Shabeer😉", title: "Speech Legend · 110d", pts: 682, time: "3h ago", isUser: false, initials: "SH" },
+    { rank: 3, medal: "🥉", name: "Abdul Fathah", title: "Elite Communicator · 65d", pts: 617, time: "4h ago", isUser: false, initials: "AF" },
+    { rank: 4, medal: "👉", name: `${displayName} (You)`, title: `${profile?.streak || 4}d streak`, pts: Math.round(profile?.monthlyScore || 599), time: "Yesterday", isUser: true, initials: avatarInitials || "YOU" },
+    { rank: 5, medal: "5", name: "Muhammed Nabhan", title: "Momentum Builder · 6d", pts: 417, time: "Yesterday", isUser: false, initials: "MN" },
+  ], [displayName, profile?.streak, profile?.monthlyScore, avatarInitials]);
+
+  const currentLeaderboard = useMemo(() => {
+    const hasRealLeaderboard = Array.isArray(leaderboard) && leaderboard.length > 0;
+    const rawList = hasRealLeaderboard ? leaderboard : defaultLeaderboard;
+
+    const isUserItem = (item) => {
+      if (!item) return false;
+      if (item.isCurrentUser || item.isUser) return true;
+      const cleanItemName = (item.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const cleanUserName = (displayName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (cleanItemName && cleanUserName && (cleanItemName === cleanUserName || cleanItemName.includes(cleanUserName) || cleanUserName.includes(cleanItemName))) {
+        return true;
+      }
+      if (user?.phone && item.phone) {
+        const p1 = String(user.phone).replace(/^(\+91|91)/, "");
+        const p2 = String(item.phone).replace(/^(\+91|91)/, "");
+        if (p1 === p2) return true;
+      }
+      return false;
+    };
+
+    let itemsToDisplay = rawList.slice(0, 5);
+    const hasUserInTop5 = itemsToDisplay.some(isUserItem);
+
+    if (!hasUserInTop5 && myStreakEntry) {
+      itemsToDisplay = [...itemsToDisplay.slice(0, 4), { ...myStreakEntry, isCurrentUser: true }];
+    } else if (!hasUserInTop5 && user && hasRealLeaderboard) {
+      itemsToDisplay = [
+        ...itemsToDisplay.slice(0, 4),
+        {
+          rank: itemsToDisplay.length + 1,
+          name: `${displayName} (You)`,
+          streak: profile?.streak || 0,
+          monthlyScore: profile?.monthlyScore || 0,
+          completed: profile?.completed || false,
+          isCurrentUser: true,
+        },
+      ];
+    }
+
+    return itemsToDisplay.map((u, i) => {
+      const isUser = isUserItem(u);
+      const name = isUser ? (u.name?.includes("(You)") ? u.name : `${displayName} (You)`) : u.name;
+      const rankNum = u.rank || (i + 1);
+      const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : isUser ? "👉" : String(rankNum);
+      const initials = isUser ? (avatarInitials || "YOU") : getInitials(name);
+
+      const streakDays = u.streak ?? (isUser ? (profile?.streak || 0) : 0);
+      let title = u.badge || "";
+      if (!title) {
+        if (streakDays >= 100) title = `Communication Titan · ${streakDays}d`;
+        else if (streakDays >= 60) title = `Elite Communicator · ${streakDays}d`;
+        else if (streakDays >= 30) title = `Speech Legend · ${streakDays}d`;
+        else if (streakDays >= 14) title = `Master Speaker · ${streakDays}d`;
+        else if (streakDays >= 7) title = `Rising Star · ${streakDays}d`;
+        else if (streakDays >= 3) title = `Bronze Speaker · ${streakDays}d`;
+        else if (streakDays >= 1) title = `Momentum Builder · ${streakDays}d`;
+        else title = `Active Speaker · ${streakDays}d`;
+      }
+
+      const pts = Math.round(u.monthlyScore ?? u.points ?? (streakDays > 0 ? streakDays * 10 : 75));
+
+      let time = u.time;
+      if (!time) {
+        if (u.completed) time = "Today";
+        else if (u.lastScoreDate) time = "Today";
+        else if (streakDays > 0) time = "Yesterday";
+        else time = "Pending";
+      }
+
+      return {
+        rank: rankNum,
+        medal,
+        name,
+        initials,
+        title,
+        pts,
+        time,
+        isUser,
+      };
+    });
+  }, [leaderboard, defaultLeaderboard, displayName, avatarInitials, user, profile, myStreakEntry]);
 
   const leaderboardRef = useRef(null);
+  const animatedOnceRef = useRef(false);
 
   useEffect(() => {
-    if (!leaderboardRef.current) return;
+    if (!leaderboardRef.current || animatedOnceRef.current) return;
     const rows = leaderboardRef.current.querySelectorAll(".leaderboard-row");
     if (rows && rows.length > 0) {
+      animatedOnceRef.current = true;
       gsap.fromTo(
         rows,
         { opacity: 0, x: 16, scale: 0.98 },
@@ -826,59 +967,7 @@ export default function ModernDashboardView({
                 </div>
 
                 {/* 3 Digital Countdown Timer Boxes (Screenshot 1) */}
-                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
-                  <div className="speakshine-timer-box" style={{
-                    background: "#161024",
-                    border: "1px solid rgba(249, 115, 22, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.85rem",
-                    textAlign: "center",
-                    minWidth: 54,
-                  }}>
-                    <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                      {timeLeft.hrs}
-                    </div>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                      HRS
-                    </div>
-                  </div>
-
-                  <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
-
-                  <div className="speakshine-timer-box" style={{
-                    background: "#161024",
-                    border: "1px solid rgba(249, 115, 22, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.85rem",
-                    textAlign: "center",
-                    minWidth: 54,
-                  }}>
-                    <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                      {timeLeft.mins}
-                    </div>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                      MINS
-                    </div>
-                  </div>
-
-                  <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
-
-                  <div className="speakshine-timer-box" style={{
-                    background: "#161024",
-                    border: "1px solid rgba(249, 115, 22, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.85rem",
-                    textAlign: "center",
-                    minWidth: 54,
-                  }}>
-                    <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                      {timeLeft.secs}
-                    </div>
-                    <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                      SECS
-                    </div>
-                  </div>
-                </div>
+                <MidnightCountdownTimer />
 
                 {/* Streak Warning */}
                 <div style={{
@@ -1503,7 +1592,7 @@ export default function ModernDashboardView({
                       e.currentTarget.style.transform = "translateX(0)";
                     }}
                   >
-                    <span>Group 3</span>
+                    <span>{groupName}</span>
                     <span style={{ fontSize: "0.85rem" }}>↗</span>
                   </Link>
                 </div>
@@ -1523,7 +1612,7 @@ export default function ModernDashboardView({
                   marginBottom: "1.2rem",
                 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                  <span>GROUP 3 · 7 MEMBERS · 0 SUBMITTED · 7 PENDING</span>
+                  <span>{groupName.toUpperCase()} · {memberCount} MEMBERS · {submittedCount} SUBMITTED · {pendingCount} PENDING</span>
                 </div>
 
                 {/* Ranked Peer Rows */}
@@ -1707,7 +1796,7 @@ export default function ModernDashboardView({
                       <span>ALL-TIME GROUP RECORD</span>
                     </div>
                     <div style={{ fontSize: "0.85rem", color: "#f1f0f5", fontWeight: 600 }}>
-                      Sarah M. · <span style={{ color: "#94a3b8", fontWeight: 500 }}>Nov 12</span>
+                      {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
                     </div>
                   </div>
 
@@ -1725,9 +1814,9 @@ export default function ModernDashboardView({
                       lineHeight: 1,
                       filter: "drop-shadow(0 2px 8px rgba(245, 158, 11, 0.35))",
                     }}>
-                      94
+                      {recordScore}
                     </span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24" }}>pts</span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
                   </div>
                 </div>
 
@@ -1747,7 +1836,7 @@ export default function ModernDashboardView({
                     padding: "0.55rem 0.4rem",
                   }}>
                     <div style={{ color: "#716c85", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>MEMBERS</div>
-                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>7</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>{memberCount}</div>
                   </div>
                   <div style={{
                     background: "rgba(255, 255, 255, 0.02)",
@@ -1756,7 +1845,7 @@ export default function ModernDashboardView({
                     padding: "0.55rem 0.4rem",
                   }}>
                     <div style={{ color: "#716c85", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>SUBMITTED</div>
-                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>0</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>{submittedCount}</div>
                   </div>
                   <div style={{
                     background: "rgba(239, 68, 68, 0.06)",
@@ -1765,7 +1854,7 @@ export default function ModernDashboardView({
                     padding: "0.55rem 0.4rem",
                   }}>
                     <div style={{ color: "#fca5a5", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>PENDING</div>
-                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#f87171", marginTop: "2px" }}>7</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#f87171", marginTop: "2px" }}>{pendingCount}</div>
                   </div>
                 </div>
               </div>

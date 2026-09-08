@@ -197,13 +197,18 @@ export async function getUserProfile(phone) {
   });
 
   const topStreak = leaderboardSorted
-    .map(u => withBadgeData(u, {
+    .map((u, i) => withBadgeData(u, {
+      rank: i + 1,
       name: u.name,
       userId: u.userId,
+      phone: u.phone,
       streak: u.streak || 0,
       weeklySubmissions: u.weeklySubmissions || 0,
       completed: u.completed || false,
       monthlyScore: u.monthlyScore ?? 0,
+      todayScore: u.todayScore ?? null,
+      lastScoreDate: u.lastScoreDate,
+      isCurrentUser: u.phone === phone || u.phone === strippedPhone || `91${u.phone}` === phone,
     }));
 
   // ── Today's top scorer ──────────────────────────────────────────────────
@@ -333,6 +338,7 @@ export async function getUserProfile(phone) {
       totalFreeze: paidUsers.reduce((sum, u) => sum + (u.streakFreeze || 0), 0),
     },
     topStreak,
+    leaderboard: topStreak,
     myStreakEntry,
     todayTopScorer,
     streakRecord: await (async () => {

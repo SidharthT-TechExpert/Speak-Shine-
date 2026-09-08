@@ -1129,7 +1129,10 @@ export default function UserDashboard() {
         profile={profile || {}}
         today={data?.today || {}}
         scores={scores || []}
-        leaderboard={data?.leaderboard || []}
+        leaderboard={data?.topStreak || data?.leaderboard || []}
+        stats={data?.stats || {}}
+        streakRecord={data?.streakRecord || null}
+        myStreakEntry={data?.myStreakEntry || null}
         badges={{
           available: profile?.availableBadges || [],
           earned: profile?.earnedBadges || [],
