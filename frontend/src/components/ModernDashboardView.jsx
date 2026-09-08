@@ -403,7 +403,7 @@ export default function ModernDashboardView({
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      navigate("/record", { state: { file } });
+      navigate("/record#video-studio-container", { state: { file } });
     }
   };
 
@@ -1020,7 +1020,7 @@ export default function ModernDashboardView({
               <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginTop: "auto" }}>
                 <button
                   type="button"
-                  onClick={() => navigate("/record")}
+                  onClick={() => navigate("/record#video-studio-container")}
                   style={{
                     width: "100%",
                     background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
@@ -1069,7 +1069,7 @@ export default function ModernDashboardView({
                   onMouseLeave={e => e.currentTarget.style.background = "#181427"}
                 >
                   <span>📁</span>
-                  <span>Upload a file</span>
+                  <span>Upload summary</span>
                 </button>
 
                 <input

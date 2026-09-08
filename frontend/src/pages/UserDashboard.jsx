@@ -207,7 +207,7 @@ function SubmitNudge({ name, streak, navigate, specialDay }) {
       </div>
 
       <button
-        onClick={() => navigate('/record')}
+        onClick={() => navigate('/record#video-studio-container')}
         className={`urgency-record-btn urgency-record-btn-${urgency}`}
       >
         🎥 Record Now

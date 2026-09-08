@@ -42,6 +42,40 @@ export default function VideoAnalysis() {
     }
   }, [location.pathname, location.search]);
 
+  // Smooth scroll to studio container with sticky topbar offset
+  const scrollToStudio = useCallback((targetMode) => {
+    if (targetMode) {
+      setMode(targetMode);
+    }
+    setTimeout(() => {
+      const el = document.getElementById("video-studio-container");
+      if (el) {
+        const topbarHeight = 85;
+        const elementPosition = el.getBoundingClientRect().top + window.pageYOffset;
+        window.scrollTo({
+          top: Math.max(0, elementPosition - topbarHeight),
+          behavior: "smooth"
+        });
+      }
+    }, 60);
+  }, []);
+
+  useEffect(() => {
+    if (location.hash === "#video-studio-container") {
+      setTimeout(() => {
+        const el = document.getElementById("video-studio-container");
+        if (el) {
+          const topbarHeight = 85;
+          const elementPosition = el.getBoundingClientRect().top + window.pageYOffset;
+          window.scrollTo({
+            top: Math.max(0, elementPosition - topbarHeight),
+            behavior: "smooth"
+          });
+        }
+      }, 250);
+    }
+  }, [location.pathname, location.hash]);
+
   const [todayQuestion, setTodayQuestion] = useState(null);
   const [todayVocabulary, setTodayVocabulary] = useState([]);
   const [vocabWordCount, setVocabWordCount] = useState(5);
@@ -1045,10 +1079,7 @@ export default function VideoAnalysis() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginTop: "auto" }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode("record");
-                      document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
-                    }}
+                    onClick={() => scrollToStudio("record")}
                     style={{
                       width: "100%",
                       background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
@@ -1075,10 +1106,7 @@ export default function VideoAnalysis() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode("upload");
-                      document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
-                    }}
+                    onClick={() => scrollToStudio("upload")}
                     className="speakshine-btn-secondary"
                     style={{
                       width: "100%",
@@ -1100,7 +1128,7 @@ export default function VideoAnalysis() {
                     onMouseLeave={e => e.currentTarget.style.background = "#181427"}
                   >
                     <span>📁</span>
-                    <span>Upload a file</span>
+                    <span>Upload summary</span>
                   </button>
                 </div>
               </div>
@@ -1117,13 +1145,14 @@ export default function VideoAnalysis() {
           borderRadius: 12,
           border: "1px solid rgba(255, 255, 255, 0.06)",
           marginBottom: "1.25rem",
+          scrollMarginTop: "90px",
         }}>
           <button
             type="button"
             className={`tab-btn${mode === "record" ? " active" : ""}`}
             onClick={() => {
-              setMode("record");
               navigate("/record");
+              scrollToStudio("record");
             }}
           >
             <span>🎥</span> Record Now
@@ -1132,8 +1161,8 @@ export default function VideoAnalysis() {
             type="button"
             className={`tab-btn${mode === "upload" ? " active" : ""}`}
             onClick={() => {
-              setMode("upload");
               navigate("/video-analysis");
+              scrollToStudio("upload");
             }}
           >
             <span>📁</span> Upload Video
