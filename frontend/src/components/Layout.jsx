@@ -383,6 +383,7 @@ export default function Layout({ children, title, subtitle }) {
                 </div>
               </>
             )}
+            <ThemeToggle compact />
             <Suspense fallback={<div style={{ width: 34, height: 34 }} />}>
               <NotificationBell token={localStorage.getItem("token")} />
             </Suspense>
@@ -479,10 +480,18 @@ export default function Layout({ children, title, subtitle }) {
                 <span>💳</span> <span>Payments</span>
               </Link>
             </nav>
+
+            <div style={{ marginTop: "auto", marginBottom: "1rem" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#8e8a9f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
+                Appearance
+              </div>
+              <ThemeToggle />
+            </div>
+
             <button
               onClick={handleLogout}
               style={{
-                marginTop: "auto", background: "rgba(248,113,113,0.1)",
+                background: "rgba(248,113,113,0.1)",
                 border: "1px solid rgba(248,113,113,0.3)", color: "#f87171",
                 padding: "0.75rem", borderRadius: 10, fontWeight: 700,
                 cursor: "pointer", textAlign: "center",

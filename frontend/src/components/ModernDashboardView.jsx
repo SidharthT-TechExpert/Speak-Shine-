@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, CartesianGrid
 } from "recharts";
 import NotificationBell from "./NotificationBell.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -526,6 +527,7 @@ export default function ModernDashboardView({
               <span style={{ color: "#fbbf24" }}>⭐</span>
               <span>{totalPoints} Points</span>
             </div>
+            <ThemeToggle compact />
             <NotificationBell token={localStorage.getItem("token")} />
             <div
               className="speakshine-avatar"
@@ -547,7 +549,7 @@ export default function ModernDashboardView({
             marginBottom: "1.25rem",
           }}>
             {/* Left Challenge Card */}
-            <div style={{
+            <div className="speakshine-hero-left-card" style={{
               background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
               border: "1px solid rgba(124, 111, 255, 0.25)",
               borderRadius: 18,
@@ -588,7 +590,7 @@ export default function ModernDashboardView({
                 fontWeight: 400,
                 color: "#ffffff",
                 lineHeight: 1.15,
-                margin: "0 0 0.85rem 0",
+                margin: "0 0 0.75rem 0",
                 letterSpacing: "-0.01em",
               }}>
                 {mainTitlePart}{" "}
@@ -611,7 +613,7 @@ export default function ModernDashboardView({
               </p>
 
               {/* Waveform Audio Player ("LISTEN FIRST") */}
-              <div style={{
+              <div className="speakshine-audio-bar" style={{
                 background: "rgba(10, 8, 18, 0.65)",
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 12,
@@ -782,7 +784,7 @@ export default function ModernDashboardView({
             </div>
 
             {/* Right Action & Countdown Card (Screenshot 1) */}
-            <div style={{
+            <div className="speakshine-hero-right-card" style={{
               background: "#0d0a18",
               border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: 18,
@@ -798,7 +800,7 @@ export default function ModernDashboardView({
 
                 {/* 3 Digital Countdown Timer Boxes (Screenshot 1) */}
                 <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
-                  <div style={{
+                  <div className="speakshine-timer-box" style={{
                     background: "#161024",
                     border: "1px solid rgba(249, 115, 22, 0.35)",
                     borderRadius: 10,
@@ -806,7 +808,7 @@ export default function ModernDashboardView({
                     textAlign: "center",
                     minWidth: 54,
                   }}>
-                    <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                    <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                       {timeLeft.hrs}
                     </div>
                     <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
@@ -816,7 +818,7 @@ export default function ModernDashboardView({
 
                   <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
-                  <div style={{
+                  <div className="speakshine-timer-box" style={{
                     background: "#161024",
                     border: "1px solid rgba(249, 115, 22, 0.35)",
                     borderRadius: 10,
@@ -824,7 +826,7 @@ export default function ModernDashboardView({
                     textAlign: "center",
                     minWidth: 54,
                   }}>
-                    <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                    <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                       {timeLeft.mins}
                     </div>
                     <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
@@ -834,7 +836,7 @@ export default function ModernDashboardView({
 
                   <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
-                  <div style={{
+                  <div className="speakshine-timer-box" style={{
                     background: "#161024",
                     border: "1px solid rgba(249, 115, 22, 0.35)",
                     borderRadius: 10,
@@ -842,7 +844,7 @@ export default function ModernDashboardView({
                     textAlign: "center",
                     minWidth: 54,
                   }}>
-                    <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                    <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                       {timeLeft.secs}
                     </div>
                     <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
@@ -866,7 +868,7 @@ export default function ModernDashboardView({
                 </div>
 
                 {/* Rules to Remember (Screenshot 1) */}
-                <div style={{
+                <div className="speakshine-rules-box" style={{
                   background: "rgba(255, 255, 255, 0.03)",
                   border: "1px solid rgba(255, 255, 255, 0.06)",
                   borderRadius: 12,
@@ -877,15 +879,15 @@ export default function ModernDashboardView({
                     RULES TO REMEMBER
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                    <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                       <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                       <span>Minimum 60 seconds speaking</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                    <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                       <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                       <span>Use at least 2 target words</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                    <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                       <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                       <span>No script reading - speak naturally</span>
                     </div>
@@ -925,6 +927,7 @@ export default function ModernDashboardView({
                 <button
                   type="button"
                   onClick={handleFileUploadClick}
+                  className="speakshine-btn-secondary"
                   style={{
                     width: "100%",
                     background: "#181427",
@@ -960,7 +963,7 @@ export default function ModernDashboardView({
           </div>
 
           {/* ── Section 2: 5 KPI Metrics Row (Screenshot 2) ── */}
-          <div style={{
+          <div className="speakshine-kpi-bar" style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: "1rem",
@@ -1038,7 +1041,7 @@ export default function ModernDashboardView({
           </div>
 
           {/* ── Section 3: Badge Milestone Banner (Screenshot 2) ── */}
-          <div style={{
+          <div className="speakshine-card-box" style={{
             background: "#0d0a18",
             border: "1px solid rgba(255, 255, 255, 0.05)",
             borderRadius: 14,
@@ -1090,7 +1093,7 @@ export default function ModernDashboardView({
             gap: "1.25rem",
           }}>
             {/* Left Column: Performance Center with 3 Tabs */}
-            <div style={{
+            <div className="speakshine-card-box" style={{
               background: "#0d0a18",
               border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: 18,
@@ -1416,7 +1419,7 @@ export default function ModernDashboardView({
             {/* Right Column: Leaderboard & Community Card (Screenshot 5) */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               {/* Leaderboard Box */}
-              <div style={{
+              <div className="speakshine-card-box" style={{
                 background: "#0d0a18",
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 18,
@@ -1520,6 +1523,7 @@ export default function ModernDashboardView({
               {/* Community Feed Prompt Card (Screenshot 5) */}
               <div
                 onClick={() => navigate("/record")}
+                className="speakshine-card-box"
                 style={{
                   background: "#0d0a18",
                   border: "1px solid rgba(255, 255, 255, 0.06)",

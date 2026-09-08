@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../api/client.js";
+import ThemeToggle from "../components/ThemeToggle.jsx";
 
 const META = {
   admin:   { title: "Admin Portal",   icon: "🛡️", sub: "Manage members, questions & platform insights" },
@@ -223,6 +224,9 @@ export default function Login({ loginFor = "user" }) {
 
   return (
     <div className="speakshine-auth-page">
+      <div style={{ position: "absolute", top: "1.25rem", right: "1.25rem", zIndex: 10 }}>
+        <ThemeToggle compact />
+      </div>
       <div className="speakshine-auth-card">
         {/* Brand Emblem Header */}
         <div className="speakshine-auth-brand">

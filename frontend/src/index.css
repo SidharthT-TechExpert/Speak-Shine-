@@ -5536,6 +5536,323 @@ audio { border-radius: 12px; }
   }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES FOR SPEAK & SHINE SHELL, DASHBOARD & AUTH
+   ════════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="light"] .speakshine-shell,
+.light .speakshine-shell {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+[data-theme="light"] .speakshine-sidebar,
+.light .speakshine-sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .speakshine-sidebar-brand .brand-logo-text,
+.light .speakshine-sidebar-brand .brand-logo-text {
+  color: #0f172a;
+}
+
+[data-theme="light"] .speakshine-nav-item,
+.light .speakshine-nav-item {
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-nav-item:hover,
+.light .speakshine-nav-item:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+[data-theme="light"] .speakshine-nav-item.active,
+.light .speakshine-nav-item.active {
+  color: #6366f1;
+  background: #ede9fe;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(99, 102, 241, 0.15);
+}
+
+[data-theme="light"] .speakshine-freeze-box,
+.light .speakshine-freeze-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .speakshine-freeze-box .freeze-title,
+.light .speakshine-freeze-box .freeze-title {
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-freeze-box .freeze-val,
+.light .speakshine-freeze-box .freeze-val {
+  color: #0284c7;
+}
+
+[data-theme="light"] .speakshine-freeze-box .freeze-desc,
+.light .speakshine-freeze-box .freeze-desc {
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-freeze-box .freeze-link,
+.light .speakshine-freeze-box .freeze-link {
+  color: #4f46e5;
+}
+
+[data-theme="light"] .speakshine-main,
+.light .speakshine-main {
+  background: #f8fafc;
+}
+
+[data-theme="light"] .speakshine-topbar,
+.light .speakshine-topbar {
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .speakshine-topbar-greeting,
+.light .speakshine-topbar-greeting {
+  color: #0f172a;
+}
+
+[data-theme="light"] .speakshine-topbar-subtitle,
+.light .speakshine-topbar-subtitle {
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-pill.streak,
+.light .speakshine-pill.streak {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
+[data-theme="light"] .speakshine-pill.points,
+.light .speakshine-pill.points {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .speakshine-avatar,
+.light .speakshine-avatar {
+  background: #c084fc;
+  color: #1e1136;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .speakshine-shell .card,
+.light .speakshine-shell .card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  color: #1e293b;
+}
+
+[data-theme="light"] .speakshine-shell .section-title,
+.light .speakshine-shell .section-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .speakshine-hero-left-card,
+.light .speakshine-hero-left-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .speakshine-hero-left-card h1,
+.light .speakshine-hero-left-card h1 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .speakshine-hero-left-card p,
+.light .speakshine-hero-left-card p {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .speakshine-audio-bar,
+.light .speakshine-audio-bar {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .speakshine-hero-right-card,
+.light .speakshine-hero-right-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .speakshine-timer-box,
+.light .speakshine-timer-box {
+  background: #f8fafc !important;
+  border: 1px solid rgba(249, 115, 22, 0.35) !important;
+}
+
+[data-theme="light"] .speakshine-timer-val,
+.light .speakshine-timer-val {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .speakshine-rules-box,
+.light .speakshine-rules-box {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .speakshine-rules-item,
+.light .speakshine-rules-item {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .speakshine-btn-secondary,
+.light .speakshine-btn-secondary {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .speakshine-btn-secondary:hover,
+.light .speakshine-btn-secondary:hover {
+  background: #e2e8f0 !important;
+}
+
+[data-theme="light"] .vocab-card-pro,
+.light .vocab-card-pro {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .vocab-word-title,
+.light .vocab-word-title {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .vocab-example-bubble,
+.light .vocab-example-bubble {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .speakshine-kpi-bar,
+.light .speakshine-kpi-bar {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .speakshine-kpi-bar div > div:nth-child(2),
+.light .speakshine-kpi-bar div > div:nth-child(2) {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .speakshine-card-box,
+.light .speakshine-card-box {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .speakshine-card-box div,
+.light .speakshine-card-box div {
+  color: #334155;
+}
+
+/* Auth Page in Light Mode */
+[data-theme="light"] .speakshine-auth-page,
+.light .speakshine-auth-page {
+  background: 
+    radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse at 85% 85%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
+    #f8fafc;
+}
+
+[data-theme="light"] .speakshine-auth-card,
+.light .speakshine-auth-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="light"] .speakshine-brand-emblem,
+.light .speakshine-brand-emblem {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+[data-theme="light"] .speakshine-auth-title,
+.light .speakshine-auth-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .speakshine-auth-subtitle,
+.light .speakshine-auth-subtitle {
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-role-tabs,
+.light .speakshine-role-tabs {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .speakshine-role-tab,
+.light .speakshine-role-tab {
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-role-tab:hover,
+.light .speakshine-role-tab:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .speakshine-role-tab.active,
+.light .speakshine-role-tab.active {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .speakshine-form-label,
+.light .speakshine-form-label {
+  color: #334155;
+}
+
+[data-theme="light"] .speakshine-form-input,
+.light .speakshine-form-input {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .speakshine-form-input:focus,
+.light .speakshine-form-input:focus {
+  background: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+[data-theme="light"] .speakshine-preview-btn,
+.light .speakshine-preview-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .speakshine-feature-badge,
+.light .speakshine-feature-badge {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
 
 
 

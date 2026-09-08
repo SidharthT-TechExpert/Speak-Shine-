@@ -612,7 +612,7 @@ export default function VideoAnalysis() {
           return (
             <div className="speakshine-hero-grid">
               {/* Left Challenge Card */}
-              <div style={{
+              <div className="speakshine-hero-left-card" style={{
                 background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
                 border: "1px solid rgba(124, 111, 255, 0.25)",
                 borderRadius: 18,
@@ -642,7 +642,7 @@ export default function VideoAnalysis() {
                     color: "#cbd5e1",
                     textTransform: "uppercase",
                   }}>
-                    {todayQuestion?.category || (isStorySummary ? "STORY SUMMARY" : isPictureDescription ? "PICTURE DESCRIPTION" : isMonthlyGoals ? "MONTHLY GOALS" : isMonthlyReflection ? "MONTHLY REFLECTION" : "SPEAKING CHALLENGE")}
+                    {isStorySummary ? "STORY SUMMARY" : isPictureDescription ? "PICTURE DESCRIPTION" : (todayQuestion?.category || "DAILY CHALLENGE")}
                   </span>
                 </div>
 
@@ -653,23 +653,21 @@ export default function VideoAnalysis() {
                   fontWeight: 400,
                   color: "#ffffff",
                   lineHeight: 1.15,
-                  margin: "0 0 0.85rem 0",
+                  marginBottom: "0.75rem",
                   letterSpacing: "-0.01em",
                 }}>
                   {mainTitlePart}{" "}
-                  {italicTitlePart && (
-                    <span style={{ fontStyle: "italic", color: "#c4b5fd" }}>
-                      {italicTitlePart}
-                    </span>
-                  )}
+                  <span style={{ fontStyle: "italic", color: "#c4b5fd" }}>
+                    {italicTitlePart}
+                  </span>
                 </h1>
 
-                {/* Synopsis / Question prompt */}
+                {/* Question / Prompt */}
                 <p style={{
-                  fontSize: "0.92rem",
+                  fontSize: "0.9rem",
                   color: "#94a3b8",
                   lineHeight: 1.55,
-                  marginBottom: (isStorySummary || audioSrc) ? "1.35rem" : "1.1rem",
+                  marginBottom: "1.35rem",
                   maxWidth: "680px",
                 }}>
                   {todayQuestion?.question || (isMonthlyGoals ? "Record a video detailing your personal learning milestones, dreams, and specific goals for this month." : isMonthlyReflection ? "Answer all monthly reflection questions below to assess your growth and learning progress." : "Record your response to today's speaking prompt.")}
@@ -677,7 +675,7 @@ export default function VideoAnalysis() {
 
                 {/* Waveform Audio Player ("LISTEN FIRST") for Story Summary / Audio Prompts */}
                 {(isStorySummary || audioSrc) && (
-                  <div style={{
+                  <div className="speakshine-audio-bar" style={{
                     background: "rgba(10, 8, 18, 0.65)",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
                     borderRadius: 12,
@@ -937,7 +935,7 @@ export default function VideoAnalysis() {
               </div>
 
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
-              <div style={{
+              <div className="speakshine-hero-right-card" style={{
                 background: "#0d0a18",
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 18,
@@ -953,7 +951,7 @@ export default function VideoAnalysis() {
 
                   {/* 3 Digital Countdown Timer Boxes */}
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
-                    <div style={{
+                    <div className="speakshine-timer-box" style={{
                       background: "#161024",
                       border: "1px solid rgba(249, 115, 22, 0.35)",
                       borderRadius: 10,
@@ -961,7 +959,7 @@ export default function VideoAnalysis() {
                       textAlign: "center",
                       minWidth: 54,
                     }}>
-                      <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                      <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                         {timeLeft.hrs}
                       </div>
                       <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
@@ -971,7 +969,7 @@ export default function VideoAnalysis() {
 
                     <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
-                    <div style={{
+                    <div className="speakshine-timer-box" style={{
                       background: "#161024",
                       border: "1px solid rgba(249, 115, 22, 0.35)",
                       borderRadius: 10,
@@ -979,7 +977,7 @@ export default function VideoAnalysis() {
                       textAlign: "center",
                       minWidth: 54,
                     }}>
-                      <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                      <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                         {timeLeft.mins}
                       </div>
                       <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
@@ -989,7 +987,7 @@ export default function VideoAnalysis() {
 
                     <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
-                    <div style={{
+                    <div className="speakshine-timer-box" style={{
                       background: "#161024",
                       border: "1px solid rgba(249, 115, 22, 0.35)",
                       borderRadius: 10,
@@ -997,7 +995,7 @@ export default function VideoAnalysis() {
                       textAlign: "center",
                       minWidth: 54,
                     }}>
-                      <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                      <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                         {timeLeft.secs}
                       </div>
                       <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
@@ -1021,7 +1019,7 @@ export default function VideoAnalysis() {
                   </div>
 
                   {/* Rules to Remember */}
-                  <div style={{
+                  <div className="speakshine-rules-box" style={{
                     background: "rgba(255, 255, 255, 0.03)",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
                     borderRadius: 12,
@@ -1032,15 +1030,15 @@ export default function VideoAnalysis() {
                       RULES TO REMEMBER
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                         <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                         <span>Minimum 60 seconds speaking</span>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                         <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                         <span>Use at least 2 target words</span>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                         <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                         <span>No script reading - speak naturally</span>
                       </div>
@@ -1086,6 +1084,7 @@ export default function VideoAnalysis() {
                       setMode("upload");
                       document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
                     }}
+                    className="speakshine-btn-secondary"
                     style={{
                       width: "100%",
                       background: "#181427",
