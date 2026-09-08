@@ -809,17 +809,20 @@ export default function VideoAnalysis() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                         <span style={{ fontSize: "1.05rem" }}>📚</span>
-                        <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase" }}>
+                        <span className="vocab-section-title">
                           TODAY'S VOCABULARY CHALLENGE
                         </span>
                       </div>
-                      <div style={{
-                        fontSize: "0.72rem", fontWeight: 700,
-                        background: plannedCount >= (vocabRequiredCount || 3) ? "rgba(74, 222, 128, 0.15)" : "rgba(124, 111, 255, 0.15)",
-                        border: `1px solid ${plannedCount >= (vocabRequiredCount || 3) ? "rgba(74, 222, 128, 0.4)" : "rgba(124, 111, 255, 0.3)"}`,
-                        color: plannedCount >= (vocabRequiredCount || 3) ? "#4ade80" : "#c4b5fd",
-                        padding: "2px 8px", borderRadius: 99,
-                      }}>
+                      <div
+                        className={`vocab-goal-pill ${plannedCount >= (vocabRequiredCount || 3) ? "goal-met" : ""}`}
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 99,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
                         🎯 Goal: {plannedCount} / {Math.min(vocabRequiredCount || 3, normalizedVocab.length)} words (+30 pts)
                       </div>
                     </div>
@@ -831,10 +834,8 @@ export default function VideoAnalysis() {
                         return (
                           <div
                             key={i}
-                            className="vocab-card-pro"
+                            className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
                             style={{
-                              background: isPlanned ? "rgba(34, 197, 94, 0.08)" : "rgba(255, 255, 255, 0.03)",
-                              border: isPlanned ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(124, 111, 255, 0.16)",
                               borderRadius: 12,
                               padding: "0.85rem 1rem",
                               transition: "all 0.15s ease",
@@ -844,7 +845,7 @@ export default function VideoAnalysis() {
                               <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                                   <div className="vocab-num-badge">0{i + 1}</div>
-                                  <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem", color: "#ffffff" }}>
+                                  <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
                                     {v.word}
                                   </span>
                                   {v.meaning && (
@@ -864,7 +865,7 @@ export default function VideoAnalysis() {
                               <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0, marginTop: "2px" }}>
                                 <button
                                   type="button"
-                                  onClick={() => handleSpeakVocab(v.word, v.meaning, v.example, i)}
+                                  onClick={() => handleSpeak(v.word, v.meaning, v.example, i)}
                                   className="vocab-listen-btn"
                                   title="Listen to full pronunciation and example sentence"
                                   style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
@@ -894,7 +895,7 @@ export default function VideoAnalysis() {
                       })}
                     </div>
 
-                    <div style={{ marginTop: "0.75rem", fontSize: "0.74rem", color: "#8c87a2", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <div className="vocab-footer-hint">
                       <span>✨</span>
                       <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
                     </div>
@@ -2067,16 +2068,16 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
           const w = parseVocabItem(rawItem);
           const isSpeaking = speakingIndex === i;
           return (
-            <div key={i} className="vocab-card-pro">
+            <div key={i} className={`vocab-card-pro ${plannedWords[i] ? "planned" : ""}`}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                     <div className="vocab-num-badge">0{i + 1}</div>
-                    <span className="vocab-word-title" style={{ color: "#ffffff", fontWeight: 800, fontSize: "0.98rem" }}>
+                    <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
                       {w.word}
                     </span>
                     {w.meaning && (
-                      <span style={{ fontSize: "0.8rem", color: "#cbd5e1", fontWeight: 500, lineHeight: 1.4 }}>
+                      <span className="vocab-meaning-text">
                         — {w.meaning}
                       </span>
                     )}
@@ -2102,11 +2103,8 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
                   <button
                     type="button"
                     onClick={() => togglePlanned(i)}
-                    className="vocab-plan-btn"
+                    className={`vocab-plan-btn ${plannedWords[i] ? "planned" : ""}`}
                     style={{
-                      background: plannedWords[i] ? "rgba(74, 222, 128, 0.2)" : "var(--card2)",
-                      border: `1px solid ${plannedWords[i] ? "rgba(74, 222, 128, 0.4)" : "var(--border)"}`,
-                      color: plannedWords[i] ? "var(--success)" : "var(--text2)",
                       borderRadius: 8,
                       padding: "4px 8px",
                       fontSize: "0.72rem",

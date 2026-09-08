@@ -6420,9 +6420,9 @@ audio { border-radius: 12px; }
 
 [data-theme="light"] .vocab-card-pro.planned,
 .light .vocab-card-pro.planned {
-  background: #f0fdf4 !important; /* Rich light emerald tint (green-50) */
-  border: 1.5px solid #16a34a !important; /* Bold, unmistakable emerald green border */
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.16) !important;
+  background: rgba(34, 197, 94, 0.16) !important; /* Increased green opacity, clearly visible */
+  border: 2px solid #16a34a !important; /* Bold, unmistakable emerald green border */
+  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.2) !important;
 }
 
 [data-theme="light"] .vocab-plan-btn,
