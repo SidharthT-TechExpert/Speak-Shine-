@@ -1223,17 +1223,16 @@ export default function ModernDashboardView({
             }}>
               {/* Header with Title & Tabs */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
-                <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase" }}>
+                <div className="perf-center-title" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   PERFORMANCE CENTER
                 </div>
 
-                <div style={{ display: "flex", gap: "0.35rem", background: "rgba(255, 255, 255, 0.03)", padding: 4, borderRadius: 10, border: "1px solid rgba(255, 255, 255, 0.06)" }}>
+                <div className="perf-tab-wrapper" style={{ display: "flex", gap: "0.35rem", padding: 4, borderRadius: 10 }}>
                   <button
                     type="button"
+                    className={`perf-tab-btn${activeTab === "points" ? " active" : ""}`}
                     onClick={() => setActiveTab("points")}
                     style={{
-                      background: activeTab === "points" ? "#26203a" : "transparent",
-                      color: activeTab === "points" ? "#ffffff" : "#7c7793",
                       border: "none",
                       borderRadius: 8,
                       padding: "0.4rem 0.9rem",
@@ -1248,10 +1247,9 @@ export default function ModernDashboardView({
 
                   <button
                     type="button"
+                    className={`perf-tab-btn${activeTab === "history" ? " active" : ""}`}
                     onClick={() => setActiveTab("history")}
                     style={{
-                      background: activeTab === "history" ? "#26203a" : "transparent",
-                      color: activeTab === "history" ? "#ffffff" : "#7c7793",
                       border: "none",
                       borderRadius: 8,
                       padding: "0.4rem 0.9rem",
@@ -1266,10 +1264,9 @@ export default function ModernDashboardView({
 
                   <button
                     type="button"
+                    className={`perf-tab-btn${activeTab === "sessions" ? " active" : ""}`}
                     onClick={() => setActiveTab("sessions")}
                     style={{
-                      background: activeTab === "sessions" ? "#26203a" : "transparent",
-                      color: activeTab === "sessions" ? "#ffffff" : "#7c7793",
                       border: "none",
                       borderRadius: 8,
                       padding: "0.4rem 0.9rem",
@@ -1285,47 +1282,47 @@ export default function ModernDashboardView({
               </div>
 
               {/* Dynamic Subtitle per Tab */}
-              <div style={{ fontSize: "0.82rem", color: "#8b85a3", marginBottom: "1.25rem" }}>
+              <div className="perf-center-subtitle" style={{ fontSize: "0.82rem", marginBottom: "1.25rem" }}>
                 {activeTab === "points" && "Points Progression - Track your daily score and cumulative growth over time."}
                 {activeTab === "history" && "Skill Breakdown - Fluency, Grammar, Confidence, and Vocabulary trends across all submissions."}
                 {activeTab === "sessions" && "Submission Log - All completed speaking challenges with detailed rubric breakdown."}
               </div>
 
               {/* Metric Averages Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-                <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+              <div className="perf-metric-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+                <div className="perf-metric-card">
+                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     FLUENCY
                   </div>
-                  <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#ffffff" }}>
-                    6.5 <span style={{ fontSize: "0.78rem", color: "#716c85", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
+                    6.5 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
 
-                <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+                <div className="perf-metric-card">
+                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     GRAMMAR
                   </div>
-                  <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#ffffff" }}>
-                    5.2 <span style={{ fontSize: "0.78rem", color: "#716c85", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
+                    5.2 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
 
-                <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+                <div className="perf-metric-card">
+                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     CONFIDENCE
                   </div>
-                  <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#ffffff" }}>
-                    6.6 <span style={{ fontSize: "0.78rem", color: "#716c85", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
+                    6.6 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
 
-                <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.25rem" }}>
+                <div className="perf-metric-card">
+                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     VOCABULARY
                   </div>
-                  <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#ffffff" }}>
-                    5.6 <span style={{ fontSize: "0.78rem", color: "#716c85", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
+                    5.6 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
               </div>
@@ -1382,7 +1379,7 @@ export default function ModernDashboardView({
                     </ResponsiveContainer>
                   </div>
 
-                  <div style={{ fontSize: "0.74rem", color: "#716c85", marginTop: "1rem" }}>
+                  <div className="chart-footer-note" style={{ fontSize: "0.74rem", marginTop: "1rem" }}>
                     <span style={{ color: "#c084fc" }}>●</span> Daily points, last 25 sessions · Average 85 · Best 94 · Sunday bonuses excluded
                   </div>
                 </div>
@@ -1421,7 +1418,7 @@ export default function ModernDashboardView({
                     </ResponsiveContainer>
                   </div>
 
-                  <div style={{ display: "flex", gap: "1.25rem", fontSize: "0.75rem", color: "#94a3b8", marginTop: "1rem", flexWrap: "wrap" }}>
+                  <div className="chart-legend-row" style={{ display: "flex", gap: "1.25rem", fontSize: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
                     <span><strong style={{ color: "#a78bfa" }}>●</strong> Fluency</span>
                     <span><strong style={{ color: "#4ade80" }}>●</strong> Grammar</span>
                     <span><strong style={{ color: "#fbbf24" }}>●</strong> Confidence</span>
@@ -1436,7 +1433,7 @@ export default function ModernDashboardView({
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                       <thead>
-                        <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)", color: "#716c85", textAlign: "left" }}>
+                        <tr className="perf-session-header-row" style={{ textAlign: "left" }}>
                           <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>SESSION</th>
                           <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>DATE</th>
                           <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>RECORDED</th>
@@ -1451,18 +1448,15 @@ export default function ModernDashboardView({
                           <tr
                             key={idx}
                             onClick={() => onOpenReport && onOpenReport(s)}
+                            className="perf-session-row"
                             style={{
-                              borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
-                              color: "#e2e8f0",
                               cursor: "pointer",
                               transition: "background 0.15s ease",
                             }}
-                            onMouseEnter={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
-                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                           >
-                            <td style={{ padding: "0.75rem 0.5rem", color: "#94a3b8" }}>{s.session}</td>
+                            <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.session}</td>
                             <td style={{ padding: "0.75rem 0.5rem" }}>{s.date}</td>
-                            <td style={{ padding: "0.75rem 0.5rem", color: "#94a3b8" }}>{s.duration}</td>
+                            <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.duration}</td>
                             <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.fluency) }}>{s.fluency}/10</td>
                             <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.grammar) }}>{s.grammar}/10</td>
                             <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.confidence) }}>{s.confidence}/10</td>
@@ -1567,7 +1561,7 @@ export default function ModernDashboardView({
                       🏆
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.08em", color: "#ffffff", textTransform: "uppercase" }}>
+                      <div className="leaderboard-header-title" style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                         TODAY'S LEADERBOARD
                       </div>
                     </div>
@@ -1578,10 +1572,7 @@ export default function ModernDashboardView({
                     style={{
                       fontSize: "0.74rem",
                       fontWeight: 700,
-                      color: "#c4b5fd",
                       textDecoration: "none",
-                      background: "rgba(124, 111, 255, 0.12)",
-                      border: "1px solid rgba(124, 111, 255, 0.28)",
                       padding: "4px 10px",
                       borderRadius: 99,
                       display: "flex",
@@ -1590,11 +1581,9 @@ export default function ModernDashboardView({
                       transition: "all 0.2s ease",
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(124, 111, 255, 0.22)";
                       e.currentTarget.style.transform = "translateX(2px)";
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(124, 111, 255, 0.12)";
                       e.currentTarget.style.transform = "translateX(0)";
                     }}
                   >
@@ -1604,15 +1593,12 @@ export default function ModernDashboardView({
                 </div>
 
                 {/* Subheader Status Pill */}
-                <div style={{
+                <div className="leaderboard-sub-pill" style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "0.45rem",
                   fontSize: "0.7rem",
                   fontWeight: 600,
-                  color: "#94a3b8",
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid rgba(255, 255, 255, 0.06)",
                   padding: "3px 9px",
                   borderRadius: 99,
                   marginBottom: "1.2rem",
@@ -1686,14 +1672,16 @@ export default function ModernDashboardView({
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
                           {/* Rank / Medal Emblem */}
-                          <div style={{
-                            width: 24,
-                            textAlign: "center",
-                            fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.85rem",
-                            fontWeight: 800,
-                            color: isUser ? "#c084fc" : "#8b85a3",
-                            flexShrink: 0,
-                          }}>
+                          <div
+                            className="leaderboard-rank-num"
+                            style={{
+                              width: 24,
+                              textAlign: "center",
+                              fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.85rem",
+                              fontWeight: 800,
+                              flexShrink: 0,
+                            }}
+                          >
                             {isRank1 ? "🥇" : isRank2 ? "🥈" : isRank3 ? "🥉" : isUser ? "👉" : u.rank}
                           </div>
 
@@ -1716,35 +1704,40 @@ export default function ModernDashboardView({
 
                           {/* Name & Title */}
                           <div style={{ minWidth: 0 }}>
-                            <div style={{
-                              fontSize: "0.88rem",
-                              fontWeight: 700,
-                              color: isUser ? "#ffffff" : isRank1 ? "#fef08a" : "#f1f0f5",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.35rem",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}>
+                            <div
+                              className="leaderboard-name"
+                              style={{
+                                fontSize: "0.88rem",
+                                fontWeight: 700,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
                               <span>{u.name}</span>
                               {isRank1 && <span title="Current #1 Leader">👑</span>}
                               {isUser && (
-                                <span style={{
-                                  fontSize: "0.62rem",
-                                  fontWeight: 800,
-                                  background: "rgba(168, 85, 247, 0.3)",
-                                  color: "#d8b4fe",
-                                  border: "1px solid rgba(168, 85, 247, 0.5)",
-                                  padding: "1px 5px",
-                                  borderRadius: 4,
-                                  letterSpacing: "0.05em",
-                                }}>
+                                <span
+                                  className="leaderboard-you-badge"
+                                  style={{
+                                    fontSize: "0.62rem",
+                                    fontWeight: 800,
+                                    padding: "1px 5px",
+                                    borderRadius: 4,
+                                    letterSpacing: "0.05em",
+                                  }}
+                                >
                                   YOU
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: "0.72rem", color: "#8e8a9f", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                            <div
+                              className="leaderboard-subtitle"
+                              style={{ fontSize: "0.72rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+                            >
                               <span>{u.title}</span>
                             </div>
                           </div>
@@ -1755,13 +1748,12 @@ export default function ModernDashboardView({
                           <div
                             className="leaderboard-pts-badge"
                             style={{
-                              color: isRank1 ? "#fbbf24" : isUser ? "#c084fc" : "#ffffff",
                               fontSize: "0.92rem",
                               fontWeight: 800,
                             }}
                           >
-                            <span>{u.pts}</span>
-                            <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#8e8a9f" }}>pts</span>
+                            <span className="leaderboard-pts-num">{u.pts}</span>
+                            <span className="leaderboard-pts-label" style={{ fontSize: "0.72rem", fontWeight: 600 }}>pts</span>
                           </div>
                           <div style={{
                             fontSize: "0.8rem",
