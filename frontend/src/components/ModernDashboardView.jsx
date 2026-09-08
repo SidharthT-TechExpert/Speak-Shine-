@@ -764,19 +764,26 @@ export default function ModernDashboardView({
                 </span>
               </div>
 
-              {/* Title with Editorial Serif Styling */}
+              {/* Title with Premium Editorial Serif — Playfair Display */}
               <h1 style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "2.35rem",
-                fontWeight: 400,
+                fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                fontSize: "2.4rem",
+                fontWeight: 700,
                 color: "#ffffff",
                 lineHeight: 1.15,
                 margin: "0 0 0.75rem 0",
-                letterSpacing: "-0.01em",
+                letterSpacing: "-0.02em",
               }}>
                 {mainTitlePart}{" "}
                 {italicTitlePart && (
-                  <span style={{ fontStyle: "italic", color: "#c4b5fd" }}>
+                  <span style={{
+                    fontStyle: "italic",
+                    fontWeight: 600,
+                    background: "linear-gradient(135deg, #c4b5fd 0%, #a78bfa 60%, #e879f9 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}>
                     {italicTitlePart}
                   </span>
                 )}
