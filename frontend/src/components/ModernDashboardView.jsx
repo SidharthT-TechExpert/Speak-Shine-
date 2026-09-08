@@ -638,13 +638,29 @@ export default function ModernDashboardView({
           formattedDate = new Date(rawDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
         } catch {}
       }
+
+      const rawPts = getSessionPoints(s);
+      let isSunday = Boolean(s.sundayBonus);
+      if (!isSunday && rawDate) {
+        try {
+          const d = new Date(rawDate);
+          if (d.toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" }) === "Sun" && (rawPts ?? 0) > 100) {
+            isSunday = true;
+          }
+        } catch {}
+      }
+
+      // Sunday bonus points are doubled (2x): divide by 2 for the graph so baseline remains normalized
+      const graphPts = (isSunday && rawPts != null) ? Math.round(rawPts / 2) : (rawPts ?? 75);
+
       return {
         session: `#${i + 1}`,
         sessionIndex: i + 1,
-        pts: getSessionPoints(s) ?? 75,
+        pts: graphPts,
+        totalPts: rawPts,
         date: formattedDate,
         rawDate,
-        sundayBonus: Boolean(s.sundayBonus),
+        sundayBonus: isSunday,
       };
     });
   }, [scores, hasActualScores, getSessionPoints]);
@@ -2968,7 +2984,7 @@ export default function ModernDashboardView({
                                     <div style={{ background: isDark ? "#161226" : "#ffffff", border: isDark ? "1px solid rgba(167, 139, 250, 0.4)" : "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", color: isDark ? "#fff" : "#0f172a" }}>
                                       <div style={{ fontWeight: 700 }}>Session {label} {item?.date ? `· ${item.date}` : ""}</div>
                                       <div style={{ color: "#a78bfa", fontWeight: 700, marginTop: 2 }}>
-                                        Score: {payload[0].value} pts {item?.sundayBonus ? "🎉 (Sunday Bonus)" : ""}
+                                        Score: {payload[0].value} pts {item?.sundayBonus ? `🎉 (${item.totalPts || Math.round(payload[0].value * 2)} pts Sunday Bonus)` : ""}
                                       </div>
                                     </div>
                                   );
@@ -2988,7 +3004,7 @@ export default function ModernDashboardView({
                       </div>
 
                       <div className="chart-footer-note" style={{ fontSize: "0.74rem", marginTop: "1rem" }}>
-                        <span style={{ color: "#c084fc" }}>●</span> Daily points ({chartPointsData.length} sessions logged) · Average {pointsAvg} pts · Best {pointsBest} pts · Sunday bonuses included
+                        <span style={{ color: "#c084fc" }}>●</span> Daily points ({chartPointsData.length} sessions logged) · Average {pointsAvg} pts · Best {pointsBest} pts · Sunday bonus normalized to base score
                       </div>
                     </>
                   )}
