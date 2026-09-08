@@ -327,6 +327,7 @@ export async function getUserProfile(phone) {
       streakFreeze: profileUser.streakFreeze || 0,
       monthlyScore: profileUser.monthlyScore || 0,
       completed: profileUser.completed || false,
+      completedToday: profileUser.completed || false,
       weeklySubmissions: profileUser.weeklySubmissions || 0,
       monthlySubmissions: profileUser.monthlySubmissions || 0,
       linkedPhone: profileUser.phone || null,
@@ -334,6 +335,8 @@ export async function getUserProfile(phone) {
     },
     today: {
       questionSent: isQuestionSentToday,
+      isSubmitted: Boolean(profileUser.completed || false),
+      submitted: Boolean(profileUser.completed || false),
       posterSendTime: status?.posterSendTime || "08:00",
       topic: isQuestionSentToday ? (status?.todayTopic || null) : null,
       question: isQuestionSentToday ? (status?.todayQuestion || null) : null,

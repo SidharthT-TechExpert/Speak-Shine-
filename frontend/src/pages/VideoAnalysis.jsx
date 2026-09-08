@@ -210,6 +210,7 @@ export default function VideoAnalysis() {
   const [isQuestionActive, setIsQuestionActive] = useState(false);
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(true);
   const [posterSendTime, setPosterSendTime] = useState("08:00");
+  const [isTodaySubmitted, setIsTodaySubmitted] = useState(false);
 
   // ── Live Countdown to Midnight IST (Matching Dashboard Page) ────────────────
   const [timeLeft, setTimeLeft] = useState({ hrs: "09", mins: "22", secs: "50" });
@@ -501,6 +502,13 @@ export default function VideoAnalysis() {
         (t?.questionSent && (t?.question || t?.topic))
       );
       setIsQuestionActive(active);
+      const isSub = Boolean(
+        r.data?.profile?.completed ||
+        r.data?.profile?.completedToday ||
+        t?.isSubmitted ||
+        t?.submitted
+      );
+      setIsTodaySubmitted(isSub);
       if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
       if (t?.question && active) {
         setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
@@ -1277,6 +1285,64 @@ export default function VideoAnalysis() {
             </div>
           );
         })()}
+
+        {/* Accomplishment celebration banner if today's task is already submitted */}
+        {isTodaySubmitted && (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)",
+            border: "1px solid rgba(74, 222, 128, 0.35)",
+            boxShadow: "0 4px 20px rgba(16, 185, 129, 0.12)",
+            borderRadius: 14,
+            padding: "1rem 1.35rem",
+            marginBottom: "1.25rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.85rem",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+              <span style={{ fontSize: "1.6rem" }}>🎉</span>
+              <div>
+                <div style={{ fontSize: "0.98rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span>Today's Speaking Challenge Accomplished!</span>
+                  <span style={{
+                    background: "rgba(34, 197, 94, 0.2)",
+                    border: "1px solid rgba(74, 222, 128, 0.4)",
+                    color: "#86efac",
+                    borderRadius: 999,
+                    padding: "2px 8px",
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}>
+                    ✓ Submitted &amp; Verified
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#cbd5e1", marginTop: "2px" }}>
+                  Your attendance is marked and your streak is safe! You can record or upload additional takes below anytime for free practice.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard")}
+              style={{
+                background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: 10,
+                padding: "0.55rem 1.15rem",
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(34, 197, 94, 0.3)",
+              }}
+            >
+              Dashboard Overview →
+            </button>
+          </div>
+        )}
 
         {/* Mode switcher */}
         <div id="video-studio-container" style={{

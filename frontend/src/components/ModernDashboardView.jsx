@@ -531,21 +531,26 @@ export default function ModernDashboardView({
   const freezeTokens = profile.streakFreeze ?? 0;
 
   // Determine if today's challenge/task has been submitted
+  const nowISTDateStr = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toDateString();
   const isTodaySubmitted = Boolean(
     profile?.completedToday === true ||
     profile?.completed === true ||
     today?.submitted === true ||
     today?.isSubmitted === true ||
     (scores.length > 0 && scores.some(s => {
-      const d = s.createdAt || s.date;
-      return d && new Date(d).toDateString() === new Date().toDateString();
+      const d = s.createdAt || s.date || s.submittedAt;
+      if (!d) return false;
+      const sISTDateStr = new Date(new Date(d).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toDateString();
+      return sISTDateStr === nowISTDateStr;
     }))
   );
 
   // Find latest/today's score for today's points display
   const todayScoreObj = scores.slice().reverse().find(s => {
-    const d = s.createdAt || s.date;
-    return d && new Date(d).toDateString() === new Date().toDateString();
+    const d = s.createdAt || s.date || s.submittedAt;
+    if (!d) return false;
+    const sISTDateStr = new Date(new Date(d).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toDateString();
+    return sISTDateStr === nowISTDateStr;
   }) || scores[scores.length - 1];
 
   const todayPoints = todayScoreObj?.points != null
@@ -927,7 +932,9 @@ export default function ModernDashboardView({
               Good {getGreeting()}, {displayName} 👋
             </span>
             <span className="speakshine-topbar-subtitle">
-              {isQuestionActive
+              {isTodaySubmitted
+                ? "🎉 Today's speaking mission accomplished! Your streak is secured."
+                : isQuestionActive
                 ? "Here's your speaking mission for today."
                 : `Daily reset complete · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)}`}
             </span>
@@ -957,8 +964,403 @@ export default function ModernDashboardView({
 
         {/* Canvas Body */}
         <main className="speakshine-canvas">
-          {/* ── Section 1: Hero Section (Active Question OR 12 AM Reset Countdown Layout) ── */}
-          {isQuestionActive ? (
+          {/* ── Section 1: Hero Section (Submitted Accomplishment OR Active Question OR 12 AM Reset Countdown Layout) ── */}
+          {isTodaySubmitted ? (
+            /* ── Section 1A: Daily Mission Accomplishment Hero Setup (Submitted Users) ── */
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
+              gap: "1.25rem",
+              marginBottom: "1.25rem",
+            }}>
+              {/* Left Accomplishment Card */}
+              <div className="speakshine-hero-left-card" style={{
+                background: "linear-gradient(145deg, #0d2818 0%, #081a10 50%, #0f172a 100%)",
+                border: "1px solid rgba(74, 222, 128, 0.35)",
+                boxShadow: "0 12px 40px rgba(16, 185, 129, 0.15)",
+                borderRadius: 18,
+                padding: "2rem",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                overflow: "hidden",
+              }}>
+                {/* Decorative background glow */}
+                <div style={{
+                  position: "absolute",
+                  top: -80,
+                  right: -80,
+                  width: 260,
+                  height: 260,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(34, 197, 94, 0.18) 0%, transparent 70%)",
+                  pointerEvents: "none",
+                }} />
+
+                <div>
+                  {/* Top Header: Mission Completed Pill + Verified Badge */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{
+                        width: 9, height: 9, borderRadius: "50%",
+                        background: "#4ade80", boxShadow: "0 0 12px #4ade80",
+                      }} />
+                      <span style={{ fontSize: "0.76rem", fontWeight: 800, letterSpacing: "0.08em", color: "#4ade80", textTransform: "uppercase" }}>
+                        MISSION COMPLETE · SUBMISSION VERIFIED
+                      </span>
+                    </div>
+                    <span style={{
+                      background: "rgba(34, 197, 94, 0.15)",
+                      border: "1px solid rgba(74, 222, 128, 0.4)",
+                      borderRadius: 9999,
+                      padding: "4px 12px",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.06em",
+                      color: "#86efac",
+                      textTransform: "uppercase",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                    }}>
+                      <span>✓</span> TODAY'S TASK DONE
+                    </span>
+                  </div>
+
+                  {/* Headline: Editorial serif */}
+                  <h1 className="story-title-heading" style={{
+                    fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                    fontSize: "2.35rem",
+                    fontWeight: 700,
+                    lineHeight: 1.15,
+                    margin: "0 0 0.65rem 0",
+                    letterSpacing: "-0.02em",
+                    color: "#ffffff",
+                  }}>
+                    Terrific Speaking, <span className="story-title-italic" style={{ color: "#86efac", fontStyle: "italic", fontWeight: 400 }}>{displayName.split(" ")[0]}! 🌟</span>
+                  </h1>
+
+                  {/* Motivational celebration text */}
+                  <p style={{
+                    fontSize: "0.94rem",
+                    color: "#cbd5e1",
+                    lineHeight: 1.6,
+                    marginBottom: "1.5rem",
+                    maxWidth: "680px",
+                  }}>
+                    You've successfully completed and submitted today's daily speaking challenge! Your recording was analyzed, attendance is marked, and your streak is locked in and protected until tomorrow.
+                  </p>
+
+                  {/* 4 Accomplishment Highlights Grid */}
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))",
+                    gap: "0.75rem",
+                    marginBottom: "1.5rem",
+                  }}>
+                    <div style={{
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(74, 222, 128, 0.25)",
+                      borderRadius: 12,
+                      padding: "0.85rem 1rem",
+                      textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>✅</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>Submitted</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#86efac", textTransform: "uppercase", marginTop: "3px" }}>Daily Task</div>
+                    </div>
+
+                    <div style={{
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(249, 115, 22, 0.3)",
+                      borderRadius: 12,
+                      padding: "0.85rem 1rem",
+                      textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>🔥</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>{streak} Days</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#fb923c", textTransform: "uppercase", marginTop: "3px" }}>Streak Safe</div>
+                    </div>
+
+                    <div style={{
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(251, 191, 36, 0.3)",
+                      borderRadius: 12,
+                      padding: "0.85rem 1rem",
+                      textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>⭐</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>+{todayPoints} pts</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#fcd34d", textTransform: "uppercase", marginTop: "3px" }}>Earned Today</div>
+                    </div>
+
+                    <div style={{
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(168, 85, 247, 0.3)",
+                      borderRadius: 12,
+                      padding: "0.85rem 1rem",
+                      textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>🏅</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>{milestone?.currentBadge?.name || "Speaker"}</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#c084fc", textTransform: "uppercase", marginTop: "3px" }}>Active Rank</div>
+                    </div>
+                  </div>
+
+                  {/* Submission Context Preview (Topic + Vocab Used) */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    borderRadius: 12,
+                    padding: "1rem 1.25rem",
+                    marginBottom: "1.5rem",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase" }}>
+                        CHALLENGE TOPIC SUBMITTED
+                      </div>
+                      <span style={{ fontSize: "0.72rem", color: "#4ade80", fontWeight: 700 }}>✓ Scored by AI</span>
+                    </div>
+                    <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.65rem" }}>
+                      "{topicTitle}"
+                    </div>
+
+                    {/* Target Vocab Pills */}
+                    {vocabList && vocabList.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, marginRight: "4px" }}>
+                          VOCABULARY:
+                        </span>
+                        {vocabList.map((v, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              background: "rgba(34, 197, 94, 0.12)",
+                              border: "1px solid rgba(74, 222, 128, 0.3)",
+                              borderRadius: 6,
+                              padding: "2px 8px",
+                              fontSize: "0.74rem",
+                              fontWeight: 600,
+                              color: "#86efac",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                            }}
+                          >
+                            <span>✓</span> {v.word}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary Action Buttons */}
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.85rem", marginTop: "auto" }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/record#report-section")}
+                    style={{
+                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: 12,
+                      padding: "0.85rem 1.4rem",
+                      fontWeight: 700,
+                      fontSize: "0.92rem",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.55rem",
+                      boxShadow: "0 4px 18px rgba(34, 197, 94, 0.35)",
+                      transition: "transform 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                  >
+                    <span>📊</span>
+                    <span>View Speech Feedback &amp; Scorecard</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/community")}
+                    className="speakshine-btn-secondary"
+                    style={{
+                      background: "#181427",
+                      color: "#cbd5e1",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: 12,
+                      padding: "0.85rem 1.25rem",
+                      fontWeight: 600,
+                      fontSize: "0.88rem",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <span>👥</span>
+                    <span>Community Feed</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById("community-leaderboard-section");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    style={{
+                      background: "transparent",
+                      color: "#94a3b8",
+                      border: "none",
+                      padding: "0.85rem 1rem",
+                      fontWeight: 600,
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}
+                  >
+                    <span>🏆</span> Leaderboard Rank
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Streak Security & Daily Mission Status Card */}
+              <div className="speakshine-hero-right-card" style={{
+                background: "linear-gradient(145deg, #120e24 0%, #0d0918 100%)",
+                border: "1px solid rgba(74, 222, 128, 0.25)",
+                borderRadius: 18,
+                padding: "1.75rem",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.4)",
+              }}>
+                <div>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#86efac", textTransform: "uppercase", marginBottom: "0.85rem" }}>
+                    DAILY MISSION STATUS
+                  </div>
+
+                  {/* Luminous Streak Shield Box */}
+                  <div style={{
+                    background: "rgba(34, 197, 94, 0.08)",
+                    border: "1px solid rgba(74, 222, 128, 0.3)",
+                    borderRadius: 14,
+                    padding: "1.1rem",
+                    marginBottom: "1.25rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.85rem",
+                  }}>
+                    <div style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: "50%",
+                      background: "rgba(34, 197, 94, 0.18)",
+                      border: "1px solid rgba(74, 222, 128, 0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.6rem",
+                      flexShrink: 0,
+                      boxShadow: "0 0 16px rgba(34, 197, 94, 0.25)",
+                    }}>
+                      🛡️
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "1rem", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
+                        Streak Locked &amp; Protected!
+                      </div>
+                      <div style={{ fontSize: "0.78rem", color: "#86efac", lineHeight: 1.4 }}>
+                        Your {streak}-day streak is 100% safe. No fine or streak loss will occur tonight.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Countdown to Next Drop */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: 12,
+                    padding: "0.85rem 1rem",
+                    marginBottom: "1.25rem",
+                  }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.45rem" }}>
+                      NEXT CHALLENGE CYCLE
+                    </div>
+                    <div style={{ fontSize: "0.82rem", color: "#cbd5e1" }}>
+                      Next speaking mission drops tomorrow at <strong style={{ color: "#ffffff" }}>{formatDropTime(targetPosterSendTime)} IST</strong>. Take today to rest your vocal cords!
+                    </div>
+                  </div>
+
+                  {/* Checklist of Completed Requirements */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: 12,
+                    padding: "1rem",
+                    marginBottom: "1.25rem",
+                  }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                      TODAY'S VERIFIED CHECKLIST
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                        <span>Speaking video recorded &amp; uploaded</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                        <span>Target vocabulary integrated in speech</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                        <span>Fluency, grammar &amp; vocabulary scored</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                        <span>Streak preserved &amp; milestone points credited</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optional Studio Practice Link */}
+                <div style={{ marginTop: "auto" }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/record#video-studio-container")}
+                    className="speakshine-btn-secondary"
+                    style={{
+                      width: "100%",
+                      background: "#181427",
+                      color: "#cbd5e1",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      borderRadius: 12,
+                      padding: "0.75rem",
+                      fontWeight: 600,
+                      fontSize: "0.84rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.45rem",
+                    }}
+                  >
+                    <span>🎙️</span>
+                    <span>Practice Extra Take in Studio (Optional)</span>
+                  </button>
+                  <div style={{ fontSize: "0.7rem", color: "#64748b", textAlign: "center", marginTop: "6px" }}>
+                    Extra takes won't overwrite your completed score.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : isQuestionActive ? (
             <div style={{
               display: "grid",
               gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
