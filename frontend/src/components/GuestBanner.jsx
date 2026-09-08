@@ -8,11 +8,13 @@ import api from "../api/client.js";
  */
 export default function GuestBanner() {
   const navigate = useNavigate();
-  const [slots, setSlots] = useState(null);
+  const [slots, setSlots] = useState({ slotsLeft: 5, totalSlots: 20, percentFull: 75, isFull: false });
 
   useEffect(() => {
     api.get("/guest/slots")
-      .then(r => setSlots(r.data))
+      .then(r => {
+        if (r.data) setSlots(r.data);
+      })
       .catch(() => {});
   }, []);
 
@@ -38,9 +40,7 @@ export default function GuestBanner() {
           <div style={{ fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.15rem" }}>
             {slots?.isFull
               ? "⚠️ Today's slots are full. New slots open at midnight."
-              : slots
-              ? `🔥 Only ${slots.slotsLeft} of ${slots.totalSlots} daily spots left today!`
-              : "Submit videos daily, get AI feedback & track your English growth."}
+              : `🔥 Only ${slots?.slotsLeft ?? 5} of ${slots?.totalSlots ?? 20} daily slots left today!`}
           </div>
         </div>
       </div>

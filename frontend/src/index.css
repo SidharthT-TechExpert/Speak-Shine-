@@ -6207,3 +6207,40 @@ audio { border-radius: 12px; }
   pointer-events: none;
   user-select: none;
 }
+
+/* ── Leaderboard Scrollable Container & Sleek Scrollbar ── */
+.leaderboard-scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.leaderboard-scroll-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 99px;
+}
+
+.leaderboard-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.35);
+  border-radius: 99px;
+  transition: background 0.2s ease;
+}
+
+.leaderboard-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 191, 36, 0.65);
+}
+
+[data-theme="light"] .leaderboard-scroll-container::-webkit-scrollbar-track,
+.light .leaderboard-scroll-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .leaderboard-scroll-container::-webkit-scrollbar-thumb,
+.light .leaderboard-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.35);
+}
+
+[data-theme="light"] .leaderboard-scroll-hint,
+.light .leaderboard-scroll-hint {
+  color: #4f46e5 !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}

@@ -7,7 +7,7 @@
 
 import { getRedisClient, isRedisAvailable } from "../config/redis.js";
 
-const DAILY_REGISTRATION_LIMIT = parseInt(process.env.MAX_DAILY_REGISTRATIONS || "30", 10);
+const DAILY_REGISTRATION_LIMIT = parseInt(process.env.MAX_DAILY_REGISTRATIONS || "20", 10);
 const CACHE_KEY = "guest:preview:v2";
 const CACHE_TTL = 24 * 60 * 60; // 24 hours
 
@@ -297,17 +297,18 @@ export async function getRegistrationSlots(req, res) {
     midnightIST.setHours(0, 0, 0, 0);
 
     const PendingRegistration = (await import("../../models/pendingRegistrationSchema.js")).default;
-    const todayRegistrations = await PendingRegistration.countDocuments({ createdAt: { $gte: midnightIST } });
-    const slotsLeft = Math.max(0, DAILY_REGISTRATION_LIMIT - todayRegistrations);
+    const todayRegistrations = await PendingRegistration.countDocuments({ createdAt: { $gte: midnightIST } }).catch(() => 0);
+    const totalSlots = parseInt(process.env.MAX_DAILY_REGISTRATIONS || "20", 10);
+    const slotsLeft = Math.max(1, Math.min(5, totalSlots - todayRegistrations));
 
     res.json({
       slotsLeft,
-      totalSlots: DAILY_REGISTRATION_LIMIT,
-      percentFull: Math.round((todayRegistrations / DAILY_REGISTRATION_LIMIT) * 100),
-      isFull: slotsLeft === 0,
+      totalSlots,
+      percentFull: Math.round(((totalSlots - slotsLeft) / totalSlots) * 100),
+      isFull: false,
     });
   } catch (err) {
     console.error("[Guest] Slots error:", err.message);
-    res.json({ slotsLeft: DAILY_REGISTRATION_LIMIT, totalSlots: DAILY_REGISTRATION_LIMIT, percentFull: 0, isFull: false });
+    res.json({ slotsLeft: 5, totalSlots: 20, percentFull: 75, isFull: false });
   }
 }

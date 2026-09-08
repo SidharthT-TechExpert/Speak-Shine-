@@ -516,24 +516,27 @@ export default function ModernDashboardView({
       return false;
     };
 
-    let itemsToDisplay = rawList.slice(0, 5);
-    const hasUserInTop5 = itemsToDisplay.some(isUserItem);
+    let itemsToDisplay = [...rawList];
+    const hasUser = itemsToDisplay.some(isUserItem);
 
-    if (!hasUserInTop5 && myStreakEntry) {
-      itemsToDisplay = [...itemsToDisplay.slice(0, 4), { ...myStreakEntry, isCurrentUser: true }];
-    } else if (!hasUserInTop5 && user && hasRealLeaderboard) {
-      itemsToDisplay = [
-        ...itemsToDisplay.slice(0, 4),
-        {
-          rank: itemsToDisplay.length + 1,
-          name: `${displayName} (You)`,
-          streak: profile?.streak || 0,
-          monthlyScore: profile?.monthlyScore || 0,
-          completed: profile?.completed || false,
-          isCurrentUser: true,
-        },
-      ];
+    if (!hasUser && myStreakEntry) {
+      itemsToDisplay.push({ ...myStreakEntry, isCurrentUser: true });
+    } else if (!hasUser && user && hasRealLeaderboard) {
+      itemsToDisplay.push({
+        rank: itemsToDisplay.length + 1,
+        name: `${displayName} (You)`,
+        streak: profile?.streak || 0,
+        monthlyScore: profile?.monthlyScore || 0,
+        completed: profile?.completed || false,
+        isCurrentUser: true,
+      });
     }
+
+    // Sort so ranked entries stay in numerical podium order
+    itemsToDisplay.sort((a, b) => {
+      if (a.rank != null && b.rank != null) return a.rank - b.rank;
+      return (b.monthlyScore || 0) - (a.monthlyScore || 0);
+    });
 
     return itemsToDisplay.map((u, i) => {
       const isUser = isUserItem(u);
@@ -1615,8 +1618,20 @@ export default function ModernDashboardView({
                   <span>{groupName.toUpperCase()} · {memberCount} MEMBERS · {submittedCount} SUBMITTED · {pendingCount} PENDING</span>
                 </div>
 
-                {/* Ranked Peer Rows */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "1.25rem" }}>
+                {/* Ranked Peer Rows (Scrollable Container) */}
+                <div
+                  className="leaderboard-scroll-container"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.55rem",
+                    marginBottom: currentLeaderboard.length > 5 ? "0.6rem" : "1.25rem",
+                    maxHeight: "330px",
+                    overflowY: "auto",
+                    paddingRight: "4px",
+                    scrollBehavior: "smooth",
+                  }}
+                >
                   {currentLeaderboard.map((u, i) => {
                     const isRank1 = i === 0;
                     const isRank2 = i === 1;
@@ -1753,6 +1768,46 @@ export default function ModernDashboardView({
                     );
                   })}
                 </div>
+
+                {/* Scroll for more members button / indicator (Screenshot request) */}
+                {currentLeaderboard.length > 5 && (
+                  <div
+                    className="leaderboard-scroll-hint"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.45rem",
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      color: "#c4b5fd",
+                      background: "rgba(124, 111, 255, 0.08)",
+                      border: "1px dashed rgba(124, 111, 255, 0.3)",
+                      borderRadius: 10,
+                      padding: "6px 12px",
+                      marginBottom: "1.1rem",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      userSelect: "none",
+                    }}
+                    onClick={() => {
+                      const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
+                      if (el) el.scrollBy({ top: 140, behavior: "smooth" });
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "rgba(124, 111, 255, 0.18)";
+                      e.currentTarget.style.borderColor = "rgba(124, 111, 255, 0.55)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "rgba(124, 111, 255, 0.08)";
+                      e.currentTarget.style.borderColor = "rgba(124, 111, 255, 0.3)";
+                    }}
+                    title="Click to scroll and see more group members"
+                  >
+                    <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
+                    <span style={{ fontSize: "0.85rem" }}>↓</span>
+                  </div>
+                )}
 
                 {/* All-Time Record Callout */}
                 <div
