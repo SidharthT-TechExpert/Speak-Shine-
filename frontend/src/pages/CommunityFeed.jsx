@@ -1685,6 +1685,10 @@ export default function CommunityFeed() {
                 const overallScore = item.analysis?.overallScore ?? null;
                 const quoteText = item.analysis?.transcription || item.analysis?.overallComment;
 
+                const isOwner = Boolean(item.isOwn || (user?.phone && item.uploaderPhone === user.phone) || (user?.id && item.userId === user.id));
+                const isAdmin = user?.role === "admin" || user?.role === "admins" || user?.role === "trainer";
+                const canPlay = item.canPlayVideo ?? (item.isPublic !== false || isOwner || isAdmin);
+
                 return (
                   <div
                     key={item._id}
@@ -1736,8 +1740,16 @@ export default function CommunityFeed() {
                               </span>
                             )}
                             {item.isPublic === false && (
-                              <span style={{ fontSize: "0.62rem", background: "rgba(248,113,113,0.12)", color: "#f87171", borderRadius: 99, padding: "2px 7px", fontWeight: 700 }}>
-                                🔒 Private
+                              <span style={{
+                                fontSize: "0.62rem",
+                                background: canPlay ? "rgba(244, 114, 182, 0.15)" : "rgba(248, 113, 113, 0.12)",
+                                color: canPlay ? "#f472b6" : "#f87171",
+                                border: canPlay ? "1px solid rgba(244, 114, 182, 0.3)" : "1px solid rgba(248, 113, 113, 0.25)",
+                                borderRadius: 99,
+                                padding: "2px 7px",
+                                fontWeight: 700,
+                              }}>
+                                {canPlay ? "🔒 Private (You Can Play)" : "🔒 Video Private · Report Visible"}
                               </span>
                             )}
                           </div>
@@ -1817,7 +1829,7 @@ export default function CommunityFeed() {
                       </div>
                     )}
 
-                    {/* Video player */}
+                    {/* Video player or Private Restricted Card */}
                     {item.isDemo ? (
                       /* Demo card — preview for unregistered guests */
                       <div style={{
@@ -1851,6 +1863,117 @@ export default function CommunityFeed() {
                         <div style={{ position: "absolute", bottom: 8, right: 10, background: "rgba(0,0,0,0.7)", borderRadius: 6, padding: "2px 8px", fontSize: "0.7rem", color: "#fff" }}>
                           {fmtDur(item.videoDuration)}
                         </div>
+                      </div>
+                    ) : !canPlay ? (
+                      /* Private video: Playing restricted to normal users, but report is viewable */
+                      <div
+                        style={{
+                          width: "100%",
+                          borderRadius: 14,
+                          background: isDark
+                            ? "linear-gradient(135deg, rgba(28, 16, 32, 0.95) 0%, rgba(14, 10, 22, 0.95) 100%)"
+                            : "linear-gradient(135deg, #fdf4ff 0%, #faf5ff 100%)",
+                          border: isDark ? "1px solid rgba(244, 114, 182, 0.25)" : "1px solid #f5d0fe",
+                          aspectRatio: "16/9",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          position: "relative",
+                          overflow: "hidden",
+                          marginBottom: "1rem",
+                          padding: "1.5rem",
+                          textAlign: "center",
+                          boxShadow: isDark ? "0 4px 20px rgba(0, 0, 0, 0.3)" : "0 2px 12px rgba(0, 0, 0, 0.03)",
+                        }}
+                      >
+                        <div style={{
+                          position: "absolute",
+                          width: 140,
+                          height: 140,
+                          borderRadius: "50%",
+                          background: "radial-gradient(circle, rgba(244, 114, 182, 0.15) 0%, transparent 70%)",
+                          pointerEvents: "none",
+                        }} />
+
+                        <div style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: "50%",
+                          background: isDark ? "rgba(244, 114, 182, 0.15)" : "rgba(244, 114, 182, 0.2)",
+                          border: isDark ? "1px solid rgba(244, 114, 182, 0.4)" : "1px solid rgba(244, 114, 182, 0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "1.35rem",
+                          marginBottom: "0.6rem",
+                        }}>
+                          🔒
+                        </div>
+
+                        <div style={{
+                          fontWeight: 800,
+                          fontSize: "0.92rem",
+                          color: isDark ? "#fbcfe8" : "#86198f",
+                          marginBottom: "0.25rem",
+                        }}>
+                          Video Playback Private
+                        </div>
+
+                        <p style={{
+                          fontSize: "0.78rem",
+                          color: isDark ? "#94a3b8" : "#64748b",
+                          maxWidth: 340,
+                          lineHeight: 1.45,
+                          margin: "0 0 0.85rem 0",
+                        }}>
+                          This speaker chose to keep their video recording private. You can still explore their rubric scores, speaking feedback, and detailed analysis report below.
+                        </p>
+
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleView(item._id, "feedback")}
+                            style={{
+                              background: isDark ? "rgba(244, 114, 182, 0.15)" : "#fdf2f8",
+                              border: isDark ? "1px solid rgba(244, 114, 182, 0.35)" : "1px solid #fbcfe8",
+                              color: isDark ? "#f472b6" : "#db2777",
+                              borderRadius: 8,
+                              padding: "0.35rem 0.85rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            📊 View Feedback
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleView(item._id, "report")}
+                            style={{
+                              background: isDark ? "rgba(167, 139, 250, 0.15)" : "#f5f3ff",
+                              border: isDark ? "1px solid rgba(167, 139, 250, 0.35)" : "1px solid #ddd6fe",
+                              color: isDark ? "#c084fc" : "#7c3aed",
+                              borderRadius: 8,
+                              padding: "0.35rem 0.85rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            📋 View Detailed Report
+                          </button>
+                        </div>
+
+                        {item.videoDuration && (
+                          <span style={{
+                            position: "absolute", bottom: 10, right: 12,
+                            background: "rgba(0,0,0,0.6)", color: "#ffffff",
+                            fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+                          }}>
+                            ⏱️ {fmtDur(item.videoDuration)}
+                          </span>
+                        )}
                       </div>
                     ) : playing === item._id ? (
                       <div style={{ marginBottom: "1.2rem" }}>

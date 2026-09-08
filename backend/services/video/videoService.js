@@ -1292,29 +1292,18 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
     myPhone?.replace(/^91/, ""),
   ].filter(Boolean))];
 
-  // MINIMAL PRIVATE VIDEO RULE:
-  // - Admins / Trainers: see ALL videos (public + private)
-  // - Regular Users: see PUBLIC videos ({ isPublic: true }) + THEIR OWN private videos
   const isAdmin = myRole === "admin" || myRole === "admins" || myRole === "trainer";
-  const visibilityFilter = isAdmin
-    ? {}
-    : {
-        $or: [
-          { isPublic: true },
-          ...(linkedUser?._id ? [{ userId: linkedUser._id }] : []),
-          ...(phoneCandidates.length > 0 ? [{ phone: { $in: phoneCandidates } }] : []),
-        ],
-      };
 
+  // In the community feed, show today's completed submissions (public + private reports).
+  // For private submissions, normal users can view the report but video playback is restricted.
   const feed = await VideoReport.find({
     status: "completed",
     videoUrl: { $ne: null },
     submittedAt: { $gte: since },
     expiresAt: { $gt: new Date() },
-    ...visibilityFilter,
   })
     .sort({ submittedAt: -1 })
-    .limit(20)
+    .limit(30)
     .select("userId uploaderName submittedAt videoDuration videoUrl videoKey phone challengeType analysis status expiresAt likes dislikes comments isPublic")
     .lean();
 
@@ -1329,26 +1318,38 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
   const userById = new Map(feedUsers.map(user => [String(user._id), user]));
   const userByPhone = new Map(feedUsers.filter(user => user.phone).map(user => [user.phone, user]));
 
-  // Private objects are not readable through the public CDN URL. Generate a
-  // short-lived URL for every private item the query allowed through.
   const annotated = await Promise.all(feed.map(async item => {
     const feedUser = userById.get(String(item.userId)) || userByPhone.get(item.phone) || {};
-    let videoUrl = item.videoUrl;
-    if (!item.isPublic && item.videoKey) {
-      try {
-        videoUrl = await getPresignedDownloadUrl(item.videoKey, 3600);
-      } catch (err) {
-        console.error("[VideoService] Failed to generate community signed URL:", err);
+    const isPublic = item.isPublic ?? true;
+    const isOwner = Boolean(linkedUser?._id && String(item.userId) === String(linkedUser._id)) ||
+                    Boolean(item.phone && phoneCandidates.includes(item.phone));
+    const canPlay = isPublic || isAdmin || isOwner;
+
+    // Normal users cannot play private videos (videoUrl stripped for privacy)
+    let videoUrl = null;
+    if (canPlay) {
+      if (!isPublic && item.videoKey) {
+        try {
+          videoUrl = await getPresignedDownloadUrl(item.videoKey, 3600);
+        } catch (err) {
+          console.error("[VideoService] Failed to generate community signed URL:", err);
+          videoUrl = item.videoUrl;
+        }
+      } else {
+        videoUrl = item.videoUrl;
       }
     }
 
     return {
       _id: item._id,
       uploaderName: item.uploaderName,
+      uploaderPhone: item.phone,
       ...serializeStreakBadges(feedUser),
       submittedAt: item.submittedAt,
       videoDuration: item.videoDuration,
-      videoUrl,
+      videoUrl: videoUrl || null,
+      canPlayVideo: canPlay,
+      isOwn: isOwner,
       challengeType: item.challengeType || item.analysis?.challengeType || null,
       analysis: (await prepareReportAnalysis(item)).analysis,
       expiresAt: item.expiresAt,
@@ -1368,7 +1369,7 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
         createdAt: c.createdAt,
         isOwn:     c.phone === myPhone,
       })),
-      isPublic: item.isPublic ?? true,
+      isPublic,
     };
   }));
 

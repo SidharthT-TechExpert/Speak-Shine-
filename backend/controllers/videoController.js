@@ -381,9 +381,7 @@ export async function reactToVideo(req, res) {
     if (!report) {
       return res.status(404).json({ error: "Video not found" });
     }
-    const isAdmin = req.user?.role === "admin" || req.user?.role === "admins" || req.user?.role === "trainer";
-    const isOwner = (req.user?.id && report.userId?.toString() === req.user.id.toString()) || (phone && report.phone === phone);
-    if (!report.isPublic && !isAdmin && !isOwner) {
+    if (report.status !== "completed") {
       return res.status(404).json({ error: "Video not found" });
     }
 
@@ -469,9 +467,7 @@ export async function addComment(req, res) {
     if (!report) {
       return res.status(404).json({ error: "Video not found" });
     }
-    const isAdmin = req.user?.role === "admin" || req.user?.role === "admins" || req.user?.role === "trainer";
-    const isOwner = (req.user?.id && report.userId?.toString() === req.user.id.toString()) || (phone && report.phone === phone);
-    if (!report.isPublic && !isAdmin && !isOwner) {
+    if (report.status !== "completed") {
       return res.status(404).json({ error: "Video not found" });
     }
 
