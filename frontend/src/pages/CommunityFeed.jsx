@@ -1334,6 +1334,29 @@ export default function CommunityFeed() {
   const cohortName = dashboardData?.profile?.group || user?.group || "Beta";
   const rawLeaderboard = dashboardData?.leaderboard || dashboardData?.topStreak || [];
 
+  const cohortRankings = useMemo(() => {
+    if (!rawLeaderboard || rawLeaderboard.length === 0) return [];
+
+    return [...rawLeaderboard].sort((a, b) => {
+      const aScore = a.todayScore != null ? Number(a.todayScore) : null;
+      const bScore = b.todayScore != null ? Number(b.todayScore) : null;
+      // 1. Members who earned points today sort to top, highest today's points first
+      if (aScore != null && bScore == null) return -1;
+      if (aScore == null && bScore != null) return 1;
+      if (aScore != null && bScore != null) {
+        if (bScore !== aScore) return bScore - aScore;
+      }
+      // 2. Members who completed today but scoring in progress
+      const aDone = Boolean(a.isCompletedToday || a.completed);
+      const bDone = Boolean(b.isCompletedToday || b.completed);
+      if (aDone && !bDone) return -1;
+      if (!aDone && bDone) return 1;
+
+      // 3. Fallback to streak/rank order
+      return (b.streak || 0) - (a.streak || 0);
+    });
+  }, [rawLeaderboard]);
+
   if (loading) return (
     <Layout title="Community Feed">
       <div className="spinner-wrap" style={{ textAlign: "center", padding: "4rem 1rem" }}>
@@ -2255,17 +2278,22 @@ export default function CommunityFeed() {
 
               {/* Leaderboard peers list */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" }}>
-                {rawLeaderboard.slice(0, 6).map((u, i) => {
+                {cohortRankings.slice(0, 6).map((u, i) => {
                   const rank = i + 1;
                   const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
-                  const isUserMember = u.isUser || u.userId === user?.id || u.phone === user?.phone;
+                  const isUserMember = Boolean(
+                    u.isCurrentUser ||
+                    u.isUser ||
+                    u.userId === user?.id ||
+                    (user?.phone && u.phone && String(user.phone).replace(/\D/g, "").slice(-10) === String(u.phone).replace(/\D/g, "").slice(-10))
+                  );
                   const name = u.name || "Cohort Speaker";
                   const initial = (name[0] || "?").toUpperCase();
-                  const pts = Math.round(u.monthlyScore ?? u.points ?? (rank === 1 ? 95 : 80));
+                  const hasTodayPoints = u.todayScore != null;
 
                   return (
                     <div
-                      key={u.id || i}
+                      key={u.id || u.userId || u.phone || i}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -2318,14 +2346,36 @@ export default function CommunityFeed() {
                         </div>
                       </div>
 
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <span style={{ fontSize: "0.8rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7c3aed" }}>
-                          {pts}
-                        </span>
-                        <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", marginLeft: 2 }}>
-                          pts
-                        </span>
-                      </div>
+                      {hasTodayPoints ? (
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <span style={{ fontSize: "0.82rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7c3aed" }}>
+                            {Math.round(u.todayScore)}
+                          </span>
+                          <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", marginLeft: 2 }}>
+                            pts
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                            padding: "0.18rem 0.5rem",
+                            borderRadius: 99,
+                            background: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.08)",
+                            border: isDark ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid rgba(245, 158, 11, 0.2)",
+                            color: isDark ? "#fbbf24" : "#d97706",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}
+                          title="Pending today's mission"
+                        >
+                          <span style={{ fontSize: "0.75rem", lineHeight: 1 }}>⏳</span>
+                          <span>Pending</span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

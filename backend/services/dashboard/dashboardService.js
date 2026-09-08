@@ -242,6 +242,9 @@ export async function getUserProfile(phone) {
         activeRankCounter += 1;
         rank = activeRankCounter;
       }
+      const isScoredToday = Boolean(u.lastScoreDate === todayIST && u.todayScore != null);
+      const todayPoints = isScoredToday ? Math.round(u.todayScore) : null;
+
       return withBadgeData(u, {
         rank,
         name: u.name,
@@ -251,7 +254,8 @@ export async function getUserProfile(phone) {
         weeklySubmissions: u.weeklySubmissions || 0,
         completed: u.completed || false,
         monthlyScore: u.monthlyScore ?? 0,
-        todayScore: u.todayScore ?? null,
+        todayScore: todayPoints,
+        isCompletedToday: Boolean(u.completed || isScoredToday),
         lastScoreDate: u.lastScoreDate,
         isCurrentUser: u.phone === phone || u.phone === strippedPhone || `91${u.phone}` === phone,
       });
@@ -281,6 +285,8 @@ export async function getUserProfile(phone) {
   if (myHasStreak) {
     myActiveRank = leaderboardSorted.slice(0, myRankIdx + 1).filter(u => (u.streak || 0) > 0).length;
   }
+  const myIsScoredToday = myUserObj ? Boolean(myUserObj.lastScoreDate === todayIST && myUserObj.todayScore != null) : false;
+  const myTodayPoints = myIsScoredToday ? Math.round(myUserObj.todayScore) : null;
   const myStreakEntry = myUserObj ? withBadgeData(myUserObj, {
     rank: myActiveRank,
     name: myUserObj.name,
@@ -289,6 +295,9 @@ export async function getUserProfile(phone) {
     weeklySubmissions: myUserObj.weeklySubmissions || 0,
     completed: myUserObj.completed || false,
     monthlyScore: myUserObj.monthlyScore ?? 0,
+    todayScore: myTodayPoints,
+    isCompletedToday: Boolean(myUserObj.completed || myIsScoredToday),
+    lastScoreDate: myUserObj.lastScoreDate,
     inTop5: myActiveRank != null && myActiveRank <= 5,
   }) : null;
 

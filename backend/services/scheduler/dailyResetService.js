@@ -135,7 +135,7 @@ export async function incrementSubmissionCounters() {
  */
 export async function resetDailyFlags() {
   try {
-    const result = await User.updateMany({}, { completed: false, fineChargedToday: false });
+    const result = await User.updateMany({}, { completed: false, fineChargedToday: false, todayScore: null });
 
     return {
       reset: result.modifiedCount
