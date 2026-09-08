@@ -5251,18 +5251,49 @@ audio { border-radius: 12px; }
   letter-spacing: -0.01em !important;
 }
 
-/* Community Feed Styling */
+/* Community Feed Modern Dashboard Layout */
 .speakshine-shell .community-feed-wrap {
-  max-width: 900px;
+  max-width: 1360px;
   margin: 0 auto;
+  width: 100%;
+}
+.speakshine-shell .community-feed-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .speakshine-shell .community-feed-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
 }
 .speakshine-shell .community-card,
 .speakshine-shell .feed-item {
   background: #0d0a18;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
   padding: 1.5rem;
   margin-bottom: 1.25rem;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  position: relative;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.speakshine-shell .community-card:hover {
+  border-color: rgba(167, 139, 250, 0.35);
+  box-shadow: 0 16px 44px rgba(124, 111, 255, 0.12);
+}
+[data-theme="light"] .speakshine-shell .community-card,
+.light .speakshine-shell .community-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+}
+[data-theme="light"] .speakshine-shell .community-card:hover,
+.light .speakshine-shell .community-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.08) !important;
 }
 
 /* Payment Tables & Invoices */

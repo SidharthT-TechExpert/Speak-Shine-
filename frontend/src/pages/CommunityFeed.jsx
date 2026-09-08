@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -1232,9 +1232,114 @@ export default function CommunityFeed() {
     } catch {}
   }, []);
 
+  // Theme detection matching ModernDashboardView
+  const [isDark, setIsDark] = useState(() => {
+    return document.documentElement.getAttribute("data-theme") !== "light";
+  });
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const theme = document.documentElement.getAttribute("data-theme");
+      setIsDark(theme !== "light");
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+
+  // Fetch today's mission and cohort leaderboard data to match dashboard layout
+  const [dashboardData, setDashboardData] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    api.get("/dashboard/me")
+      .then(res => setDashboardData(res.data))
+      .catch(() => {});
+  }, [user]);
+
+  // Filter & Search state
+  const [filterTab, setFilterTab] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 24H Reset Countdown to midnight IST
+  const [resetCountdown, setResetCountdown] = useState("");
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const istTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      const midnightIST = new Date(istTime);
+      midnightIST.setHours(24, 0, 0, 0);
+      const diffMs = midnightIST - istTime;
+      if (diffMs <= 0) {
+        setResetCountdown("Resetting...");
+        return;
+      }
+      const hrs = Math.floor(diffMs / 3600000);
+      const mins = Math.floor((diffMs % 3600000) / 60000);
+      setResetCountdown(`${hrs}h ${mins}m`);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Filtered and sorted feed items
+  const filteredFeed = useMemo(() => {
+    let list = [...feed];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(item =>
+        (item.uploaderName || "").toLowerCase().includes(q) ||
+        (item.analysis?.overallComment || "").toLowerCase().includes(q) ||
+        (item.analysis?.transcription || "").toLowerCase().includes(q)
+      );
+    }
+
+    if (filterTab === "top") {
+      list.sort((a, b) => {
+        const scoreA = a.analysis?.compositeScore ?? (a.analysis?.overallScore ? a.analysis.overallScore * 10 : 0);
+        const scoreB = b.analysis?.compositeScore ?? (b.analysis?.overallScore ? b.analysis.overallScore * 10 : 0);
+        return scoreB - scoreA;
+      });
+    } else if (filterTab === "comments") {
+      list.sort((a, b) => {
+        const cA = (a.comments?.length || 0) + (a.likeCount || 0);
+        const cB = (b.comments?.length || 0) + (b.likeCount || 0);
+        return cB - cA;
+      });
+    } else if (filterTab === "my") {
+      list = list.filter(item => item.uploaderPhone === user?.phone || item.isOwn === true || item.uploaderName === user?.name);
+    }
+
+    return list;
+  }, [feed, filterTab, searchQuery, user?.phone, user?.name]);
+
+  // Aggregate stats
+  const avgOverallScore = useMemo(() => {
+    const validScores = feed
+      .map(item => item.analysis?.overallScore ?? (item.analysis?.compositeScore ? item.analysis.compositeScore / 10 : null))
+      .filter(v => v != null && !isNaN(v));
+    if (!validScores.length) return "7.5";
+    return (validScores.reduce((a, b) => a + Number(b), 0) / validScores.length).toFixed(1);
+  }, [feed]);
+
+  const totalCommentsCount = useMemo(() => {
+    return feed.reduce((sum, item) => sum + (item.comments?.length || 0), 0);
+  }, [feed]);
+
+  // Mission & Cohort Leaderboard info
+  const todayMission = dashboardData?.today || {};
+  const topicTitle = todayMission.topic || todayMission.question || "Speaking Challenge";
+  const topicQuestion = todayMission.question || "Share your authentic perspective and practice your daily mission.";
+  const cohortName = dashboardData?.profile?.group || user?.group || "Beta";
+  const rawLeaderboard = dashboardData?.leaderboard || dashboardData?.topStreak || [];
+
   if (loading) return (
     <Layout title="Community Feed">
-      <div className="spinner-wrap"><div className="spinner" /><p style={{ color: "var(--muted)" }}>Loading…</p></div>
+      <div className="spinner-wrap" style={{ textAlign: "center", padding: "4rem 1rem" }}>
+        <div className="spinner" />
+        <p style={{ color: isDark ? "#94a3b8" : "#64748b", marginTop: "1rem", fontSize: "0.9rem" }}>Loading community submissions…</p>
+      </div>
     </Layout>
   );
 
@@ -1252,235 +1357,919 @@ export default function CommunityFeed() {
           <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Screenshots and recording are disabled for privacy.</p>
         </div>
       )}
-      <div style={{ maxWidth: "900px", margin: "0 auto", userSelect: "none", WebkitUserSelect: "none" }}>
 
+      <div className="community-feed-wrap" style={{ userSelect: "none", WebkitUserSelect: "none" }}>
         {/* Guest banner — shown when not logged in */}
         {!user && <GuestBanner />}
 
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.4rem" }}>
-            👥 Today's Submissions
-          </h2>
-          <p style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-            {user
-              ? "Watch, like, and comment on how other members answered today's question. Videos auto-delete after 24 hours."
-              : "Preview of community submissions — register to see real videos and join the conversation!"}
+        {/* ── Section 1: Hero Showcase Banner ── */}
+        <div className="speakshine-card-box" style={{
+          background: isDark ? "#0d0a18" : "#ffffff",
+          border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+          borderRadius: 20,
+          padding: "1.75rem",
+          marginBottom: "1.5rem",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: isDark ? "0 12px 36px rgba(0, 0, 0, 0.5)" : "0 4px 20px rgba(0, 0, 0, 0.04)",
+        }}>
+          {/* Subtle Ambient Radial Glow */}
+          <div style={{
+            position: "absolute", top: -40, right: -40, width: 280, height: 280,
+            background: "radial-gradient(circle, rgba(124, 111, 255, 0.15) 0%, transparent 70%)",
+            pointerEvents: "none",
+          }} />
+
+          {/* Top Pill / Badge */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.6rem", marginBottom: "0.75rem" }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.45rem",
+              background: isDark ? "rgba(124, 111, 255, 0.12)" : "rgba(124, 111, 255, 0.08)",
+              border: isDark ? "1px solid rgba(124, 111, 255, 0.3)" : "1px solid rgba(124, 111, 255, 0.25)",
+              padding: "3px 10px", borderRadius: 99,
+              fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em",
+              color: isDark ? "#c4b5fd" : "#6d28d9", textTransform: "uppercase",
+            }}>
+              <span>👥</span>
+              <span>COHORT COMMUNITY · {cohortName.toUpperCase()}</span>
+            </div>
+
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.45rem",
+              fontSize: "0.72rem", fontWeight: 700,
+              color: "#22c55e",
+              background: "rgba(34, 197, 94, 0.1)",
+              border: "1px solid rgba(34, 197, 94, 0.25)",
+              padding: "3px 9px", borderRadius: 99,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+              <span>24H LIVE FEED</span>
+            </div>
+          </div>
+
+          {/* Headline Title */}
+          <h1 style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "1.85rem",
+            fontWeight: 700,
+            color: isDark ? "#ffffff" : "#0f172a",
+            margin: "0 0 0.5rem 0",
+            letterSpacing: "-0.01em",
+          }}>
+            Community Speaking <span style={{ fontStyle: "italic", color: isDark ? "#c084fc" : "#7c3aed" }}>Showcase</span>
+          </h1>
+
+          <p style={{
+            color: isDark ? "#94a3b8" : "#64748b",
+            fontSize: "0.88rem",
+            lineHeight: 1.5,
+            margin: "0 0 1.25rem 0",
+            maxWidth: 820,
+          }}>
+            Watch, celebrate, and share constructive feedback with fellow cohort speakers. All submissions auto-delete after 24 hours at midnight IST to ensure privacy.
           </p>
+
+          {/* 4 Quick-KPI Stat Micro-Cards */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+            gap: "0.75rem",
+            paddingTop: "1rem",
+            borderTop: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #f1f5f9",
+          }}>
+            <div style={{
+              background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0",
+              borderRadius: 12, padding: "0.7rem 0.9rem",
+            }}>
+              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                SUBMISSIONS TODAY
+              </div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", marginTop: 2 }}>
+                {feed.length} <span style={{ fontSize: "0.75rem", fontWeight: 500, color: isDark ? "#94a3b8" : "#64748b" }}>videos</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0",
+              borderRadius: 12, padding: "0.7rem 0.9rem",
+            }}>
+              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                PEER DISCUSSIONS
+              </div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", marginTop: 2 }}>
+                {totalCommentsCount} <span style={{ fontSize: "0.75rem", fontWeight: 500, color: isDark ? "#94a3b8" : "#64748b" }}>comments</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0",
+              borderRadius: 12, padding: "0.7rem 0.9rem",
+            }}>
+              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                RUBRIC AVERAGE
+              </div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#4ade80", marginTop: 2 }}>
+                {avgOverallScore} <span style={{ fontSize: "0.75rem", fontWeight: 500, color: isDark ? "#94a3b8" : "#64748b" }}>/ 10</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0",
+              borderRadius: 12, padding: "0.7rem 0.9rem",
+            }}>
+              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                EPHEMERAL RESET
+              </div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#fbbf24", marginTop: 2 }}>
+                {resetCountdown || "12:00 AM"} <span style={{ fontSize: "0.75rem", fontWeight: 500, color: isDark ? "#94a3b8" : "#64748b" }}>IST</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {error && <div className="error-box"><p>{error}</p></div>}
+        {error && <div className="error-box" style={{ marginBottom: "1rem" }}><p>{error}</p></div>}
 
-        {!error && feed.length === 0 && (
-          <div className="card empty-state">
-            <div className="empty-icon">🎥</div>
-            <p>No public submissions yet today.</p>
-            <p style={{ fontSize: "0.82rem", color: "var(--muted)", marginTop: "0.5rem" }}>
-              Be the first — submit your video and enable "Share with group"
-            </p>
-          </div>
-        )}
+        {/* ── Section 2: 2-Column Responsive Dashboard Layout ── */}
+        <div className="community-feed-layout">
 
-        {/* Highlight pulse animation */}
-        <style>{`
-          @keyframes highlight-ring {
-            0%   { box-shadow: 0 0 0 0 rgba(124,111,255,0.8), 0 8px 32px rgba(0,0,0,0.3); }
-            40%  { box-shadow: 0 0 0 8px rgba(124,111,255,0.35), 0 8px 32px rgba(0,0,0,0.3); }
-            100% { box-shadow: 0 0 0 4px rgba(124,111,255,0.15), 0 8px 32px rgba(0,0,0,0.3); }
-          }
-        `}</style>
+          {/* ── Left Column: Controls & Video Feed ── */}
+          <div style={{ minWidth: 0 }}>
+            {/* Filter Tabs & Search Bar */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+              marginBottom: "1.25rem",
+            }}>
+              {/* Segmented Filter Pills */}
+              <div style={{
+                display: "inline-flex",
+                background: isDark ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+                borderRadius: 12,
+                padding: 4,
+                gap: 4,
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("all")}
+                  style={{
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "0.45rem 0.85rem",
+                    fontSize: "0.8rem",
+                    fontWeight: filterTab === "all" ? 700 : 500,
+                    cursor: "pointer",
+                    background: filterTab === "all" ? (isDark ? "#7c6fff" : "#4f46e5") : "transparent",
+                    color: filterTab === "all" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  All ({feed.length})
+                </button>
 
-        <div style={{ display: "grid", gap: "1rem" }}>
-          {feed.map((item) => (
-            <div
-              key={item._id}
-              ref={el => { itemRefs.current[item._id] = el; }}
-              className="card"
-              style={{
-                padding: "1.25rem",
-                transition: "box-shadow 0.3s",
-                ...(item._id === highlightId ? {
-                  animation: "highlight-ring 1.8s ease forwards",
-                  border: "1.5px solid rgba(124,111,255,0.55)",
-                } : {}),
-              }}
-            >
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("top")}
+                  style={{
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "0.45rem 0.85rem",
+                    fontSize: "0.8rem",
+                    fontWeight: filterTab === "top" ? 700 : 500,
+                    cursor: "pointer",
+                    background: filterTab === "top" ? (isDark ? "#7c6fff" : "#4f46e5") : "transparent",
+                    color: filterTab === "top" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  🔥 Top Rated
+                </button>
 
-              {/* Header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div className="avatar" style={{
-                    width: "38px", height: "38px", fontSize: "0.9rem",
-                    ...(item.uploaderColor ? { background: `linear-gradient(135deg, ${item.uploaderColor}, ${item.uploaderColor}99)` } : {}),
-                  }}>
-                    {item.uploaderInitials || (item.uploaderName || "?")[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      {item.uploaderName || "Anonymous"}
-                      {item.currentBadge && <StreakBadge badge={item.currentBadge} compact />}
-                      {item.isDemo && <span style={{ fontSize: "0.62rem", background: "rgba(124,111,255,0.15)", color: "#a78bfa", borderRadius: 20, padding: "0.1rem 0.45rem", fontWeight: 700 }}>DEMO</span>}
-                      {item.isPublic === false && <span style={{ fontSize: "0.62rem", background: "rgba(248,113,113,0.12)", color: "#f87171", borderRadius: 20, padding: "0.1rem 0.45rem", fontWeight: 700 }}>🔒 Private</span>}
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
-                      {fmtTime(item.submittedAt)}{item.videoDuration ? ` · ${fmtDur(item.videoDuration)}` : ""}
-                    </div>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setFilterTab("comments")}
+                  style={{
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "0.45rem 0.85rem",
+                    fontSize: "0.8rem",
+                    fontWeight: filterTab === "comments" ? 700 : 500,
+                    cursor: "pointer",
+                    background: filterTab === "comments" ? (isDark ? "#7c6fff" : "#4f46e5") : "transparent",
+                    color: filterTab === "comments" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  💬 Most Active
+                </button>
 
-                {/* Score badges */}
-                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                  {SCORE_LABELS.map(({ key, label }) => item.analysis?.[key] != null && (
-                    <span key={key} style={{
-                      fontSize: "0.68rem", fontWeight: 700,
-                      padding: "0.2rem 0.5rem", borderRadius: "99px",
-                      background: "var(--card2)", border: "1px solid var(--border2)",
-                      color: scoreColor(item.analysis[key]),
-                    }}>{label[0]} {item.analysis[key]}/10</span>
-                  ))}
-                </div>
+                {user && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab("my")}
+                    style={{
+                      border: "none",
+                      borderRadius: 8,
+                      padding: "0.45rem 0.85rem",
+                      fontSize: "0.8rem",
+                      fontWeight: filterTab === "my" ? 700 : 500,
+                      cursor: "pointer",
+                      background: filterTab === "my" ? (isDark ? "#7c6fff" : "#4f46e5") : "transparent",
+                      color: filterTab === "my" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    👤 My Video
+                  </button>
+                )}
               </div>
 
-              {/* Short comment preview */}
-              {!view[item._id] && item.analysis?.overallComment && (
-                <p style={{ fontSize: "0.82rem", color: "var(--text2)", marginBottom: "1rem", lineHeight: 1.6, fontStyle: "italic" }}>
-                  "{item.analysis.overallComment.slice(0, 180)}{item.analysis.overallComment.length > 180 ? "…" : ""}"
-                </p>
-              )}
-
-              {/* Video player */}
-              {item.isDemo ? (
-                /* Demo card — show topic + colored thumbnail, no video lock */
-                <div style={{
-                  width: "100%", borderRadius: "10px", background: "#0a0a14",
-                  border: `1px solid ${item.uploaderColor || "rgba(124,111,255,0.25)"}44`,
-                  aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center",
-                  position: "relative", overflow: "hidden", marginBottom: "1rem",
-                }}>
-                  <div style={{
-                    position: "absolute", inset: 0,
-                    background: `linear-gradient(135deg, ${item.uploaderColor || "#7c6fff"}22, transparent 70%)`,
-                  }} />
-                  <div style={{ textAlign: "center", position: "relative", zIndex: 1, padding: "1rem" }}>
-                    <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>🎙️</div>
-                    <div style={{ fontWeight: 600, color: "#fff", fontSize: "0.82rem", lineHeight: 1.4, maxWidth: 280 }}>
-                      "{item.analysis?.transcription?.slice(0, 100)}…"
-                    </div>
-                    <button
-                      onClick={() => navigate("/register")}
-                      style={{
-                        marginTop: "0.75rem",
-                        background: `linear-gradient(135deg, ${item.uploaderColor || "#7c6fff"}, ${item.uploaderColor || "#4f46e5"})`,
-                        border: "none", color: "#fff",
-                        borderRadius: 8, padding: "0.4rem 0.9rem",
-                        fontSize: "0.75rem", fontWeight: 700, cursor: "pointer",
-                      }}
-                    >🎬 Watch Real Videos — Register Free</button>
-                  </div>
-                  <div style={{ position: "absolute", bottom: 8, right: 10, background: "rgba(0,0,0,0.7)", borderRadius: 6, padding: "2px 8px", fontSize: "0.7rem", color: "#fff" }}>
-                    {fmtDur(item.videoDuration)}
-                  </div>
-                </div>
-              ) : playing === item._id ? (
-                <div style={{ marginBottom: "1.5rem" }}>
-                  <ProtectedVideoPlayer
-                    src={item.videoUrl ? item.videoUrl + "#t=0.1" : item.videoUrl}
-                    knownDuration={item.videoDuration || 0}
-                    identity={identity}
-                    watermarkUrl={watermarkUrl}
-                    fullscreenId={fullscreenId}
-                    itemId={item._id}
-                    containerRef={el => containerRefs.current[item._id] = el}
-                    onToggleFullscreen={() => toggleFullscreen(item._id)}
-                  />
-                  {fullscreenId !== item._id && (
-                    <button onClick={() => setPlaying(null)}
-                      style={{
-                        marginTop: "0.5rem", fontSize: "0.78rem",
-                        color: "var(--muted)", background: "none",
-                        border: "none", cursor: "pointer",
-                      }}>✕ Close video</button>
-                  )}
-                </div>
-              ) : (
-                <button onClick={() => setPlaying(item._id)} style={{
-                  width: "100%", borderRadius: "10px", background: "#0a0a14",
-                  border: "1px solid rgba(124,111,255,0.25)", cursor: "pointer",
-                  padding: 0, overflow: "hidden", position: "relative",
-                  aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <video src={`${item.videoUrl}#t=2`} preload="metadata" muted playsInline
-                    onContextMenu={e => e.preventDefault()}
-                    onError={e => { e.currentTarget.style.display = "none"; }}
-                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(6px) brightness(0.45)", borderRadius: "10px", pointerEvents: "none" }}
-                  />
-                  <div style={{ position: "relative", zIndex: 1, width: 52, height: 52, borderRadius: "50%", background: "rgba(124,111,255,0.85)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 20px rgba(124,111,255,0.5)" }}>
-                    <span style={{ fontSize: "1.3rem", marginLeft: 3 }}>▶</span>
-                  </div>
-                  {item.videoDuration && (
-                    <span style={{ position: "absolute", bottom: 8, right: 10, zIndex: 1, background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "0.72rem", fontWeight: 600, padding: "0.15rem 0.45rem", borderRadius: 6 }}>
-                      {fmtDur(item.videoDuration)}
-                    </span>
-                  )}
-                </button>
-              )}
-
-              {/* Feedback / Report toggle buttons */}
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem" }}>
-                  <button onClick={() => toggleView(item._id, "feedback")} style={{
-                    flex: 1, padding: "0.5rem", borderRadius: "8px", background: "transparent",
-                    border: `1px solid ${view[item._id] === "feedback" ? "var(--primary)" : "var(--border2)"}`,
-                    color: view[item._id] === "feedback" ? "var(--primary)" : "var(--muted)",
-                    fontSize: "0.78rem", cursor: "pointer", transition: "all 0.18s",
-                  }}>
-                    {view[item._id] === "feedback" ? "▲ Hide" : "📊 Feedback"}
-                  </button>
-                  <button onClick={() => toggleView(item._id, "report")} style={{
-                    flex: 1, padding: "0.5rem", borderRadius: "8px", background: "transparent",
-                    border: `1px solid ${view[item._id] === "report" ? "var(--primary)" : "var(--border2)"}`,
-                    color: view[item._id] === "report" ? "var(--primary)" : "var(--muted)",
-                    fontSize: "0.78rem", cursor: "pointer", transition: "all 0.18s",
-                  }}>
-                    {view[item._id] === "report" ? "▲ Hide" : "📋 Report"}
-                  </button>
-                </div>
-
-              {/* Quick feedback panel — scores + one-liner */}
-              {view[item._id] === "feedback" && item.analysis && (
-                <div style={{ marginTop: "0.75rem", padding: "1rem", borderRadius: "10px", background: "var(--card2)", border: "1px solid var(--border2)" }}>
-                  <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.75rem" }}>📊 Feedback</div>
-                  <FeedbackPanel a={item.analysis} />
-                </div>
-              )}
-
-              {/* Full detailed report — everything */}
-              {view[item._id] === "report" && (
-                <div style={{ marginTop: "0.75rem", padding: "1rem", borderRadius: "10px", background: "var(--card2)", border: "1px solid var(--border2)" }}>
-                  <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.5rem" }}>📋 Detailed Analysis Report</div>
-                  {item.analysis
-                    ? <DetailedReport a={item.analysis} />
-                    : <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>The detailed report is not available for this submission.</p>}
-                </div>
-              )}
-
-              {/* ── Engagement bar ── */}
-              <EngagementBar
-                item={item}
-                onReact={handleReact}
-                onToggleComments={toggleComments}
-                showComments={!!showComments[item._id]}
-              />
-
-              {/* ── Comments ── */}
-              {showComments[item._id] && (
-                <CommentSection
-                  item={item}
-                  onAddComment={handleAddComment}
-                  onDeleteComment={handleDeleteComment}
+              {/* Speaker Search Bar */}
+              <div style={{ position: "relative", minWidth: 180, flex: "1 1 200px", maxWidth: 300 }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search speaker or speech…"
+                  style={{
+                    width: "100%",
+                    padding: "0.48rem 0.85rem 0.48rem 2rem",
+                    borderRadius: 10,
+                    background: isDark ? "rgba(255, 255, 255, 0.04)" : "#ffffff",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
+                    color: isDark ? "#ffffff" : "#0f172a",
+                    fontSize: "0.8rem",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
                 />
-              )}
-
+                <span style={{ position: "absolute", left: "0.65rem", top: "50%", transform: "translateY(-50%)", fontSize: "0.8rem", color: isDark ? "#64748b" : "#94a3b8" }}>
+                  🔍
+                </span>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    style={{
+                      position: "absolute", right: "0.6rem", top: "50%", transform: "translateY(-50%)",
+                      background: "none", border: "none", color: isDark ? "#94a3b8" : "#64748b",
+                      cursor: "pointer", fontSize: "0.75rem", padding: 0,
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
-          ))}
+
+            {/* Empty State */}
+            {!error && filteredFeed.length === 0 && (
+              <div className="speakshine-card-box" style={{
+                textAlign: "center",
+                padding: "3.5rem 1.5rem",
+                borderRadius: 20,
+                background: isDark ? "#0d0a18" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+              }}>
+                <div style={{ fontSize: "2.8rem", marginBottom: "0.8rem" }}>🎥</div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.35rem" }}>
+                  {searchQuery ? "No matching submissions found" : "No public submissions yet today"}
+                </h3>
+                <p style={{ fontSize: "0.85rem", color: isDark ? "#94a3b8" : "#64748b", maxWidth: 420, margin: "0 auto 1.25rem" }}>
+                  {searchQuery ? "Try clearing your search query or switching filters to see all community submissions." : "Be the trailblazer for your cohort today — record your response and check 'Share with group' to showcase your speaking skills!"}
+                </p>
+                {searchQuery ? (
+                  <button
+                    onClick={() => { setSearchQuery(""); setFilterTab("all"); }}
+                    className="btn-primary"
+                    style={{ padding: "0.55rem 1.2rem", borderRadius: 10, fontSize: "0.82rem", cursor: "pointer" }}
+                  >
+                    Clear Search
+                  </button>
+                ) : (
+                  <Link
+                    to="/record"
+                    className="btn-primary"
+                    style={{ textDecoration: "none", display: "inline-block", padding: "0.6rem 1.25rem", borderRadius: 10, fontSize: "0.85rem" }}
+                  >
+                    Record My Video Now ↗
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* Highlight pulse animation style */}
+            <style>{`
+              @keyframes highlight-ring {
+                0%   { box-shadow: 0 0 0 0 rgba(124,111,255,0.8), 0 12px 36px rgba(0,0,0,0.5); }
+                40%  { box-shadow: 0 0 0 8px rgba(124,111,255,0.35), 0 12px 36px rgba(0,0,0,0.5); }
+                100% { box-shadow: 0 0 0 4px rgba(124,111,255,0.15), 0 12px 36px rgba(0,0,0,0.5); }
+              }
+            `}</style>
+
+            {/* Feed Cards List */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              {filteredFeed.map((item) => {
+                const isHighlight = item._id === highlightId;
+                const avatarBg = item.uploaderColor
+                  ? `linear-gradient(135deg, ${item.uploaderColor}, ${item.uploaderColor}99)`
+                  : "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)";
+                const initials = item.uploaderInitials || (item.uploaderName || "?")[0].toUpperCase();
+                const compositeScore = item.analysis?.compositeScore ?? null;
+                const overallScore = item.analysis?.overallScore ?? null;
+                const quoteText = item.analysis?.transcription || item.analysis?.overallComment;
+
+                return (
+                  <div
+                    key={item._id}
+                    ref={el => { itemRefs.current[item._id] = el; }}
+                    className="speakshine-card-box community-card"
+                    style={{
+                      background: isDark ? "#0d0a18" : "#ffffff",
+                      border: isHighlight
+                        ? "1.5px solid rgba(124,111,255,0.7)"
+                        : isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+                      borderRadius: 20,
+                      padding: "1.4rem",
+                      boxShadow: isDark ? "0 12px 36px rgba(0, 0, 0, 0.5)" : "0 4px 18px rgba(0, 0, 0, 0.04)",
+                      animation: isHighlight ? "highlight-ring 1.8s ease forwards" : "none",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        {/* Avatar */}
+                        <div
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: "50%",
+                            background: avatarBg,
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 800,
+                            fontSize: "0.95rem",
+                            boxShadow: "0 2px 10px rgba(124, 111, 255, 0.25)",
+                            border: isDark ? "2px solid rgba(255, 255, 255, 0.15)" : "2px solid #ffffff",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {initials}
+                        </div>
+
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "0.92rem", color: isDark ? "#ffffff" : "#0f172a", display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                            <span>{item.uploaderName || "Anonymous Speaker"}</span>
+                            {item.currentBadge && <StreakBadge badge={item.currentBadge} compact />}
+                            {item.isDemo && (
+                              <span style={{ fontSize: "0.62rem", background: "rgba(124,111,255,0.15)", color: "#a78bfa", borderRadius: 99, padding: "2px 7px", fontWeight: 700 }}>
+                                DEMO
+                              </span>
+                            )}
+                            {item.isPublic === false && (
+                              <span style={{ fontSize: "0.62rem", background: "rgba(248,113,113,0.12)", color: "#f87171", borderRadius: 99, padding: "2px 7px", fontWeight: 700 }}>
+                                🔒 Private
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "0.74rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: 2 }}>
+                            <span>{fmtTime(item.submittedAt)}</span>
+                            {item.videoDuration && <span> · ⏱️ {fmtDur(item.videoDuration)}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Score badges row */}
+                      <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", alignItems: "center" }}>
+                        {compositeScore != null ? (
+                          <div style={{
+                            fontSize: "0.74rem",
+                            fontWeight: 800,
+                            padding: "3px 9px",
+                            borderRadius: 99,
+                            background: "linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.1))",
+                            border: "1px solid rgba(251, 191, 36, 0.4)",
+                            color: "#fbbf24",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                          }}>
+                            <span>⭐</span>
+                            <span>{Math.round(compositeScore)} pts</span>
+                          </div>
+                        ) : overallScore != null ? (
+                          <div style={{
+                            fontSize: "0.74rem",
+                            fontWeight: 800,
+                            padding: "3px 9px",
+                            borderRadius: 99,
+                            background: "rgba(74, 222, 128, 0.12)",
+                            border: "1px solid rgba(74, 222, 128, 0.35)",
+                            color: "#4ade80",
+                          }}>
+                            ⭐ {overallScore}/10
+                          </div>
+                        ) : null}
+
+                        {SCORE_LABELS.map(({ key, label, icon }) => item.analysis?.[key] != null && (
+                          <span
+                            key={key}
+                            style={{
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              padding: "3px 8px",
+                              borderRadius: 99,
+                              background: isDark ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9",
+                              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+                              color: scoreColor(item.analysis[key]),
+                            }}
+                          >
+                            {icon} {label[0]} {item.analysis[key]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quotation preview */}
+                    {quoteText && !view[item._id] && (
+                      <div style={{
+                        background: isDark ? "rgba(124, 111, 255, 0.05)" : "rgba(124, 111, 255, 0.04)",
+                        borderLeft: "3px solid #a78bfa",
+                        borderRadius: "0 10px 10px 0",
+                        padding: "0.75rem 1rem",
+                        marginBottom: "1rem",
+                        fontSize: "0.84rem",
+                        lineHeight: 1.6,
+                        fontStyle: "italic",
+                        color: isDark ? "#cbd5e1" : "#334155",
+                        fontFamily: "Georgia, 'Times New Roman', serif",
+                      }}>
+                        "{quoteText.slice(0, 180)}{quoteText.length > 180 ? "…" : ""}"
+                      </div>
+                    )}
+
+                    {/* Video player */}
+                    {item.isDemo ? (
+                      /* Demo card — preview for unregistered guests */
+                      <div style={{
+                        width: "100%", borderRadius: 14, background: "#0a0a14",
+                        border: `1px solid ${item.uploaderColor || "rgba(124,111,255,0.25)"}44`,
+                        aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center",
+                        position: "relative", overflow: "hidden", marginBottom: "1rem",
+                      }}>
+                        <div style={{
+                          position: "absolute", inset: 0,
+                          background: `linear-gradient(135deg, ${item.uploaderColor || "#7c6fff"}22, transparent 70%)`,
+                        }} />
+                        <div style={{ textAlign: "center", position: "relative", zIndex: 1, padding: "1rem" }}>
+                          <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>🎙️</div>
+                          <div style={{ fontWeight: 600, color: "#fff", fontSize: "0.82rem", lineHeight: 1.4, maxWidth: 300 }}>
+                            "{item.analysis?.transcription?.slice(0, 100)}…"
+                          </div>
+                          <button
+                            onClick={() => navigate("/register")}
+                            style={{
+                              marginTop: "0.75rem",
+                              background: `linear-gradient(135deg, ${item.uploaderColor || "#7c6fff"}, ${item.uploaderColor || "#4f46e5"})`,
+                              border: "none", color: "#fff",
+                              borderRadius: 8, padding: "0.45rem 1rem",
+                              fontSize: "0.78rem", fontWeight: 700, cursor: "pointer",
+                            }}
+                          >
+                            🎬 Watch Full Video — Register Free
+                          </button>
+                        </div>
+                        <div style={{ position: "absolute", bottom: 8, right: 10, background: "rgba(0,0,0,0.7)", borderRadius: 6, padding: "2px 8px", fontSize: "0.7rem", color: "#fff" }}>
+                          {fmtDur(item.videoDuration)}
+                        </div>
+                      </div>
+                    ) : playing === item._id ? (
+                      <div style={{ marginBottom: "1.2rem" }}>
+                        <ProtectedVideoPlayer
+                          src={item.videoUrl ? item.videoUrl + "#t=0.1" : item.videoUrl}
+                          knownDuration={item.videoDuration || 0}
+                          identity={identity}
+                          watermarkUrl={watermarkUrl}
+                          fullscreenId={fullscreenId}
+                          itemId={item._id}
+                          containerRef={el => containerRefs.current[item._id] = el}
+                          onToggleFullscreen={() => toggleFullscreen(item._id)}
+                        />
+                        {fullscreenId !== item._id && (
+                          <button
+                            onClick={() => setPlaying(null)}
+                            style={{
+                              marginTop: "0.5rem", fontSize: "0.78rem",
+                              color: isDark ? "#94a3b8" : "#64748b", background: "none",
+                              border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem",
+                            }}
+                          >
+                            <span>✕</span>
+                            <span>Close video</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPlaying(item._id)}
+                        style={{
+                          width: "100%", borderRadius: 14, background: "#080612",
+                          border: isDark ? "1px solid rgba(124,111,255,0.25)" : "1px solid #cbd5e1",
+                          cursor: "pointer",
+                          padding: 0, overflow: "hidden", position: "relative",
+                          aspectRatio: "16/9", display: "flex", alignItems: "center", justifyContent: "center",
+                          marginBottom: "1rem",
+                        }}
+                      >
+                        <video
+                          src={`${item.videoUrl}#t=2`}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          onContextMenu={e => e.preventDefault()}
+                          onError={e => { e.currentTarget.style.display = "none"; }}
+                          style={{
+                            position: "absolute", inset: 0, width: "100%", height: "100%",
+                            objectFit: "cover", filter: "blur(6px) brightness(0.45)",
+                            borderRadius: 14, pointerEvents: "none",
+                          }}
+                        />
+                        <div style={{
+                          position: "relative", zIndex: 1, width: 54, height: 54,
+                          borderRadius: "50%",
+                          background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          boxShadow: "0 4px 24px rgba(124,111,255,0.6)",
+                          transition: "transform 0.15s ease",
+                        }}>
+                          <span style={{ fontSize: "1.35rem", color: "#ffffff", marginLeft: 3 }}>▶</span>
+                        </div>
+                        {item.videoDuration && (
+                          <span style={{
+                            position: "absolute", bottom: 10, right: 12, zIndex: 1,
+                            background: "rgba(0,0,0,0.75)", color: "#ffffff",
+                            fontSize: "0.72rem", fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                          }}>
+                            {fmtDur(item.videoDuration)}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Feedback / Report toggle buttons */}
+                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleView(item._id, "feedback")}
+                        style={{
+                          flex: 1,
+                          minWidth: 120,
+                          padding: "0.5rem 0.85rem",
+                          borderRadius: 10,
+                          background: view[item._id] === "feedback"
+                            ? (isDark ? "#7c6fff" : "#4f46e5")
+                            : (isDark ? "rgba(255,255,255,0.04)" : "#f1f5f9"),
+                          color: view[item._id] === "feedback" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
+                          border: view[item._id] === "feedback" ? "none" : (isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0"),
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        <span>📊</span>
+                        <span>{view[item._id] === "feedback" ? "Hide Feedback" : "Quick Feedback"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleView(item._id, "report")}
+                        style={{
+                          flex: 1,
+                          minWidth: 120,
+                          padding: "0.5rem 0.85rem",
+                          borderRadius: 10,
+                          background: view[item._id] === "report"
+                            ? (isDark ? "#7c6fff" : "#4f46e5")
+                            : (isDark ? "rgba(255,255,255,0.04)" : "#f1f5f9"),
+                          color: view[item._id] === "report" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
+                          border: view[item._id] === "report" ? "none" : (isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0"),
+                          fontSize: "0.78rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        <span>📋</span>
+                        <span>{view[item._id] === "report" ? "Hide Report" : "Detailed Report"}</span>
+                      </button>
+                    </div>
+
+                    {/* Quick feedback panel */}
+                    {view[item._id] === "feedback" && item.analysis && (
+                      <div style={{
+                        marginTop: "0.85rem", padding: "1.15rem", borderRadius: 14,
+                        background: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                        border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0",
+                      }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.85rem" }}>
+                          📊 Rubric Performance Breakdown
+                        </div>
+                        <FeedbackPanel a={item.analysis} />
+                      </div>
+                    )}
+
+                    {/* Full detailed report */}
+                    {view[item._id] === "report" && (
+                      <div style={{
+                        marginTop: "0.85rem", padding: "1.15rem", borderRadius: 14,
+                        background: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
+                        border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0",
+                      }}>
+                        <div style={{ fontSize: "0.82rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.75rem" }}>
+                          📋 Detailed AI Speaking Analysis
+                        </div>
+                        {item.analysis
+                          ? <DetailedReport a={item.analysis} />
+                          : <p style={{ color: isDark ? "#94a3b8" : "#64748b", fontSize: "0.82rem" }}>The detailed report is not available for this submission.</p>}
+                      </div>
+                    )}
+
+                    {/* Engagement bar */}
+                    <EngagementBar
+                      item={item}
+                      onReact={handleReact}
+                      onToggleComments={toggleComments}
+                      showComments={!!showComments[item._id]}
+                    />
+
+                    {/* Comments drawer */}
+                    {showComments[item._id] && (
+                      <CommentSection
+                        item={item}
+                        onAddComment={handleAddComment}
+                        onDeleteComment={handleDeleteComment}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Right Column: Community Sidebar Widgets (Matching Modern Dashboard) ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+            {/* Widget 1: Today's Mission Prompt */}
+            <div className="speakshine-card-box" style={{
+              background: isDark ? "#0d0a18" : "#ffffff",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+              borderRadius: 20,
+              padding: "1.4rem",
+              boxShadow: isDark ? "0 12px 36px rgba(0, 0, 0, 0.5)" : "0 4px 18px rgba(0, 0, 0, 0.04)",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
+                <span style={{ fontSize: "1rem" }}>⭐</span>
+                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fbbf24" }}>
+                  TODAY'S MISSION
+                </span>
+              </div>
+
+              <div style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "1.15rem",
+                fontWeight: 700,
+                color: isDark ? "#ffffff" : "#0f172a",
+                marginBottom: "0.5rem",
+                lineHeight: 1.35,
+              }}>
+                {topicTitle}
+              </div>
+
+              <p style={{
+                fontSize: "0.82rem",
+                color: isDark ? "#94a3b8" : "#64748b",
+                lineHeight: 1.5,
+                marginBottom: "1.15rem",
+              }}>
+                {topicQuestion}
+              </p>
+
+              <Link
+                to="/record"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.45rem",
+                  width: "100%",
+                  padding: "0.65rem 1rem",
+                  borderRadius: 12,
+                  background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
+                  color: "#ffffff",
+                  textDecoration: "none",
+                  fontWeight: 700,
+                  fontSize: "0.82rem",
+                  boxShadow: "0 4px 16px rgba(124, 111, 255, 0.35)",
+                  boxSizing: "border-box",
+                }}
+              >
+                <span>📹</span>
+                <span>Record Your Submission</span>
+                <span>↗</span>
+              </Link>
+            </div>
+
+            {/* Widget 2: Cohort Leaderboard */}
+            <div className="speakshine-card-box" style={{
+              background: isDark ? "#0d0a18" : "#ffffff",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+              borderRadius: 20,
+              padding: "1.4rem",
+              boxShadow: isDark ? "0 12px 36px rgba(0, 0, 0, 0.5)" : "0 4px 18px rgba(0, 0, 0, 0.04)",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "1rem" }}>🏆</span>
+                  <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: isDark ? "#ffffff" : "#0f172a" }}>
+                    COHORT RANKINGS
+                  </span>
+                </div>
+
+                <span style={{
+                  fontSize: "0.68rem", fontWeight: 700,
+                  color: isDark ? "#a78bfa" : "#6d28d9",
+                  background: isDark ? "rgba(124, 111, 255, 0.12)" : "rgba(124, 111, 255, 0.08)",
+                  padding: "2px 7px", borderRadius: 99,
+                }}>
+                  {cohortName.toUpperCase()}
+                </span>
+              </div>
+
+              <div style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginBottom: "0.85rem" }}>
+                Top speakers for today's mission
+              </div>
+
+              {/* Leaderboard peers list */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" }}>
+                {rawLeaderboard.slice(0, 6).map((u, i) => {
+                  const rank = i + 1;
+                  const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
+                  const isUserMember = u.isUser || u.userId === user?.id || u.phone === user?.phone;
+                  const name = u.name || "Cohort Speaker";
+                  const initial = (name[0] || "?").toUpperCase();
+                  const pts = Math.round(u.monthlyScore ?? u.points ?? (rank === 1 ? 95 : 80));
+
+                  return (
+                    <div
+                      key={u.id || i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "0.5rem 0.65rem",
+                        borderRadius: 10,
+                        background: isUserMember
+                          ? (isDark ? "rgba(124, 111, 255, 0.14)" : "rgba(124, 111, 255, 0.08)")
+                          : (isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc"),
+                        border: isUserMember
+                          ? "1px solid rgba(124, 111, 255, 0.4)"
+                          : isDark ? "1px solid rgba(255, 255, 255, 0.04)" : "1px solid #f1f5f9",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
+                        <span style={{ fontSize: rank <= 3 ? "1rem" : "0.75rem", fontWeight: 800, width: 22, textAlign: "center" }}>
+                          {medal}
+                        </span>
+
+                        <div style={{
+                          width: 28, height: 28, borderRadius: "50%",
+                          background: rank === 1
+                            ? "linear-gradient(135deg, #fbbf24, #d97706)"
+                            : rank === 2
+                            ? "linear-gradient(135deg, #cbd5e1, #64748b)"
+                            : rank === 3
+                            ? "linear-gradient(135deg, #f97316, #b45309)"
+                            : isDark ? "#334155" : "#e2e8f0",
+                          color: rank === 1 ? "#000" : "#fff",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.75rem", fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {initial}
+                        </div>
+
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "0.8rem", fontWeight: 700,
+                            color: isDark ? "#ffffff" : "#0f172a",
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                            display: "flex", alignItems: "center", gap: "0.3rem",
+                          }}>
+                            <span>{name}</span>
+                            {isUserMember && (
+                              <span style={{ fontSize: "0.6rem", background: "#7c6fff", color: "#fff", padding: "0 4px", borderRadius: 4 }}>
+                                YOU
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.8rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7c3aed" }}>
+                          {pts}
+                        </span>
+                        <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", marginLeft: 2 }}>
+                          pts
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Link
+                to="/dashboard"
+                style={{
+                  display: "block",
+                  textAlign: "center",
+                  fontSize: "0.76rem",
+                  fontWeight: 700,
+                  color: isDark ? "#a78bfa" : "#6d28d9",
+                  textDecoration: "none",
+                  padding: "0.4rem",
+                  borderRadius: 8,
+                  background: isDark ? "rgba(124, 111, 255, 0.08)" : "rgba(124, 111, 255, 0.05)",
+                  border: isDark ? "1px solid rgba(124, 111, 255, 0.2)" : "1px solid rgba(124, 111, 255, 0.15)",
+                }}
+              >
+                Go to Performance Dashboard ↗
+              </Link>
+            </div>
+
+            {/* Widget 3: Community Norms & Privacy */}
+            <div className="speakshine-card-box" style={{
+              background: isDark ? "#0d0a18" : "#ffffff",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+              borderRadius: 20,
+              padding: "1.4rem",
+              boxShadow: isDark ? "0 12px 36px rgba(0, 0, 0, 0.5)" : "0 4px 18px rgba(0, 0, 0, 0.04)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <span style={{ fontSize: "1rem" }}>🛡️</span>
+                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: isDark ? "#ffffff" : "#0f172a" }}>
+                  COMMUNITY NORMS
+                </span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.9rem" }}>💬</span>
+                  <div>
+                    <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>Constructive Feedback</strong>
+                    <div>Highlight what your peer did well and offer actionable speaking tips.</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.9rem" }}>⏳</span>
+                  <div>
+                    <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>24-Hour Ephemeral Videos</strong>
+                    <div>All public submissions reset automatically at midnight IST for privacy.</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.9rem" }}>🔒</span>
+                  <div>
+                    <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>Privacy Shield Active</strong>
+                    <div>Videos are watermarked with viewer identity; screen capture is restricted.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </Layout>
