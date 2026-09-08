@@ -2211,14 +2211,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     }
   }, [step]);
 
-  // Failsafe: Ensure camera & mic hardware tracks are killed whenever exiting recording/countdown
-  useEffect(() => {
-    if (step !== "countdown" && step !== "recording") {
-      if (rawStreamRef.current || streamRef.current || liveVideoRef.current?.srcObject) {
-        cleanup();
-      }
-    }
-  }, [step, cleanup]);
 
   // ── Background compression — starts as soon as preview loads ─────────────
   // If the blob is large enough, kick off compression immediately so it's
@@ -2301,6 +2293,15 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     cleanupBlur();
     setNcStatus("idle");
   }, [cleanupNC, cleanupBlur]);
+
+  // Failsafe: Ensure camera & mic hardware tracks are killed whenever exiting recording/countdown
+  useEffect(() => {
+    if (step !== "countdown" && step !== "recording") {
+      if (rawStreamRef.current || streamRef.current || liveVideoRef.current?.srcObject) {
+        cleanup();
+      }
+    }
+  }, [step, cleanup]);
 
   const startCountdown = async () => {
     setError(null);
