@@ -4,6 +4,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { ToastProvider } from "./components/Toast.jsx";
 import { ConfirmProvider } from "./components/ConfirmDialog.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
+import CustomCursor from "./components/CustomCursor.jsx";
 const ChatLauncher = lazy(() => import("./components/ChatLauncher.jsx"));
 const InstallPrompt = lazy(() => import("./components/InstallPrompt.jsx"));
 const WakeUpScreen  = lazy(() => import("./components/WakeUpScreen.jsx"));
@@ -117,6 +118,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <CustomCursor />
       <AuthProvider>
         <ToastProvider>
           <ConfirmProvider>

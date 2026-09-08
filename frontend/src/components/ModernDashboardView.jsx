@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import NotificationBell from "./NotificationBell.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import gsap from "gsap";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -405,26 +406,52 @@ export default function ModernDashboardView({
     return "#f87171"; // red
   };
 
-  // ── Leaderboard Data (Matching Screenshot 5) ────────────────────────────────
+  const getInitials = (name) => {
+    if (!name) return "S";
+    const clean = name.replace(/\(You\)/i, "").trim();
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return clean.slice(0, 2).toUpperCase();
+  };
+
   const defaultLeaderboard = [
-    { rank: 1, medal: "🥇", name: "Sarah M.", title: "Communication Titan · 120d", pts: 88, time: "2h ago", isUser: false },
-    { rank: 2, medal: "🥈", name: "Alex K.", title: "Speech Legend · 110d", pts: 84, time: "3h ago", isUser: false },
-    { rank: 3, medal: "🥉", name: "Priya R.", title: "Elite Communicator · 65d", pts: 82, time: "4h ago", isUser: false },
-    { rank: 4, medal: "👉", name: `${displayName} (You)`, title: "Bronze Speaker · 2d", pts: 80, time: "Yesterday", isUser: true },
-    { rank: 5, medal: "5", name: "David L.", title: "Momentum Builder · 6d", pts: 76, time: "Yesterday", isUser: false },
+    { rank: 1, medal: "🥇", name: "Sarah M.", title: "Communication Titan · 120d", pts: 88, time: "2h ago", isUser: false, initials: "SM" },
+    { rank: 2, medal: "🥈", name: "Alex K.", title: "Speech Legend · 110d", pts: 84, time: "3h ago", isUser: false, initials: "AK" },
+    { rank: 3, medal: "🥉", name: "Priya R.", title: "Elite Communicator · 65d", pts: 82, time: "4h ago", isUser: false, initials: "PR" },
+    { rank: 4, medal: "👉", name: `${displayName} (You)`, title: "Bronze Speaker · 2d", pts: 80, time: "Yesterday", isUser: true, initials: avatarInitials || "YOU" },
+    { rank: 5, medal: "5", name: "David L.", title: "Momentum Builder · 6d", pts: 76, time: "Yesterday", isUser: false, initials: "DL" },
   ];
 
   const currentLeaderboard = (leaderboard && leaderboard.length >= 3)
-    ? leaderboard.slice(0, 5).map((l, i) => ({
-        rank: i + 1,
-        medal: i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : l.isCurrentUser ? "👉" : String(i + 1),
-        name: l.isCurrentUser ? `${displayName} (You)` : l.name,
-        title: l.badge || `${l.streak || 10}d streak`,
-        pts: l.points || (88 - i * 3),
-        time: l.submittedAgo || (i === 0 ? "2h ago" : i === 1 ? "3h ago" : "Yesterday"),
-        isUser: !!l.isCurrentUser,
-      }))
+    ? leaderboard.slice(0, 5).map((l, i) => {
+        const isUser = !!l.isCurrentUser;
+        const name = isUser ? `${displayName} (You)` : l.name;
+        return {
+          rank: i + 1,
+          medal: i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : isUser ? "👉" : String(i + 1),
+          name,
+          initials: isUser ? (avatarInitials || "YOU") : getInitials(name),
+          title: l.badge || `${l.streak || 10}d streak`,
+          pts: l.points || (88 - i * 3),
+          time: l.submittedAgo || (i === 0 ? "2h ago" : i === 1 ? "3h ago" : "Yesterday"),
+          isUser,
+        };
+      })
     : defaultLeaderboard;
+
+  const leaderboardRef = useRef(null);
+
+  useEffect(() => {
+    if (!leaderboardRef.current) return;
+    const rows = leaderboardRef.current.querySelectorAll(".leaderboard-row");
+    if (rows && rows.length > 0) {
+      gsap.fromTo(
+        rows,
+        { opacity: 0, x: 16, scale: 0.98 },
+        { opacity: 1, x: 0, scale: 1, stagger: 0.05, duration: 0.45, ease: "power2.out" }
+      );
+    }
+  }, [currentLeaderboard]);
 
   // Title formatting: split into white serif and soft purple italic serif
   const topicTitle = today.topic || "The Unexpected Delivery";
@@ -1419,103 +1446,326 @@ export default function ModernDashboardView({
             {/* Right Column: Leaderboard & Community Card (Screenshot 5) */}
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               {/* Leaderboard Box */}
-              <div className="speakshine-card-box" style={{
-                background: "#0d0a18",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                borderRadius: 18,
-                padding: "1.5rem",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-                  <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase" }}>
-                    TODAY'S LEADERBOARD
-                  </span>
-                  <Link to="/community" style={{ fontSize: "0.78rem", color: "#a78bfa", fontWeight: 600, textDecoration: "none" }}>
-                    Group ↗
+              <div
+                ref={leaderboardRef}
+                className="speakshine-card-box speakshine-leaderboard-box"
+                style={{
+                  background: "#0d0a18",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: 20,
+                  padding: "1.5rem",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
+                }}
+              >
+                {/* Header with Trophy Emblem & Cohort Switcher */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      background: "linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.1))",
+                      border: "1px solid rgba(251, 191, 36, 0.4)",
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.95rem",
+                      boxShadow: "0 2px 10px rgba(245, 158, 11, 0.2)",
+                    }}>
+                      🏆
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.08em", color: "#ffffff", textTransform: "uppercase" }}>
+                        TODAY'S LEADERBOARD
+                      </div>
+                    </div>
+                  </div>
+                  <Link
+                    to="/community"
+                    className="leaderboard-group-btn"
+                    style={{
+                      fontSize: "0.74rem",
+                      fontWeight: 700,
+                      color: "#c4b5fd",
+                      textDecoration: "none",
+                      background: "rgba(124, 111, 255, 0.12)",
+                      border: "1px solid rgba(124, 111, 255, 0.28)",
+                      padding: "4px 10px",
+                      borderRadius: 99,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "rgba(124, 111, 255, 0.22)";
+                      e.currentTarget.style.transform = "translateX(2px)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "rgba(124, 111, 255, 0.12)";
+                      e.currentTarget.style.transform = "translateX(0)";
+                    }}
+                  >
+                    <span>Group 3</span>
+                    <span style={{ fontSize: "0.85rem" }}>↗</span>
                   </Link>
                 </div>
 
-                <div style={{ fontSize: "0.72rem", color: "#8b85a3", marginBottom: "1.1rem" }}>
-                  GROUP 3 · 7 MEMBERS · 0 SUBMITTED · 7 PENDING
+                {/* Subheader Status Pill */}
+                <div style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                  color: "#94a3b8",
+                  background: "rgba(255, 255, 255, 0.03)",
+                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                  padding: "3px 9px",
+                  borderRadius: 99,
+                  marginBottom: "1.2rem",
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                  <span>GROUP 3 · 7 MEMBERS · 0 SUBMITTED · 7 PENDING</span>
                 </div>
 
-                {/* Ranked Peer Rows (Screenshot 5) */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "1.25rem" }}>
-                  {currentLeaderboard.map((u) => (
-                    <div
-                      key={u.rank}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "0.65rem 0.85rem",
-                        borderRadius: 10,
-                        background: u.isUser ? "rgba(124, 111, 255, 0.12)" : "rgba(255, 255, 255, 0.02)",
-                        border: u.isUser ? "1px solid rgba(167, 139, 250, 0.4)" : "1px solid transparent",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#6b6680", width: 18, textAlign: "center" }}>
-                          {u.medal}
-                        </span>
-                        <div>
-                          <div style={{ fontSize: "0.85rem", fontWeight: 700, color: u.isUser ? "#ffffff" : "#e2e8f0" }}>
-                            {u.name}
-                          </div>
-                          <div style={{ fontSize: "0.72rem", color: "#7c7793" }}>
-                            {u.title}
-                          </div>
-                        </div>
-                      </div>
+                {/* Ranked Peer Rows */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "1.25rem" }}>
+                  {currentLeaderboard.map((u, i) => {
+                    const isRank1 = i === 0;
+                    const isRank2 = i === 1;
+                    const isRank3 = i === 2;
+                    const isUser = u.isUser;
 
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff" }}>
-                          {u.pts} pts
+                    const rowClass = isUser
+                      ? "leaderboard-row user-row"
+                      : isRank1
+                      ? "leaderboard-row rank-1"
+                      : isRank2
+                      ? "leaderboard-row rank-2"
+                      : isRank3
+                      ? "leaderboard-row rank-3"
+                      : "leaderboard-row standard-row";
+
+                    const avatarBg = isRank1
+                      ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
+                      : isRank2
+                      ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
+                      : isRank3
+                      ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
+                      : isUser
+                      ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
+                      : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
+
+                    const avatarColor = isRank1 ? "#000000" : "#ffffff";
+                    const avatarBorder = isRank1
+                      ? "2px solid #fde68a"
+                      : isRank2
+                      ? "2px solid #e2e8f0"
+                      : isRank3
+                      ? "2px solid #fed7aa"
+                      : isUser
+                      ? "2px solid #c084fc"
+                      : "1px solid rgba(255, 255, 255, 0.12)";
+
+                    return (
+                      <div
+                        key={u.rank}
+                        className={rowClass}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: isUser ? "0.8rem 0.95rem" : "0.7rem 0.85rem",
+                          borderRadius: 12,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                          {/* Rank / Medal Emblem */}
+                          <div style={{
+                            width: 24,
+                            textAlign: "center",
+                            fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.85rem",
+                            fontWeight: 800,
+                            color: isUser ? "#c084fc" : "#8b85a3",
+                            flexShrink: 0,
+                          }}>
+                            {isRank1 ? "🥇" : isRank2 ? "🥈" : isRank3 ? "🥉" : isUser ? "👉" : u.rank}
+                          </div>
+
+                          {/* Avatar Circle */}
+                          <div
+                            className="leaderboard-avatar"
+                            style={{
+                              background: avatarBg,
+                              color: avatarColor,
+                              border: avatarBorder,
+                              boxShadow: isRank1
+                                ? "0 0 10px rgba(251, 191, 36, 0.4)"
+                                : isUser
+                                ? "0 0 12px rgba(168, 85, 247, 0.4)"
+                                : "none",
+                            }}
+                          >
+                            {u.initials || "S"}
+                          </div>
+
+                          {/* Name & Title */}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{
+                              fontSize: "0.88rem",
+                              fontWeight: 700,
+                              color: isUser ? "#ffffff" : isRank1 ? "#fef08a" : "#f1f0f5",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.35rem",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}>
+                              <span>{u.name}</span>
+                              {isRank1 && <span title="Current #1 Leader">👑</span>}
+                              {isUser && (
+                                <span style={{
+                                  fontSize: "0.62rem",
+                                  fontWeight: 800,
+                                  background: "rgba(168, 85, 247, 0.3)",
+                                  color: "#d8b4fe",
+                                  border: "1px solid rgba(168, 85, 247, 0.5)",
+                                  padding: "1px 5px",
+                                  borderRadius: 4,
+                                  letterSpacing: "0.05em",
+                                }}>
+                                  YOU
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: "0.72rem", color: "#8e8a9f", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                              <span>{u.title}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: "0.7rem", color: "#7c7793" }}>
-                          {u.time}
+
+                        {/* Points & Time */}
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div
+                            className="leaderboard-pts-badge"
+                            style={{
+                              color: isRank1 ? "#fbbf24" : isUser ? "#c084fc" : "#ffffff",
+                              fontSize: "0.92rem",
+                              fontWeight: 800,
+                            }}
+                          >
+                            <span>{u.pts}</span>
+                            <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#8e8a9f" }}>pts</span>
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "#7c7793", marginTop: "2px" }}>
+                            {u.time}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* All-Time Record Callout */}
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "0.85rem 1rem",
-                  borderRadius: 12,
-                  background: "#161122",
-                  border: "1px solid rgba(251, 191, 36, 0.15)",
-                  marginBottom: "1rem",
-                }}>
-                  <div>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#9e8648", textTransform: "uppercase" }}>
-                      ALL-TIME GROUP RECORD
+                <div
+                  className="all-time-record-box"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "0.95rem 1.15rem",
+                    borderRadius: 14,
+                    background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
+                    border: "1px solid rgba(251, 191, 36, 0.28)",
+                    boxShadow: "0 6px 20px rgba(245, 158, 11, 0.08)",
+                    marginBottom: "1.1rem",
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "transform 0.2s ease, border-color 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.5)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.28)";
+                  }}
+                >
+                  <div style={{
+                    position: "absolute", top: 0, right: 0, bottom: 0, width: "35%",
+                    background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.12) 0%, transparent 70%)",
+                    pointerEvents: "none",
+                  }} />
+
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: "0.4rem",
+                      fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em",
+                      color: "#fbbf24", textTransform: "uppercase", marginBottom: "3px",
+                    }}>
+                      <span>⭐</span>
+                      <span>ALL-TIME GROUP RECORD</span>
                     </div>
-                    <div style={{ fontSize: "0.82rem", color: "#e2e8f0", marginTop: "2px" }}>
-                      Sarah M. · Nov 12
+                    <div style={{ fontSize: "0.85rem", color: "#f1f0f5", fontWeight: 600 }}>
+                      Sarah M. · <span style={{ color: "#94a3b8", fontWeight: 500 }}>Nov 12</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: "2rem", fontWeight: 800, color: "#fbbf24", lineHeight: 1 }}>
-                    94
+
+                  <div style={{
+                    position: "relative", zIndex: 1,
+                    display: "flex", alignItems: "baseline", gap: "3px",
+                  }}>
+                    <span style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "2.35rem",
+                      fontWeight: 800,
+                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      lineHeight: 1,
+                      filter: "drop-shadow(0 2px 8px rgba(245, 158, 11, 0.35))",
+                    }}>
+                      94
+                    </span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24" }}>pts</span>
                   </div>
                 </div>
 
-                {/* Group Member Stats (Screenshot 5) */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", textAlign: "center", fontSize: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
-                  <div>
-                    <div style={{ color: "#716c85", fontSize: "0.65rem", textTransform: "uppercase", fontWeight: 700 }}>MEMBERS</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#fff", marginTop: "2px" }}>7</div>
+                {/* Group Member Stats: 3 Micro-Cards */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "0.6rem",
+                  textAlign: "center",
+                  borderTop: "1px solid rgba(255,255,255,0.06)",
+                  paddingTop: "0.9rem",
+                }}>
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    borderRadius: 10,
+                    padding: "0.55rem 0.4rem",
+                  }}>
+                    <div style={{ color: "#716c85", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>MEMBERS</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>7</div>
                   </div>
-                  <div>
-                    <div style={{ color: "#716c85", fontSize: "0.65rem", textTransform: "uppercase", fontWeight: 700 }}>SUBMITTED</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#fff", marginTop: "2px" }}>0</div>
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    borderRadius: 10,
+                    padding: "0.55rem 0.4rem",
+                  }}>
+                    <div style={{ color: "#716c85", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>SUBMITTED</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>0</div>
                   </div>
-                  <div>
-                    <div style={{ color: "#716c85", fontSize: "0.65rem", textTransform: "uppercase", fontWeight: 700 }}>PENDING</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f87171", marginTop: "2px" }}>7</div>
+                  <div style={{
+                    background: "rgba(239, 68, 68, 0.06)",
+                    border: "1px solid rgba(239, 68, 68, 0.2)",
+                    borderRadius: 10,
+                    padding: "0.55rem 0.4rem",
+                  }}>
+                    <div style={{ color: "#fca5a5", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>PENDING</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#f87171", marginTop: "2px" }}>7</div>
                   </div>
                 </div>
               </div>
