@@ -96,6 +96,117 @@ function MidnightCountdownTimer() {
   );
 }
 
+// ── Drop Countdown Timer for 12 AM Reset Period (Counts down to posterSendTime, e.g. 08:00 AM IST) ──
+function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
+  const calc = () => {
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const [h, m] = (posterSendTime || "08:00").split(":").map(Number);
+    const target = new Date(nowIST);
+    target.setHours(h, m, 0, 0);
+
+    const diffSec = Math.floor((target - nowIST) / 1000);
+    const isDue = diffSec <= 0;
+    const absDiff = Math.max(0, diffSec);
+
+    const hrs = String(Math.floor(absDiff / 3600)).padStart(2, "0");
+    const mins = String(Math.floor((absDiff % 3600) / 60)).padStart(2, "0");
+    const secs = String(absDiff % 60).padStart(2, "0");
+    return { hrs, mins, secs, isDue, absDiff };
+  };
+
+  const [t, setT] = useState(calc);
+
+  useEffect(() => {
+    const interval = setInterval(() => setT(calc()), 1000);
+    return () => clearInterval(interval);
+  }, [posterSendTime]);
+
+  if (t.isDue) {
+    return (
+      <div style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.85rem",
+        padding: "0.85rem 1.25rem",
+        borderRadius: 14,
+        background: "rgba(249, 115, 22, 0.12)",
+        border: "1px solid rgba(249, 115, 22, 0.35)",
+        margin: "1rem 0",
+      }}>
+        <span style={{ fontSize: "1.5rem" }}>⚡</span>
+        <div>
+          <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "#f97316" }}>
+            Mission Launching Shortly
+          </div>
+          <div style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
+            The AI trainer is finalizing today's topic &amp; vocabulary. Please refresh momentarily!
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", margin: "1.1rem 0 1.25rem" }}>
+      <div className="speakshine-timer-box" style={{
+        background: "#141024",
+        border: "1px solid rgba(249, 115, 22, 0.45)",
+        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.15)",
+        borderRadius: 12,
+        padding: "0.85rem 1.15rem",
+        textAlign: "center",
+        minWidth: 64,
+      }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.hrs}
+        </div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+          HRS
+        </div>
+      </div>
+
+      <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px" }}>:</span>
+
+      <div className="speakshine-timer-box" style={{
+        background: "#141024",
+        border: "1px solid rgba(249, 115, 22, 0.45)",
+        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.15)",
+        borderRadius: 12,
+        padding: "0.85rem 1.15rem",
+        textAlign: "center",
+        minWidth: 64,
+      }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.mins}
+        </div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+          MINS
+        </div>
+      </div>
+
+      <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px" }}>:</span>
+
+      <div className="speakshine-timer-box" style={{
+        background: "#141024",
+        border: "1px solid rgba(249, 115, 22, 0.45)",
+        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.15)",
+        borderRadius: 12,
+        padding: "0.85rem 1.15rem",
+        textAlign: "center",
+        minWidth: 64,
+      }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          {t.secs}
+        </div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+          SECS
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ModernDashboardView({
   user,
   profile = {},
@@ -105,6 +216,7 @@ export default function ModernDashboardView({
   stats = {},
   streakRecord = null,
   myStreakEntry = null,
+  posterSendTime: propPosterSendTime,
   badges = {},
   onOpenBadges,
   onOpenSettings,
@@ -140,7 +252,22 @@ export default function ModernDashboardView({
   const [duration, setDuration] = useState(104); // Default 1:44 as in screenshot
   const audioRef = useRef(null);
 
-  const storyPrompt = today.prompt || today.question || "Maya ordered a book on pottery but received an antique wooden puzzle box instead. With no return address and a strange riddle carved on the base, she spent her Saturday trying to solve it rather than packing for her move.";
+  const targetPosterSendTime = today.posterSendTime || propPosterSendTime || "08:00";
+
+  const formatDropTime = (timeStr) => {
+    const [hh, mm] = (timeStr || "08:00").split(":");
+    const h = parseInt(hh, 10);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${displayH}:${mm || "00"} ${ampm} IST`;
+  };
+
+  // The daily speaking challenge is active only when published for today with valid content
+  const isQuestionActive = Boolean(
+    today?.questionSent && (today?.topic || today?.question || today?.prompt)
+  );
+
+  const storyPrompt = today.prompt || today.question || today.topic || "Maya ordered a book on pottery but received an antique wooden puzzle box instead. With no return address and a strange riddle carved on the base, she spent her Saturday trying to solve it rather than packing for her move.";
   const audioSrc = today.audioUrl || "https://pub-1c5ce667ea4445fb98d667349b649704.r2.dev/story-audio/wrong-delivery-surprise-1788843000000.mp3";
 
   // Speech synthesis fallback so audio ALWAYS works
@@ -689,7 +816,7 @@ export default function ModernDashboardView({
   }, [currentLeaderboard]);
 
   // Title formatting: split into white serif and soft purple italic serif
-  const topicTitle = today.topic || "The Unexpected Delivery";
+  const topicTitle = today.topic || today.question || (isQuestionActive ? "The Unexpected Delivery" : "Speaking Challenge");
   const titleParts = topicTitle.split(" ");
   const mainTitlePart = titleParts.length > 1 ? titleParts.slice(0, -1).join(" ") : titleParts[0];
   const italicTitlePart = titleParts.length > 1 ? titleParts[titleParts.length - 1] : "";
@@ -709,15 +836,17 @@ export default function ModernDashboardView({
         />
       )}
 
-      {/* ── Audio element for playback ── */}
-      <audio
-        ref={audioRef}
-        src={audioSrc}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={handleAudioEnded}
-        preload="metadata"
-      />
+      {/* ── Audio element for playback (only rendered when challenge is active) ── */}
+      {isQuestionActive && (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onEnded={handleAudioEnded}
+          preload="metadata"
+        />
+      )}
 
       {/* ── Left Sidebar Navigation (Screenshot 1) ── */}
       <aside className="speakshine-sidebar">
@@ -798,7 +927,9 @@ export default function ModernDashboardView({
               Good {getGreeting()}, {displayName} 👋
             </span>
             <span className="speakshine-topbar-subtitle">
-              Here's your speaking mission for today.
+              {isQuestionActive
+                ? "Here's your speaking mission for today."
+                : `Daily reset complete · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)}`}
             </span>
           </div>
 
@@ -826,13 +957,14 @@ export default function ModernDashboardView({
 
         {/* Canvas Body */}
         <main className="speakshine-canvas">
-          {/* ── Section 1: Hero 2-Column Grid (Screenshot 1) ── */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
-            gap: "1.25rem",
-            marginBottom: "1.25rem",
-          }}>
+          {/* ── Section 1: Hero Section (Active Question OR 12 AM Reset Countdown Layout) ── */}
+          {isQuestionActive ? (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
+              gap: "1.25rem",
+              marginBottom: "1.25rem",
+            }}>
             {/* Left Challenge Card */}
             <div className="speakshine-hero-left-card" style={{
               background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
@@ -1186,6 +1318,262 @@ export default function ModernDashboardView({
               </div>
             </div>
           </div>
+          ) : (
+            /* ── Daily 12 AM Reset: Rearranged Mission Countdown & Readiness Hero ── */
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
+              gap: "1.25rem",
+              marginBottom: "1.25rem",
+            }}>
+              {/* Left: Countdown & Rest Card */}
+              <div className="speakshine-hero-left-card" style={{
+                background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
+                border: "1px solid rgba(124, 111, 255, 0.25)",
+                borderRadius: 18,
+                padding: "2rem",
+                position: "relative",
+                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.45)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}>
+                <div>
+                  {/* Top Status Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: "#a78bfa", boxShadow: "0 0 10px #a78bfa",
+                      }} />
+                      <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#a78bfa", textTransform: "uppercase" }}>
+                        DAILY RESET COMPLETE
+                      </span>
+                    </div>
+                    <span style={{
+                      background: "rgba(249, 115, 22, 0.1)",
+                      border: "1px solid rgba(249, 115, 22, 0.3)",
+                      borderRadius: 6,
+                      padding: "3px 8px",
+                      fontSize: "0.7rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      color: "#fb923c",
+                      textTransform: "uppercase",
+                    }}>
+                      WINDOW OPENS AT {formatDropTime(targetPosterSendTime)}
+                    </span>
+                  </div>
+
+                  {/* Title with Serif Font */}
+                  <h1 className="story-title-heading" style={{
+                    fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                    fontSize: "2.35rem",
+                    fontWeight: 700,
+                    lineHeight: 1.15,
+                    margin: "0 0 0.75rem 0",
+                    letterSpacing: "-0.02em",
+                    color: "#ffffff",
+                  }}>
+                    Today's Challenge <span className="story-title-italic" style={{ color: "#c084fc", fontStyle: "italic", fontWeight: 400 }}>Unlocks Soon</span>
+                  </h1>
+
+                  {/* Reset Description */}
+                  <p style={{
+                    fontSize: "0.92rem",
+                    color: "#94a3b8",
+                    lineHeight: 1.6,
+                    marginBottom: "1.25rem",
+                    maxWidth: "640px",
+                  }}>
+                    The daily 12:00 AM reset has finished. Yesterday's submission window has closed and all streaks have been updated. Take a break to rest your vocal cords — today's speaking mission drops in:
+                  </p>
+
+                  {/* High Precision Countdown Timer */}
+                  <MissionDropCountdownTimer posterSendTime={targetPosterSendTime} />
+
+                  {/* Streak Status Notice */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    borderRadius: 12,
+                    padding: "0.85rem 1.15rem",
+                    marginTop: "1.25rem",
+                    fontSize: "0.86rem",
+                  }}>
+                    <span style={{ fontSize: "1.35rem" }}>{streak > 0 ? "🔥" : "✨"}</span>
+                    <div>
+                      <span style={{ color: streak > 0 ? "#fbbf24" : "#ffffff", fontWeight: 700 }}>
+                        {streak > 0 ? `${streak}-Day Streak Active & Protected` : "Ready to Start Day 1!"}
+                      </span>
+                      <span style={{ color: "#94a3b8", marginLeft: "0.4rem" }}>
+                        {streak > 0
+                          ? "Your streak is preserved after midnight reset. Submit once the new mission unlocks to keep it alive."
+                          : "Be ready when today's prompt unlocks to begin your speaking journey."}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick actions while waiting */}
+                <div style={{
+                  display: "flex",
+                  gap: "0.75rem",
+                  marginTop: "1.75rem",
+                  flexWrap: "wrap",
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/record")}
+                    style={{
+                      background: "rgba(124, 111, 255, 0.12)",
+                      border: "1px solid rgba(124, 111, 255, 0.3)",
+                      color: "#c4b5fd",
+                      borderRadius: 10,
+                      padding: "0.65rem 1rem",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.45rem",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(124, 111, 255, 0.22)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(124, 111, 255, 0.12)"}
+                  >
+                    <span>📹</span>
+                    <span>Review Past Video Feedback</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onOpenBadges}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.04)",
+                      border: "1px solid rgba(255, 255, 255, 0.09)",
+                      color: "#e2e8f0",
+                      borderRadius: 10,
+                      padding: "0.65rem 1rem",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.45rem",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+                  >
+                    <span>⭐</span>
+                    <span>Badge Progress ({milestone.currentDays}/{milestone.targetDays}d)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Daily Protocol & Warm-Up Card */}
+              <div className="speakshine-hero-right-card" style={{
+                background: "#0d0a18",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderRadius: 18,
+                padding: "1.75rem",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}>
+                <div>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                    DAILY SPEAKING PROTOCOL
+                  </div>
+
+                  {/* Daily Rhythm Timeline */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.02)",
+                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    borderRadius: 12,
+                    padding: "0.85rem 1rem",
+                    marginBottom: "1.25rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.55rem",
+                    fontSize: "0.78rem",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#4ade80" }}>
+                      <span>🌙 12:00 AM Midnight</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.72rem", background: "rgba(74, 222, 128, 0.12)", padding: "2px 6px", borderRadius: 4 }}>Reset Done ✓</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fb923c" }}>
+                      <span>🌅 {formatDropTime(targetPosterSendTime)}</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.72rem", background: "rgba(249, 115, 22, 0.12)", padding: "2px 6px", borderRadius: 4 }}>Upcoming ⏳</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#94a3b8" }}>
+                      <span>⏰ 11:59 PM Midnight</span>
+                      <span style={{ fontSize: "0.72rem" }}>Deadline</span>
+                    </div>
+                  </div>
+
+                  {/* Rules to Remember */}
+                  <div className="speakshine-rules-box" style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: 12,
+                    padding: "1rem",
+                    marginBottom: "1.25rem",
+                  }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                      RULES TO REMEMBER
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span>Minimum 60 seconds speaking</span>
+                      </div>
+                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span>Use at least 2 target words</span>
+                      </div>
+                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span>No script reading - speak naturally</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Warm-Up Advice */}
+                  <div style={{
+                    borderLeft: "3px solid #7c6fff",
+                    padding: "0.65rem 0.85rem",
+                    background: "rgba(124, 111, 255, 0.05)",
+                    borderRadius: "0 8px 8px 0",
+                    fontSize: "0.78rem",
+                    color: "#cbd5e1",
+                    lineHeight: 1.45,
+                  }}>
+                    <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "3px" }}>💡 Pre-Recording Warm-up</div>
+                    Take a deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles lead to higher confidence scores!
+                  </div>
+                </div>
+
+                {/* Studio Lock Notice */}
+                <div style={{
+                  marginTop: "1.5rem",
+                  padding: "0.9rem",
+                  borderRadius: 12,
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px dashed rgba(255, 255, 255, 0.1)",
+                  textAlign: "center",
+                }}>
+                  <div style={{ fontSize: "0.8rem", color: "#716c85", fontWeight: 600 }}>
+                    🔒 Recording Studio &amp; Uploads unlock when today's mission goes live
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Section 2: 5 KPI Metrics Row (Screenshot 2) ── */}
           <div className="speakshine-kpi-bar" style={{
@@ -1318,12 +1706,12 @@ export default function ModernDashboardView({
             <div style={{ position: "relative", height: 8, background: "rgba(255, 255, 255, 0.06)", borderRadius: 99, overflow: "hidden", marginBottom: "0.45rem" }}>
               <div style={{
                 position: "absolute", left: 0, top: 0, bottom: 0,
-                width: `${Math.min(100, Math.max(4, milestone.percent))}%`,
+                width: milestone.percent > 0 ? `${Math.min(100, Math.max(4, milestone.percent))}%` : "0%",
                 background: milestone.nextBadge?.color
                   ? `linear-gradient(90deg, ${milestone.nextBadge.color}cc, ${milestone.nextBadge.color})`
                   : "linear-gradient(90deg, #f59e0b, #fbbf24)",
                 borderRadius: 99,
-                boxShadow: `0 0 12px ${milestone.nextBadge?.color || "#fbbf24"}66`,
+                boxShadow: milestone.percent > 0 ? `0 0 12px ${milestone.nextBadge?.color || "#fbbf24"}66` : "none",
                 transition: "width 0.6s ease",
               }} />
             </div>

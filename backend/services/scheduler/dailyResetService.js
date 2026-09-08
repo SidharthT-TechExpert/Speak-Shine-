@@ -238,6 +238,11 @@ export async function resetStatusFlags() {
         todayImagePhotographerUrl: null,
         todayImageSearchQuery: null,
         todayImageInstructions: null,
+        todayQuestion: null,
+        todayTopic: null,
+        todayCategory: null,
+        todayPosterImage: null,
+        todayVocabulary: [],
       }
     }, { upsert: true });
 

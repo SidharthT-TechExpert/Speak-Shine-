@@ -43,6 +43,8 @@ export function serializeStreakBadges(user = {}) {
   const nextDays = nextBadge?.days || startDays;
   const streak = user.streak || 0;
   const span = nextDays - startDays;
+  const percent = nextDays > 0 ? Math.min(100, Math.max(0, Math.round((streak / nextDays) * 100))) : 0;
+  const tierPercent = span > 0 ? Math.min(100, Math.max(0, Math.round(((streak - startDays) / span) * 100))) : 0;
   return {
     currentBadge,
     earnedBadges: getStreakBadges(user),
@@ -52,8 +54,9 @@ export function serializeStreakBadges(user = {}) {
       ? {
           currentDays: streak,
           remainingDays: Math.max(0, nextDays - streak),
-          percent: span > 0 ? Math.min(100, Math.max(0, ((streak - startDays) / span) * 100)) : 0,
+          percent,
+          tierPercent,
         }
-      : { currentDays: streak, remainingDays: 0, percent: 100 },
+      : { currentDays: streak, remainingDays: 0, percent: 100, tierPercent: 100 },
   };
 }

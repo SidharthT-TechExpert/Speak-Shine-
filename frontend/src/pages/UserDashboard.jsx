@@ -1128,6 +1128,7 @@ export default function UserDashboard() {
         stats={data?.stats || {}}
         streakRecord={data?.streakRecord || null}
         myStreakEntry={data?.myStreakEntry || null}
+        posterSendTime={data?.posterSendTime || data?.today?.posterSendTime || "08:00"}
         badges={{
           available: profile?.availableBadges || [],
           earned: profile?.earnedBadges || [],

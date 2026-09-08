@@ -64,25 +64,39 @@ export async function getTodayOverview() {
       completed: u.completed || false,
     }));
 
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  const todayIST = `${y}-${mo}-${d}`;
+
+  // Check if today's question was genuinely published for today and has not reset
+  const isQuestionSentToday = Boolean(
+    status?.questionSentToday &&
+    (status?.lastPosterSentDate === todayIST || (!status?.lastResetDate && status?.lastPosterSentDate)) &&
+    (status?.todayQuestion || status?.todayTopic)
+  );
+
   return {
     today: {
-      questionSent: status?.questionSentToday || false,
-      topic: status?.todayTopic || null,
-      question: status?.todayQuestion || null,
-      category: status?.todayCategory || null,
-      contentType: status?.todayContentType || "question",
-      audioUrl: status?.todayAudioUrl || null,
-      isStorySummary: activeStoryTask(status),
-      isPictureDescription: activePictureTask(status),
-      isMonthlyReflection: Boolean(status?.isMonthlyReflectionDay),
-      isMonthlyGoals: Boolean(status?.isMonthlyGoalsDay),
-      imageUrl:          status?.todayImageUrl || null,
-      imageSource:       status?.todayImageSource || null,
-      imagePageUrl:      status?.todayImagePageUrl || null,
-      imagePhotographer: status?.todayImagePhotographer || null,
-      imageInstructions: status?.todayImageInstructions || null,
-      posterImage: getPosterImage(status),
-      vocabulary: status?.todayVocabulary || [],
+      questionSent: isQuestionSentToday,
+      posterSendTime: status?.posterSendTime || "08:00",
+      topic: isQuestionSentToday ? (status?.todayTopic || null) : null,
+      question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
+      category: isQuestionSentToday ? (status?.todayCategory || null) : null,
+      contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
+      audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
+      isStorySummary: isQuestionSentToday && activeStoryTask(status),
+      isPictureDescription: isQuestionSentToday && activePictureTask(status),
+      isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
+      isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
+      imageUrl:          isQuestionSentToday ? (status?.todayImageUrl || null) : null,
+      imageSource:       isQuestionSentToday ? (status?.todayImageSource || null) : null,
+      imagePageUrl:      isQuestionSentToday ? (status?.todayImagePageUrl || null) : null,
+      imagePhotographer: isQuestionSentToday ? (status?.todayImagePhotographer || null) : null,
+      imageInstructions: isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
+      posterImage: isQuestionSentToday ? getPosterImage(status) : null,
+      vocabulary: isQuestionSentToday ? (status?.todayVocabulary || []) : [],
     },
     stats: {
       total: users.length,
@@ -179,10 +193,23 @@ export async function getUserProfile(phone) {
   const completed = paidUsers.filter(u => u.completed).length;
   const sortedByStreak = [...paidUsers].sort((a, b) => (b.streak || 0) - (a.streak || 0));
 
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  const todayIST = `${y}-${mo}-${d}`;
+
+  // Check if today's question was genuinely published for today and has not reset
+  const isQuestionSentToday = Boolean(
+    status?.questionSentToday &&
+    (status?.lastPosterSentDate === todayIST || (!status?.lastResetDate && status?.lastPosterSentDate)) &&
+    (status?.todayQuestion || status?.todayTopic)
+  );
+
   // Lazy-generate vocabulary if missing (non-blocking — resolves in parallel)
-  const vocabularyPromise = (status?.questionSentToday && status?.todayQuestion)
+  const vocabularyPromise = (isQuestionSentToday && status?.todayQuestion)
     ? getTodayVocabulary().catch(() => [])
-    : Promise.resolve(status?.todayVocabulary || []);
+    : Promise.resolve(isQuestionSentToday ? (status?.todayVocabulary || []) : []);
 
   // ── Leaderboard sort (Paid Members Only) ──────────────────────────────────
   // 1. Active streak speakers (streak > 0) rank above 0-day speakers (streak === 0).
@@ -308,25 +335,26 @@ export async function getUserProfile(phone) {
       ...serializeStreakBadges(profileUser),
     },
     today: {
-      questionSent: status?.questionSentToday || false,
-      topic: status?.todayTopic || null,
-      question: status?.todayQuestion || null,
-      category: status?.todayCategory || null,
-      contentType: status?.todayContentType || "question",
-      audioUrl: status?.todayAudioUrl || null,
-      posterImage: getPosterImage(status),
-      isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-      isMonthlyGoals: status?.isMonthlyGoalsDay || false,
-      isStorySummary: activeStoryTask(status),
-      isPictureDescription: activePictureTask(status),
+      questionSent: isQuestionSentToday,
+      posterSendTime: status?.posterSendTime || "08:00",
+      topic: isQuestionSentToday ? (status?.todayTopic || null) : null,
+      question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
+      category: isQuestionSentToday ? (status?.todayCategory || null) : null,
+      contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
+      audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
+      posterImage: isQuestionSentToday ? getPosterImage(status) : null,
+      isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
+      isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
+      isStorySummary: isQuestionSentToday && activeStoryTask(status),
+      isPictureDescription: isQuestionSentToday && activePictureTask(status),
       // Picture description image data (only populated on picture description days)
-      imageUrl:             status?.todayImageUrl || null,
-      imageSource:          status?.todayImageSource || null,
-      imagePageUrl:         status?.todayImagePageUrl || null,
-      imagePhotographer:    status?.todayImagePhotographer || null,
-      imagePhotographerUrl: status?.todayImagePhotographerUrl || null,
-      imageSearchQuery:     status?.todayImageSearchQuery || null,
-      imageInstructions:    status?.todayImageInstructions || null,
+      imageUrl:             isQuestionSentToday ? (status?.todayImageUrl || null) : null,
+      imageSource:          isQuestionSentToday ? (status?.todayImageSource || null) : null,
+      imagePageUrl:         isQuestionSentToday ? (status?.todayImagePageUrl || null) : null,
+      imagePhotographer:    isQuestionSentToday ? (status?.todayImagePhotographer || null) : null,
+      imagePhotographerUrl: isQuestionSentToday ? (status?.todayImagePhotographerUrl || null) : null,
+      imageSearchQuery:     isQuestionSentToday ? (status?.todayImageSearchQuery || null) : null,
+      imageInstructions:    isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
       vocabulary: await vocabularyPromise,
       allowPrivateVideos: status?.allowPrivateVideos ?? true,
       enableBackgroundBlur: status?.enableBackgroundBlur ?? false,
@@ -443,6 +471,7 @@ export async function setTodayQuestion(topic, question, category) {
       todayImageSearchQuery: null,
       todayImageInstructions: null,
       questionSentToday: true,
+      lastPosterSentDate: `${new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }).split(",")[0].split("/").map(p => p.padStart(2, "0")).join("-")}`, // fallback IST date
     }
   }, { upsert: true });
   

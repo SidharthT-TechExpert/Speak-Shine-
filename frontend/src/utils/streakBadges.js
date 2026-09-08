@@ -51,6 +51,7 @@ export function getBadgeProgress(streakDays = 0) {
       targetDays: streakDays,
       remainingDays: 0,
       percent: 100,
+      tierPercent: 100,
       startDays: currentBadge?.days || 0,
     };
   }
@@ -59,7 +60,10 @@ export function getBadgeProgress(streakDays = 0) {
   const targetDays = nextBadge.days;
   const remainingDays = Math.max(0, targetDays - streakDays);
   const span = targetDays - startDays;
-  const percent = span > 0
+  const percent = targetDays > 0
+    ? Math.min(100, Math.max(0, Math.round((streakDays / targetDays) * 100)))
+    : 0;
+  const tierPercent = span > 0
     ? Math.min(100, Math.max(0, Math.round(((streakDays - startDays) / span) * 100)))
     : 0;
 
@@ -70,6 +74,7 @@ export function getBadgeProgress(streakDays = 0) {
     targetDays,
     remainingDays,
     percent,
+    tierPercent,
     startDays,
   };
 }
