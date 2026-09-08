@@ -346,18 +346,54 @@ export async function generateStoryNow(req, res) {
 
 /**
  * POST /api/questions/generate-story-audio
- * Body: { storyText, topic }
- * Generates TTS audio, uploads to R2, returns { audioUrl }
+ * Body: { storyText, topic, voiceId, voiceSettings, character }
+ * Generates TTS audio with character-adapted voice, uploads to R2, returns { audioUrl, voiceUsed }
  */
 export async function generateStoryAudio(req, res) {
   try {
-    const { storyText, topic } = req.body;
+    const { storyText, topic, voiceId, voiceSettings, character } = req.body;
     if (!storyText) return res.status(400).json({ error: "storyText is required" });
     const { generateAndUploadStoryAudio } = await import("../services/ai/storyAudioService.js");
-    const audioUrl = await generateAndUploadStoryAudio(storyText, topic || "story");
-    res.json({ success: true, audioUrl });
+    const result = await generateAndUploadStoryAudio(storyText, topic || "story", voiceId, voiceSettings, character);
+    res.json({
+      success: true,
+      audioUrl: result.audioUrl,
+      voiceUsed: result.voiceUsed,
+    });
   } catch (error) {
     console.error("[Questions] Story audio error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/questions/analyze-story-voice
+ * Body: { storyText, character }
+ * Evaluates the story to detect character profile, mood, and optimal ElevenLabs voice
+ */
+export async function analyzeStoryVoiceController(req, res) {
+  try {
+    const { storyText, character } = req.body;
+    if (!storyText) return res.status(400).json({ error: "storyText is required" });
+    const { analyzeStoryVoice, getAvailableVoices } = await import("../services/ai/storyVoiceAnalyzer.js");
+    const voiceRecommendation = await analyzeStoryVoice(storyText, character);
+    const availableVoices = getAvailableVoices();
+    res.json({ success: true, voiceRecommendation, availableVoices });
+  } catch (error) {
+    console.error("[Questions] Story voice analysis error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * GET /api/questions/story-voices
+ * Returns curated list of voices for dropdown selection
+ */
+export async function getStoryVoices(req, res) {
+  try {
+    const { getAvailableVoices } = await import("../services/ai/storyVoiceAnalyzer.js");
+    res.json({ success: true, voices: getAvailableVoices() });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 }

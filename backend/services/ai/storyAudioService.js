@@ -4,6 +4,9 @@
  * Generates an MP3 audio file from story text using ElevenLabs TTS,
  * then uploads it to Cloudflare R2 under story-audio/ folder.
  *
+ * Supports dynamic character voices (Rachel, Emily, Nicole, Josh, Sam, Adam, George)
+ * and tailored acoustic parameters (stability, style) for authentic human expression.
+ *
  * Uses the ElevenLabs key manager (min-heap rotation) so multiple keys
  * are cycled automatically on rate-limit / quota / transient errors.
  *
@@ -21,18 +24,34 @@ import {
   markTransientError,
   parseRetryAfter,
 } from "./elevenLabsKeyManager.js";
+import { findVoice, analyzeStoryVoice, STORY_VOICES } from "./storyVoiceAnalyzer.js";
 
-// Adam voice — premade, free-tier compatible on all ElevenLabs accounts
-const VOICE_ID = "pNInz6obpgDQGcFmaJgB";
+// Fallback voice if none specified or matched
+const DEFAULT_VOICE_ID = STORY_VOICES.adam.id;
 
 const MAX_ATTEMPTS = 8; // try up to 8 key-switches before giving up
 
 /**
  * Convert text to an MP3 Buffer using ElevenLabs TTS.
  * Rotates keys automatically on 429 / 401 / 403 / 5xx.
+ *
+ * @param {string} text - The script to read
+ * @param {string} [voiceId] - ElevenLabs Voice ID
+ * @param {object} [customVoiceSettings] - Stability, style, etc.
  */
-async function textToMp3Buffer(text) {
+async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSettings = null) {
   let lastError = null;
+
+  // Selected voice configuration
+  const voiceMeta = findVoice(voiceId);
+  const settings = {
+    stability: customVoiceSettings?.stability ?? voiceMeta?.defaultSettings?.stability ?? 0.35,
+    similarity_boost: customVoiceSettings?.similarity_boost ?? 0.75,
+    style: customVoiceSettings?.style ?? voiceMeta?.defaultSettings?.style ?? 0.45,
+    use_speaker_boost: true,
+  };
+
+  const targetVoiceId = voiceId || DEFAULT_VOICE_ID;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const apiKey = getKey();
@@ -46,7 +65,7 @@ async function textToMp3Buffer(text) {
 
     let res;
     try {
-      res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+      res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${targetVoiceId}`, {
         method: "POST",
         headers: {
           "xi-api-key": apiKey,
@@ -56,12 +75,7 @@ async function textToMp3Buffer(text) {
         body: JSON.stringify({
           text,
           model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.3,
-            use_speaker_boost: true,
-          },
+          voice_settings: settings,
         }),
       });
     } catch (networkErr) {
@@ -115,18 +129,48 @@ async function textToMp3Buffer(text) {
 
 /**
  * Generate TTS audio for a story and upload to R2.
+ * Automatically analyzes story character and adapts voice if voiceId is not specified.
+ *
  * @param {string} storyText - The story text to convert to audio
  * @param {string} [topic]   - Used to build the R2 filename slug
- * @returns {Promise<string>} Public URL of the uploaded MP3
+ * @param {string} [voiceId] - Optional specific ElevenLabs voice ID or key
+ * @param {object} [voiceSettings] - Optional custom stability/style
+ * @param {object} [characterHint] - Optional metadata from story generation
+ * @returns {Promise<{ audioUrl: string, voiceUsed: object }>} Public URL and voice metadata
  */
-export async function generateAndUploadStoryAudio(storyText, topic = "story") {
+export async function generateAndUploadStoryAudio(
+  storyText,
+  topic = "story",
+  voiceId = null,
+  voiceSettings = null,
+  characterHint = null
+) {
   if (!storyText || storyText.trim().length < 10) {
     throw new Error("Story text is too short to generate audio");
   }
 
-  console.log(`[StoryAudio] Generating TTS for "${topic}" (${storyText.length} chars)…`);
+  // Determine which voice to use
+  let selectedVoiceId = voiceId;
+  let selectedSettings = voiceSettings;
+  let voiceProfile = null;
 
-  const mp3Buffer = await textToMp3Buffer(storyText);
+  if (selectedVoiceId) {
+    voiceProfile = findVoice(selectedVoiceId);
+    if (voiceProfile) selectedVoiceId = voiceProfile.id;
+  } else {
+    // Automatically analyze character and select the most adaptable voice
+    console.log(`[StoryAudio] Analyzing story to pick optimal character voice…`);
+    const analysis = await analyzeStoryVoice(storyText, characterHint);
+    selectedVoiceId = analysis.voiceId;
+    selectedSettings = selectedSettings || analysis.voiceSettings;
+    voiceProfile = analysis;
+    console.log(`[StoryAudio] 🎭 Matched voice: ${analysis.voiceName} (${analysis.vibe}) for character "${analysis.characterName}" — ${analysis.reason}`);
+  }
+
+  const voiceName = voiceProfile?.name || voiceProfile?.voiceName || "Adam";
+  console.log(`[StoryAudio] Generating TTS for "${topic}" using voice: ${voiceName} (${storyText.length} chars)…`);
+
+  const mp3Buffer = await textToMp3Buffer(storyText, selectedVoiceId, selectedSettings);
   console.log(`[StoryAudio] TTS done — ${(mp3Buffer.length / 1024).toFixed(1)} KB. Uploading to R2…`);
 
   const slug = topic
@@ -138,5 +182,16 @@ export async function generateAndUploadStoryAudio(storyText, topic = "story") {
 
   const publicUrl = await uploadBufferToR2(mp3Buffer, key, "audio/mpeg");
   console.log(`[StoryAudio] Uploaded: ${publicUrl}`);
-  return publicUrl;
+
+  return {
+    audioUrl: publicUrl,
+    voiceUsed: {
+      id: selectedVoiceId,
+      name: voiceName,
+      character: voiceProfile?.characterName || characterHint?.name || null,
+      mood: voiceProfile?.mood || null,
+      vibe: voiceProfile?.vibe || null,
+      reason: voiceProfile?.reason || null,
+    },
+  };
 }

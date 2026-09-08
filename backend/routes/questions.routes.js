@@ -25,6 +25,8 @@ router.delete("/manual/:id", authMiddleware, requireRole("admin", "admins", "tra
 router.post("/generate-now",   authMiddleware, requireRole("admin", "admins"), questionsController.generateQuestionsNow);
 router.post("/generate-story", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.generateStoryNow);
 router.post("/generate-story-audio", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.generateStoryAudio);
+router.post("/analyze-story-voice", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.analyzeStoryVoiceController);
+router.get("/story-voices", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), questionsController.getStoryVoices);
 router.post("/generate-picture", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.generatePictureNow);
 router.post("/clean-generic",  authMiddleware, requireRole("admin", "admins"), questionsController.cleanGenericQuestions);
 router.post("/",               authMiddleware, requireRole("admin", "admins"), questionsController.addQuestion);

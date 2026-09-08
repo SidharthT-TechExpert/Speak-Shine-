@@ -8359,6 +8359,9 @@ function ManualQuestionsPanel() {
   const [generatingStory, setGeneratingStory] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [generatingPicture, setGeneratingPicture] = useState(false);
+  const [voiceRecommendation, setVoiceRecommendation] = useState(null);
+  const [selectedVoiceId, setSelectedVoiceId] = useState("21m00Tcm4TlvDq8ikWAM");
+  const [analyzingVoice, setAnalyzingVoice] = useState(false);
   const [busy, setBusy] = useState({});
   const [toast, setToast] = useState(null);
   const [selectedTemplate, setSelectedTemplate] = useState("");
@@ -8408,7 +8411,7 @@ function ManualQuestionsPanel() {
     setGeneratingStory(true);
     try {
       const res = await api.post("/questions/generate-story");
-      const { topic, story, summaryGuide, question } = res.data;
+      const { topic, story, summaryGuide, question, voiceRecommendation: vRec } = res.data;
       setForm(f => ({
         ...f,
         topic,
@@ -8416,11 +8419,39 @@ function ManualQuestionsPanel() {
         storyTranscript: story,
         summaryGuide: Array.isArray(summaryGuide) ? summaryGuide.join("\n") : summaryGuide || "",
       }));
-      notify("Story generated! Review and add an audio URL before saving.");
+      if (vRec) {
+        setVoiceRecommendation(vRec);
+        if (vRec.voiceId) setSelectedVoiceId(vRec.voiceId);
+      }
+      notify("Story generated! Character and matching voice identified.");
     } catch (err) {
       notify(err.response?.data?.error || "Story generation failed", "error");
     } finally {
       setGeneratingStory(false);
+    }
+  };
+
+  const handleAnalyzeVoice = async () => {
+    if (!form.storyTranscript) {
+      notify("Please enter or generate a story transcript first.", "error");
+      return;
+    }
+    setAnalyzingVoice(true);
+    try {
+      const res = await api.post("/questions/analyze-story-voice", {
+        storyText: form.storyTranscript,
+      });
+      if (res.data.voiceRecommendation) {
+        setVoiceRecommendation(res.data.voiceRecommendation);
+        if (res.data.voiceRecommendation.voiceId) {
+          setSelectedVoiceId(res.data.voiceRecommendation.voiceId);
+        }
+        notify(`Matched voice: ${res.data.voiceRecommendation.voiceName} for "${res.data.voiceRecommendation.characterName}"!`);
+      }
+    } catch (err) {
+      notify(err.response?.data?.error || "Voice analysis failed", "error");
+    } finally {
+      setAnalyzingVoice(false);
     }
   };
 
@@ -8434,9 +8465,12 @@ function ManualQuestionsPanel() {
       const res = await api.post("/questions/generate-story-audio", {
         storyText: form.storyTranscript,
         topic: form.topic || "story",
+        voiceId: selectedVoiceId || voiceRecommendation?.voiceId || undefined,
+        voiceSettings: voiceRecommendation?.voiceSettings || undefined,
       });
       setForm(f => ({ ...f, audioUrl: res.data.audioUrl }));
-      notify("Audio generated and uploaded! URL has been filled in.");
+      const voiceLabel = res.data.voiceUsed?.name ? ` with voice ${res.data.voiceUsed.name}` : "";
+      notify(`Audio generated and uploaded${voiceLabel}! URL filled in.`);
     } catch (err) {
       notify(err.response?.data?.error || "Audio generation failed", "error");
     } finally {
@@ -8859,11 +8893,104 @@ function ManualQuestionsPanel() {
                     className="btn-primary"
                     disabled={generatingStory}
                     onClick={handleGenerateStory}
-                    style={{ width: "100%", marginBottom: "0.75rem", background: "linear-gradient(135deg,#0f766e,#0d9488)" }}
+                    style={{ width: "100%", marginBottom: "0.5rem", background: "linear-gradient(135deg,#0f766e,#0d9488)" }}
                   >
                     {generatingStory ? "✨ Generating story…" : "✨ AI Generate Story"}
                   </button>
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
+                    Generates a natural listening story with human pacing, key summary points, and matches the best character voice.
+                  </div>
                 </div>
+
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <label className="form-label">Story Transcript *</label>
+                  <textarea
+                    className="form-input"
+                    rows={5}
+                    placeholder="Story text to read aloud..."
+                    value={form.storyTranscript}
+                    onChange={e => setForm(f => ({ ...f, storyTranscript: e.target.value }))}
+                  />
+                </div>
+
+                {/* Character & Adaptive Voice Matcher Card */}
+                <div style={{
+                  marginBottom: "0.85rem",
+                  padding: "0.85rem",
+                  background: "rgba(167, 139, 250, 0.08)",
+                  borderRadius: 8,
+                  border: "1px solid rgba(167, 139, 250, 0.25)"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "#c4b5fd" }}>
+                      🎭 Character Voice Matcher
+                    </span>
+                    {form.storyTranscript && (
+                      <button
+                        type="button"
+                        disabled={analyzingVoice}
+                        onClick={handleAnalyzeVoice}
+                        style={{
+                          background: "rgba(167, 139, 250, 0.15)",
+                          border: "1px solid rgba(196, 181, 253, 0.35)",
+                          color: "#ddd6fe",
+                          borderRadius: 4,
+                          padding: "3px 8px",
+                          fontSize: "0.72rem",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {analyzingVoice ? "Analyzing…" : "🔄 Re-Analyze Voice"}
+                      </button>
+                    )}
+                  </div>
+
+                  {voiceRecommendation && (
+                    <div style={{ fontSize: "0.78rem", color: "#e2e8f0", marginBottom: "0.65rem", lineHeight: 1.45, background: "rgba(15, 23, 42, 0.4)", padding: "8px", borderRadius: 6 }}>
+                      <div><strong style={{ color: "#a78bfa" }}>Character:</strong> {voiceRecommendation.characterName} <span style={{ color: "#94a3b8" }}>({voiceRecommendation.persona})</span></div>
+                      <div><strong style={{ color: "#38bdf8" }}>Mood & Delivery:</strong> {voiceRecommendation.mood}</div>
+                      <div style={{ color: "#cbd5e1", marginTop: "3px", fontSize: "0.73rem" }}>
+                        💡 <em>"{voiceRecommendation.reason}"</em>
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="form-label" style={{ fontSize: "0.74rem", color: "#cbd5e1", marginBottom: "0.3rem" }}>
+                    Select Voice (ElevenLabs Human Cast)
+                  </label>
+                  <select
+                    className="form-input"
+                    value={selectedVoiceId}
+                    onChange={e => setSelectedVoiceId(e.target.value)}
+                    style={{ fontSize: "0.82rem", background: "#0f172a", borderColor: "rgba(167, 139, 250, 0.4)", color: "#f8fafc" }}
+                  >
+                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Warm & Conversational (Female, 20s)</option>
+                    <option value="LcfcDJNUP1GQjkzn1xUU">Emily — Energetic & Bright (Female, 20s)</option>
+                    <option value="piTKgcLEGmPE4e6mEKli">Nicole — Gentle Storyteller (Female, Soft)</option>
+                    <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Casual & Relatable (Male, 20s)</option>
+                    <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Dynamic & Expressive (Male, Confident)</option>
+                    <option value="pNInz6obpgDQGcFmaJgB">Adam — Deep Classic Narrator (Male)</option>
+                    <option value="JBFqnCBsd6RMkjVDRZzb">George — Warm British Storyteller (Male)</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={generatingAudio || !form.storyTranscript}
+                    onClick={handleGenerateAudio}
+                    style={{
+                      marginTop: "0.6rem",
+                      width: "100%",
+                      color: "#22d3ee",
+                      borderColor: "rgba(6,182,212,0.45)",
+                      fontWeight: 600,
+                      background: "rgba(6, 182, 212, 0.08)"
+                    }}
+                  >
+                    {generatingAudio ? "🎙️ Generating Audio with Selected Voice…" : "🎙️ Generate Audio with Character Voice"}
+                  </button>
+                </div>
+
                 <div style={{ marginBottom: "0.75rem" }}>
                   <label className="form-label">Story Audio URL *</label>
                   <input
@@ -8874,26 +9001,13 @@ function ManualQuestionsPanel() {
                     value={form.audioUrl}
                     onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
                   />
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    disabled={generatingAudio}
-                    onClick={handleGenerateAudio}
-                    style={{ marginTop: "0.5rem", width: "100%", color: "#22d3ee", borderColor: "rgba(6,182,212,0.4)" }}
-                  >
-                    {generatingAudio ? "🔊 Generating audio…" : "🔊 Generate Audio from Story"}
-                  </button>
+                  {form.audioUrl && (
+                    <div style={{ marginTop: "0.5rem" }}>
+                      <audio controls src={form.audioUrl} style={{ width: "100%", height: 36 }} />
+                    </div>
+                  )}
                 </div>
-                <div style={{ marginBottom: "0.75rem" }}>
-                  <label className="form-label">Story Transcript (optional)</label>
-                  <textarea
-                    className="form-input"
-                    rows={4}
-                    placeholder="Paste the story text here for better AI summary scoring..."
-                    value={form.storyTranscript}
-                    onChange={e => setForm(f => ({ ...f, storyTranscript: e.target.value }))}
-                  />
-                </div>
+
                 <div style={{ marginBottom: "1rem" }}>
                   <label className="form-label">Expected Summary / Key Points (optional)</label>
                   <textarea

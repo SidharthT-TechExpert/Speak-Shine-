@@ -198,8 +198,16 @@ export async function publishAutoSaturdayStory() {
     console.log("[QuestionScheduler] 🎧 Auto-generating Saturday story…");
     const story = await generateListeningStory({ wordCount, usedThemes });
 
-    // Generate and upload audio
-    const audioUrl = await generateAndUploadStoryAudio(story.story, story.topic);
+    // Generate and upload audio with character-adapted voice
+    const audioResult = await generateAndUploadStoryAudio(
+      story.story,
+      story.topic,
+      story.voiceRecommendation?.voiceId,
+      story.voiceRecommendation?.voiceSettings,
+      story.character
+    );
+    const audioUrl = typeof audioResult === "string" ? audioResult : audioResult.audioUrl;
+    console.log(`[QuestionScheduler] 🎭 Story audio created using voice: ${audioResult.voiceUsed?.name || "Adaptive"} (${audioResult.voiceUsed?.vibe || ""}) for character: "${story.character?.name || "Protagonist"}"`);
 
     // Save used theme
     await Status.updateOne({}, { $addToSet: { usedStoryThemes: story.theme } }, { upsert: true });

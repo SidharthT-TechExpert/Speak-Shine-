@@ -9,6 +9,7 @@
 
 import fetch from "node-fetch";
 import { getTextKey, getTextModel, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
+import { analyzeStoryVoice } from "./storyVoiceAnalyzer.js";
 
 export const STORY_THEMES = [
   "a first day at a new job",
@@ -142,6 +143,7 @@ Requirements:
 - Ends with a practical insight or realisation, not a childish moral
 - Written in third person (narrating about ${character.name})
 - Natural spoken English style — like a friend telling an interesting true-to-life story aloud
+- Pacing & human touch: Write for the human ear with natural breath pauses (using commas, dashes, or short clauses) and relatable emotional reactions so the audio feels alive, authentic, and engaging
 - Use a small amount of natural dialogue when it makes the story more vivid, but keep it easy to follow
 - Use a modern setting such as college, a first job, shared housing, public transport, a café, a family event, travel, or a personal project
 - Make the character feel like a young adult with realistic goals, friendships, small problems, and decisions
@@ -208,13 +210,21 @@ Return ONLY valid JSON in this exact format, no markdown, no extra text:
       if (!parsed.topic || !parsed.story || !Array.isArray(parsed.summaryGuide) || !parsed.question) {
         throw new Error("Missing required fields in story response");
       }
+
+      const voiceRecommendation = await analyzeStoryVoice(parsed.story.trim(), {
+        name: character.name,
+        type: character.type,
+        pronoun: character.pronoun,
+      });
+
       return {
         topic: parsed.topic.trim(),
         story: parsed.story.trim(),
         summaryGuide: parsed.summaryGuide.map(p => String(p).trim()),
         question: parsed.question.trim(),
         theme,
-        character: { name: character.name, type: character.type }, // return for caller to store
+        character: { name: character.name, type: character.type, pronoun: character.pronoun },
+        voiceRecommendation,
       };
     } catch (parseErr) {
       lastError = parseErr;
