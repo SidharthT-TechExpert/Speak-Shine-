@@ -14,6 +14,12 @@ import { evaluateSubmitGate, getDurationLimits } from "../utils/videoSubmitGate.
 import { saveDraft, loadDraft, clearDraft } from "../utils/videoDraftDB.js";
 import MonthlyGraceCountdown from "../components/MonthlyGraceCountdown.jsx";
 
+// ── Waveform bar patterns for realistic speech audio visualization ───────────
+const WAVE_PATTERN = [
+  14, 20, 16, 26, 22, 14, 18, 24, 12, 22, 28, 18, 24, 16, 20,
+  28, 22, 18, 26, 20, 14, 18, 24, 16, 22, 26, 18, 14
+];
+
 // ── Mode toggle ──────────────────────────────────────────────────────────────
 // "upload"  → existing file-upload flow
 // "record"  → new live-record flow
@@ -47,6 +53,174 @@ export default function VideoAnalysis() {
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
   const [durationLimits, setDurationLimits] = useState(null);
+
+  // ── Live Countdown to Midnight IST (Matching Dashboard Page) ────────────────
+  const [timeLeft, setTimeLeft] = useState({ hrs: "09", mins: "22", secs: "50" });
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      const midnight = new Date(nowIST);
+      midnight.setDate(midnight.getDate() + 1);
+      midnight.setHours(0, 0, 0, 0);
+
+      const diffSec = Math.max(0, Math.floor((midnight - nowIST) / 1000));
+      const h = String(Math.floor(diffSec / 3600)).padStart(2, "0");
+      const m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
+      const s = String(diffSec % 60).padStart(2, "0");
+      setTimeLeft({ hrs: h, mins: m, secs: s });
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Audio Player & Waveform State ───────────────────────────────────────────
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(75);
+  const audioRef = useRef(null);
+
+  const audioSrc = todayQuestion?.audioUrl || "";
+
+  // Speech synthesis fallback so audio ALWAYS works
+  const playVoiceFallback = () => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const promptText = todayQuestion?.question || todayQuestion?.topic || "Listen to the story carefully and summarize it in your own words.";
+    const utt = new SpeechSynthesisUtterance(promptText);
+    utt.rate = 0.96;
+    utt.pitch = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    const prefVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha")));
+    if (prefVoice) utt.voice = prefVoice;
+
+    utt.onstart = () => {
+      setIsPlaying(true);
+      setCurrentTime(0);
+    };
+    utt.onend = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    utt.onerror = () => {
+      setIsPlaying(false);
+    };
+
+    window.speechSynthesis.speak(utt);
+  };
+
+  const togglePlay = () => {
+    if (isPlaying) {
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+      if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+      setIsPlaying(false);
+    } else {
+      if (audioRef.current && audioRef.current.src && audioRef.current.src !== window.location.href) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(err => {
+          console.warn("[Audio] Falling back to Web Speech API:", err);
+          playVoiceFallback();
+        });
+      } else {
+        playVoiceFallback();
+      }
+    }
+  };
+
+  useEffect(() => {
+    let interval;
+    if (isPlaying && (!audioRef.current || audioRef.current.paused)) {
+      interval = setInterval(() => {
+        setCurrentTime(prev => {
+          if (prev >= duration) {
+            setIsPlaying(false);
+            return 0;
+          }
+          return prev + 0.5;
+        });
+      }, 500);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, duration]);
+
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    setCurrentTime(audioRef.current.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (!audioRef.current) return;
+    if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
+      setDuration(Math.round(audioRef.current.duration));
+    }
+  };
+
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const seekWaveform = (index) => {
+    const targetTime = (index / WAVE_PATTERN.length) * (duration || 75);
+    if (audioRef.current && !isNaN(audioRef.current.duration)) {
+      audioRef.current.currentTime = targetTime;
+    }
+    setCurrentTime(targetTime);
+  };
+
+  const fmtTime = (sec) => {
+    const s = Math.floor(sec || 0);
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m}:${String(rem).padStart(2, "0")}`;
+  };
+
+  const progressPercentAudio = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const activeWaveIndex = Math.floor((progressPercentAudio / 100) * WAVE_PATTERN.length);
+
+  // ── Target Vocabulary Planning (LocalStorage 16h TTL) ────────────────────────
+  const VOCAB_STORAGE_KEY = "speakshine_planned_vocab_v1";
+  const SIXTEEN_HOURS_MS = 16 * 60 * 60 * 1000;
+
+  const [plannedWords, setPlannedWords] = useState(() => {
+    try {
+      const saved = localStorage.getItem(VOCAB_STORAGE_KEY);
+      if (!saved) return { 0: true };
+      const parsed = JSON.parse(saved);
+      if (Date.now() - (parsed.timestamp || 0) > SIXTEEN_HOURS_MS) {
+        localStorage.removeItem(VOCAB_STORAGE_KEY);
+        return { 0: true };
+      }
+      return parsed.planned || { 0: true };
+    } catch {
+      return { 0: true };
+    }
+  });
+
+  const togglePlanned = (idx) => {
+    setPlannedWords(prev => {
+      const next = { ...prev, [idx]: !prev[idx] };
+      try {
+        localStorage.setItem(VOCAB_STORAGE_KEY, JSON.stringify({
+          planned: next,
+          timestamp: Date.now(),
+        }));
+      } catch {}
+      return next;
+    });
+  };
+
+  const plannedCount = Object.values(plannedWords).filter(Boolean).length;
+  const plannedBonusPts = plannedCount * 10;
+
 
   // shared state
   const [reportId, setReportId]       = useState(null);
@@ -305,131 +479,193 @@ export default function VideoAnalysis() {
         )}
 
 
-        {/* ── Unified Daily Challenge / Question Card (All Types) ── */}
-        {(todayQuestion || isMonthlyGoals || isMonthlyReflection) && (
-          <div
-            className={`daily-poster ${
-              isMonthlyReflection
-                ? "poster-reflection"
-                : isMonthlyGoals
-                ? "poster-goals"
-                : isStorySummary
-                ? "poster-story"
-                : isPictureDescription
-                ? "poster-picture"
-                : ""
-            }`}
-            style={{ marginBottom: "1rem" }}
-          >
-            {/* Header */}
-            <div className="daily-poster-header">
-              <div className="daily-poster-brand">
-                {isMonthlyReflection
-                  ? "🌟 Speak & Shine"
-                  : isMonthlyGoals
-                  ? "🎯 Speak & Shine"
-                  : isStorySummary
-                  ? "🎧 Speak & Shine"
-                  : isPictureDescription
-                  ? "🖼️ Speak & Shine"
-                  : "✦ Speak & Shine"}
-              </div>
-              <div className="daily-poster-sub">
-                {isMonthlyReflection
-                  ? "MONTHLY REFLECTION"
-                  : isMonthlyGoals
-                  ? "MONTHLY GOAL SETTING"
-                  : isStorySummary
-                  ? "STORY SUMMARY"
-                  : isPictureDescription
-                  ? "PICTURE DESCRIPTION"
-                  : "DAILY SPEAKING CHALLENGE"}
-              </div>
-              {todayQuestion?.category && (
-                <div className="daily-poster-badge">{todayQuestion.category}</div>
-              )}
-            </div>
+        {/* Hidden Audio element for custom waveform player */}
+        {audioSrc && (
+          <audio
+            ref={audioRef}
+            src={audioSrc}
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
+            onEnded={handleAudioEnded}
+            preload="metadata"
+          />
+        )}
 
-            {/* 1. Monthly Goals Content */}
-            {isMonthlyGoals && (
-              <>
-                <div className="daily-poster-topic-wrap">
-                  <div className="daily-poster-section-label">🎯 NEW MONTH — NEW GOALS</div>
-                  <div className="daily-poster-topic">Speak your plan, dreams &amp; goals for this month</div>
+        {/* ── Unified Daily Challenge / Question Card (Matching Dashboard Page) ── */}
+        {(todayQuestion || isMonthlyGoals || isMonthlyReflection) && (() => {
+          const rawTopic = todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : "Daily Speaking Mission");
+          const topicClean = rawTopic.replace(/^["']|["']$/g, '');
+          const titleParts = topicClean.split(" ");
+          const mainTitlePart = titleParts.length > 1 ? titleParts.slice(0, -1).join(" ") : titleParts[0];
+          const italicTitlePart = titleParts.length > 1 ? titleParts[titleParts.length - 1] : "";
+
+          const normalizedVocab = (todayVocabulary && todayVocabulary.length > 0)
+            ? todayVocabulary.slice(0, 5).map((v, i) => {
+                if (typeof v === "string") {
+                  const parts = v.split(/\s*[-—:]\s*/);
+                  return {
+                    word: parts[0]?.trim() || `Word ${i + 1}`,
+                    meaning: parts.slice(1).join(" — ").trim() || "",
+                    bonus: i === 1 ? "+15 pts" : "+10 pts",
+                  };
+                }
+                return {
+                  word: v.word || v.Word || v.term || `Word ${i + 1}`,
+                  meaning: v.meaning || v.Meaning || v.definition || v.desc || "",
+                  bonus: v.bonus || (i === 1 ? "+15 pts" : "+10 pts"),
+                };
+              })
+            : [];
+
+          return (
+            <div className="speakshine-hero-grid">
+              {/* Left Challenge Card */}
+              <div style={{
+                background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
+                border: "1px solid rgba(124, 111, 255, 0.25)",
+                borderRadius: 18,
+                padding: "1.75rem 2rem",
+                position: "relative",
+                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.45)",
+              }}>
+                {/* Header: Live dot + Category pill */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: "#22c55e", boxShadow: "0 0 10px #22c55e",
+                    }} />
+                    <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e", textTransform: "uppercase" }}>
+                      LIVE NOW
+                    </span>
+                  </div>
+                  <span style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: 6,
+                    padding: "3px 8px",
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    color: "#cbd5e1",
+                    textTransform: "uppercase",
+                  }}>
+                    {todayQuestion?.category || (isStorySummary ? "STORY SUMMARY" : isPictureDescription ? "PICTURE DESCRIPTION" : isMonthlyGoals ? "MONTHLY GOALS" : isMonthlyReflection ? "MONTHLY REFLECTION" : "SPEAKING CHALLENGE")}
+                  </span>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.25rem" }}>
-                  {[
-                    { n: "1", q: "What is your main goal for this month in the program?" },
-                    { n: "2", q: "What is your dream or target you are working toward right now?" },
-                    { n: "3", q: "What specific steps will you take this month to improve your communication?" },
-                    { n: "4", q: "What was your biggest challenge last month and how will you overcome it this month?" },
-                    { n: "5", q: "How many reviews are you planning to attend this month?" },
-                    { n: "6", q: "What will you do differently this month to grow faster?" },
-                  ].map(({ n, q }) => (
-                    <div key={n} className="daily-poster-step-item">
-                      <div className="daily-poster-step-num">{n}</div>
-                      <div className="daily-poster-step-text">{q}</div>
+                {/* Title with Editorial Serif Styling */}
+                <h1 style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "2.35rem",
+                  fontWeight: 400,
+                  color: "#ffffff",
+                  lineHeight: 1.15,
+                  margin: "0 0 0.85rem 0",
+                  letterSpacing: "-0.01em",
+                }}>
+                  {mainTitlePart}{" "}
+                  {italicTitlePart && (
+                    <span style={{ fontStyle: "italic", color: "#c4b5fd" }}>
+                      {italicTitlePart}
+                    </span>
+                  )}
+                </h1>
+
+                {/* Synopsis / Question prompt */}
+                <p style={{
+                  fontSize: "0.92rem",
+                  color: "#94a3b8",
+                  lineHeight: 1.55,
+                  marginBottom: (isStorySummary || audioSrc) ? "1.35rem" : "1.1rem",
+                  maxWidth: "680px",
+                }}>
+                  {todayQuestion?.question || (isMonthlyGoals ? "Record a video detailing your personal learning milestones, dreams, and specific goals for this month." : isMonthlyReflection ? "Answer all monthly reflection questions below to assess your growth and learning progress." : "Record your response to today's speaking prompt.")}
+                </p>
+
+                {/* Waveform Audio Player ("LISTEN FIRST") for Story Summary / Audio Prompts */}
+                {(isStorySummary || audioSrc) && (
+                  <div style={{
+                    background: "rgba(10, 8, 18, 0.65)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: 12,
+                    padding: "0.75rem 1.1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1rem",
+                    marginBottom: "1.75rem",
+                  }}>
+                    <button
+                      type="button"
+                      onClick={togglePlay}
+                      title={isPlaying ? "Pause audio" : "Play audio"}
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: "50%",
+                        background: "#ffffff",
+                        border: "none",
+                        color: "#18122c",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(255,255,255,0.25)",
+                        flexShrink: 0,
+                        transition: "transform 0.15s ease",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                      onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                      {isPlaying ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                      ) : (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* Waveform Bars (Clickable Scrubbing) */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "32px", cursor: "pointer" }}>
+                      {WAVE_PATTERN.map((height, i) => {
+                        const isPassed = i <= activeWaveIndex;
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => seekWaveform(i)}
+                            title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
+                            style={{
+                              flex: 1,
+                              height: `${height}px`,
+                              borderRadius: 2,
+                              background: isPassed ? "#a78bfa" : "rgba(255, 255, 255, 0.12)",
+                              transition: "background 0.15s ease",
+                            }}
+                          />
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
 
-                <div className="daily-poster-tip">
-                  💡 <strong>Tip:</strong> Be specific and speak from the heart. Your goals drive your growth — say them out loud with confidence!
-                </div>
-              </>
-            )}
-
-            {/* 2. Monthly Reflection Content */}
-            {isMonthlyReflection && (
-              <>
-                <div className="daily-poster-topic-wrap">
-                  <div className="daily-poster-section-label">🌟 END OF MONTH</div>
-                  <div className="daily-poster-topic">Record a video answering all reflection questions below</div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.25rem" }}>
-                  {[
-                    { n: "1", q: "How many reviews did you attend this month?" },
-                    { n: "2", q: "How many reviews passed and how many failed? Why did you fail?" },
-                    { n: "3", q: "How many extensions did you take this month?" },
-                    { n: "4", q: "What is your current growth and progress in the program?" },
-                    { n: "5", q: "What did you do this month to improve your communication skill?" },
-                    { n: "6", q: "What is your communication skill level now compared to last month?" },
-                  ].map(({ n, q }) => (
-                    <div key={n} className="daily-poster-step-item">
-                      <div className="daily-poster-step-num">{n}</div>
-                      <div className="daily-poster-step-text">{q}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="daily-poster-tip">
-                  💡 <strong>Tip:</strong> Speak clearly and answer each question in order. This counts as your daily submission — same rules apply.
-                </div>
-              </>
-            )}
-
-            {/* 3. Picture Description Content */}
-            {todayQuestion && isPictureDescription && (
-              <>
-                {todayQuestion.topic && (
-                  <div className="daily-poster-topic-wrap">
-                    <div className="daily-poster-section-label">🖼️ SCENE</div>
-                    <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
+                    <span style={{ fontSize: "0.78rem", color: "#7c7793", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                      {fmtTime(currentTime)} / {fmtTime(duration)}
+                    </span>
                   </div>
                 )}
 
-                {todayQuestion.imageUrl && (
-                  <div style={{ marginBottom: "1rem", borderRadius: 14, overflow: "hidden", position: "relative", border: "1px solid var(--border)" }}>
+                {/* Specialized Mode: Picture Description */}
+                {todayQuestion && isPictureDescription && todayQuestion.imageUrl && (
+                  <div style={{ marginBottom: "1.25rem", borderRadius: 14, overflow: "hidden", position: "relative", border: "1px solid rgba(255,255,255,0.08)" }}>
                     <img
                       src={todayQuestion.imageUrl}
-                      alt={todayQuestion.topic || "Picture description challenge"}
+                      alt={todayQuestion.topic || "Picture description"}
                       style={{
                         width: "100%",
-                        maxHeight: 400,
-                        objectFit: "contain",
-                        background: "var(--card2)",
+                        maxHeight: 380,
+                        objectFit: "cover",
                         display: "block",
                         borderRadius: 14,
                       }}
@@ -438,190 +674,322 @@ export default function VideoAnalysis() {
                     <button
                       type="button"
                       onClick={() => setPicturePreviewOpen(true)}
-                      aria-label="View picture full screen"
                       style={{
                         position: "absolute", top: "0.75rem", right: "0.75rem",
-                        border: "1px solid rgba(255,255,255,0.35)", borderRadius: 10,
-                        padding: "0.5rem 0.75rem", background: "rgba(0,0,0,0.7)",
-                        color: "#fff", fontSize: "0.8rem", fontWeight: 700,
+                        border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10,
+                        padding: "0.45rem 0.75rem", background: "rgba(0,0,0,0.75)",
+                        color: "#fff", fontSize: "0.78rem", fontWeight: 700,
                         cursor: "pointer", backdropFilter: "blur(6px)",
                       }}
                     >⛶ View Full Screen</button>
-                    {todayQuestion.imagePhotographer && (
-                      <div style={{
-                        position: "absolute", bottom: 0, left: 0, right: 0,
-                        padding: "0.5rem 0.75rem",
-                        background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
-                        borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
-                        fontSize: "0.68rem", color: "rgba(255,255,255,0.85)",
-                        display: "flex", alignItems: "center", gap: "0.25rem",
+                  </div>
+                )}
+
+                {/* Specialized Mode: Monthly Goals / Reflection questions */}
+                {(isMonthlyGoals || isMonthlyReflection) && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "1.25rem" }}>
+                    {(isMonthlyGoals ? [
+                      "What is your main goal for this month in the program?",
+                      "What is your dream or target you are working toward right now?",
+                      "What specific steps will you take this month to improve your communication?",
+                      "What was your biggest challenge last month and how will you overcome it?",
+                    ] : [
+                      "How many reviews did you attend this month?",
+                      "How many reviews passed and how many failed? Why?",
+                      "What is your current growth and progress in the program?",
+                      "What did you do this month to improve your communication skills?",
+                    ]).map((q, idx) => (
+                      <div key={idx} style={{
+                        display: "flex", alignItems: "center", gap: "0.75rem",
+                        background: "rgba(255, 255, 255, 0.03)",
+                        border: "1px solid rgba(255, 255, 255, 0.05)",
+                        borderRadius: 10, padding: "0.6rem 0.85rem",
+                        fontSize: "0.85rem", color: "#e2e8f0",
                       }}>
-                        <span>📷</span>
-                        <span>
-                          Photo by{" "}
-                          {todayQuestion.imagePhotographerUrl
-                            ? <a href={todayQuestion.imagePhotographerUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", textDecoration: "underline" }}>{todayQuestion.imagePhotographer}</a>
-                            : todayQuestion.imagePhotographer
-                          }
-                          {todayQuestion.imageSource && (
-                            <>
-                              {" on "}
-                              {todayQuestion.imagePageUrl
-                                ? <a href={todayQuestion.imagePageUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#fff", textDecoration: "underline" }}>{todayQuestion.imageSource}</a>
-                                : todayQuestion.imageSource
-                              }
-                            </>
-                          )}
-                        </span>
+                        <span style={{
+                          width: 20, height: 20, borderRadius: "50%",
+                          background: "rgba(124, 111, 255, 0.2)", color: "#c4b5fd",
+                          fontSize: "0.72rem", fontWeight: 800,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>{idx + 1}</span>
+                        <span>{q}</span>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {picturePreviewOpen && todayQuestion.imageUrl && createPortal(
-                  <div
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Full screen picture preview"
-                    onClick={() => setPicturePreviewOpen(false)}
-                    style={{
-                      position: "fixed", inset: 0, zIndex: 2000,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      padding: "2rem", background: "rgba(0,0,0,0.92)",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setPicturePreviewOpen(false)}
-                      aria-label="Close full screen picture preview"
-                      style={{
-                        position: "fixed", top: "1.5rem", right: "1.5rem", zIndex: 2001,
-                        width: 42, height: 42, borderRadius: "50%",
-                        border: "2px solid rgba(255,255,255,0.65)",
-                        background: "rgba(255,255,255,0.12)", color: "#fff",
-                        fontSize: "1.4rem", cursor: "pointer",
-                        boxShadow: "0 3px 16px rgba(0,0,0,0.45)",
-                      }}
-                    >×</button>
-                    <a
-                      href={todayQuestion.imageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={event => event.stopPropagation()}
-                      style={{
-                        position: "fixed", top: "1.5rem", left: "1.5rem", zIndex: 2001,
-                        border: "2px solid rgba(255,255,255,0.55)", borderRadius: 10,
-                        padding: "0.55rem 0.8rem", background: "rgba(255,255,255,0.12)",
-                        color: "#fff", fontSize: "0.8rem", fontWeight: 700,
-                        textDecoration: "none", backdropFilter: "blur(6px)",
-                        boxShadow: "0 3px 16px rgba(0,0,0,0.45)",
-                      }}
-                    >🔍 Open Original Image</a>
-                    <img
-                      src={todayQuestion.imageUrl}
-                      alt={todayQuestion.topic || "Picture description challenge"}
-                      onClick={event => event.stopPropagation()}
-                      style={{
-                        maxWidth: "96vw", maxHeight: "92vh", objectFit: "contain",
-                        borderRadius: 10, boxShadow: "0 12px 60px rgba(0,0,0,0.55)",
-                      }}
-                    />
-                  </div>,
-                  document.body
-                )}
-
-                <div className="daily-poster-question-wrap">
-                  <div className="daily-poster-section-label">❓ TASK</div>
-                  <div className="daily-poster-question">
-                    {todayQuestion.imageInstructions || todayQuestion.question || "Look at the image carefully, then record your response."}
-                  </div>
-                </div>
-
-                <div className="daily-poster-guiding-wrap">
-                  <div className="daily-poster-guiding-title">💬 Guiding questions — use these in your response</div>
-                  <ol className="daily-poster-guiding-list">
-                    {["What do you see?", "What do you think is happening?", "What is the atmosphere like?", "What do you think might happen next?"].map(question => (
-                      <li key={question} style={{ fontWeight: 600 }}>{question}</li>
                     ))}
-                  </ol>
-                </div>
-
-                {todayVocabulary.length > 0 && (
-                  <VocabularyWords
-                    words={todayVocabulary}
-                    requiredCount={vocabRequiredCount}
-                    totalCount={vocabWordCount}
-                    isPictureDescription={isPictureDescription}
-                  />
-                )}
-              </>
-            )}
-
-            {/* 4. Story Summary Content */}
-            {todayQuestion && isStorySummary && (
-              <>
-                {todayQuestion.topic && (
-                  <div className="daily-poster-topic-wrap">
-                    <div className="daily-poster-section-label">📖 STORY TITLE</div>
-                    <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
                   </div>
                 )}
 
-                {todayQuestion.audioUrl && (
-                  <div style={{ marginBottom: "1rem" }}>
-                    <audio
-                      controls
-                      controlsList="nodownload nofullscreen noremoteplayback"
-                      onContextMenu={e => e.preventDefault()}
-                      src={todayQuestion.audioUrl}
-                      style={{ width: "100%", borderRadius: 12 }}
-                    />
+                {/* Target Vocabulary Section (Matching Dashboard Page) */}
+                {normalizedVocab.length > 0 && (
+                  <div style={{ marginTop: "1rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase" }}>
+                        TARGET VOCABULARY
+                      </span>
+                      <span style={{ fontSize: "0.74rem", color: "#a78bfa", fontWeight: 600 }}>
+                        {plannedCount} of {Math.min(vocabRequiredCount || 3, normalizedVocab.length)} planned · +{plannedBonusPts} pts
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                      {normalizedVocab.map((v, i) => {
+                        const isPlanned = !!plannedWords[i];
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "0.85rem 1.1rem",
+                              borderRadius: 12,
+                              background: isPlanned ? "rgba(34, 197, 94, 0.08)" : "rgba(255, 255, 255, 0.03)",
+                              border: isPlanned ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(255, 255, 255, 0.06)",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", marginBottom: "0.2rem" }}>
+                                <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>
+                                  0{i + 1}
+                                </span>
+                                <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>
+                                  {v.word}
+                                </span>
+                                <span style={{
+                                  background: "rgba(34, 197, 94, 0.15)",
+                                  color: "#4ade80",
+                                  fontSize: "0.68rem",
+                                  fontWeight: 800,
+                                  padding: "2px 7px",
+                                  borderRadius: 6,
+                                  letterSpacing: "0.02em",
+                                }}>
+                                  {v.bonus || "+10 pts"}
+                                </span>
+                              </div>
+                              {v.meaning && (
+                                <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+                                  {v.meaning}
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => togglePlanned(i)}
+                              style={{
+                                background: isPlanned ? "#22c55e" : "rgba(255, 255, 255, 0.06)",
+                                border: isPlanned ? "none" : "1px solid rgba(255, 255, 255, 0.15)",
+                                color: isPlanned ? "#ffffff" : "#cbd5e1",
+                                borderRadius: 99,
+                                padding: "0.4rem 0.85rem",
+                                fontSize: "0.76rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                whiteSpace: "nowrap",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              {isPlanned ? (
+                                <>
+                                  <span>✓</span>
+                                  <span>Planned</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>+</span>
+                                  <span>Mark as planned</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
-                <div className="daily-poster-question-wrap">
-                  <div className="daily-poster-section-label">❓ TASK</div>
-                  <div className="daily-poster-question">
-                    {todayQuestion.question || "Listen to the story audio and record a short video summary in your own words."}
+                {/* Tip banner */}
+                <div style={{
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                  borderRadius: 10,
+                  padding: "0.65rem 0.9rem",
+                  marginTop: "1.25rem",
+                  fontSize: "0.8rem",
+                  color: "#9490ab",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                }}>
+                  <span style={{ color: "#fbbf24" }}>💡</span>
+                  <span>
+                    <strong>Tip:</strong>{" "}
+                    {isStorySummary
+                      ? "Listen carefully to the key events and characters. Summarize the story in your own words with good pacing!"
+                      : isPictureDescription
+                      ? "Describe the setting, emotions, and subtle details in full connected sentences."
+                      : "Speak clearly and confidently into the camera. Use target vocabulary to earn extra points!"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Action & Countdown Card (Matching Dashboard Page) */}
+              <div style={{
+                background: "#0d0a18",
+                border: "1px solid rgba(255, 255, 255, 0.06)",
+                borderRadius: 18,
+                padding: "1.75rem",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}>
+                <div>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.65rem" }}>
+                    WINDOW CLOSES AT MIDNIGHT
+                  </div>
+
+                  {/* 3 Digital Countdown Timer Boxes */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
+                    <div style={{
+                      background: "#161024",
+                      border: "1px solid rgba(249, 115, 22, 0.35)",
+                      borderRadius: 10,
+                      padding: "0.65rem 0.85rem",
+                      textAlign: "center",
+                      minWidth: 54,
+                    }}>
+                      <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                        {timeLeft.hrs}
+                      </div>
+                      <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+                        HRS
+                      </div>
+                    </div>
+
+                    <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#f97316" }}>:</span>
+
+                    <div style={{
+                      background: "#161024",
+                      border: "1px solid rgba(249, 115, 22, 0.35)",
+                      borderRadius: 10,
+                      padding: "0.65rem 0.85rem",
+                      textAlign: "center",
+                      minWidth: 54,
+                    }}>
+                      <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                        {timeLeft.mins}
+                      </div>
+                      <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+                        MIN
+                      </div>
+                    </div>
+
+                    <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#f97316" }}>:</span>
+
+                    <div style={{
+                      background: "#161024",
+                      border: "1px solid rgba(249, 115, 22, 0.35)",
+                      borderRadius: 10,
+                      padding: "0.65rem 0.85rem",
+                      textAlign: "center",
+                      minWidth: 54,
+                    }}>
+                      <div style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                        {timeLeft.secs}
+                      </div>
+                      <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+                        SEC
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: "0.74rem", color: "#64748b", marginBottom: "1.5rem" }}>
+                    Active window resets every 24 hours at 12:00 AM IST.
+                  </div>
+
+                  {/* Mission Details */}
+                  <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)", paddingTop: "1.25rem", marginBottom: "1.5rem" }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.08em", color: "#cbd5e1", textTransform: "uppercase", marginBottom: "0.45rem" }}>
+                      Your Mission
+                    </div>
+                    <div style={{ fontSize: "0.84rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                      {isStorySummary
+                        ? "Listen to the audio above first, then record a 1–5 min video retelling the story clearly in your own words. Use planned target vocabulary to earn extra bonus points."
+                        : "Record a 1–5 min speaking video answering the prompt. Use target vocabulary to earn up to +30 bonus points."}
+                    </div>
                   </div>
                 </div>
 
-                <div className="daily-poster-tip">
-                  💡 <strong>Tip:</strong> Listen carefully to the key events and characters. Summarize the story in your own words with good pacing!
+                {/* Action Buttons */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("record");
+                      document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    style={{
+                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                      border: "none",
+                      borderRadius: 12,
+                      padding: "0.85rem 1.25rem",
+                      color: "#ffffff",
+                      fontSize: "0.9rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      boxShadow: "0 4px 20px rgba(249, 115, 22, 0.35)",
+                      transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                  >
+                    <span>🎙️</span>
+                    <span>Record Speaking Video</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("upload");
+                      document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.04)",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: 12,
+                      padding: "0.75rem 1.25rem",
+                      color: "#cbd5e1",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      transition: "background 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+                  >
+                    <span>📁</span>
+                    <span>Upload Existing Video</span>
+                  </button>
                 </div>
-              </>
-            )}
-
-            {/* 5. Regular Day Question Content */}
-            {todayQuestion && !isMonthlyReflection && !isMonthlyGoals && !isStorySummary && !isPictureDescription && (
-              <>
-                {todayQuestion.topic && (
-                  <div className="daily-poster-topic-wrap">
-                    <div className="daily-poster-section-label">TOPIC</div>
-                    <div className="daily-poster-topic">"{todayQuestion.topic}"</div>
-                  </div>
-                )}
-
-                <div className="daily-poster-question-wrap">
-                  <div className="daily-poster-section-label">❓ QUESTION</div>
-                  <div className="daily-poster-question">{todayQuestion.question}</div>
-                </div>
-
-                {todayVocabulary.length > 0 && (
-                  <VocabularyWords
-                    words={todayVocabulary}
-                    requiredCount={vocabRequiredCount}
-                    totalCount={vocabWordCount}
-                    isPictureDescription={isPictureDescription}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Mode switcher */}
-        <div style={{
+        <div id="video-studio-container" style={{
           display: "inline-flex",
           gap: "0.35rem",
           background: "rgba(255, 255, 255, 0.03)",

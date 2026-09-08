@@ -5523,5 +5523,19 @@ audio { border-radius: 12px; }
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+.speakshine-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 960px) {
+  .speakshine-hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
 
 
