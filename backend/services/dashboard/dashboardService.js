@@ -259,8 +259,6 @@ export async function getUserProfile(phone) {
 
   // ── Today's top scorer ──────────────────────────────────────────────────
   // Find the paid user with the highest todayScore who actually scored today
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const todayIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth()+1).padStart(2,"0")}-${String(nowIST.getDate()).padStart(2,"0")}`;
   const todayScoredUsers = paidUsers.filter(u => u.lastScoreDate === todayIST && u.todayScore != null);
   const topScorerToday = todayScoredUsers.length > 0
     ? todayScoredUsers.reduce((best, u) => (u.todayScore > best.todayScore ? u : best))
