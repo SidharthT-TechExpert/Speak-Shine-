@@ -5027,6 +5027,24 @@ audio { border-radius: 12px; }
 .speakshine-freeze-box .freeze-link:hover {
   color: #c4b5fd;
 }
+.speakshine-freeze-box .speakshine-sidebar-logout {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f87171;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.speakshine-freeze-box .speakshine-sidebar-logout:hover {
+  color: #ef4444;
+  transform: translateX(2px);
+}
 
 /* Main Area */
 .speakshine-main {
@@ -5101,9 +5119,15 @@ audio { border-radius: 12px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: default;
   border: 1.5px solid rgba(255, 255, 255, 0.15);
+  user-select: none;
 }
+.speakshine-avatar.disabled {
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
 
 /* Canvas padding */
 .speakshine-canvas {
@@ -5607,6 +5631,16 @@ audio { border-radius: 12px; }
 .light .speakshine-freeze-box .freeze-link {
   color: #4f46e5;
 }
+
+[data-theme="light"] .speakshine-freeze-box .speakshine-sidebar-logout,
+.light .speakshine-freeze-box .speakshine-sidebar-logout {
+  color: #dc2626;
+}
+[data-theme="light"] .speakshine-freeze-box .speakshine-sidebar-logout:hover,
+.light .speakshine-freeze-box .speakshine-sidebar-logout:hover {
+  color: #b91c1c;
+}
+
 
 [data-theme="light"] .speakshine-main,
 .light .speakshine-main {

@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import NotificationBell from "./NotificationBell.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import Modal from "./Modal.jsx";
 import gsap from "gsap";
 import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
 
@@ -112,6 +113,21 @@ export default function ModernDashboardView({
 }) {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
+    if (onLogout) {
+      onLogout();
+    } else {
+      localStorage.removeItem("token");
+      navigate("/login");
+    }
+  };
 
   // ── Tabs for Performance Center: "points", "history", "sessions" ────────────
   const [activeTab, setActiveTab] = useState("points");
@@ -414,6 +430,7 @@ export default function ModernDashboardView({
 
   const displayName = user?.name || profile?.name || "Jane Doe";
   const avatarInitials = displayName.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "JD";
+  const isLoggedIn = Boolean(user && profile?.name !== "Preview User");
 
   const getGreeting = () => {
     const h = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
@@ -645,6 +662,19 @@ export default function ModernDashboardView({
 
   return (
     <div className="speakshine-shell">
+      {/* ── Logout confirmation modal ── */}
+      {showLogoutModal && (
+        <Modal
+          type="danger"
+          title="Log Out"
+          message="Are you sure you want to log out?"
+          confirmText="Log Out"
+          cancelText="Stay"
+          onConfirm={confirmLogout}
+          onCancel={() => setShowLogoutModal(false)}
+        />
+      )}
+
       {/* ── Audio element for playback ── */}
       <audio
         ref={audioRef}
@@ -707,12 +737,21 @@ export default function ModernDashboardView({
           <div className="freeze-desc">
             Earn tokens by completing 7-day streak milestones.
           </div>
-          <div
-            onClick={() => onOpenSettings ? onOpenSettings() : navigate("/payment")}
-            className="freeze-link"
-          >
-            Account settings ↗
-          </div>
+          {isLoggedIn && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="freeze-link speakshine-sidebar-logout"
+              title="Log Out"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" x2="9" y1="12" y2="12" />
+              </svg>
+              <span>Log out</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -740,13 +779,14 @@ export default function ModernDashboardView({
             </div>
             <ThemeToggle compact />
             <NotificationBell token={localStorage.getItem("token")} />
-            <div
-              className="speakshine-avatar"
-              title={`${displayName} (${user?.email || ""})`}
-              onClick={() => onOpenSettings ? onOpenSettings() : (onLogout ? onLogout() : navigate("/payment"))}
-            >
-              {avatarInitials}
-            </div>
+            {isLoggedIn && (
+              <div
+                className="speakshine-avatar disabled"
+                title={`${displayName} (${user?.email || ""})`}
+              >
+                {avatarInitials}
+              </div>
+            )}
           </div>
         </header>
 

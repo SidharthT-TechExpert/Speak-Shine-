@@ -157,6 +157,7 @@ export default function Layout({ children, title, subtitle }) {
   const freezeTokens = profile?.streakFreeze ?? (user?.streakFreeze || 0);
   const displayName = user?.name ? user.name.split(" ")[0] : (profile?.name ? profile.name.split(" ")[0] : "Speaker");
   const avatarInitials = (displayName || "S").charAt(0).toUpperCase();
+  const isLoggedIn = Boolean(user && profile?.name !== "Preview User");
 
   const isAdminRoute = location.pathname.startsWith("/admin");
   const isTrainerRoute = location.pathname.startsWith("/trainer");
@@ -332,9 +333,21 @@ export default function Layout({ children, title, subtitle }) {
             <div className="freeze-desc">
               Earn tokens by completing 7-day streak milestones.
             </div>
-            <Link to="/payment" className="freeze-link">
-              Account settings ↗
-            </Link>
+            {isLoggedIn && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="freeze-link speakshine-sidebar-logout"
+                title="Log Out"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" x2="9" y1="12" y2="12" />
+                </svg>
+                <span>Log out</span>
+              </button>
+            )}
           </div>
         )}
       </aside>
@@ -387,13 +400,14 @@ export default function Layout({ children, title, subtitle }) {
             <Suspense fallback={<div style={{ width: 34, height: 34 }} />}>
               <NotificationBell token={localStorage.getItem("token")} />
             </Suspense>
-            <div
-              className="speakshine-avatar"
-              title={`${displayName} (${user?.email || ""})`}
-              onClick={handleLogout}
-            >
-              {avatarInitials}
-            </div>
+            {isLoggedIn && (
+              <div
+                className="speakshine-avatar disabled"
+                title={`${displayName} (${user?.email || ""})`}
+              >
+                {avatarInitials}
+              </div>
+            )}
 
             {/* Mobile Hamburger Toggle */}
             <button
@@ -488,17 +502,19 @@ export default function Layout({ children, title, subtitle }) {
               <ThemeToggle />
             </div>
 
-            <button
-              onClick={handleLogout}
-              style={{
-                background: "rgba(248,113,113,0.1)",
-                border: "1px solid rgba(248,113,113,0.3)", color: "#f87171",
-                padding: "0.75rem", borderRadius: 10, fontWeight: 700,
-                cursor: "pointer", textAlign: "center",
-              }}
-            >
-              Log Out
-            </button>
+            {isLoggedIn && (
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: "rgba(248,113,113,0.1)",
+                  border: "1px solid rgba(248,113,113,0.3)", color: "#f87171",
+                  padding: "0.75rem", borderRadius: 10, fontWeight: 700,
+                  cursor: "pointer", textAlign: "center",
+                }}
+              >
+                Log Out
+              </button>
+            )}
           </div>
         </div>
       )}
