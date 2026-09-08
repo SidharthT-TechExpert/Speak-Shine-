@@ -51,7 +51,7 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
     use_speaker_boost: true,
   };
 
-  const targetVoiceId = voiceId || DEFAULT_VOICE_ID;
+  let targetVoiceId = voiceId || DEFAULT_VOICE_ID;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const apiKey = getKey();
@@ -110,6 +110,8 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
       if (targetVoiceId !== DEFAULT_VOICE_ID) {
         console.warn(`[StoryAudio] Voice "${targetVoiceId}" is restricted on free tier. Automatically retrying with Adam (${DEFAULT_VOICE_ID})...`);
         targetVoiceId = DEFAULT_VOICE_ID;
+        settings.stability = 0.42;
+        settings.style = 0.35;
         continue; // Retry with Adam using the same key
       }
       // If Adam also fails with 402, this key's monthly free characters are exhausted
