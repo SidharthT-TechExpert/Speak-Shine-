@@ -1877,40 +1877,33 @@ export default function ModernDashboardView({
                 </div>
 
                 {/* Group Member Stats: 3 Micro-Cards */}
-                <div style={{
+                <div className="leaderboard-stat-grid" style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",
                   gap: "0.6rem",
                   textAlign: "center",
-                  borderTop: "1px solid rgba(255,255,255,0.06)",
                   paddingTop: "0.9rem",
                 }}>
-                  <div style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                  <div className="leaderboard-stat-card members-card" style={{
                     borderRadius: 10,
                     padding: "0.55rem 0.4rem",
                   }}>
-                    <div style={{ color: "#716c85", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>MEMBERS</div>
-                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>{memberCount}</div>
+                    <div className="leaderboard-stat-label">MEMBERS</div>
+                    <div className="leaderboard-stat-val">{memberCount}</div>
                   </div>
-                  <div style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                  <div className="leaderboard-stat-card submitted-card" style={{
                     borderRadius: 10,
                     padding: "0.55rem 0.4rem",
                   }}>
-                    <div style={{ color: "#716c85", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>SUBMITTED</div>
-                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>{submittedCount}</div>
+                    <div className="leaderboard-stat-label">SUBMITTED</div>
+                    <div className="leaderboard-stat-val">{submittedCount}</div>
                   </div>
-                  <div style={{
-                    background: "rgba(239, 68, 68, 0.06)",
-                    border: "1px solid rgba(239, 68, 68, 0.2)",
+                  <div className="leaderboard-stat-card pending-card" style={{
                     borderRadius: 10,
                     padding: "0.55rem 0.4rem",
                   }}>
-                    <div style={{ color: "#fca5a5", fontSize: "0.63rem", textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.06em" }}>PENDING</div>
-                    <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#f87171", marginTop: "2px" }}>{pendingCount}</div>
+                    <div className="leaderboard-stat-label">PENDING</div>
+                    <div className="leaderboard-stat-val">{pendingCount}</div>
                   </div>
                 </div>
               </div>

@@ -6063,6 +6063,39 @@ audio { border-radius: 12px; }
   color: #c084fc;
 }
 
+/* Leaderboard Bottom Stats Grid */
+.leaderboard-stat-grid {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.leaderboard-stat-card.members-card,
+.leaderboard-stat-card.submitted-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.leaderboard-stat-card.pending-card {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.leaderboard-stat-label {
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #716c85;
+}
+.pending-card .leaderboard-stat-label {
+  color: #fca5a5;
+}
+.leaderboard-stat-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 2px;
+}
+.pending-card .leaderboard-stat-val {
+  color: #f87171;
+}
+
 /* ═════════════════════════════════════════════════════════════════════════════
    LIGHT THEME OVERRIDES FOR PERFORMANCE CENTER & LEADERBOARD
    ═════════════════════════════════════════════════════════════════════════════ */
@@ -6380,6 +6413,52 @@ audio { border-radius: 12px; }
   background: #f5f3ff !important;
   border: 1px solid #ddd6fe !important;
   color: #6d28d9 !important;
+}
+
+/* Leaderboard Bottom Stats Grid in Light Mode */
+[data-theme="light"] .leaderboard-stat-grid,
+.light .leaderboard-stat-grid {
+  border-top: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .leaderboard-stat-card.members-card,
+.light .leaderboard-stat-card.members-card,
+[data-theme="light"] .leaderboard-stat-card.submitted-card,
+.light .leaderboard-stat-card.submitted-card {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+[data-theme="light"] .leaderboard-stat-card.pending-card,
+.light .leaderboard-stat-card.pending-card {
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.06) !important;
+}
+
+[data-theme="light"] .leaderboard-stat-label,
+.light .leaderboard-stat-label {
+  color: #475569 !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .pending-card .leaderboard-stat-label,
+.light .pending-card .leaderboard-stat-label {
+  color: #b91c1c !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .leaderboard-stat-val,
+.light .leaderboard-stat-val {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+
+[data-theme="light"] .pending-card .leaderboard-stat-val,
+.light .pending-card .leaderboard-stat-val {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
 }
 
 [data-theme="light"] .all-time-record-box,
