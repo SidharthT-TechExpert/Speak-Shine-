@@ -140,13 +140,21 @@ export default function Layout({ children, title, subtitle }) {
     await install();
   };
 
-  const doLogout = () => {
+  const doLogout = async () => {
     setShowLogoutModal(false);
     setMenuOpen(false);
-    logout();
-    if (user?.role === "admin" || user?.role === "admins") navigate("/admin/login");
-    else if (user?.role === "trainer") navigate("/trainer/login");
-    else navigate("/login");
+    try {
+      if (logout) await logout();
+    } catch (e) {
+      console.warn("[Layout] Logout error:", e);
+    }
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {}
+    if (user?.role === "admin" || user?.role === "admins") window.location.href = "/admin/login";
+    else if (user?.role === "trainer") window.location.href = "/trainer/login";
+    else window.location.href = "/login";
   };
 
   const handleLogout = () => setShowLogoutModal(true);

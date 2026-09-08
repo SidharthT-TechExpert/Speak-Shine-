@@ -791,7 +791,7 @@ function buildGuestData() {
 }
 
 export default function UserDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const isGuest = !user;
 
   const cached = isGuest ? null : getCachedDashboard();
@@ -1139,8 +1139,16 @@ export default function UserDashboard() {
           if (session?._id) navigate("/analysis/" + session._id);
           else navigate("/video-analysis");
         }}
-        onLogout={() => {
-          localStorage.removeItem("token");
+        onLogout={async () => {
+          try {
+            if (logout) await logout();
+          } catch (e) {
+            console.warn("[Dashboard] Logout error:", e);
+          }
+          try {
+            localStorage.clear();
+            sessionStorage.clear();
+          } catch {}
           window.location.href = "/login";
         }}
       />

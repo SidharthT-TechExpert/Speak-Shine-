@@ -9,6 +9,7 @@ import ThemeToggle from "./ThemeToggle.jsx";
 import Modal from "./Modal.jsx";
 import gsap from "gsap";
 import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
+import api from "../api/client.js";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -231,13 +232,19 @@ export default function ModernDashboardView({
     setShowLogoutModal(true);
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
     setShowLogoutModal(false);
     if (onLogout) {
-      onLogout();
+      await onLogout();
     } else {
-      localStorage.removeItem("token");
-      navigate("/login");
+      try {
+        await api.post("/auth/logout", {});
+      } catch {}
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {}
+      window.location.href = "/login";
     }
   };
 
@@ -956,8 +963,10 @@ export default function ModernDashboardView({
             <NotificationBell token={localStorage.getItem("token")} />
             {isLoggedIn && (
               <div
-                className="speakshine-avatar disabled"
-                title={`${displayName} (${user?.email || ""})`}
+                className="speakshine-avatar"
+                onClick={handleLogout}
+                style={{ cursor: "pointer" }}
+                title={`${displayName} (${user?.email || ""}) · Click to log out`}
               >
                 {avatarInitials}
               </div>
