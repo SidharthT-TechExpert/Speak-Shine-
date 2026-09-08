@@ -566,7 +566,12 @@ export default function ModernDashboardView({
         (u.lastScoreDate && new Date(u.lastScoreDate).toDateString() === new Date().toDateString() && u.completed !== false)
       );
 
-      let time = isCompletedToday ? "Today" : "Pending";
+      let time = u.time;
+      if (!time) {
+        if (isCompletedToday) time = "Today";
+        else if (streakDays > 0) time = "Yesterday";
+        else time = "Today";
+      }
 
       return {
         rank: rankNum,
@@ -1753,7 +1758,7 @@ export default function ModernDashboardView({
                           </div>
                         </div>
 
-                        {/* Points & Submission Status (Pending or Completed) */}
+                        {/* Points & Time with Status Icon */}
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
                           <div
                             className="leaderboard-pts-badge"
@@ -1768,15 +1773,16 @@ export default function ModernDashboardView({
                           </div>
                           <div style={{
                             fontSize: "0.7rem",
-                            fontWeight: 600,
+                            color: "#7c7793",
                             marginTop: "2px",
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: "3px",
-                            color: u.isCompletedToday ? "#4ade80" : "#fca5a5",
+                            gap: "4px",
                           }}>
-                            <span>{u.isCompletedToday ? "✅" : "⏳"}</span>
-                            <span>{u.isCompletedToday ? "Completed" : "Pending"}</span>
+                            <span>{u.time || (u.isCompletedToday ? "Today" : "Yesterday")}</span>
+                            <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
+                              {u.isCompletedToday ? "✅" : "⏳"}
+                            </span>
                           </div>
                         </div>
                       </div>
