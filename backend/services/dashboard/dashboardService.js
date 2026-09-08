@@ -185,31 +185,50 @@ export async function getUserProfile(phone) {
     : Promise.resolve(status?.todayVocabulary || []);
 
   // ── Leaderboard sort (Paid Members Only) ──────────────────────────────────
-  // Primary sort: monthlyScore desc (highest pts first, always)
-  // Secondary sort: streak desc (tiebreaker when scores are equal)
-  // Submitted today floats above non-submitted at equal score
+  // 1. Active streak speakers (streak > 0) rank above 0-day speakers (streak === 0).
+  // 2. Primary sort within tier: monthlyScore desc (highest pts first, always).
+  // 3. Secondary sort: streak desc (tiebreaker when scores are equal).
+  // 4. Submitted today floats above non-submitted at equal score.
   const leaderboardSorted = [...paidUsers].sort((a, b) => {
+    const streakA = a.streak || 0;
+    const streakB = b.streak || 0;
+    const hasStreakA = streakA > 0;
+    const hasStreakB = streakB > 0;
+
+    // Active streak speakers always sort above 0-day speakers
+    if (hasStreakA && !hasStreakB) return -1;
+    if (!hasStreakA && hasStreakB) return 1;
+
     const scoreA = a.monthlyScore ?? 0;
     const scoreB = b.monthlyScore ?? 0;
     if (scoreB !== scoreA) return scoreB - scoreA;          // higher pts first
     if (b.completed !== a.completed) return b.completed ? 1 : -1; // submitted floats up
-    return (b.streak || 0) - (a.streak || 0);               // streak tiebreaker
+    return streakB - streakA;                               // streak tiebreaker
   });
 
+  let activeRankCounter = 0;
   const topStreak = leaderboardSorted
-    .map((u, i) => withBadgeData(u, {
-      rank: i + 1,
-      name: u.name,
-      userId: u.userId,
-      phone: u.phone,
-      streak: u.streak || 0,
-      weeklySubmissions: u.weeklySubmissions || 0,
-      completed: u.completed || false,
-      monthlyScore: u.monthlyScore ?? 0,
-      todayScore: u.todayScore ?? null,
-      lastScoreDate: u.lastScoreDate,
-      isCurrentUser: u.phone === phone || u.phone === strippedPhone || `91${u.phone}` === phone,
-    }));
+    .map((u) => {
+      const hasStreak = (u.streak || 0) > 0;
+      let rank = null;
+      if (hasStreak) {
+        activeRankCounter += 1;
+        rank = activeRankCounter;
+      }
+      return withBadgeData(u, {
+        rank,
+        name: u.name,
+        userId: u.userId,
+        phone: u.phone,
+        streak: u.streak || 0,
+        weeklySubmissions: u.weeklySubmissions || 0,
+        completed: u.completed || false,
+        monthlyScore: u.monthlyScore ?? 0,
+        todayScore: u.todayScore ?? null,
+        lastScoreDate: u.lastScoreDate,
+        isCurrentUser: u.phone === phone || u.phone === strippedPhone || `91${u.phone}` === phone,
+      });
+    });
 
   // ── Today's top scorer ──────────────────────────────────────────────────
   // Find the paid user with the highest todayScore who actually scored today
@@ -230,15 +249,22 @@ export async function getUserProfile(phone) {
     u.phone === phone.replace(/^91/, "") ||
     u.phone === `91${phone}`
   );
-  const myStreakEntry = myRankIdx >= 0 ? withBadgeData(leaderboardSorted[myRankIdx], {
-    rank: myRankIdx + 1,
-    name: leaderboardSorted[myRankIdx].name,
-    userId: leaderboardSorted[myRankIdx].userId,
-    streak: leaderboardSorted[myRankIdx].streak || 0,
-    weeklySubmissions: leaderboardSorted[myRankIdx].weeklySubmissions || 0,
-    completed: leaderboardSorted[myRankIdx].completed || false,
-    monthlyScore: leaderboardSorted[myRankIdx].monthlyScore ?? 0,
-    inTop5: myRankIdx < 5,
+  const myUserObj = myRankIdx >= 0 ? leaderboardSorted[myRankIdx] : null;
+  const myHasStreak = myUserObj ? (myUserObj.streak || 0) > 0 : false;
+  // Calculate user's active rank if streak > 0, otherwise null
+  let myActiveRank = null;
+  if (myHasStreak) {
+    myActiveRank = leaderboardSorted.slice(0, myRankIdx + 1).filter(u => (u.streak || 0) > 0).length;
+  }
+  const myStreakEntry = myUserObj ? withBadgeData(myUserObj, {
+    rank: myActiveRank,
+    name: myUserObj.name,
+    userId: myUserObj.userId,
+    streak: myUserObj.streak || 0,
+    weeklySubmissions: myUserObj.weeklySubmissions || 0,
+    completed: myUserObj.completed || false,
+    monthlyScore: myUserObj.monthlyScore ?? 0,
+    inTop5: myActiveRank != null && myActiveRank <= 5,
   }) : null;
 
   // Check if we should show daily report (12 AM - 8 AM)

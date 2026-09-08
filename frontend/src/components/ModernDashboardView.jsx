@@ -578,31 +578,64 @@ export default function ModernDashboardView({
       });
     }
 
-    // Sort so ranked entries stay in numerical podium order
+    // Separate active streak speakers (streak > 0) from 0-day speakers.
+    // Active speakers should always appear above 0-day speakers.
+    const getStreak = (item) => {
+      if (item.streak != null) return Number(item.streak);
+      if (item.title) {
+        const match = item.title.match(/(\d+)\s*d/);
+        if (match) return parseInt(match[1], 10);
+      }
+      if (isUserItem(item)) {
+        return Number(profile?.streak ?? 0);
+      }
+      return 0;
+    };
+
     itemsToDisplay.sort((a, b) => {
-      if (a.rank != null && b.rank != null) return a.rank - b.rank;
-      return (b.monthlyScore || 0) - (a.monthlyScore || 0);
+      const streakA = getStreak(a);
+      const streakB = getStreak(b);
+      const hasStreakA = streakA > 0;
+      const hasStreakB = streakB > 0;
+
+      // Active streak speakers always sort above 0-day speakers
+      if (hasStreakA && !hasStreakB) return -1;
+      if (!hasStreakA && hasStreakB) return 1;
+
+      // When both are in the same streak tier (both active or both 0d):
+      // Sort by monthlyScore descending, then by streak descending
+      const scoreA = a.monthlyScore ?? a.points ?? 0;
+      const scoreB = b.monthlyScore ?? b.points ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      if (streakB !== streakA) return streakB - streakA;
+      return 0;
     });
+
+    let activeRankCounter = 0;
 
     return itemsToDisplay.map((u, i) => {
       const isUser = isUserItem(u);
       const name = isUser ? (u.name?.includes("(You)") ? u.name : `${displayName} (You)`) : u.name;
-      const rankNum = u.rank || (i + 1);
-      const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : isUser ? "👉" : String(rankNum);
+      const streakDays = getStreak(u);
+      const hasActiveStreak = streakDays > 0;
+
+      let rankNum = null;
+      let medal = "—";
+
+      if (hasActiveStreak) {
+        activeRankCounter += 1;
+        rankNum = activeRankCounter;
+        medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : isUser ? "👉" : String(rankNum);
+      } else {
+        rankNum = null;
+        medal = "—";
+      }
+
       const initials = isUser ? (avatarInitials || "YOU") : getInitials(name);
 
-      let streakDays = u.streak;
-      if (streakDays == null && u.title) {
-        const match = u.title.match(/(\d+)\s*d/);
-        if (match) streakDays = parseInt(match[1], 10);
-      }
-      if (streakDays == null) {
-        streakDays = isUser ? (profile?.streak ?? 0) : 0;
-      }
-
-      const streakBadge = getBadgeForStreak(streakDays);
-      const badgeName = streakBadge ? streakBadge.name : "Active Speaker";
-      const badgeIcon = streakBadge ? streakBadge.icon : "🌱";
+      const streakBadge = hasActiveStreak ? getBadgeForStreak(streakDays) : null;
+      const badgeName = hasActiveStreak ? (streakBadge ? streakBadge.name : "Active Speaker") : "No rank";
+      const badgeIcon = hasActiveStreak ? (streakBadge ? streakBadge.icon : "🌱") : "⚪";
       const title = `${badgeName} · ${streakDays}d`;
 
       const pts = Math.round(u.monthlyScore ?? u.points ?? (streakDays > 0 ? streakDays * 10 : 75));
@@ -621,6 +654,7 @@ export default function ModernDashboardView({
       }
 
       return {
+        id: u.userId || u._id || u.phone || `${name}-${i}`,
         rank: rankNum,
         medal,
         name,
@@ -1723,9 +1757,9 @@ export default function ModernDashboardView({
                   }}
                 >
                   {currentLeaderboard.map((u, i) => {
-                    const isRank1 = i === 0;
-                    const isRank2 = i === 1;
-                    const isRank3 = i === 2;
+                    const isRank1 = u.rank === 1;
+                    const isRank2 = u.rank === 2;
+                    const isRank3 = u.rank === 3;
                     const isUser = u.isUser;
 
                     const rowClass = isUser
@@ -1761,7 +1795,7 @@ export default function ModernDashboardView({
 
                     return (
                       <div
-                        key={u.rank}
+                        key={u.id || `${u.name}-${i}`}
                         className={rowClass}
                         style={{
                           display: "flex",
@@ -1783,7 +1817,7 @@ export default function ModernDashboardView({
                               flexShrink: 0,
                             }}
                           >
-                            {isRank1 ? "🥇" : isRank2 ? "🥈" : isRank3 ? "🥉" : isUser ? "👉" : u.rank}
+                            {u.medal}
                           </div>
 
                           {/* Avatar Circle */}
