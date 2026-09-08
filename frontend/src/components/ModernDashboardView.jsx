@@ -599,57 +599,131 @@ export default function ModernDashboardView({
     }
   };
 
-  // ── Historical Scores Dataset (Matching Screenshots 3 & 4) ──────────────────
-  const chartPointsData = Array.from({ length: 25 }, (_, i) => {
-    const sessionNum = `#${i + 1}`;
-    // Curve matching Screenshot 3
-    const curve = [72, 78, 75, 82, 85, 84, 88, 86, 89, 90, 88, 87, 89, 85, 75, 74, 82, 86, 88, 85, 82, 84, 86, 88, 92];
-    const scoreVal = scores[i]?.total || curve[i % curve.length];
-    return { session: sessionNum, pts: scoreVal };
-  });
+  // ── Safely extract points from a score entry ────────────────────────────────
+  const getSessionPoints = useCallback((s) => {
+    if (!s) return null;
+    const pt = s.points ?? s.total ?? s.compositeScore ?? s.score;
+    return (pt != null && !isNaN(pt)) ? Math.round(Number(pt)) : null;
+  }, []);
 
-  const chartHistoryData = Array.from({ length: 25 }, (_, i) => {
-    const sessionNum = `#${i + 1}`;
-    const s = scores[i] || {};
-    // Matches Screenshot 4
-    const fl = s.fluency ?? +(5.5 + Math.sin(i * 0.5) * 1.5 + (i * 0.05)).toFixed(1);
-    const gr = s.grammar ?? +(4.5 + Math.cos(i * 0.6) * 1.2 + (i * 0.04)).toFixed(1);
-    const cf = s.confidence ?? +(5.8 + Math.sin(i * 0.4) * 1.4 + (i * 0.05)).toFixed(1);
-    const vb = s.vocabulary ?? +(5.0 + Math.cos(i * 0.5) * 1.3 + (i * 0.04)).toFixed(1);
+  const hasActualScores = Boolean(Array.isArray(scores) && scores.length > 0);
+
+  // ── Metric Averages across all actual sessions ──────────────────────────────
+  const rubricAverages = useMemo(() => {
+    if (!hasActualScores) {
+      return { fluency: "0.0", grammar: "0.0", confidence: "0.0", vocabulary: "0.0", count: 0 };
+    }
+    const fl = scores.filter(s => s && s.fluency != null && !isNaN(s.fluency));
+    const gr = scores.filter(s => s && s.grammar != null && !isNaN(s.grammar));
+    const cf = scores.filter(s => s && s.confidence != null && !isNaN(s.confidence));
+    const vb = scores.filter(s => s && s.vocabulary != null && !isNaN(s.vocabulary));
+
     return {
-      session: sessionNum,
-      fluency: Math.min(10, Math.max(2, fl)),
-      grammar: Math.min(10, Math.max(2, gr)),
-      confidence: Math.min(10, Math.max(2, cf)),
-      vocabulary: Math.min(10, Math.max(2, vb)),
+      fluency: fl.length ? (fl.reduce((sum, s) => sum + Number(s.fluency), 0) / fl.length).toFixed(1) : "0.0",
+      grammar: gr.length ? (gr.reduce((sum, s) => sum + Number(s.grammar), 0) / gr.length).toFixed(1) : "0.0",
+      confidence: cf.length ? (cf.reduce((sum, s) => sum + Number(s.confidence), 0) / cf.length).toFixed(1) : "0.0",
+      vocabulary: vb.length ? (vb.reduce((sum, s) => sum + Number(s.vocabulary), 0) / vb.length).toFixed(1) : "0.0",
+      count: scores.length,
     };
-  });
+  }, [scores, hasActualScores]);
 
-  // Table Sessions Data (Matching Screenshot 5)
-  const defaultSessions = [
-    { session: "#30", date: "7 Sep 2026", duration: "3m 53s", fluency: 7, grammar: 7, confidence: 7, vocabulary: 7 },
-    { session: "#29", date: "6 Sep 2026", duration: "2m 58s", fluency: 7, grammar: 7, confidence: 7, vocabulary: 7 },
-    { session: "#28", date: "5 Sep 2026", duration: "3m 47s", fluency: 6, grammar: 4, confidence: 5, vocabulary: 5 },
-    { session: "#27", date: "4 Sep 2026", duration: "3m 48s", fluency: 6, grammar: 7, confidence: 6, vocabulary: 7 },
-    { session: "#26", date: "3 Sep 2026", duration: "2m 48s", fluency: 7, grammar: 4, confidence: 6, vocabulary: 5 },
-    { session: "#25", date: "2 Sep 2026", duration: "4m 02s", fluency: 8, grammar: 6, confidence: 7, vocabulary: 6 },
-    { session: "#24", date: "1 Sep 2026", duration: "3m 15s", fluency: 7, grammar: 6, confidence: 6, vocabulary: 6 },
-    { session: "#23", date: "31 Aug 2026", duration: "2m 50s", fluency: 6, grammar: 5, confidence: 6, vocabulary: 5 },
-  ];
+  // ── Tab 1: Points Area Chart Data (Chronological: #1 to #N) ─────────────────
+  const chartPointsData = useMemo(() => {
+    if (!hasActualScores) return [];
+    return scores.map((s, i) => {
+      const rawDate = s.date || s.submittedAt || s.createdAt;
+      let formattedDate = `Session #${i + 1}`;
+      if (rawDate) {
+        try {
+          formattedDate = new Date(rawDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        } catch {}
+      }
+      return {
+        session: `#${i + 1}`,
+        sessionIndex: i + 1,
+        pts: getSessionPoints(s) ?? 75,
+        date: formattedDate,
+        rawDate,
+        sundayBonus: Boolean(s.sundayBonus),
+      };
+    });
+  }, [scores, hasActualScores, getSessionPoints]);
 
-  const sessionsList = (scores && scores.length > 0)
-    ? scores.map((s, idx) => ({
-        session: `#${scores.length - idx}`,
-        date: s.submittedAt ? new Date(s.submittedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : `${idx + 1} Sep 2026`,
-        duration: s.duration ? `${Math.floor(s.duration / 60)}m ${String(s.duration % 60).padStart(2, "0")}s` : "3m 15s",
-        fluency: s.fluency ? Math.round(s.fluency) : 7,
-        grammar: s.grammar ? Math.round(s.grammar) : 6,
-        confidence: s.confidence ? Math.round(s.confidence) : 7,
-        vocabulary: s.vocabulary ? Math.round(s.vocabulary) : 6,
-      }))
-    : defaultSessions;
+  const pointsOnly = useMemo(() => chartPointsData.map(d => d.pts).filter(p => p != null && !isNaN(p)), [chartPointsData]);
+  const pointsAvg = pointsOnly.length ? Math.round(pointsOnly.reduce((a, b) => a + b, 0) / pointsOnly.length) : 0;
+  const pointsBest = pointsOnly.length ? Math.max(...pointsOnly) : 0;
+  const pointsMaxDomain = Math.max(100, Math.ceil((pointsBest + 10) / 10) * 10);
 
-  const totalPages = Math.ceil(sessionsList.length / SESSION_PAGE_SIZE);
+  // ── Tab 2: Score History Multi-Line Chart Data (Fluency, Grammar, Confidence, Vocab) ──
+  const chartHistoryData = useMemo(() => {
+    if (!hasActualScores) return [];
+    return scores.map((s, i) => {
+      const rawDate = s.date || s.submittedAt || s.createdAt;
+      let formattedDate = `Session #${i + 1}`;
+      if (rawDate) {
+        try {
+          formattedDate = new Date(rawDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        } catch {}
+      }
+      return {
+        session: `#${i + 1}`,
+        sessionIndex: i + 1,
+        fluency: s.fluency != null ? Math.min(10, Math.max(1, Number(s.fluency))) : 7,
+        grammar: s.grammar != null ? Math.min(10, Math.max(1, Number(s.grammar))) : 6,
+        confidence: s.confidence != null ? Math.min(10, Math.max(1, Number(s.confidence))) : 7,
+        vocabulary: s.vocabulary != null ? Math.min(10, Math.max(1, Number(s.vocabulary))) : 6,
+        date: formattedDate,
+        rawDate,
+      };
+    });
+  }, [scores, hasActualScores]);
+
+  // ── Tab 3: Sessions Paginated Table (Reverse chronological: Latest Session #N on Page 1) ──
+  const sessionsList = useMemo(() => {
+    if (!hasActualScores) return [];
+    const mapped = scores.map((s, i) => {
+      const rawDate = s.date || s.submittedAt || s.createdAt;
+      let formattedDate = "—";
+      if (rawDate) {
+        try {
+          formattedDate = new Date(rawDate).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
+        } catch {
+          formattedDate = String(rawDate);
+        }
+      }
+
+      let formattedDuration = "—";
+      const durSec = Number(s.duration);
+      if (!isNaN(durSec) && durSec > 0) {
+        const mins = Math.floor(durSec / 60);
+        const secs = Math.round(durSec % 60);
+        formattedDuration = `${mins}m ${String(secs).padStart(2, "0")}s`;
+      }
+
+      return {
+        _id: s._id,
+        session: `#${i + 1}`,
+        sessionNumber: i + 1,
+        date: formattedDate,
+        rawDate,
+        duration: formattedDuration,
+        fluency: s.fluency != null ? Math.round(Number(s.fluency)) : 7,
+        grammar: s.grammar != null ? Math.round(Number(s.grammar)) : 6,
+        confidence: s.confidence != null ? Math.round(Number(s.confidence)) : 7,
+        vocabulary: s.vocabulary != null ? Math.round(Number(s.vocabulary)) : 6,
+        points: getSessionPoints(s),
+      };
+    });
+
+    // Newest sessions first so row 1 on page 1 is the user's latest session
+    return mapped.reverse();
+  }, [scores, hasActualScores, getSessionPoints]);
+
+  const totalPages = Math.max(1, Math.ceil(sessionsList.length / SESSION_PAGE_SIZE));
   const pagedSessions = sessionsList.slice((sessionPage - 1) * SESSION_PAGE_SIZE, sessionPage * SESSION_PAGE_SIZE);
 
   const getScoreColor = (val) => {
@@ -2819,7 +2893,7 @@ export default function ModernDashboardView({
                     FLUENCY
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    6.5 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                    {rubricAverages.fluency} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
 
@@ -2828,7 +2902,7 @@ export default function ModernDashboardView({
                     GRAMMAR
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    5.2 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                    {rubricAverages.grammar} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
 
@@ -2837,7 +2911,7 @@ export default function ModernDashboardView({
                     CONFIDENCE
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    6.6 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                    {rubricAverages.confidence} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
 
@@ -2846,7 +2920,7 @@ export default function ModernDashboardView({
                     VOCABULARY
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    5.6 <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                    {rubricAverages.vocabulary} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
                   </div>
                 </div>
               </div>
@@ -2854,204 +2928,255 @@ export default function ModernDashboardView({
               {/* Tab 1: Points Area Chart (Screenshot 3) */}
               {activeTab === "points" && (
                 <div>
-                  <div style={{ width: "100%", height: 230 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartPointsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="purpleWaveGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                        <XAxis
-                          dataKey="session"
-                          stroke="#524d68"
-                          fontSize={11}
-                          tickLine={false}
-                          interval={1}
-                        />
-                        <YAxis
-                          stroke="#524d68"
-                          fontSize={11}
-                          domain={[0, 100]}
-                          ticks={[0, 25, 50, 75, 100]}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <Tooltip
-                          content={({ active, payload, label }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div style={{ background: "#161226", border: "1px solid rgba(167, 139, 250, 0.4)", borderRadius: 8, padding: "6px 12px", fontSize: "0.8rem", color: "#fff" }}>
-                                  <div>Session {label}</div>
-                                  <div style={{ color: "#a78bfa", fontWeight: 700 }}>Score: {payload[0].value} pts</div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="pts"
-                          stroke="#c084fc"
-                          strokeWidth={2.5}
-                          fill="url(#purpleWaveGradient)"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {chartPointsData.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📊</div>
+                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Points Data Yet</div>
+                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>Complete your daily speaking challenge to start graphing your score progress!</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ width: "100%", height: 230 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartPointsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="purpleWaveGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.4} />
+                                <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
+                            <XAxis
+                              dataKey="session"
+                              stroke={isDark ? "#524d68" : "#94a3b8"}
+                              fontSize={11}
+                              tickLine={false}
+                              interval={chartPointsData.length <= 10 ? 0 : Math.max(1, Math.floor(chartPointsData.length / 8))}
+                            />
+                            <YAxis
+                              stroke={isDark ? "#524d68" : "#94a3b8"}
+                              fontSize={11}
+                              domain={[0, pointsMaxDomain]}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <Tooltip
+                              content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                  const item = payload[0].payload;
+                                  return (
+                                    <div style={{ background: isDark ? "#161226" : "#ffffff", border: isDark ? "1px solid rgba(167, 139, 250, 0.4)" : "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", color: isDark ? "#fff" : "#0f172a" }}>
+                                      <div style={{ fontWeight: 700 }}>Session {label} {item?.date ? `· ${item.date}` : ""}</div>
+                                      <div style={{ color: "#a78bfa", fontWeight: 700, marginTop: 2 }}>
+                                        Score: {payload[0].value} pts {item?.sundayBonus ? "🎉 (Sunday Bonus)" : ""}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="pts"
+                              stroke="#c084fc"
+                              strokeWidth={2.5}
+                              fill="url(#purpleWaveGradient)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
 
-                  <div className="chart-footer-note" style={{ fontSize: "0.74rem", marginTop: "1rem" }}>
-                    <span style={{ color: "#c084fc" }}>●</span> Daily points, last 25 sessions · Average 85 · Best 94 · Sunday bonuses excluded
-                  </div>
+                      <div className="chart-footer-note" style={{ fontSize: "0.74rem", marginTop: "1rem" }}>
+                        <span style={{ color: "#c084fc" }}>●</span> Daily points ({chartPointsData.length} sessions logged) · Average {pointsAvg} pts · Best {pointsBest} pts · Sunday bonuses included
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
               {/* Tab 2: Score History Multi-Line Chart (Screenshot 4) */}
               {activeTab === "history" && (
                 <div>
-                  <div style={{ width: "100%", height: 230 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
-                        <XAxis dataKey="session" stroke="#524d68" fontSize={11} tickLine={false} interval={1} />
-                        <YAxis stroke="#524d68" fontSize={11} domain={[3, 10]} ticks={[3, 4, 5, 6, 7, 8, 9, 10]} tickLine={false} axisLine={false} />
-                        <Tooltip
-                          content={({ active, payload, label }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div style={{ background: "#141026", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "8px 12px", fontSize: "0.78rem", minWidth: 140 }}>
-                                  <div style={{ fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{label}</div>
-                                  <div style={{ color: "#a78bfa" }}>■ Fluency: {payload.find(p => p.dataKey === "fluency")?.value}</div>
-                                  <div style={{ color: "#4ade80" }}>■ Grammar: {payload.find(p => p.dataKey === "grammar")?.value}</div>
-                                  <div style={{ color: "#fbbf24" }}>■ Confidence: {payload.find(p => p.dataKey === "confidence")?.value}</div>
-                                  <div style={{ color: "#ff6b9d" }}>■ Vocabulary: {payload.find(p => p.dataKey === "vocabulary")?.value}</div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Line type="monotone" dataKey="fluency" stroke="#a78bfa" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="grammar" stroke="#4ade80" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="confidence" stroke="#fbbf24" strokeWidth={2} dot={false} />
-                        <Line type="monotone" dataKey="vocabulary" stroke="#ff6b9d" strokeWidth={2} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {chartHistoryData.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📈</div>
+                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Score History Yet</div>
+                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>Submit speaking sessions to view detailed Fluency, Grammar, Confidence, and Vocabulary rubric trends.</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ width: "100%", height: 230 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
+                            <XAxis
+                              dataKey="session"
+                              stroke={isDark ? "#524d68" : "#94a3b8"}
+                              fontSize={11}
+                              tickLine={false}
+                              interval={chartHistoryData.length <= 10 ? 0 : Math.max(1, Math.floor(chartHistoryData.length / 8))}
+                            />
+                            <YAxis
+                              stroke={isDark ? "#524d68" : "#94a3b8"}
+                              fontSize={11}
+                              domain={[0, 10]}
+                              ticks={[0, 2, 4, 6, 8, 10]}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <Tooltip
+                              content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                  const item = payload[0]?.payload;
+                                  return (
+                                    <div style={{ background: isDark ? "#141026" : "#ffffff", border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", borderRadius: 8, padding: "8px 12px", fontSize: "0.78rem", minWidth: 150 }}>
+                                      <div style={{ fontWeight: 700, color: isDark ? "#fff" : "#0f172a", marginBottom: "4px" }}>
+                                        Session {label} {item?.date ? `· ${item.date}` : ""}
+                                      </div>
+                                      <div style={{ color: "#a78bfa" }}>■ Fluency: {payload.find(p => p.dataKey === "fluency")?.value}/10</div>
+                                      <div style={{ color: "#4ade80" }}>■ Grammar: {payload.find(p => p.dataKey === "grammar")?.value}/10</div>
+                                      <div style={{ color: "#fbbf24" }}>■ Confidence: {payload.find(p => p.dataKey === "confidence")?.value}/10</div>
+                                      <div style={{ color: "#ff6b9d" }}>■ Vocabulary: {payload.find(p => p.dataKey === "vocabulary")?.value}/10</div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Line type="monotone" dataKey="fluency" stroke="#a78bfa" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="grammar" stroke="#4ade80" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="confidence" stroke="#fbbf24" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="vocabulary" stroke="#ff6b9d" strokeWidth={2} dot={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
 
-                  <div className="chart-legend-row" style={{ display: "flex", gap: "1.25rem", fontSize: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
-                    <span><strong style={{ color: "#a78bfa" }}>●</strong> Fluency</span>
-                    <span><strong style={{ color: "#4ade80" }}>●</strong> Grammar</span>
-                    <span><strong style={{ color: "#fbbf24" }}>●</strong> Confidence</span>
-                    <span><strong style={{ color: "#ff6b9d" }}>●</strong> Vocabulary</span>
-                  </div>
+                      <div className="chart-legend-row" style={{ display: "flex", gap: "1.25rem", fontSize: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
+                        <span><strong style={{ color: "#a78bfa" }}>●</strong> Fluency</span>
+                        <span><strong style={{ color: "#4ade80" }}>●</strong> Grammar</span>
+                        <span><strong style={{ color: "#fbbf24" }}>●</strong> Confidence</span>
+                        <span><strong style={{ color: "#ff6b9d" }}>●</strong> Vocabulary</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
               {/* Tab 3: Sessions Paginated Table (Screenshot 5) */}
               {activeTab === "sessions" && (
                 <div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-                      <thead>
-                        <tr className="perf-session-header-row" style={{ textAlign: "left" }}>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>SESSION</th>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>DATE</th>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>RECORDED</th>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>FLUENCY</th>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>GRAMMAR</th>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>CONFIDENCE</th>
-                          <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>VOCABULARY</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pagedSessions.map((s, idx) => (
-                          <tr
-                            key={idx}
-                            onClick={() => onOpenReport && onOpenReport(s)}
-                            className="perf-session-row"
+                  {sessionsList.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📋</div>
+                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Sessions Recorded Yet</div>
+                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>Completed video submissions will appear here with detailed dates, recorded duration, and rubric scores.</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                          <thead>
+                            <tr className="perf-session-header-row" style={{ textAlign: "left" }}>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>SESSION</th>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>DATE</th>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>RECORDED</th>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>FLUENCY</th>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>GRAMMAR</th>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>CONFIDENCE</th>
+                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>VOCABULARY</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pagedSessions.map((s, idx) => (
+                              <tr
+                                key={idx}
+                                onClick={() => onOpenReport && onOpenReport(s)}
+                                className="perf-session-row"
+                                style={{
+                                  cursor: "pointer",
+                                  transition: "background 0.15s ease",
+                                }}
+                              >
+                                <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.session}</td>
+                                <td style={{ padding: "0.75rem 0.5rem" }}>{s.date}</td>
+                                <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.duration}</td>
+                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.fluency) }}>{s.fluency}/10</td>
+                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.grammar) }}>{s.grammar}/10</td>
+                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.confidence) }}>{s.confidence}/10</td>
+                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.vocabulary) }}>{s.vocabulary}/10</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination Controls */}
+                      {totalPages > 1 && (
+                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.4rem", marginTop: "1.25rem" }}>
+                          <button
+                            type="button"
+                            disabled={sessionPage <= 1}
+                            onClick={() => setSessionPage(p => Math.max(1, p - 1))}
                             style={{
-                              cursor: "pointer",
-                              transition: "background 0.15s ease",
+                              background: "transparent",
+                              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+                              color: sessionPage <= 1 ? (isDark ? "#524d68" : "#cbd5e1") : (isDark ? "#94a3b8" : "#64748b"),
+                              borderRadius: 6,
+                              padding: "4px 10px",
+                              fontSize: "0.75rem",
+                              cursor: sessionPage <= 1 ? "default" : "pointer",
                             }}
                           >
-                            <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.session}</td>
-                            <td style={{ padding: "0.75rem 0.5rem" }}>{s.date}</td>
-                            <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.duration}</td>
-                            <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.fluency) }}>{s.fluency}/10</td>
-                            <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.grammar) }}>{s.grammar}/10</td>
-                            <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.confidence) }}>{s.confidence}/10</td>
-                            <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.vocabulary) }}>{s.vocabulary}/10</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            Prev
+                          </button>
 
-                  {/* Pagination Controls */}
-                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.4rem", marginTop: "1.25rem" }}>
-                    <button
-                      type="button"
-                      disabled={sessionPage <= 1}
-                      onClick={() => setSessionPage(p => Math.max(1, p - 1))}
-                      style={{
-                        background: "transparent",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
-                        color: sessionPage <= 1 ? "#524d68" : "#94a3b8",
-                        borderRadius: 6,
-                        padding: "4px 10px",
-                        fontSize: "0.75rem",
-                        cursor: sessionPage <= 1 ? "default" : "pointer",
-                      }}
-                    >
-                      Prev
-                    </button>
+                          {Array.from({ length: totalPages }, (_, i) => {
+                            const pNum = i + 1;
+                            const isActive = pNum === sessionPage;
+                            return (
+                              <button
+                                key={pNum}
+                                type="button"
+                                onClick={() => setSessionPage(pNum)}
+                                style={{
+                                  background: isActive ? (isDark ? "#ffffff" : "#1e1b4b") : "transparent",
+                                  color: isActive ? (isDark ? "#110e20" : "#ffffff") : (isDark ? "#94a3b8" : "#64748b"),
+                                  border: isActive ? "none" : (isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0"),
+                                  borderRadius: 6,
+                                  width: 28,
+                                  height: 28,
+                                  fontSize: "0.75rem",
+                                  fontWeight: isActive ? 800 : 500,
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                }}
+                              >
+                                {pNum}
+                              </button>
+                            );
+                          })}
 
-                    {Array.from({ length: Math.min(6, totalPages || 1) }, (_, i) => {
-                      const pNum = i + 1;
-                      const isActive = pNum === sessionPage;
-                      return (
-                        <button
-                          key={pNum}
-                          type="button"
-                          onClick={() => setSessionPage(pNum)}
-                          style={{
-                            background: isActive ? "#ffffff" : "transparent",
-                            color: isActive ? "#110e20" : "#94a3b8",
-                            border: isActive ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
-                            borderRadius: 6,
-                            width: 28,
-                            height: 28,
-                            fontSize: "0.75rem",
-                            fontWeight: isActive ? 800 : 500,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {pNum}
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      disabled={sessionPage >= totalPages}
-                      onClick={() => setSessionPage(p => Math.min(totalPages, p + 1))}
-                      style={{
-                        background: "transparent",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
-                        color: sessionPage >= totalPages ? "#524d68" : "#94a3b8",
-                        borderRadius: 6,
-                        padding: "4px 10px",
-                        fontSize: "0.75rem",
-                        cursor: sessionPage >= totalPages ? "default" : "pointer",
-                      }}
-                    >
-                      Next
-                    </button>
-                  </div>
+                          <button
+                            type="button"
+                            disabled={sessionPage >= totalPages}
+                            onClick={() => setSessionPage(p => Math.min(totalPages, p + 1))}
+                            style={{
+                              background: "transparent",
+                              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+                              color: sessionPage >= totalPages ? (isDark ? "#524d68" : "#cbd5e1") : (isDark ? "#94a3b8" : "#64748b"),
+                              borderRadius: 6,
+                              padding: "4px 10px",
+                              fontSize: "0.75rem",
+                              cursor: sessionPage >= totalPages ? "default" : "pointer",
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
