@@ -676,8 +676,6 @@ export default function VideoAnalysis() {
                 {/* Waveform Audio Player ("LISTEN FIRST") for Story Summary / Audio Prompts */}
                 {(isStorySummary || audioSrc) && (
                   <div className="speakshine-audio-bar" style={{
-                    background: "rgba(10, 8, 18, 0.65)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
                     borderRadius: 12,
                     padding: "0.75rem 1.1rem",
                     display: "flex",
@@ -689,18 +687,15 @@ export default function VideoAnalysis() {
                       type="button"
                       onClick={togglePlay}
                       title={isPlaying ? "Pause audio" : "Play audio"}
+                      className="audio-play-btn"
                       style={{
                         width: 38,
                         height: 38,
                         borderRadius: "50%",
-                        background: "#ffffff",
-                        border: "none",
-                        color: "#18122c",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         cursor: "pointer",
-                        boxShadow: "0 4px 12px rgba(255,255,255,0.25)",
                         flexShrink: 0,
                         transition: "transform 0.15s ease",
                       }}
@@ -726,13 +721,13 @@ export default function VideoAnalysis() {
                         return (
                           <div
                             key={i}
+                            className={`audio-wave-bar ${isPassed ? "active" : ""}`}
                             onClick={() => seekWaveform(i)}
                             title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
                             style={{
                               flex: 1,
                               height: `${height}px`,
                               borderRadius: 2,
-                              background: isPassed ? "#a78bfa" : "rgba(255, 255, 255, 0.12)",
                               transition: "background 0.15s ease",
                             }}
                           />
@@ -740,7 +735,7 @@ export default function VideoAnalysis() {
                       })}
                     </div>
 
-                    <span style={{ fontSize: "0.78rem", color: "#7c7793", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                       {fmtTime(currentTime)} / {fmtTime(duration)}
                     </span>
                   </div>
@@ -853,7 +848,7 @@ export default function VideoAnalysis() {
                                     {v.word}
                                   </span>
                                   {v.meaning && (
-                                    <span style={{ fontSize: "0.82rem", color: "#cbd5e1", fontWeight: 500, lineHeight: 1.4 }}>
+                                    <span className="vocab-meaning-text">
                                       — {v.meaning}
                                     </span>
                                   )}

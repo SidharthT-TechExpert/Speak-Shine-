@@ -794,8 +794,6 @@ export default function ModernDashboardView({
 
               {/* Waveform Audio Player ("LISTEN FIRST") */}
               <div className="speakshine-audio-bar" style={{
-                background: "rgba(10, 8, 18, 0.65)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 12,
                 padding: "0.75rem 1.1rem",
                 display: "flex",
@@ -807,18 +805,15 @@ export default function ModernDashboardView({
                   type="button"
                   onClick={togglePlay}
                   title={isPlaying ? "Pause audio" : "Play audio"}
+                  className="audio-play-btn"
                   style={{
                     width: 38,
                     height: 38,
                     borderRadius: "50%",
-                    background: "#ffffff",
-                    border: "none",
-                    color: "#18122c",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    boxShadow: "0 4px 12px rgba(255,255,255,0.25)",
                     flexShrink: 0,
                     transition: "transform 0.15s ease",
                   }}
@@ -844,13 +839,13 @@ export default function ModernDashboardView({
                     return (
                       <div
                         key={i}
+                        className={`audio-wave-bar ${isPassed ? "active" : ""}`}
                         onClick={() => seekWaveform(i)}
                         title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
                         style={{
                           flex: 1,
                           height: `${height}px`,
                           borderRadius: 2,
-                          background: isPassed ? "#a78bfa" : "rgba(255, 255, 255, 0.12)",
                           transition: "background 0.15s ease",
                         }}
                       />
@@ -858,7 +853,7 @@ export default function ModernDashboardView({
                   })}
                 </div>
 
-                <span style={{ fontSize: "0.78rem", color: "#7c7793", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                   {fmtTime(currentTime)} / {fmtTime(duration)}
                 </span>
               </div>
@@ -868,7 +863,7 @@ export default function ModernDashboardView({
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                     <span style={{ fontSize: "1.05rem" }}>📚</span>
-                    <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase" }}>
+                    <span className="vocab-section-title">
                       TODAY'S VOCABULARY CHALLENGE
                     </span>
                   </div>
@@ -890,10 +885,8 @@ export default function ModernDashboardView({
                     return (
                       <div
                         key={i}
-                        className="vocab-card-pro"
+                        className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
                         style={{
-                          background: isPlanned ? "rgba(34, 197, 94, 0.08)" : "rgba(255, 255, 255, 0.03)",
-                          border: isPlanned ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(124, 111, 255, 0.16)",
                           borderRadius: 12,
                           padding: "0.85rem 1rem",
                           transition: "all 0.15s ease",
@@ -903,11 +896,11 @@ export default function ModernDashboardView({
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                               <div className="vocab-num-badge">0{i + 1}</div>
-                              <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem", color: "#ffffff" }}>
+                              <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
                                 {v.word}
                               </span>
                               {v.meaning && (
-                                <span style={{ fontSize: "0.82rem", color: "#cbd5e1", fontWeight: 500, lineHeight: 1.4 }}>
+                                <span className="vocab-meaning-text">
                                   — {v.meaning}
                                 </span>
                               )}
@@ -956,7 +949,7 @@ export default function ModernDashboardView({
                   })}
                 </div>
 
-                <div style={{ marginTop: "0.75rem", fontSize: "0.74rem", color: "#8c87a2", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <div className="vocab-footer-hint">
                   <span>✨</span>
                   <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
                 </div>
