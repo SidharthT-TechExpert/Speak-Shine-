@@ -246,6 +246,9 @@ export default function ModernDashboardView({
   const [sessionPage, setSessionPage] = useState(1);
   const SESSION_PAGE_SIZE = 6;
 
+  // ── Milestone Roadmap View Mode: "roadmap" (macro landmarks) | "sprint" (active tier) ──
+  const [roadmapViewMode, setRoadmapViewMode] = useState("roadmap");
+
   // ── Audio Player & Waveform State ───────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -2065,7 +2068,7 @@ export default function ModernDashboardView({
             </div>
           </div>
 
-          {/* ── Section 3: Accurate Stepped Milestone Roadmap Graph (Dynamic) ── */}
+          {/* ── Section 3: Universal Dynamic Milestone Roadmap Graph (Suitable for Any Range) ── */}
           {(() => {
             const currentBadge = milestone.currentBadge;
             const nextBadge = milestone.nextBadge;
@@ -2074,13 +2077,32 @@ export default function ModernDashboardView({
             const startDays = currentBadge ? currentBadge.days : 0;
             const remainingDays = Math.max(0, targetDays - currentDays);
             const overallPercent = targetDays > 0 ? Math.min(100, Math.max(0, Math.round((currentDays / targetDays) * 100))) : 100;
+            const tierSpan = Math.max(1, targetDays - startDays);
+            const tierProgress = Math.max(0, currentDays - startDays);
+            const tierPercent = Math.min(100, Math.max(0, Math.round((tierProgress / tierSpan) * 100)));
 
-            // Generate accurate roadmap nodes
-            // For <= 14 days, show all discrete days 1..targetDays
-            // For > 14 days, show key milestone checkpoints, current day, and target day
+            // ── Dynamic Node Generator for ANY Range ────────────────────────
             const nodes = [];
-            if (targetDays <= 14) {
-              for (let d = 1; d <= targetDays; d++) {
+
+            if (roadmapViewMode === "sprint" && targetDays > startDays) {
+              // SPRINT VIEW: Micro progression focusing purely on the active tier (startDays -> targetDays)
+              const span = targetDays - startDays;
+              const sprintDays = [];
+              if (span <= 12) {
+                for (let d = startDays; d <= targetDays; d++) {
+                  if (d > 0) sprintDays.push(d);
+                }
+              } else {
+                // Step evenly through the active tier so it never looks crowded or empty
+                const step = Math.max(1, Math.round(span / 7));
+                const s = new Set([startDays, currentDays, targetDays].filter(d => d > 0));
+                for (let d = startDays; d <= targetDays; d += step) {
+                  if (d > 0) s.add(d);
+                }
+                sprintDays.push(...Array.from(s).sort((a, b) => a - b));
+              }
+
+              sprintDays.forEach(d => {
                 const isCompleted = d < currentDays;
                 const isCurrent = d === currentDays && currentDays > 0;
                 const isTarget = d === targetDays;
@@ -2090,35 +2112,85 @@ export default function ModernDashboardView({
                   isCompleted,
                   isCurrent,
                   isTarget,
-                  badge: badgeOnDay,
+                  badge: badgeOnDay || (d === startDays ? currentBadge : isTarget ? nextBadge : null),
                   label: isCurrent ? "Today" : isTarget ? "Goal" : d === currentDays + 1 ? "Next" : "",
                 });
-              }
+              });
             } else {
-              // Smart checkpoint spacing for higher streaks
-              const checkpoints = new Set([1, startDays > 0 ? startDays : null, currentDays, targetDays].filter(Boolean));
-              STREAK_BADGES.forEach(b => {
-                if (b.days >= startDays && b.days <= targetDays) checkpoints.add(b.days);
-              });
-              const sorted = Array.from(checkpoints).sort((a, b) => a - b);
-              sorted.forEach(d => {
-                const isCompleted = d < currentDays;
-                const isCurrent = d === currentDays && currentDays > 0;
-                const isTarget = d === targetDays;
-                const badgeOnDay = STREAK_BADGES.find(b => b.days === d);
-                nodes.push({
-                  day: d,
-                  isCompleted,
-                  isCurrent,
-                  isTarget,
-                  badge: badgeOnDay,
-                  label: isCurrent ? "Today" : isTarget ? "Goal" : "",
+              // ROADMAP VIEW: Macro landmark progression suitable for any streak (1 to 730 days)
+              if (targetDays <= 8) {
+                // Small milestone range (e.g. 1 to 7): show all discrete days
+                for (let d = 1; d <= targetDays; d++) {
+                  const isCompleted = d < currentDays;
+                  const isCurrent = d === currentDays && currentDays > 0;
+                  const isTarget = d === targetDays;
+                  const badgeOnDay = STREAK_BADGES.find(b => b.days === d);
+                  nodes.push({
+                    day: d,
+                    isCompleted,
+                    isCurrent,
+                    isTarget,
+                    badge: badgeOnDay,
+                    label: isCurrent ? "Today" : isTarget ? "Goal" : d === currentDays + 1 ? "Next" : "",
+                  });
+                }
+              } else {
+                // Dynamic multi-stage checkpoint distribution for medium to large ranges:
+                // 1. Landmark historical badges achieved in history
+                const earnedBadges = STREAK_BADGES.filter(b => b.days < currentDays);
+                const landmarkDays = [];
+                if (earnedBadges.length <= 3) {
+                  landmarkDays.push(...earnedBadges.map(b => b.days));
+                } else {
+                  // Pick first, middle, and latest earned landmark badges
+                  landmarkDays.push(earnedBadges[0].days);
+                  const midIdx = Math.floor(earnedBadges.length / 2);
+                  landmarkDays.push(earnedBadges[midIdx].days);
+                  landmarkDays.push(earnedBadges[earnedBadges.length - 1].days);
+                }
+
+                // 2. Upcoming stepping stone checkpoints between currentDays and targetDays (avoids large voids)
+                const remaining = targetDays - currentDays;
+                const upcomingSteps = [];
+                if (remaining >= 8) {
+                  const s1 = Math.round(currentDays + remaining * 0.35);
+                  const s2 = Math.round(currentDays + remaining * 0.70);
+                  upcomingSteps.push(s1, s2);
+                } else if (remaining >= 4) {
+                  const s1 = Math.round(currentDays + remaining * 0.50);
+                  upcomingSteps.push(s1);
+                }
+
+                // Merge into sorted unique checkpoints
+                const candidateSet = new Set([1, ...landmarkDays, currentDays, ...upcomingSteps, targetDays].filter(d => d > 0));
+                const sortedDays = Array.from(candidateSet).sort((a, b) => a - b);
+
+                sortedDays.forEach(d => {
+                  const isCompleted = d < currentDays;
+                  const isCurrent = d === currentDays && currentDays > 0;
+                  const isTarget = d === targetDays;
+                  const badgeOnDay = STREAK_BADGES.find(b => b.days === d);
+                  const daysToNode = d - currentDays;
+                  let label = "";
+                  if (isCurrent) label = "Today";
+                  else if (isTarget) label = "Goal";
+                  else if (d === 1) label = "Start";
+                  else if (isCompleted) label = "Earned";
+                  else if (daysToNode > 0) label = `+${daysToNode}d`;
+
+                  nodes.push({
+                    day: d,
+                    isCompleted,
+                    isCurrent,
+                    isTarget,
+                    badge: badgeOnDay || (d === startDays ? currentBadge : isTarget ? nextBadge : null),
+                    label,
+                  });
                 });
-              });
+              }
             }
 
-            // Mathematical position of the progress line connecting precisely to current node
-            // Between first node (index 0) and last node (index nodes.length - 1)
+            // Mathematical position of the progress fill line
             const currentIndex = nodes.findIndex(n => n.isCurrent);
             const fillWidthPercent = nodes.length > 1 && currentIndex >= 0
               ? Math.min(100, Math.max(0, (currentIndex / (nodes.length - 1)) * 100))
@@ -2147,7 +2219,7 @@ export default function ModernDashboardView({
                   pointerEvents: "none",
                 }} />
 
-                {/* ── Header: Title & Badges Modal Link ── */}
+                {/* ── Header: Title, Range Mode Switcher, & Badges Modal Link ── */}
                 <div style={{
                   display: "flex",
                   justifyContent: "space-between",
@@ -2176,35 +2248,84 @@ export default function ModernDashboardView({
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={onOpenBadges}
-                    style={{
-                      background: "rgba(167, 139, 250, 0.08)",
-                      border: "1px solid rgba(167, 139, 250, 0.25)",
-                      borderRadius: 8,
-                      padding: "0.35rem 0.85rem",
-                      fontSize: "0.78rem",
-                      color: "#c084fc",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.35rem",
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(167, 139, 250, 0.18)";
-                      e.currentTarget.style.color = "#ffffff";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(167, 139, 250, 0.08)";
-                      e.currentTarget.style.color = "#c084fc";
-                    }}
-                  >
-                    <span>View all 20 badges</span>
-                    <span>→</span>
-                  </button>
+                  {/* Mode Switcher & View All Badges */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+                    {targetDays > 8 && (
+                      <div style={{
+                        display: "inline-flex",
+                        background: "rgba(255, 255, 255, 0.04)",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        borderRadius: 8,
+                        padding: 2,
+                        gap: 2,
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setRoadmapViewMode("roadmap")}
+                          style={{
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "3px 9px",
+                            fontSize: "0.72rem",
+                            fontWeight: roadmapViewMode === "roadmap" ? 700 : 500,
+                            background: roadmapViewMode === "roadmap" ? "rgba(249, 115, 22, 0.2)" : "transparent",
+                            color: roadmapViewMode === "roadmap" ? "#f97316" : "#94a3b8",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          🏆 Full Roadmap (1–{targetDays}d)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRoadmapViewMode("sprint")}
+                          style={{
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "3px 9px",
+                            fontSize: "0.72rem",
+                            fontWeight: roadmapViewMode === "sprint" ? 700 : 500,
+                            background: roadmapViewMode === "sprint" ? "rgba(167, 139, 250, 0.2)" : "transparent",
+                            color: roadmapViewMode === "sprint" ? "#c084fc" : "#94a3b8",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          ⚡ Active Tier ({startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`})
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={onOpenBadges}
+                      style={{
+                        background: "rgba(167, 139, 250, 0.08)",
+                        border: "1px solid rgba(167, 139, 250, 0.25)",
+                        borderRadius: 8,
+                        padding: "0.35rem 0.85rem",
+                        fontSize: "0.78rem",
+                        color: "#c084fc",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "rgba(167, 139, 250, 0.18)";
+                        e.currentTarget.style.color = "#ffffff";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "rgba(167, 139, 250, 0.08)";
+                        e.currentTarget.style.color = "#c084fc";
+                      }}
+                    >
+                      <span>View all 20 badges</span>
+                      <span>→</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* ── Milestone Cards: Current Tier vs Target Goal ── */}
@@ -2314,10 +2435,12 @@ export default function ModernDashboardView({
                     </div>
                     <div>
                       <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        OVERALL PROGRESS
+                        {roadmapViewMode === "sprint" ? "ACTIVE TIER PROGRESS" : "OVERALL PROGRESS"}
                       </div>
                       <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
-                        {currentDays} of {targetDays} Days ({overallPercent}%)
+                        {roadmapViewMode === "sprint"
+                          ? `${tierProgress} of ${tierSpan} Tier Days (${tierPercent}%)`
+                          : `${currentDays} of ${targetDays} Days (${overallPercent}%)`}
                       </div>
                       <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
                         {remainingDays > 0 ? `${remainingDays} more consecutive days needed` : "Milestone reached!"}
@@ -2326,7 +2449,7 @@ export default function ModernDashboardView({
                   </div>
                 </div>
 
-                {/* ── Stepped Visual Roadmap Track ── */}
+                {/* ── Stepped Visual Roadmap Track (Dynamic for Any Range) ── */}
                 <div style={{
                   position: "relative",
                   padding: "1.2rem 1.2rem 2.8rem",
@@ -2335,7 +2458,7 @@ export default function ModernDashboardView({
                   border: "1px solid rgba(255, 255, 255, 0.04)",
                   overflowX: "auto",
                 }}>
-                  <div style={{ minWidth: targetDays <= 7 ? "auto" : 600, position: "relative" }}>
+                  <div style={{ minWidth: nodes.length <= 7 ? "auto" : 620, position: "relative" }}>
                     {/* Connecting Rail - positioned exactly through vertical center of nodes (top: 20px) */}
                     <div style={{
                       position: "absolute",
@@ -2386,9 +2509,9 @@ export default function ModernDashboardView({
                               width: 60,
                               textAlign: "center",
                             }}
-                            title={node.badge ? `${node.badge.icon} Day ${node.day}: ${node.badge.name}` : `Day ${node.day} of streak`}
+                            title={node.badge ? `${node.badge.icon} Day ${node.day}: ${node.badge.name}` : `Day ${node.day} Checkpoint`}
                           >
-                            {/* Milestone Icon Pill (Floating above node if milestone) */}
+                            {/* Milestone Icon Pill (Floating above node) */}
                             <div style={{
                               height: 18,
                               display: "flex",
@@ -2396,13 +2519,17 @@ export default function ModernDashboardView({
                               justifyContent: "center",
                               marginBottom: 2,
                             }}>
-                              {hasBadge && (
+                              {hasBadge ? (
                                 <span style={{
                                   fontSize: "0.75rem",
                                   filter: isDone || isCur ? "drop-shadow(0 0 4px rgba(255,255,255,0.4))" : "grayscale(0.8)",
                                 }}>
                                   {node.badge.icon}
                                 </span>
+                              ) : node.day === 1 ? (
+                                <span style={{ fontSize: "0.68rem" }}>🚩</span>
+                              ) : (
+                                <span style={{ fontSize: "0.64rem", opacity: 0.4 }}>📍</span>
                               )}
                             </div>
 
@@ -2462,13 +2589,15 @@ export default function ModernDashboardView({
                                 fontWeight: 800,
                                 textTransform: "uppercase",
                                 letterSpacing: "0.05em",
-                                color: isCur ? "#f97316" : isTgt ? "#f59e0b" : "#94a3b8",
+                                color: isCur ? "#f97316" : isTgt ? "#f59e0b" : isDone ? "#4ade80" : "#94a3b8",
                                 background: isCur
                                   ? "rgba(249, 115, 22, 0.15)"
                                   : isTgt
                                   ? "rgba(245, 158, 11, 0.15)"
+                                  : isDone
+                                  ? "rgba(34, 197, 94, 0.12)"
                                   : "transparent",
-                                padding: isCur || isTgt ? "1px 5px" : "0",
+                                padding: isCur || isTgt || isDone ? "1px 5px" : "0",
                                 borderRadius: 4,
                                 whiteSpace: "nowrap",
                               }}>
