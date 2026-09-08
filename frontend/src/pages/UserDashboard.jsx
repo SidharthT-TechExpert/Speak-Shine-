@@ -12,6 +12,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend, Area, AreaChart,
 } from "recharts";
+import { STREAK_BADGES } from "../utils/streakBadges.js";
 
 const MOTIVATIONAL = [
   "Every great speaker started exactly where you are. 🌟",
@@ -1110,13 +1111,7 @@ export default function UserDashboard() {
       )}
       {showBadgeCatalog && (
         <BadgeCatalogModal
-          badges={profile?.availableBadges || data?.availableBadges || [
-            { id: "bronze", name: "Bronze Speaker", tier: "Bronze", days: 1, icon: "🥉", color: "#cd7f32" },
-            { id: "silver", name: "Silver Speaker", tier: "Silver", days: 3, icon: "🥈", color: "#94a3b8" },
-            { id: "gold", name: "Gold Speaker", tier: "Gold", days: 7, icon: "🥇", color: "#fbbf24" },
-            { id: "platinum", name: "Platinum Speaker", tier: "Platinum", days: 14, icon: "💎", color: "#38bdf8" },
-            { id: "diamond", name: "Diamond Speaker", tier: "Diamond", days: 30, icon: "💠", color: "#a855f7" },
-          ]}
+          badges={profile?.availableBadges || data?.availableBadges || STREAK_BADGES}
           earnedBadges={profile?.earnedBadges || []}
           onClose={() => setShowBadgeCatalog(false)}
         />

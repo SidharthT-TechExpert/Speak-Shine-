@@ -7,6 +7,7 @@ import {
 import NotificationBell from "./NotificationBell.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import gsap from "gsap";
+import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -380,9 +381,37 @@ export default function ModernDashboardView({
 
 
   // ── User Data Aggregations ──────────────────────────────────────────────────
-  const streak = profile.streak ?? 2;
-  const totalPoints = Math.round(profile.monthlyScore ?? 160);
+  const streak = profile.streak != null ? profile.streak : (myStreakEntry?.streak ?? (streakRecord?.currentStreak ?? (streakRecord?.streak ?? 2)));
+  const totalPoints = Math.round(
+    profile.totalPoints ?? profile.monthlyScore ?? (stats?.totalPoints || scores.reduce((sum, s) => sum + (s.points || s.total || 0), 0) || (streak * 10) || 160)
+  );
   const freezeTokens = profile.streakFreeze ?? 0;
+
+  // Determine if today's challenge/task has been submitted
+  const isTodaySubmitted = Boolean(
+    profile?.completedToday === true ||
+    profile?.completed === true ||
+    today?.submitted === true ||
+    today?.isSubmitted === true ||
+    (scores.length > 0 && scores.some(s => {
+      const d = s.createdAt || s.date;
+      return d && new Date(d).toDateString() === new Date().toDateString();
+    }))
+  );
+
+  // Find latest/today's score for today's points display
+  const todayScoreObj = scores.slice().reverse().find(s => {
+    const d = s.createdAt || s.date;
+    return d && new Date(d).toDateString() === new Date().toDateString();
+  }) || scores[scores.length - 1];
+
+  const todayPoints = todayScoreObj?.points != null
+    ? Math.round(todayScoreObj.points)
+    : (todayScoreObj?.total != null ? Math.round(todayScoreObj.total) : 85);
+
+  // Dynamic milestone progress using official 20 streak badges
+  const milestone = getBadgeProgress(streak);
+
   const displayName = user?.name || profile?.name || "Jane Doe";
   const avatarInitials = displayName.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "JD";
 
@@ -489,11 +518,11 @@ export default function ModernDashboardView({
   const recordUnit = streakRecord?.score ? "pts" : (streakRecord?.streak ? "d" : "pts");
 
   const defaultLeaderboard = useMemo(() => [
-    { rank: 1, medal: "🥇", name: "~Fayiz✨", title: "Communication Titan · 120d", pts: 684, time: "2h ago", isUser: false, initials: "FZ" },
-    { rank: 2, medal: "🥈", name: "Shabeer😉", title: "Speech Legend · 110d", pts: 682, time: "3h ago", isUser: false, initials: "SH" },
-    { rank: 3, medal: "🥉", name: "Abdul Fathah", title: "Elite Communicator · 65d", pts: 617, time: "4h ago", isUser: false, initials: "AF" },
-    { rank: 4, medal: "👉", name: `${displayName} (You)`, title: `${profile?.streak || 4}d streak`, pts: Math.round(profile?.monthlyScore || 599), time: "Yesterday", isUser: true, initials: avatarInitials || "YOU" },
-    { rank: 5, medal: "5", name: "Muhammed Nabhan", title: "Momentum Builder · 6d", pts: 417, time: "Yesterday", isUser: false, initials: "MN" },
+    { rank: 1, medal: "🥇", name: "~Fayiz✨", streak: 120, pts: 684, time: "2h ago", isUser: false, initials: "FZ" },
+    { rank: 2, medal: "🥈", name: "Shabeer😉", streak: 110, pts: 682, time: "3h ago", isUser: false, initials: "SH" },
+    { rank: 3, medal: "🥉", name: "Abdul Fathah", streak: 65, pts: 617, time: "4h ago", isUser: false, initials: "AF" },
+    { rank: 4, medal: "👉", name: `${displayName} (You)`, streak: profile?.streak != null ? profile.streak : 4, pts: Math.round(profile?.monthlyScore || 599), time: "Yesterday", isUser: true, initials: avatarInitials || "YOU" },
+    { rank: 5, medal: "5", name: "Muhammed Nabhan", streak: 6, pts: 417, time: "Yesterday", isUser: false, initials: "MN" },
   ], [displayName, profile?.streak, profile?.monthlyScore, avatarInitials]);
 
   const currentLeaderboard = useMemo(() => {
@@ -545,18 +574,19 @@ export default function ModernDashboardView({
       const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : isUser ? "👉" : String(rankNum);
       const initials = isUser ? (avatarInitials || "YOU") : getInitials(name);
 
-      const streakDays = u.streak ?? (isUser ? (profile?.streak || 0) : 0);
-      let badgeName = "Active Speaker";
-      let badgeIcon = "🎤";
-      if (streakDays >= 100) { badgeName = "Communication Titan"; badgeIcon = "💬"; }
-      else if (streakDays >= 60) { badgeName = "Elite Communicator"; badgeIcon = "🚀"; }
-      else if (streakDays >= 30) { badgeName = "Speech Legend"; badgeIcon = "👑"; }
-      else if (streakDays >= 14) { badgeName = "Master Speaker"; badgeIcon = "🌟"; }
-      else if (streakDays >= 7) { badgeName = "Rising Star"; badgeIcon = "⚡"; }
-      else if (streakDays >= 3) { badgeName = "First Steps"; badgeIcon = "🌱"; }
-      else if (streakDays >= 1) { badgeName = "Momentum Builder"; badgeIcon = "🔥"; }
+      let streakDays = u.streak;
+      if (streakDays == null && u.title) {
+        const match = u.title.match(/(\d+)\s*d/);
+        if (match) streakDays = parseInt(match[1], 10);
+      }
+      if (streakDays == null) {
+        streakDays = isUser ? (profile?.streak ?? 0) : 0;
+      }
 
-      let title = u.badge || `${badgeName} · ${streakDays}d`;
+      const streakBadge = getBadgeForStreak(streakDays);
+      const badgeName = streakBadge ? streakBadge.name : "Active Speaker";
+      const badgeIcon = streakBadge ? streakBadge.icon : "🌱";
+      const title = `${badgeName} · ${streakDays}d`;
 
       const pts = Math.round(u.monthlyScore ?? u.points ?? (streakDays > 0 ? streakDays * 10 : 75));
       const weeklySubmissions = u.weeklySubmissions ?? (isUser ? (profile?.weeklySubmissions ?? 2) : 2);
@@ -1147,21 +1177,31 @@ export default function ModernDashboardView({
               </div>
             </div>
 
-            {/* KPI 5 */}
+            {/* KPI 5: Dynamic Today's Points if submitted, else Total Points */}
             <div>
               <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                LAST SESSION
+                {isTodaySubmitted ? "TODAY'S POINTS" : "TOTAL POINTS"}
               </div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#4ade80", letterSpacing: "-0.01em" }}>
-                80/100
+              <div style={{
+                fontSize: "1.35rem",
+                fontWeight: 700,
+                color: isTodaySubmitted ? "#4ade80" : "#fbbf24",
+                letterSpacing: "-0.01em"
+              }}>
+                {isTodaySubmitted ? `${todayPoints} pts` : `${totalPoints} pts`}
               </div>
-              <div style={{ fontSize: "0.74rem", color: "#4ade80", marginTop: "2px" }}>
-                +6 vs first session
+              <div style={{
+                fontSize: "0.74rem",
+                color: isTodaySubmitted ? "#4ade80" : "#94a3b8",
+                marginTop: "2px",
+                fontWeight: isTodaySubmitted ? 600 : 400
+              }}>
+                {isTodaySubmitted ? "✓ Challenge completed today" : "Pending today's submission"}
               </div>
             </div>
           </div>
 
-          {/* ── Section 3: Badge Milestone Banner (Screenshot 2) ── */}
+          {/* ── Section 3: Badge Milestone Banner (Dynamic) ── */}
           <div className="speakshine-card-box" style={{
             background: "#0d0a18",
             border: "1px solid rgba(255, 255, 255, 0.05)",
@@ -1174,12 +1214,21 @@ export default function ModernDashboardView({
                 <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase" }}>
                   BADGE MILESTONE
                 </span>
-                <span style={{ fontSize: "0.88rem", fontWeight: 700, color: "#fbbf24", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                  <span>🏅</span>
-                  <span>Bronze Speaker</span>
+                <span style={{
+                  fontSize: "0.88rem",
+                  fontWeight: 700,
+                  color: milestone.currentBadge?.color || "#fbbf24",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem"
+                }}>
+                  <span>{milestone.currentBadge ? milestone.currentBadge.icon : "🎯"}</span>
+                  <span>{milestone.currentBadge ? milestone.currentBadge.name : "New Speaker"}</span>
                 </span>
                 <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
-                  · Keep a 3-day streak to earn Silver Speaker
+                  {milestone.nextBadge
+                    ? `· Keep a ${milestone.nextBadge.days}-day streak to earn ${milestone.nextBadge.icon} ${milestone.nextBadge.name}`
+                    : "· All 20 streak badges unlocked! Max tier achieved 🏆"}
                 </span>
               </div>
 
@@ -1194,16 +1243,28 @@ export default function ModernDashboardView({
             {/* Glowing Horizontal Progress Bar */}
             <div style={{ position: "relative", height: 8, background: "rgba(255, 255, 255, 0.06)", borderRadius: 99, overflow: "hidden", marginBottom: "0.45rem" }}>
               <div style={{
-                position: "absolute", left: 0, top: 0, bottom: 0, width: "66%",
-                background: "linear-gradient(90deg, #f59e0b, #fbbf24)",
+                position: "absolute", left: 0, top: 0, bottom: 0,
+                width: `${Math.min(100, Math.max(4, milestone.percent))}%`,
+                background: milestone.nextBadge?.color
+                  ? `linear-gradient(90deg, ${milestone.nextBadge.color}cc, ${milestone.nextBadge.color})`
+                  : "linear-gradient(90deg, #f59e0b, #fbbf24)",
                 borderRadius: 99,
-                boxShadow: "0 0 12px rgba(251, 191, 36, 0.4)",
+                boxShadow: `0 0 12px ${milestone.nextBadge?.color || "#fbbf24"}66`,
+                transition: "width 0.6s ease",
               }} />
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.74rem", color: "#716c85" }}>
-              <span>1 day remaining</span>
-              <span>2 of 3 days</span>
+              <span>
+                {milestone.nextBadge
+                  ? `${milestone.remainingDays} ${milestone.remainingDays === 1 ? "day" : "days"} remaining`
+                  : "Maximum tier unlocked"}
+              </span>
+              <span>
+                {milestone.nextBadge
+                  ? `${milestone.currentDays} of ${milestone.targetDays} days (${milestone.percent}%)`
+                  : `${milestone.currentDays} days achieved`}
+              </span>
             </div>
           </div>
 
