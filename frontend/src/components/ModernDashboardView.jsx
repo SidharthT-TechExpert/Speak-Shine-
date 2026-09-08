@@ -2084,19 +2084,22 @@ export default function ModernDashboardView({
             // ── Dynamic Node Generator for ANY Range ────────────────────────
             const nodes = [];
 
-            if (roadmapViewMode === "sprint" && targetDays > startDays) {
-              // SPRINT VIEW: Micro progression focusing purely on the active tier (startDays -> targetDays)
-              const span = targetDays - startDays;
+            // If targetDays <= 14, sprint starts at 1 so early milestones (e.g. 7d, 10d) always show a complete, rich track
+            const sprintFromDay = targetDays <= 14 ? 1 : Math.max(1, startDays);
+
+            if (roadmapViewMode === "sprint" && targetDays > sprintFromDay) {
+              // SPRINT VIEW: Micro progression focusing on the active milestone sprint
+              const span = targetDays - sprintFromDay;
               const sprintDays = [];
               if (span <= 12) {
-                for (let d = startDays; d <= targetDays; d++) {
+                for (let d = sprintFromDay; d <= targetDays; d++) {
                   if (d > 0) sprintDays.push(d);
                 }
               } else {
                 // Step evenly through the active tier so it never looks crowded or empty
                 const step = Math.max(1, Math.round(span / 7));
-                const s = new Set([startDays, currentDays, targetDays].filter(d => d > 0));
-                for (let d = startDays; d <= targetDays; d += step) {
+                const s = new Set([sprintFromDay, currentDays, targetDays].filter(d => d > 0));
+                for (let d = sprintFromDay; d <= targetDays; d += step) {
                   if (d > 0) s.add(d);
                 }
                 sprintDays.push(...Array.from(s).sort((a, b) => a - b));
@@ -2250,7 +2253,7 @@ export default function ModernDashboardView({
 
                   {/* Mode Switcher & View All Badges */}
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-                    {targetDays > 8 && (
+                    {targetDays > 3 && (
                       <div style={{
                         display: "inline-flex",
                         background: "rgba(255, 255, 255, 0.04)",
@@ -2274,7 +2277,7 @@ export default function ModernDashboardView({
                             transition: "all 0.15s ease",
                           }}
                         >
-                          ⚡ Active Sprint ({startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`})
+                          ⚡ Active Sprint ({targetDays <= 14 ? `1–${targetDays}d` : (startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`)})
                         </button>
                         <button
                           type="button"
@@ -2435,12 +2438,10 @@ export default function ModernDashboardView({
                     </div>
                     <div>
                       <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {roadmapViewMode === "sprint" ? "ACTIVE TIER PROGRESS" : "OVERALL PROGRESS"}
+                        OVERALL PROGRESS
                       </div>
                       <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", marginTop: "1px" }}>
-                        {roadmapViewMode === "sprint"
-                          ? `${tierProgress} of ${tierSpan} Tier Days (${tierPercent}%)`
-                          : `${currentDays} of ${targetDays} Days (${overallPercent}%)`}
+                        {currentDays} of {targetDays} Days ({overallPercent}%)
                       </div>
                       <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>
                         {remainingDays > 0 ? `${remainingDays} more consecutive days needed` : "Milestone reached!"}
