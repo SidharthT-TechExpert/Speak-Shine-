@@ -65,16 +65,16 @@ export default function CustomCursor() {
       if (interactive && !isHoveringInteractive) {
         isHoveringInteractive = true;
         gsap.to(ring, {
-          scale: 2.2,
-          borderColor: isDark ? "rgba(251, 191, 36, 0.75)" : "rgba(99, 102, 241, 0.75)",
-          backgroundColor: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(99, 102, 241, 0.08)",
-          duration: 0.25,
+          scale: 1.35,
+          borderColor: isDark ? "rgba(251, 191, 36, 0.85)" : "rgba(99, 102, 241, 0.85)",
+          backgroundColor: "transparent",
+          duration: 0.2,
           ease: "power2.out",
         });
         gsap.to(dot, {
-          scale: 1.3,
+          scale: 1.1,
           backgroundColor: isDark ? "#fbbf24" : "#6366f1",
-          duration: 0.25,
+          duration: 0.2,
         });
       } else if (!interactive && isHoveringInteractive) {
         isHoveringInteractive = false;
@@ -82,13 +82,13 @@ export default function CustomCursor() {
           scale: 1,
           borderColor: isDark ? "rgba(167, 139, 250, 0.45)" : "rgba(100, 116, 139, 0.45)",
           backgroundColor: "transparent",
-          duration: 0.25,
+          duration: 0.2,
           ease: "power2.out",
         });
         gsap.to(dot, {
           scale: 1,
           backgroundColor: isDark ? "#a78bfa" : "#6366f1",
-          duration: 0.25,
+          duration: 0.2,
         });
       }
     };
@@ -121,15 +121,12 @@ export default function CustomCursor() {
           position: "fixed",
           top: 0,
           left: 0,
-          width: 8,
-          height: 8,
-          marginTop: -4,
-          marginLeft: -4,
+          width: 6,
+          height: 6,
+          marginTop: -3,
+          marginLeft: -3,
           borderRadius: "50%",
           backgroundColor: isDark ? "#a78bfa" : "#6366f1",
-          boxShadow: isDark
-            ? "0 0 10px rgba(167, 139, 250, 0.8), 0 0 20px rgba(251, 191, 36, 0.4)"
-            : "0 0 8px rgba(99, 102, 241, 0.6)",
           zIndex: 999999,
           pointerEvents: "none",
           transform: "translate(-100px, -100px)",
@@ -137,25 +134,25 @@ export default function CustomCursor() {
         }}
       />
 
-      {/* Smooth Trailing Follower Ring */}
+      {/* Smooth Trailing Follower Ring - Crystal Clear Without Blur */}
       <div
         ref={ringRef}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
-          width: 34,
-          height: 34,
-          marginTop: -17,
-          marginLeft: -17,
+          width: 28,
+          height: 28,
+          marginTop: -14,
+          marginLeft: -14,
           borderRadius: "50%",
           border: isDark ? "1.5px solid rgba(167, 139, 250, 0.45)" : "1.5px solid rgba(100, 116, 139, 0.45)",
+          backgroundColor: "transparent",
           zIndex: 999998,
           pointerEvents: "none",
           transform: "translate(-100px, -100px)",
-          willChange: "transform, width, height, border-color, background-color",
-          transition: "border-color 0.2s ease, background-color 0.2s ease",
-          backdropFilter: "blur(0.5px)",
+          willChange: "transform, border-color",
+          transition: "border-color 0.2s ease",
         }}
       />
     </div>

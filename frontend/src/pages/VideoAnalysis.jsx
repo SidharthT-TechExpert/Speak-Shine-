@@ -52,6 +52,7 @@ export default function VideoAnalysis() {
   const [isPictureDescription, setIsPictureDescription] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
+  const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
   const [durationLimits, setDurationLimits] = useState(null);
 
   // ── Live Countdown to Midnight IST (Matching Dashboard Page) ────────────────
@@ -342,6 +343,7 @@ export default function VideoAnalysis() {
       if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
       if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
       if (r.data?.today?.allowPrivateVideos !== undefined) setAllowPrivateVideos(r.data.today.allowPrivateVideos);
+      if (r.data?.today?.enableBackgroundBlur !== undefined) setEnableBackgroundBlur(r.data.today.enableBackgroundBlur);
       if (t?.durationLimits) setDurationLimits(t.durationLimits);
     }).catch(() => {});
   }, [isGuest]);
@@ -1140,7 +1142,7 @@ export default function VideoAnalysis() {
 
         {mode === "upload"
           ? <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} />
-          : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} />
+          : <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
         }
 
         {/* Report Section */}
@@ -2523,7 +2525,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 // ── Record Card ──────────────────────────────────────────────────────────────
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
 
-function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, allowPrivateVideos = true }) {
+function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, allowPrivateVideos = true, enableBackgroundBlur = false }) {
   const navigate = useNavigate();
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
@@ -3488,75 +3490,79 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
             </button>
           </div>
 
-          {/* Background blur toggle */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            background: "var(--card2)", border: "1px solid var(--border2)",
-            borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "0.75rem",
-          }}>
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
-                🌫️ AI Background Blur
+          {/* Background blur toggle & slider — Controlled by Admin setting */}
+          {enableBackgroundBlur && (
+            <>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: "var(--card2)", border: "1px solid var(--border2)",
+                borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "0.75rem",
+              }}>
+                <div>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
+                    🌫️ AI Background Blur
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.15rem" }}>
+                    MediaPipe AI — detects you and blurs background
+                  </div>
+                  {blurError && (
+                    <div style={{ fontSize: "0.7rem", color: "var(--danger)", marginTop: "0.25rem" }}>
+                      ⚠️ Model loading failed - check internet connection
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setBackgroundBlur(v => !v)} style={{
+                  width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer",
+                  background: backgroundBlur ? "var(--primary)" : "var(--border2)",
+                  position: "relative", transition: "background 0.2s", flexShrink: 0,
+                }}>
+                  <span style={{
+                    position: "absolute", top: "3px",
+                    left: backgroundBlur ? "22px" : "3px",
+                    width: "18px", height: "18px", borderRadius: "50%",
+                    background: "#fff", transition: "left 0.2s",
+                  }} />
+                </button>
               </div>
-              <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                MediaPipe AI — detects you and blurs background
-              </div>
-              {blurError && (
-                <div style={{ fontSize: "0.7rem", color: "var(--danger)", marginTop: "0.25rem" }}>
-                  ⚠️ Model loading failed - check internet connection
+
+              {/* Blur strength slider (only show when blur is enabled) */}
+              {backgroundBlur && (
+                <div style={{
+                  background: "var(--card2)", border: "1px solid var(--border2)",
+                  borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1.25rem",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                    <label style={{ fontSize: "0.8rem", color: "var(--text)", fontWeight: 600 }}>
+                      Blur Strength
+                    </label>
+                    <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 700 }}>
+                      {blurStrength}px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="40"
+                    step="5"
+                    value={blurStrength}
+                    onChange={(e) => setBlurStrength(Number(e.target.value))}
+                    style={{
+                      width: "100%",
+                      height: "6px",
+                      borderRadius: "3px",
+                      background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${((blurStrength - 5) / 35) * 100}%, var(--border2) ${((blurStrength - 5) / 35) * 100}%, var(--border2) 100%)`,
+                      outline: "none",
+                      cursor: "pointer",
+                      WebkitAppearance: "none",
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem", fontSize: "0.65rem", color: "var(--muted)" }}>
+                    <span>Light</span>
+                    <span>Strong</span>
+                  </div>
                 </div>
               )}
-            </div>
-            <button onClick={() => setBackgroundBlur(v => !v)} style={{
-              width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer",
-              background: backgroundBlur ? "var(--primary)" : "var(--border2)",
-              position: "relative", transition: "background 0.2s", flexShrink: 0,
-            }}>
-              <span style={{
-                position: "absolute", top: "3px",
-                left: backgroundBlur ? "22px" : "3px",
-                width: "18px", height: "18px", borderRadius: "50%",
-                background: "#fff", transition: "left 0.2s",
-              }} />
-            </button>
-          </div>
-
-          {/* Blur strength slider (only show when blur is enabled) */}
-          {backgroundBlur && (
-            <div style={{
-              background: "var(--card2)", border: "1px solid var(--border2)",
-              borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1.25rem",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                <label style={{ fontSize: "0.8rem", color: "var(--text)", fontWeight: 600 }}>
-                  Blur Strength
-                </label>
-                <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 700 }}>
-                  {blurStrength}px
-                </span>
-              </div>
-              <input
-                type="range"
-                min="5"
-                max="40"
-                step="5"
-                value={blurStrength}
-                onChange={(e) => setBlurStrength(Number(e.target.value))}
-                style={{
-                  width: "100%",
-                  height: "6px",
-                  borderRadius: "3px",
-                  background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${((blurStrength - 5) / 35) * 100}%, var(--border2) ${((blurStrength - 5) / 35) * 100}%, var(--border2) 100%)`,
-                  outline: "none",
-                  cursor: "pointer",
-                  WebkitAppearance: "none",
-                }}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem", fontSize: "0.65rem", color: "var(--muted)" }}>
-                <span>Light</span>
-                <span>Strong</span>
-              </div>
-            </div>
+            </>
           )}
 
           <button className="btn-primary" onClick={startCountdown} style={{ width: "100%" }}>

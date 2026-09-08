@@ -49,6 +49,7 @@ const statusSchema = new mongoose.Schema({
   usedStoryThemes: { type: [String], default: [] },
   storyLevel: { type: String, default: "B1", enum: ["A2", "B1", "B2", "C1"] },
   allowPrivateVideos: { type: Boolean, default: true }, // admin can disable to force all videos public
+  enableBackgroundBlur: { type: Boolean, default: false }, // admin setting to enable/disable AI background blur
   // Which days of the week auto-story runs (array of 0=Sun, 1=Mon, ... 6=Sat). Default: [6] (Saturday)
   storyDays: { type: [Number], default: [6] },
   storyDay: { type: Number, default: 6, min: 0, max: 6 },

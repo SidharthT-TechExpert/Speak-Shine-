@@ -424,6 +424,7 @@ export default function AdminDashboard() {
     storyWordCount: 200,
     storyLevel: "B1",
     allowPrivateVideos: true,
+    enableBackgroundBlur: false,
     storyDays: [6],
     storyDay: 6,
     pictureDescriptionDays: [4],
@@ -920,6 +921,7 @@ export default function AdminDashboard() {
         storyWordCount: s.data.storyWordCount ?? 200,
         storyLevel: s.data.storyLevel || "B1",
         allowPrivateVideos: s.data.allowPrivateVideos ?? true,
+        enableBackgroundBlur: s.data.enableBackgroundBlur ?? false,
         storyDays: Array.isArray(s.data.storyDays) && s.data.storyDays.length > 0
           ? s.data.storyDays
           : (s.data.storyDay !== undefined ? [s.data.storyDay] : [6]),
@@ -7295,6 +7297,37 @@ export default function AdminDashboard() {
                       <div>
                         <div style={{ fontSize: "0.85rem", fontWeight: 700, color: settings.allowPrivateVideos ? "#4ade80" : "#f87171" }}>
                           {settings.allowPrivateVideos ? "Enabled — Students can set videos private" : "Disabled — All videos are forced public"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Background Blur Toggle */}
+                  <div style={{ padding: "1.25rem", borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.3rem" }}>
+                      🌫️ AI Background Blur Feature
+                    </label>
+                    <p style={{ color: "var(--muted)", fontSize: "0.78rem", margin: "0 0 0.75rem" }}>
+                      Enable or disable the MediaPipe AI background blur toggle for students on the video recording page.
+                    </p>
+                    <div
+                      onClick={() => setSettings(s => ({ ...s, enableBackgroundBlur: !s.enableBackgroundBlur }))}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "0.75rem",
+                        cursor: "pointer", userSelect: "none",
+                        background: settings.enableBackgroundBlur ? "rgba(74,222,128,0.08)" : "rgba(248,113,113,0.08)",
+                        border: `1px solid ${settings.enableBackgroundBlur ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
+                        borderRadius: 12, padding: "0.65rem 1rem",
+                      }}
+                    >
+                      <div style={{
+                        width: 12, height: 12, borderRadius: "50%",
+                        background: settings.enableBackgroundBlur ? "#4ade80" : "#f87171",
+                        boxShadow: `0 0 8px ${settings.enableBackgroundBlur ? "#4ade80" : "#f87171"}`,
+                      }} />
+                      <div>
+                        <div style={{ fontSize: "0.85rem", fontWeight: 700, color: settings.enableBackgroundBlur ? "#4ade80" : "#f87171" }}>
+                          {settings.enableBackgroundBlur ? "Enabled — AI Background Blur is available on recording page" : "Disabled — AI Background Blur option is hidden"}
                         </div>
                       </div>
                     </div>

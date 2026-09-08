@@ -303,6 +303,7 @@ export async function getUserProfile(phone) {
       imageInstructions:    status?.todayImageInstructions || null,
       vocabulary: await vocabularyPromise,
       allowPrivateVideos: status?.allowPrivateVideos ?? true,
+      enableBackgroundBlur: status?.enableBackgroundBlur ?? false,
       vocabWordCount: activePictureTask(status)
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : activeStoryTask(status)
@@ -521,6 +522,7 @@ export async function getSettings() {
     storyWordCount: status.storyWordCount ?? 200,
     storyLevel: status.storyLevel || "B1",
     allowPrivateVideos: status.allowPrivateVideos ?? true,
+    enableBackgroundBlur: status.enableBackgroundBlur ?? false,
     storyDays: Array.isArray(status.storyDays) && status.storyDays.length > 0
       ? status.storyDays
       : (status.storyDay !== undefined && status.storyDay !== null ? [status.storyDay] : [6]),
@@ -983,6 +985,10 @@ export async function updateSettings(input, ...rest) {
 
   if (allowPrivateVideos !== undefined) {
     updates.allowPrivateVideos = allowPrivateVideos === true || allowPrivateVideos === "true";
+  }
+
+  if (params.enableBackgroundBlur !== undefined) {
+    updates.enableBackgroundBlur = params.enableBackgroundBlur === true || params.enableBackgroundBlur === "true";
   }
 
   // Month-End Prize Settings
