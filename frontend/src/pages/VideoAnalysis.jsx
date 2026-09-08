@@ -2069,7 +2069,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
 
   const liveVideoRef    = useRef(null);
   const previewVideoRef = useRef(null);
-  const streamRef       = useRef(null);
+  const rawStreamRef    = useRef(null); // holds real hardware media stream from getUserMedia
+  const streamRef       = useRef(null); // holds active/processed recording stream
   const recorderRef     = useRef(null);
   const chunksRef       = useRef([]);
   const timerRef        = useRef(null);
@@ -2210,6 +2211,15 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     }
   }, [step]);
 
+  // Failsafe: Ensure camera & mic hardware tracks are killed whenever exiting recording/countdown
+  useEffect(() => {
+    if (step !== "countdown" && step !== "recording") {
+      if (rawStreamRef.current || streamRef.current || liveVideoRef.current?.srcObject) {
+        cleanup();
+      }
+    }
+  }, [step, cleanup]);
+
   // ── Background compression — starts as soon as preview loads ─────────────
   // If the blob is large enough, kick off compression immediately so it's
   // ready before the user clicks Submit (parallel, not sequential).
@@ -2250,7 +2260,43 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
   const cleanup = useCallback(() => {
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
-    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+
+    // 1. Stop all tracks on the real hardware camera/mic stream
+    if (rawStreamRef.current) {
+      rawStreamRef.current.getTracks().forEach(t => {
+        try {
+          t.stop();
+          console.log(`[CameraAccess] Stopped hardware track: ${t.kind} (${t.label})`);
+        } catch (e) {
+          console.warn("[CameraAccess] Error stopping hardware track:", e);
+        }
+      });
+      rawStreamRef.current = null;
+    }
+
+    // 2. Stop all tracks on the active/processed recording stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => {
+        try {
+          t.stop();
+        } catch (e) {}
+      });
+      streamRef.current = null;
+    }
+
+    // 3. Disconnect and stop any tracks attached to the live video preview
+    if (liveVideoRef.current) {
+      if (liveVideoRef.current.srcObject) {
+        try {
+          const liveStream = liveVideoRef.current.srcObject;
+          if (liveStream.getTracks) {
+            liveStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+          }
+        } catch (e) {}
+        liveVideoRef.current.srcObject = null;
+      }
+    }
+
     cleanupNC();
     cleanupBlur();
     setNcStatus("idle");
@@ -2267,6 +2313,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     
     try {
       const rawStream = await openRecordingStream(camId, micId);
+      rawStreamRef.current = rawStream;
 
       let finalStream = rawStream;
 
@@ -2482,9 +2529,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
         console.error(`[Recording] Error stopping recorder:`, err);
         setError("Error stopping recording. Please try again.");
         setStep("setup");
-        cleanup();
       }
     }
+    // Immediately stop hardware camera and mic access
+    cleanup();
   };
 
   const togglePause = useCallback(() => {
@@ -2493,8 +2541,29 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       closeActiveRecordingSegment();
       recorderRef.current.pause();
       clearInterval(timerRef.current);
+
+      // Disable camera & mic tracks during pause so camera enters standby
+      if (rawStreamRef.current) {
+        rawStreamRef.current.getTracks().forEach(t => { t.enabled = false; });
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => { t.enabled = false; });
+      }
+
       setIsPaused(true);
     } else if (recorderRef.current.state === "paused") {
+      // Re-enable camera & mic tracks when resuming recording
+      if (rawStreamRef.current) {
+        rawStreamRef.current.getTracks().forEach(t => { t.enabled = true; });
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => { t.enabled = true; });
+      }
+
+      if (liveVideoRef.current && streamRef.current) {
+        liveVideoRef.current.play().catch(() => {});
+      }
+
       recorderRef.current.resume();
       recordingStartedAtRef.current = Date.now();
       timerRef.current = setInterval(() => {
@@ -2505,7 +2574,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
       }, 1000);
       setIsPaused(false);
     }
-  }, [closeActiveRecordingSegment, getWallClockElapsed, MAX_SECONDS]);
+  }, [closeActiveRecordingSegment, getWallClockElapsed, MAX_SECONDS, cleanup]);
 
   // Toggle blur during recording
   const handleBlurToggle = useCallback(() => {
@@ -3093,6 +3162,30 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
                 fontSize: "0.68rem", fontWeight: 700,
                 zIndex: 2,
               }}>🎙️ AI NC</div>
+            )}
+
+            {/* Paused Overlay */}
+            {isPaused && (
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "12px",
+                zIndex: 1,
+                color: "#fff",
+                gap: "0.4rem",
+                padding: "1rem",
+                textAlign: "center"
+              }}>
+                <span style={{ fontSize: "2rem" }}>⏸</span>
+                <span style={{ fontWeight: 700, fontSize: "1rem", color: "#fbbf24" }}>Recording Paused</span>
+                <span style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>Camera and microphone on standby · Click Resume or press Space to continue</span>
+              </div>
             )}
 
             {/* Timer bar — color shifts green→yellow→red as time fills up */}

@@ -41,6 +41,11 @@ export function useBackgroundBlur(blurStrength = 20) {
     }
     
     if (inputVideoRef.current) {
+      if (inputVideoRef.current.srcObject) {
+        try {
+          inputVideoRef.current.srcObject.getTracks?.().forEach(track => track.stop());
+        } catch {}
+      }
       inputVideoRef.current.srcObject = null;
       inputVideoRef.current = null;
     }
@@ -55,7 +60,12 @@ export function useBackgroundBlur(blurStrength = 20) {
       ctxRef.current = null;
     }
     
-    originalStreamRef.current = null;
+    if (originalStreamRef.current) {
+      try {
+        originalStreamRef.current.getTracks?.().forEach(track => track.stop());
+      } catch {}
+      originalStreamRef.current = null;
+    }
     isBlurEnabledRef.current = true;
     
     setBlurStatus('idle');
@@ -137,6 +147,7 @@ export function useBackgroundBlur(blurStrength = 20) {
       video.height = 480;
       video.srcObject = originalStream;
       inputVideoRef.current = video;
+      originalStreamRef.current = originalStream;
 
       // Wait for video to load
       await new Promise((resolve, reject) => {
