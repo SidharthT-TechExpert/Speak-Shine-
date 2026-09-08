@@ -1472,12 +1472,13 @@ function ManualQuestionsPanel() {
                     style={{ fontSize: "0.82rem", background: "#0f172a", borderColor: "rgba(167, 139, 250, 0.4)", color: "#f8fafc" }}
                   >
                     <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Warm & Conversational (Female, 20s)</option>
-                    <option value="LcfcDJNUP1GQjkzn1xUU">Emily — Energetic & Bright (Female, 20s)</option>
-                    <option value="piTKgcLEGmPE4e6mEKli">Nicole — Gentle Storyteller (Female, Soft)</option>
+                    <option value="AZnzlk1XvdvUeBnXmlld">Domi — Energetic & Expressive (Female, 20s)</option>
+                    <option value="EXAVITQu4vr4xnSDxMaL">Bella — Gentle Storyteller (Female, Soft)</option>
+                    <option value="MF3mGyEYCl7XYWbV9V6O">Elli — Bright & Youthful (Female, Clear)</option>
                     <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Casual & Relatable (Male, 20s)</option>
                     <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Dynamic & Expressive (Male, Confident)</option>
+                    <option value="ErXwobaYiN019PkySvjV">Antoni — Warm Storyteller (Male, Pleasant)</option>
                     <option value="pNInz6obpgDQGcFmaJgB">Adam — Deep Classic Narrator (Male)</option>
-                    <option value="JBFqnCBsd6RMkjVDRZzb">George — Warm British Storyteller (Male)</option>
                   </select>
 
                   <button

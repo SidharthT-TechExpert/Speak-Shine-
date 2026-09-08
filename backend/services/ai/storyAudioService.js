@@ -104,6 +104,20 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
       continue; // try next key
     }
 
+    if (res.status === 402) {
+      // Free users cannot use library voices via the API, or account quota reached
+      console.warn(`[StoryAudio] ElevenLabs 402 error: ${detail}`);
+      if (targetVoiceId !== DEFAULT_VOICE_ID) {
+        console.warn(`[StoryAudio] Voice "${targetVoiceId}" is restricted on free tier. Automatically retrying with Adam (${DEFAULT_VOICE_ID})...`);
+        targetVoiceId = DEFAULT_VOICE_ID;
+        continue; // Retry with Adam using the same key
+      }
+      // If Adam also fails with 402, this key's monthly free characters are exhausted
+      markInvalid(apiKey);
+      lastError = new Error(`ElevenLabs quota or tier limit (402): ${detail}`);
+      continue; // Try next key in rotation
+    }
+
     if (res.status === 401 || res.status === 403) {
       // Invalid key or quota exceeded
       markInvalid(apiKey);

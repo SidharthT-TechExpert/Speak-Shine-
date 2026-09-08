@@ -11,7 +11,7 @@
 import fetch from "node-fetch";
 import { getTextKey, getTextModel, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 
-// Curated library of pre-made ElevenLabs voices available across free and paid tiers
+// Curated library of native pre-made ElevenLabs system voices (100% free-tier API compatible, no library restrictions)
 export const STORY_VOICES = {
   rachel: {
     key: "rachel",
@@ -23,25 +23,35 @@ export const STORY_VOICES = {
     description: "Natural, relatable, young female voice. Feels like a close friend telling a personal story.",
     defaultSettings: { stability: 0.34, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true },
   },
-  emily: {
-    key: "emily",
-    id: "LcfcDJNUP1GQjkzn1xUU",
-    name: "Emily",
+  domi: {
+    key: "domi",
+    id: "AZnzlk1XvdvUeBnXmlld",
+    name: "Domi",
     gender: "female",
     age: "young_adult",
-    vibe: "Energetic & Bright",
-    description: "Upbeat, lively, cheerful young female voice. Great for fast-paced, humorous, or social stories.",
+    vibe: "Energetic & Expressive",
+    description: "Upbeat, lively, confident young female voice. Great for fast-paced, humorous, or social stories.",
     defaultSettings: { stability: 0.30, similarity_boost: 0.75, style: 0.50, use_speaker_boost: true },
   },
-  nicole: {
-    key: "nicole",
-    id: "piTKgcLEGmPE4e6mEKli",
-    name: "Nicole",
+  bella: {
+    key: "bella",
+    id: "EXAVITQu4vr4xnSDxMaL",
+    name: "Bella",
     gender: "female",
-    age: "adult",
+    age: "young_adult",
     vibe: "Gentle Storyteller",
     description: "Thoughtful, gentle, intimate storytelling voice. Ideal for reflective, heartfelt, or calming narratives.",
     defaultSettings: { stability: 0.40, similarity_boost: 0.75, style: 0.35, use_speaker_boost: true },
+  },
+  elli: {
+    key: "elli",
+    id: "MF3mGyEYCl7XYWbV9V6O",
+    name: "Elli",
+    gender: "female",
+    age: "young_adult",
+    vibe: "Bright & Cheerful",
+    description: "Bright, youthful, clear voice. Great for student and college campus stories.",
+    defaultSettings: { stability: 0.35, similarity_boost: 0.75, style: 0.45, use_speaker_boost: true },
   },
   josh: {
     key: "josh",
@@ -63,6 +73,16 @@ export const STORY_VOICES = {
     description: "Expressive, confident male voice with natural dynamic range and conversational energy.",
     defaultSettings: { stability: 0.32, similarity_boost: 0.75, style: 0.50, use_speaker_boost: true },
   },
+  antoni: {
+    key: "antoni",
+    id: "ErXwobaYiN019PkySvjV",
+    name: "Antoni",
+    gender: "male",
+    age: "young_adult",
+    vibe: "Warm Storyteller",
+    description: "Pleasant, well-rounded, natural male voice. Perfect for relatable everyday experiences.",
+    defaultSettings: { stability: 0.38, similarity_boost: 0.75, style: 0.40, use_speaker_boost: true },
+  },
   adam: {
     key: "adam",
     id: "pNInz6obpgDQGcFmaJgB",
@@ -72,16 +92,6 @@ export const STORY_VOICES = {
     vibe: "Deep Narrator",
     description: "Classic deep narrative voice. Grounded, articulate, and authoritative.",
     defaultSettings: { stability: 0.42, similarity_boost: 0.75, style: 0.35, use_speaker_boost: true },
-  },
-  george: {
-    key: "george",
-    id: "JBFqnCBsd6RMkjVDRZzb",
-    name: "George",
-    gender: "male",
-    age: "adult",
-    vibe: "Warm British Storyteller",
-    description: "Warm, captivating, articulate storyteller. Great for thoughtful life lessons and travel adventures.",
-    defaultSettings: { stability: 0.38, similarity_boost: 0.75, style: 0.40, use_speaker_boost: true },
   },
 };
 
@@ -129,14 +139,14 @@ function heuristicMatch(storyText = "", characterHint = null) {
 
   let voiceKey = isFemale ? "rachel" : "josh";
   if (isFemale) {
-    if (isEnergetic) voiceKey = "emily";
-    else if (isReflective) voiceKey = "nicole";
+    if (isEnergetic) voiceKey = "domi";
+    else if (isReflective) voiceKey = "bella";
   } else {
     if (isEnergetic) voiceKey = "sam";
-    else if (isReflective) voiceKey = "george";
+    else if (isReflective) voiceKey = "antoni";
   }
 
-  const voice = STORY_VOICES[voiceKey];
+  const voice = STORY_VOICES[voiceKey] || STORY_VOICES.adam;
   return {
     characterName: characterHint?.name || (isFemale ? "Female Protagonist" : "Male Protagonist"),
     gender: isFemale ? "female" : "male",
@@ -175,7 +185,7 @@ ${storyText.slice(0, 1800)}
 """
 ${characterHint ? `\nKNOWN CHARACTER CONTEXT: ${JSON.stringify(characterHint)}` : ""}
 
-AVAILABLE VOICES:
+AVAILABLE VOICES (Native Pre-made System Cast):
 ${voiceOptions}
 
 Determine:
@@ -183,7 +193,7 @@ Determine:
 2. gender: "female" or "male"
 3. persona: A short 3-6 word description of who they are (e.g., "20-year-old college student", "25-year-old software trainee")
 4. mood: The overall emotional tone of the story (e.g. "Warm & conversational", "Relieved & humorous", "Thoughtful & reflective", "Upbeat & excited")
-5. selectedVoiceKey: Pick the SINGLE best voice key from the available list: rachel, emily, nicole, josh, sam, adam, george
+5. selectedVoiceKey: Pick the SINGLE best voice key from the available list: rachel, domi, bella, elli, josh, sam, antoni, adam
 6. reason: 1 concise sentence explaining why this voice creates the most natural, human listening experience for this character and story.
 7. stability: A number between 0.28 and 0.45. (Use lower ~0.30 for emotional, funny, or dramatic stories to add natural human pitch swings; use higher ~0.42 for calm/steady stories).
 8. style: A number between 0.35 and 0.55. (Higher ~0.50 for lively conversational storytelling; ~0.35 for subtle calm narration).
@@ -194,7 +204,7 @@ Return ONLY valid JSON matching this schema:
   "gender": "female" or "male",
   "persona": "...",
   "mood": "...",
-  "selectedVoiceKey": "rachel" | "emily" | "nicole" | "josh" | "sam" | "adam" | "george",
+  "selectedVoiceKey": "rachel" | "domi" | "bella" | "elli" | "josh" | "sam" | "antoni" | "adam",
   "reason": "...",
   "stability": 0.34,
   "style": 0.45
