@@ -246,8 +246,8 @@ export default function ModernDashboardView({
   const [sessionPage, setSessionPage] = useState(1);
   const SESSION_PAGE_SIZE = 6;
 
-  // ── Milestone Roadmap View Mode: "roadmap" (macro landmarks) | "sprint" (active tier) ──
-  const [roadmapViewMode, setRoadmapViewMode] = useState("roadmap");
+  // ── Milestone Roadmap View Mode: "sprint" (active tier default) | "roadmap" (macro landmarks) ──
+  const [roadmapViewMode, setRoadmapViewMode] = useState("sprint");
 
   // ── Audio Player & Waveform State ───────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -2261,6 +2261,23 @@ export default function ModernDashboardView({
                       }}>
                         <button
                           type="button"
+                          onClick={() => setRoadmapViewMode("sprint")}
+                          style={{
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "3px 9px",
+                            fontSize: "0.72rem",
+                            fontWeight: roadmapViewMode === "sprint" ? 700 : 500,
+                            background: roadmapViewMode === "sprint" ? "rgba(167, 139, 250, 0.2)" : "transparent",
+                            color: roadmapViewMode === "sprint" ? "#c084fc" : "#94a3b8",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          ⚡ Active Sprint ({startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`})
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setRoadmapViewMode("roadmap")}
                           style={{
                             border: "none",
@@ -2275,23 +2292,6 @@ export default function ModernDashboardView({
                           }}
                         >
                           🏆 Full Roadmap (1–{targetDays}d)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRoadmapViewMode("sprint")}
-                          style={{
-                            border: "none",
-                            borderRadius: 6,
-                            padding: "3px 9px",
-                            fontSize: "0.72rem",
-                            fontWeight: roadmapViewMode === "sprint" ? 700 : 500,
-                            background: roadmapViewMode === "sprint" ? "rgba(167, 139, 250, 0.2)" : "transparent",
-                            color: roadmapViewMode === "sprint" ? "#c084fc" : "#94a3b8",
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          ⚡ Active Tier ({startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`})
                         </button>
                       </div>
                     )}
