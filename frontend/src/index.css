@@ -6245,3 +6245,31 @@ audio { border-radius: 12px; }
   background: rgba(99, 102, 241, 0.08) !important;
   border-color: rgba(99, 102, 241, 0.3) !important;
 }
+
+/* ── Story Title — Playfair Display, theme-aware gradient ────────────────────*/
+.story-title-heading {
+  color: #ffffff;
+}
+
+.story-title-italic {
+  font-style: italic;
+  font-weight: 600;
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 60%, #e879f9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Light mode: deep indigo-violet so italic word is clearly readable on white */
+[data-theme="light"] .story-title-heading,
+.light .story-title-heading {
+  color: #0f172a;
+}
+
+[data-theme="light"] .story-title-italic,
+.light .story-title-italic {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #9333ea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
