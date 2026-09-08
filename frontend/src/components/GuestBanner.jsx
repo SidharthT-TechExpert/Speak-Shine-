@@ -13,7 +13,17 @@ export default function GuestBanner() {
   useEffect(() => {
     api.get("/guest/slots")
       .then(r => {
-        if (r.data) setSlots(r.data);
+        if (r.data) {
+          const totalSlots = 20;
+          const slotsLeft = Math.min(5, Math.max(1, Number(r.data.slotsLeft) || 5));
+          setSlots({
+            ...r.data,
+            totalSlots,
+            slotsLeft,
+            percentFull: Math.round(((totalSlots - slotsLeft) / totalSlots) * 100),
+            isFull: false,
+          });
+        }
       })
       .catch(() => {});
   }, []);

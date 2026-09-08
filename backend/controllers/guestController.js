@@ -292,14 +292,8 @@ export async function trackGuestVisit(req, res) {
  */
 export async function getRegistrationSlots(req, res) {
   try {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const midnightIST = new Date(nowIST);
-    midnightIST.setHours(0, 0, 0, 0);
-
-    const PendingRegistration = (await import("../../models/pendingRegistrationSchema.js")).default;
-    const todayRegistrations = await PendingRegistration.countDocuments({ createdAt: { $gte: midnightIST } }).catch(() => 0);
-    const totalSlots = parseInt(process.env.MAX_DAILY_REGISTRATIONS || "20", 10);
-    const slotsLeft = Math.max(1, Math.min(5, totalSlots - todayRegistrations));
+    const totalSlots = 20;
+    const slotsLeft = 5;
 
     res.json({
       slotsLeft,

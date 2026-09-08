@@ -546,24 +546,25 @@ export default function ModernDashboardView({
       const initials = isUser ? (avatarInitials || "YOU") : getInitials(name);
 
       const streakDays = u.streak ?? (isUser ? (profile?.streak || 0) : 0);
-      let title = u.badge || "";
-      if (!title) {
-        if (streakDays >= 100) title = `Communication Titan · ${streakDays}d`;
-        else if (streakDays >= 60) title = `Elite Communicator · ${streakDays}d`;
-        else if (streakDays >= 30) title = `Speech Legend · ${streakDays}d`;
-        else if (streakDays >= 14) title = `Master Speaker · ${streakDays}d`;
-        else if (streakDays >= 7) title = `Rising Star · ${streakDays}d`;
-        else if (streakDays >= 3) title = `Bronze Speaker · ${streakDays}d`;
-        else if (streakDays >= 1) title = `Momentum Builder · ${streakDays}d`;
-        else title = `Active Speaker · ${streakDays}d`;
-      }
+      let badgeName = "Active Speaker";
+      let badgeIcon = "🎤";
+      if (streakDays >= 100) { badgeName = "Communication Titan"; badgeIcon = "💬"; }
+      else if (streakDays >= 60) { badgeName = "Elite Communicator"; badgeIcon = "🚀"; }
+      else if (streakDays >= 30) { badgeName = "Speech Legend"; badgeIcon = "👑"; }
+      else if (streakDays >= 14) { badgeName = "Master Speaker"; badgeIcon = "🌟"; }
+      else if (streakDays >= 7) { badgeName = "Rising Star"; badgeIcon = "⚡"; }
+      else if (streakDays >= 3) { badgeName = "First Steps"; badgeIcon = "🌱"; }
+      else if (streakDays >= 1) { badgeName = "Momentum Builder"; badgeIcon = "🔥"; }
+
+      let title = u.badge || `${badgeName} · ${streakDays}d`;
 
       const pts = Math.round(u.monthlyScore ?? u.points ?? (streakDays > 0 ? streakDays * 10 : 75));
+      const weeklySubmissions = u.weeklySubmissions ?? (isUser ? (profile?.weeklySubmissions ?? 2) : 2);
+      const isCompletedToday = Boolean(u.completed || u.completedToday || (u.time === "Today") || (u.lastScoreDate && new Date(u.lastScoreDate).toDateString() === new Date().toDateString()));
 
       let time = u.time;
       if (!time) {
-        if (u.completed) time = "Today";
-        else if (u.lastScoreDate) time = "Today";
+        if (isCompletedToday) time = "Today";
         else if (streakDays > 0) time = "Yesterday";
         else time = "Pending";
       }
@@ -574,7 +575,12 @@ export default function ModernDashboardView({
         name,
         initials,
         title,
+        badgeName,
+        badgeIcon,
+        streakDays,
         pts,
+        weeklySubmissions,
+        isCompletedToday,
         time,
         isUser,
       };
@@ -1210,6 +1216,7 @@ export default function ModernDashboardView({
             display: "grid",
             gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
             gap: "1.25rem",
+            alignItems: "start",
           }}>
             {/* Left Column: Performance Center with 3 Tabs */}
             <div className="speakshine-card-box" style={{
@@ -1553,20 +1560,11 @@ export default function ModernDashboardView({
               >
                 {/* Header with Trophy Emblem & Cohort Switcher */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 8,
-                      background: "linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.1))",
-                      border: "1px solid rgba(251, 191, 36, 0.4)",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.95rem",
-                      boxShadow: "0 2px 10px rgba(245, 158, 11, 0.2)",
-                    }}>
-                      🏆
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.08em", color: "#ffffff", textTransform: "uppercase" }}>
-                        TODAY'S LEADERBOARD
-                      </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ width: 3, height: 18, background: "#38bdf8", borderRadius: 2, display: "inline-block" }} />
+                    <span style={{ fontSize: "0.95rem" }}>🏆</span>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.08em", color: "#ffffff", textTransform: "uppercase" }}>
+                      TODAY'S LEADERBOARD
                     </div>
                   </div>
                   <Link
@@ -1648,27 +1646,6 @@ export default function ModernDashboardView({
                       ? "leaderboard-row rank-3"
                       : "leaderboard-row standard-row";
 
-                    const avatarBg = isRank1
-                      ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
-                      : isRank2
-                      ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
-                      : isRank3
-                      ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
-                      : isUser
-                      ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
-                      : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
-
-                    const avatarColor = isRank1 ? "#000000" : "#ffffff";
-                    const avatarBorder = isRank1
-                      ? "2px solid #fde68a"
-                      : isRank2
-                      ? "2px solid #e2e8f0"
-                      : isRank3
-                      ? "2px solid #fed7aa"
-                      : isUser
-                      ? "2px solid #c084fc"
-                      : "1px solid rgba(255, 255, 255, 0.12)";
-
                     return (
                       <div
                         key={u.rank}
@@ -1677,91 +1654,123 @@ export default function ModernDashboardView({
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-                          padding: isUser ? "0.8rem 0.95rem" : "0.7rem 0.85rem",
+                          padding: isUser ? "0.72rem 0.95rem" : "0.62rem 0.85rem",
                           borderRadius: 12,
+                          gap: "0.75rem",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                        {/* Left: Medal/Rank + Name + Badge Pill */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0, flex: 1 }}>
                           {/* Rank / Medal Emblem */}
                           <div style={{
-                            width: 24,
+                            width: 22,
                             textAlign: "center",
-                            fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.85rem",
+                            fontSize: isRank1 || isRank2 || isRank3 ? "1.15rem" : "0.85rem",
                             fontWeight: 800,
                             color: isUser ? "#c084fc" : "#8b85a3",
                             flexShrink: 0,
                           }}>
-                            {isRank1 ? "🥇" : isRank2 ? "🥈" : isRank3 ? "🥉" : isUser ? "👉" : u.rank}
+                            {isRank1 ? "🥇" : isRank2 ? "🥈" : isRank3 ? "🥉" : `${u.rank}.`}
                           </div>
 
-                          {/* Avatar Circle */}
-                          <div
-                            className="leaderboard-avatar"
-                            style={{
-                              background: avatarBg,
-                              color: avatarColor,
-                              border: avatarBorder,
-                              boxShadow: isRank1
-                                ? "0 0 10px rgba(251, 191, 36, 0.4)"
-                                : isUser
-                                ? "0 0 12px rgba(168, 85, 247, 0.4)"
-                                : "none",
-                            }}
-                          >
-                            {u.initials || "S"}
-                          </div>
+                          {/* Name */}
+                          <span style={{
+                            fontSize: "0.88rem",
+                            fontWeight: 700,
+                            color: isUser ? "#ffffff" : isRank1 ? "#fef08a" : "#f1f0f5",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}>
+                            {u.name}
+                          </span>
 
-                          {/* Name & Title */}
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{
-                              fontSize: "0.88rem",
-                              fontWeight: 700,
-                              color: isUser ? "#ffffff" : isRank1 ? "#fef08a" : "#f1f0f5",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.35rem",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}>
-                              <span>{u.name}</span>
-                              {isRank1 && <span title="Current #1 Leader">👑</span>}
-                              {isUser && (
-                                <span style={{
-                                  fontSize: "0.62rem",
-                                  fontWeight: 800,
-                                  background: "rgba(168, 85, 247, 0.3)",
-                                  color: "#d8b4fe",
-                                  border: "1px solid rgba(168, 85, 247, 0.5)",
-                                  padding: "1px 5px",
-                                  borderRadius: 4,
-                                  letterSpacing: "0.05em",
-                                }}>
-                                  YOU
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: "0.72rem", color: "#8e8a9f", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                              <span>{u.title}</span>
-                            </div>
+                          {/* Badge Capsule (e.g. 💬 Communication Titan) */}
+                          <div style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: "rgba(255, 255, 255, 0.04)",
+                            border: isUser
+                              ? "1px solid rgba(168, 85, 247, 0.4)"
+                              : isRank1
+                              ? "1px solid rgba(251, 191, 36, 0.35)"
+                              : "1px solid rgba(255, 255, 255, 0.1)",
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                            color: isUser ? "#d8b4fe" : isRank1 ? "#fde68a" : "#cbd5e1",
+                            flexShrink: 0,
+                          }}>
+                            <span>{u.badgeIcon}</span>
+                            <span>{u.badgeName}{isUser && !u.name?.toLowerCase().includes("you") ? " (you)" : ""}</span>
                           </div>
                         </div>
 
-                        {/* Points & Time */}
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div
-                            className="leaderboard-pts-badge"
-                            style={{
-                              color: isRank1 ? "#fbbf24" : isUser ? "#c084fc" : "#ffffff",
-                              fontSize: "0.92rem",
-                              fontWeight: 800,
-                            }}
-                          >
-                            <span>{u.pts}</span>
-                            <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#8e8a9f" }}>pts</span>
+                        {/* Right: Streak + Weekly + Points + Submission Status (Pending / Submitted) */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0 }}>
+                          {/* Streak Badge */}
+                          <div style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                            padding: "3px 8px",
+                            borderRadius: 8,
+                            background: "rgba(245, 158, 11, 0.14)",
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                            fontSize: "0.74rem",
+                            fontWeight: 800,
+                            color: "#fbbf24",
+                          }}>
+                            <span>🔥</span>
+                            <span>{u.streakDays}d</span>
                           </div>
-                          <div style={{ fontSize: "0.7rem", color: "#7c7793", marginTop: "2px" }}>
-                            {u.time}
+
+                          {/* Weekly Progress */}
+                          <span style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            color: "#94a3b8",
+                            padding: "0 2px",
+                          }}>
+                            {u.weeklySubmissions}/7
+                          </span>
+
+                          {/* Points Badge */}
+                          <div style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "3px 8px",
+                            borderRadius: 8,
+                            background: "rgba(139, 92, 246, 0.15)",
+                            border: "1px solid rgba(139, 92, 246, 0.3)",
+                            fontSize: "0.74rem",
+                            fontWeight: 800,
+                            color: "#c4b5fd",
+                          }}>
+                            {u.pts} pts
+                          </div>
+
+                          {/* Submission Status: Pending / Submitted */}
+                          <div style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            padding: "3px 8px",
+                            borderRadius: 8,
+                            background: u.isCompletedToday
+                              ? "rgba(34, 197, 94, 0.12)"
+                              : "rgba(239, 68, 68, 0.1)",
+                            border: u.isCompletedToday
+                              ? "1px solid rgba(34, 197, 94, 0.35)"
+                              : "1px solid rgba(239, 68, 68, 0.28)",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                            color: u.isCompletedToday ? "#4ade80" : "#fca5a5",
+                          }}>
+                            <span>{u.isCompletedToday ? "✅" : "⏳"}</span>
+                            <span>{u.isCompletedToday ? "Submitted" : "Pending"}</span>
                           </div>
                         </div>
                       </div>
@@ -1914,52 +1923,7 @@ export default function ModernDashboardView({
                 </div>
               </div>
 
-              {/* Community Feed Prompt Card (Screenshot 5) */}
-              <div
-                onClick={() => navigate("/record")}
-                className="speakshine-card-box"
-                style={{
-                  background: "#0d0a18",
-                  border: "1px solid rgba(255, 255, 255, 0.06)",
-                  borderRadius: 18,
-                  padding: "1.5rem",
-                  cursor: "pointer",
-                  transition: "border-color 0.15s ease",
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(167, 139, 250, 0.3)"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"}
-              >
-                <div style={{ fontSize: "1.5rem", marginBottom: "0.65rem" }}>💬</div>
-                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.35rem" }}>
-                  Nobody has posted yet today
-                </div>
-                <div style={{ fontSize: "0.82rem", color: "#7c7793", lineHeight: 1.45, marginBottom: "1rem" }}>
-                  Be the first in Group 3 to submit today's video and claim the #1 spot on the leaderboard!
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate("/record");
-                  }}
-                  style={{
-                    background: "rgba(124, 111, 255, 0.15)",
-                    border: "1px solid rgba(124, 111, 255, 0.35)",
-                    color: "#c4b5fd",
-                    borderRadius: 10,
-                    padding: "0.55rem 1rem",
-                    fontWeight: 700,
-                    fontSize: "0.82rem",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.4rem",
-                  }}
-                >
-                  <span>🎥</span>
-                  <span>Record now</span>
-                </button>
-              </div>
+
             </div>
           </div>
         </main>
