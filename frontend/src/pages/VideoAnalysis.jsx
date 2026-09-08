@@ -969,7 +969,7 @@ export default function VideoAnalysis() {
                       </div>
                     </div>
 
-                    <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#f97316" }}>:</span>
+                    <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
                     <div style={{
                       background: "#161024",
@@ -983,11 +983,11 @@ export default function VideoAnalysis() {
                         {timeLeft.mins}
                       </div>
                       <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                        MIN
+                        MINS
                       </div>
                     </div>
 
-                    <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#f97316" }}>:</span>
+                    <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
 
                     <div style={{
                       background: "#161024",
@@ -1001,30 +1001,55 @@ export default function VideoAnalysis() {
                         {timeLeft.secs}
                       </div>
                       <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                        SEC
+                        SECS
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: "0.74rem", color: "#64748b", marginBottom: "1.5rem" }}>
-                    Active window resets every 24 hours at 12:00 AM IST.
+                  {/* Streak Warning */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.8rem",
+                    color: "#f87171",
+                    fontWeight: 600,
+                    marginBottom: "1.35rem",
+                  }}>
+                    <span>⚠️</span>
+                    <span>Submit before midnight to start streak</span>
                   </div>
 
-                  {/* Mission Details */}
-                  <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)", paddingTop: "1.25rem", marginBottom: "1.5rem" }}>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 800, letterSpacing: "0.08em", color: "#cbd5e1", textTransform: "uppercase", marginBottom: "0.45rem" }}>
-                      Your Mission
+                  {/* Rules to Remember */}
+                  <div style={{
+                    background: "rgba(255, 255, 255, 0.03)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: 12,
+                    padding: "1rem",
+                    marginBottom: "1.5rem",
+                  }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                      RULES TO REMEMBER
                     </div>
-                    <div style={{ fontSize: "0.84rem", color: "#94a3b8", lineHeight: 1.5 }}>
-                      {isStorySummary
-                        ? "Listen to the audio above first, then record a 1–5 min video retelling the story clearly in your own words. Use planned target vocabulary to earn extra bonus points."
-                        : "Record a 1–5 min speaking video answering the prompt. Use target vocabulary to earn up to +30 bonus points."}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span>Minimum 60 seconds speaking</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span>Use at least 2 target words</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span>No script reading - speak naturally</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                {/* Action Buttons: Record & Upload */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginTop: "auto" }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -1032,26 +1057,27 @@ export default function VideoAnalysis() {
                       document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
                     }}
                     style={{
+                      width: "100%",
                       background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                      color: "#ffffff",
                       border: "none",
                       borderRadius: 12,
-                      padding: "0.85rem 1.25rem",
-                      color: "#ffffff",
-                      fontSize: "0.9rem",
+                      padding: "0.9rem",
                       fontWeight: 700,
+                      fontSize: "0.92rem",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "0.5rem",
-                      boxShadow: "0 4px 20px rgba(249, 115, 22, 0.35)",
-                      transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                      boxShadow: "0 4px 20px rgba(249, 115, 22, 0.4)",
+                      transition: "transform 0.15s ease",
                     }}
                     onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                     onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                   >
-                    <span>🎙️</span>
-                    <span>Record Speaking Video</span>
+                    <span style={{ fontSize: "1.1rem" }}>🎥</span>
+                    <span>Record summary</span>
                   </button>
 
                   <button
@@ -1061,13 +1087,14 @@ export default function VideoAnalysis() {
                       document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth" });
                     }}
                     style={{
-                      background: "rgba(255, 255, 255, 0.04)",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
-                      borderRadius: 12,
-                      padding: "0.75rem 1.25rem",
+                      width: "100%",
+                      background: "#181427",
                       color: "#cbd5e1",
-                      fontSize: "0.85rem",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      borderRadius: 12,
+                      padding: "0.8rem",
                       fontWeight: 600,
+                      fontSize: "0.88rem",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -1075,11 +1102,11 @@ export default function VideoAnalysis() {
                       gap: "0.5rem",
                       transition: "background 0.15s ease",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+                    onMouseEnter={e => e.currentTarget.style.background = "#201b34"}
+                    onMouseLeave={e => e.currentTarget.style.background = "#181427"}
                   >
                     <span>📁</span>
-                    <span>Upload Existing Video</span>
+                    <span>Upload a file</span>
                   </button>
                 </div>
               </div>

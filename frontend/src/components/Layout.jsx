@@ -158,6 +158,10 @@ export default function Layout({ children, title, subtitle }) {
   const displayName = user?.name ? user.name.split(" ")[0] : (profile?.name ? profile.name.split(" ")[0] : "Speaker");
   const avatarInitials = (displayName || "S").charAt(0).toUpperCase();
 
+  const isAdminRoute = location.pathname.startsWith("/admin");
+  const isTrainerRoute = location.pathname.startsWith("/trainer");
+  const isStaffRoute = isAdminRoute || isTrainerRoute;
+
   const getGreeting = () => {
     const h = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getHours();
     if (h < 12) return "morning";
@@ -168,6 +172,12 @@ export default function Layout({ children, title, subtitle }) {
   const getComputedSubtitle = () => {
     if (subtitle) return subtitle;
     const path = location.pathname;
+    if (path.startsWith("/admin")) {
+      return "Control center for members, automated curriculum, live rooms & system settings.";
+    }
+    if (path.startsWith("/trainer")) {
+      return "Review student recordings, assign CEFR fluency feedback & host live coaching.";
+    }
     if (path.startsWith("/record") || path.startsWith("/video-analysis")) {
       return "Here's your speaking mission for today.";
     }
@@ -312,19 +322,21 @@ export default function Layout({ children, title, subtitle }) {
           )}
         </nav>
 
-        {/* Freeze Tokens Bottom Box */}
-        <div className="speakshine-freeze-box">
-          <div className="freeze-title">FREEZE TOKENS</div>
-          <div className="freeze-val">
-            {freezeTokens} <span style={{ fontSize: "0.95rem", color: "#7c7793", fontWeight: 500 }}>/ 2 Available</span>
+        {/* Freeze Tokens Bottom Box (Hidden on staff routes) */}
+        {!isStaffRoute && (
+          <div className="speakshine-freeze-box">
+            <div className="freeze-title">FREEZE TOKENS</div>
+            <div className="freeze-val">
+              {freezeTokens} <span style={{ fontSize: "0.95rem", color: "#7c7793", fontWeight: 500 }}>/ 2 Available</span>
+            </div>
+            <div className="freeze-desc">
+              Earn tokens by completing 7-day streak milestones.
+            </div>
+            <Link to="/payment" className="freeze-link">
+              Account settings ↗
+            </Link>
           </div>
-          <div className="freeze-desc">
-            Earn tokens by completing 7-day streak milestones.
-          </div>
-          <Link to="/payment" className="freeze-link">
-            Account settings ↗
-          </Link>
-        </div>
+        )}
       </aside>
 
       {/* ── Main Content Area ── */}
@@ -341,14 +353,36 @@ export default function Layout({ children, title, subtitle }) {
           </div>
 
           <div className="speakshine-topbar-right">
-            <div className="speakshine-pill streak">
-              <span>🔥</span>
-              <span>{streak} Day streak</span>
-            </div>
-            <div className="speakshine-pill points">
-              <span style={{ color: "#fbbf24" }}>⭐</span>
-              <span>{totalPoints} Points</span>
-            </div>
+            {isStaffRoute ? (
+              <div
+                className="speakshine-pill"
+                style={{
+                  borderColor: isAdminRoute ? "rgba(239, 68, 68, 0.45)" : "rgba(168, 85, 247, 0.45)",
+                  background: isAdminRoute ? "rgba(239, 68, 68, 0.14)" : "rgba(168, 85, 247, 0.14)",
+                  color: isAdminRoute ? "#fca5a5" : "#d8b4fe",
+                  fontWeight: 700,
+                  fontSize: "0.82rem",
+                  padding: "0.4rem 0.9rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                }}
+              >
+                <span>{isAdminRoute ? "🛡️" : "🎓"}</span>
+                <span>{isAdminRoute ? "Admin Portal" : "Trainer Workspace"}</span>
+              </div>
+            ) : (
+              <>
+                <div className="speakshine-pill streak">
+                  <span>🔥</span>
+                  <span>{streak} Day streak</span>
+                </div>
+                <div className="speakshine-pill points">
+                  <span style={{ color: "#fbbf24" }}>⭐</span>
+                  <span>{totalPoints} Points</span>
+                </div>
+              </>
+            )}
             <Suspense fallback={<div style={{ width: 34, height: 34 }} />}>
               <NotificationBell token={localStorage.getItem("token")} />
             </Suspense>
