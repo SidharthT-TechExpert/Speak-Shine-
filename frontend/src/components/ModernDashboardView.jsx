@@ -11,6 +11,13 @@ import Modal from "./Modal.jsx";
 import gsap from "gsap";
 import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
 import api from "../api/client.js";
+import {
+  detectQuestionType,
+  getQuestionUIConfig,
+  parseQuestionItems,
+  DEFAULT_MONTHLY_REFLECTION_QUESTIONS,
+  DEFAULT_MONTHLY_GOALS_QUESTIONS,
+} from "../utils/questionTypes.js";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -263,8 +270,26 @@ export default function ModernDashboardView({
   // ── Audio Player & Waveform State ───────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(104); // Default 1:44 as in screenshot
+  const [duration, setDuration] = useState(104);
   const audioRef = useRef(null);
+
+  // ── Challenge Type Detection & UI Config ────────────────────────────────────
+  const questionType = detectQuestionType(today);
+  const questionConfig = getQuestionUIConfig(questionType, today);
+  const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
+  const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
+
+  const parsedQuestions = useMemo(() => {
+    if (questionType === "monthly_reflection") {
+      const parsed = parseQuestionItems(today.question);
+      return (parsed.length > 1) ? parsed : DEFAULT_MONTHLY_REFLECTION_QUESTIONS.map((q, i) => ({ num: String(i + 1), text: q }));
+    }
+    if (questionType === "monthly_goals") {
+      const parsed = parseQuestionItems(today.question);
+      return (parsed.length > 1) ? parsed : DEFAULT_MONTHLY_GOALS_QUESTIONS.map((q, i) => ({ num: String(i + 1), text: q }));
+    }
+    return parseQuestionItems(today.question || today.prompt || "");
+  }, [today.question, today.prompt, questionType]);
 
   const targetPosterSendTime = today.posterSendTime || propPosterSendTime || "08:00";
 
@@ -278,36 +303,33 @@ export default function ModernDashboardView({
 
   // The daily speaking challenge is active only when published for today with valid content
   const isQuestionActive = Boolean(
-    today?.questionSent && (today?.topic || today?.question || today?.prompt)
+    today?.questionSent && (today?.topic || today?.question || today?.prompt || today?.imageUrl)
   );
 
-  const storyPrompt = today.prompt || today.question || today.topic || "Maya ordered a book on pottery but received an antique wooden puzzle box instead. With no return address and a strange riddle carved on the base, she spent her Saturday trying to solve it rather than packing for her move.";
-  const audioSrc = today.audioUrl || "https://pub-1c5ce667ea4445fb98d667349b649704.r2.dev/story-audio/wrong-delivery-surprise-1788843000000.mp3";
+  // Audio source: only valid if question type has audio and today.audioUrl is present
+  const audioSrc = (questionConfig.hasAudio && today.audioUrl) ? today.audioUrl : "";
 
-  // Speech synthesis fallback so audio ALWAYS works
-  const playVoiceFallback = () => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(storyPrompt);
-    utt.rate = 0.96;
-    utt.pitch = 1.0;
-    const voices = window.speechSynthesis.getVoices();
-    const prefVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha")));
-    if (prefVoice) utt.voice = prefVoice;
-
-    utt.onstart = () => {
-      setIsPlaying(true);
-      setCurrentTime(0);
-    };
-    utt.onend = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-    utt.onerror = () => {
-      setIsPlaying(false);
-    };
-
-    window.speechSynthesis.speak(utt);
+  // Quick TTS read-aloud for question/prompt
+  const handleSpeakPrompt = (textToSpeak) => {
+    if (!textToSpeak) return;
+    if (isSpeakingPrompt) {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      setIsSpeakingPrompt(false);
+      return;
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(textToSpeak);
+      utt.rate = 0.92;
+      utt.pitch = 1.0;
+      const voices = window.speechSynthesis.getVoices();
+      const prefVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha")));
+      if (prefVoice) utt.voice = prefVoice;
+      utt.onstart = () => setIsSpeakingPrompt(true);
+      utt.onend = () => setIsSpeakingPrompt(false);
+      utt.onerror = () => setIsSpeakingPrompt(false);
+      window.speechSynthesis.speak(utt);
+    }
   };
 
   const togglePlay = () => {
@@ -315,20 +337,15 @@ export default function ModernDashboardView({
       if (audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
       }
-      if (window.speechSynthesis && window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-      }
       setIsPlaying(false);
     } else {
       if (audioRef.current && audioRef.current.src) {
         audioRef.current.play().then(() => {
           setIsPlaying(true);
         }).catch(err => {
-          console.warn("[Audio] Falling back to Web Speech API:", err);
-          playVoiceFallback();
+          console.warn("[Audio] Error playing audio:", err);
+          setIsPlaying(false);
         });
-      } else {
-        playVoiceFallback();
       }
     }
   };
@@ -924,8 +941,9 @@ export default function ModernDashboardView({
     }
   }, [currentLeaderboard]);
 
-  // Title formatting: split into white serif and soft purple italic serif
-  const topicTitle = today.topic || today.question || (isQuestionActive ? "The Unexpected Delivery" : "Speaking Challenge");
+  // Title formatting: split into white serif and themed italic serif
+  const rawTopic = today.topic || (questionType === "monthly_reflection" ? "End of Month Reflection" : questionType === "monthly_goals" ? "New Month New Goals" : (today.question && parsedQuestions.length === 1 && today.question.length < 50 ? today.question : (isQuestionActive ? "Daily Speaking Mission" : "Speaking Challenge")));
+  const topicTitle = String(rawTopic).replace(/^["']|["']$/g, '');
   const titleParts = topicTitle.split(" ");
   const mainTitlePart = titleParts.length > 1 ? titleParts.slice(0, -1).join(" ") : titleParts[0];
   const italicTitlePart = titleParts.length > 1 ? titleParts[titleParts.length - 1] : "";
@@ -945,8 +963,89 @@ export default function ModernDashboardView({
         />
       )}
 
-      {/* ── Audio element for playback (only rendered when challenge is active) ── */}
-      {isQuestionActive && (
+      {/* ── Fullscreen Image Preview Modal (Picture Description) ── */}
+      {picturePreviewOpen && today.imageUrl && (
+        <div
+          onClick={() => setPicturePreviewOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0, 0, 0, 0.88)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1.5rem",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: "relative",
+              maxWidth: "92vw",
+              maxHeight: "88vh",
+              borderRadius: 16,
+              overflow: "hidden",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.8)",
+              border: "1px solid rgba(255,255,255,0.15)",
+            }}
+          >
+            <img
+              src={today.imageUrl}
+              alt={today.topic || "Picture challenge full view"}
+              style={{
+                width: "100%",
+                height: "100%",
+                maxHeight: "82vh",
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setPicturePreviewOpen(false)}
+              style={{
+                position: "absolute",
+                top: "1rem",
+                right: "1rem",
+                background: "rgba(0,0,0,0.75)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "50%",
+                width: 38,
+                height: 38,
+                color: "#ffffff",
+                fontSize: "1.2rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
+            {(today.imagePhotographer || today.imageInstructions) && (
+              <div style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%)",
+                padding: "1.5rem 1.25rem 0.85rem",
+                color: "#f1f5f9",
+                fontSize: "0.85rem",
+              }}>
+                {today.imageInstructions && <div style={{ fontWeight: 600 }}>{today.imageInstructions}</div>}
+                {today.imagePhotographer && <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: 4 }}>Photo: {today.imagePhotographer}</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Audio element for playback (only rendered when challenge has audio) ── */}
+      {isQuestionActive && questionConfig.hasAudio && audioSrc && (
         <audio
           ref={audioRef}
           src={audioSrc}
@@ -1476,14 +1575,14 @@ export default function ModernDashboardView({
             {/* Left Challenge Card */}
             <div className="speakshine-hero-left-card" style={{
               background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
-              border: "1px solid rgba(124, 111, 255, 0.25)",
+              border: `1px solid ${questionConfig.theme.border || "rgba(124, 111, 255, 0.25)"}`,
               borderRadius: 18,
               padding: "1.75rem 2rem",
               position: "relative",
               boxShadow: "0 12px 40px rgba(0, 0, 0, 0.45)",
             }}>
-              {/* Header: Live dot + Category pill */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+              {/* Header: Live dot + Category pill with dynamic theme */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.95rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                   <span style={{
                     width: 8, height: 8, borderRadius: "50%",
@@ -1494,112 +1593,285 @@ export default function ModernDashboardView({
                   </span>
                 </div>
                 <span style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: 6,
-                  padding: "3px 8px",
-                  fontSize: "0.68rem",
+                  background: questionConfig.theme.badgeBg,
+                  border: `1px solid ${questionConfig.theme.border}`,
+                  borderRadius: 999,
+                  padding: "4px 12px",
+                  fontSize: "0.72rem",
                   fontWeight: 800,
-                  letterSpacing: "0.08em",
-                  color: "#cbd5e1",
+                  letterSpacing: "0.06em",
+                  color: questionConfig.theme.primary,
                   textTransform: "uppercase",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
                 }}>
-                  {today.category || "STORY SUMMARY"}
+                  <span>✦</span> {questionConfig.badgeLabel}
                 </span>
               </div>
 
               {/* Title with Premium Editorial Serif — Playfair Display */}
-              <h1 className="story-title-heading" style={{
-                fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
-                fontSize: "2.4rem",
-                fontWeight: 700,
-                lineHeight: 1.15,
-                margin: "0 0 0.75rem 0",
-                letterSpacing: "-0.02em",
-              }}>
-                {mainTitlePart}{" "}
-                {italicTitlePart && (
-                  <span className="story-title-italic">
-                    {italicTitlePart}
-                  </span>
-                )}
-              </h1>
+              <div style={{ marginBottom: "1rem" }}>
+                <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", marginBottom: "0.35rem" }}>
+                  {questionType === "picture_description" ? "CHALLENGE THEME" : questionType === "story_audio" ? "STORY TITLE" : "TOPIC"}
+                </div>
+                <h1 className="story-title-heading" style={{
+                  fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                  fontSize: "2.3rem",
+                  fontWeight: 700,
+                  lineHeight: 1.18,
+                  margin: 0,
+                  letterSpacing: "-0.02em",
+                  color: "#ffffff",
+                }}>
+                  {mainTitlePart}{" "}
+                  {italicTitlePart && (
+                    <span className="story-title-italic" style={{ color: questionConfig.theme.primary, fontStyle: "italic", fontWeight: 400 }}>
+                      {italicTitlePart}
+                    </span>
+                  )}
+                </h1>
+              </div>
 
-              {/* Synopsis / Story description */}
-              <p style={{
-                fontSize: "0.9rem",
-                color: "#94a3b8",
-                lineHeight: 1.55,
-                marginBottom: "1.35rem",
-                maxWidth: "680px",
-              }}>
-                {storyPrompt}
-              </p>
+              {/* ── 1. PICTURE DESCRIPTION MODE: High-res Preview ── */}
+              {questionType === "picture_description" && today.imageUrl && (
+                <div style={{ marginBottom: "1.35rem" }}>
+                  <div style={{
+                    position: "relative",
+                    borderRadius: 14,
+                    overflow: "hidden",
+                    border: `1px solid ${questionConfig.theme.border || "rgba(255, 255, 255, 0.1)"}`,
+                    background: "rgba(0, 0, 0, 0.35)",
+                  }}>
+                    <img
+                      src={today.imageUrl}
+                      alt={today.topic || "Picture description"}
+                      style={{
+                        width: "100%",
+                        maxHeight: "360px",
+                        objectFit: "cover",
+                        display: "block",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setPicturePreviewOpen(true)}
+                      loading="lazy"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPicturePreviewOpen(true)}
+                      style={{
+                        position: "absolute",
+                        top: "0.75rem",
+                        right: "0.75rem",
+                        background: "rgba(13, 10, 24, 0.85)",
+                        backdropFilter: "blur(6px)",
+                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                        color: "#ffffff",
+                        padding: "5px 10px",
+                        borderRadius: 8,
+                        fontSize: "0.74rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                      }}
+                    >
+                      <span>⛶</span> Expand Image
+                    </button>
+                  </div>
+                  {today.imagePhotographer && (
+                    <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "4px", textAlign: "right" }}>
+                      Photo by {today.imagePhotographer}
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {/* Waveform Audio Player ("LISTEN FIRST") */}
-              <div className="speakshine-audio-bar" style={{
-                borderRadius: 12,
-                padding: "0.75rem 1.1rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "1rem",
-                marginBottom: "1.75rem",
-              }}>
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  title={isPlaying ? "Pause audio" : "Play audio"}
-                  className="audio-play-btn"
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: "50%",
+              {/* ── 2. STORY AUDIO / AUDIO PLAYER MODE ── */}
+              {questionType === "story_audio" && questionConfig.hasAudio && audioSrc && (
+                <div style={{ marginBottom: "1.35rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                    <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: questionConfig.theme.primary, textTransform: "uppercase" }}>
+                      🎧 LISTEN TO THE STORY
+                    </span>
+                    <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
+                      Listen once before recording summary
+                    </span>
+                  </div>
+                  <div className="speakshine-audio-bar" style={{
+                    borderRadius: 12,
+                    padding: "0.75rem 1.1rem",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    transition: "transform 0.15s ease",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                >
-                  {isPlaying ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <rect x="6" y="4" width="4" height="16" />
-                      <rect x="14" y="4" width="4" height="16" />
-                    </svg>
-                  ) : (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                  )}
-                </button>
+                    gap: "1rem",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    border: `1px solid ${questionConfig.theme.border}`,
+                  }}>
+                    <button
+                      type="button"
+                      onClick={togglePlay}
+                      title={isPlaying ? "Pause audio" : "Play audio"}
+                      className="audio-play-btn"
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        background: questionConfig.theme.primary,
+                        color: "#0d0a18",
+                        border: "none",
+                        transition: "transform 0.15s ease",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                      onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                      {isPlaying ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                      ) : (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                      )}
+                    </button>
 
-                {/* Waveform Bars (Clickable Scrubbing) */}
-                <div style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "32px", cursor: "pointer" }}>
-                  {WAVE_PATTERN.map((height, i) => {
-                    const isPassed = i <= activeWaveIndex;
-                    return (
-                      <div
-                        key={i}
-                        className={`audio-wave-bar ${isPassed ? "active" : ""}`}
-                        onClick={() => seekWaveform(i)}
-                        title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
-                        style={{
-                          flex: 1,
-                          height: `${height}px`,
-                          borderRadius: 2,
-                          transition: "background 0.15s ease",
-                        }}
-                      />
-                    );
-                  })}
+                    {/* Waveform Bars */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "32px", cursor: "pointer" }}>
+                      {WAVE_PATTERN.map((height, i) => {
+                        const isPassed = i <= activeWaveIndex;
+                        return (
+                          <div
+                            key={i}
+                            className={`audio-wave-bar ${isPassed ? "active" : ""}`}
+                            onClick={() => seekWaveform(i)}
+                            title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
+                            style={{
+                              flex: 1,
+                              height: `${height}px`,
+                              borderRadius: 2,
+                              background: isPassed ? questionConfig.theme.primary : "rgba(255, 255, 255, 0.18)",
+                              transition: "background 0.15s ease",
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "#e2e8f0" }}>
+                      {fmtTime(currentTime)} / {fmtTime(duration)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* ── 3. SPEAKING TASK / QUESTION PROMPT CARD (HERO FOR ALL TYPES) ── */}
+              <div style={{
+                background: "rgba(255, 255, 255, 0.03)",
+                border: `1px solid ${questionConfig.theme.border || "rgba(255, 255, 255, 0.08)"}`,
+                borderRadius: 14,
+                padding: "1.15rem 1.35rem",
+                marginBottom: "1.35rem",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      color: questionConfig.theme.primary,
+                      textTransform: "uppercase",
+                    }}>
+                      {questionConfig.promptLabel}
+                    </span>
+                  </div>
+                  {/* Quick TTS Audio preview for prompt */}
+                  {(questionType === "standard_question" || questionType === "picture_description") && (
+                    <button
+                      type="button"
+                      onClick={() => handleSpeakPrompt(parsedQuestions.map(q => q.text).join(". "))}
+                      style={{
+                        background: isSpeakingPrompt ? questionConfig.theme.primary : "rgba(255, 255, 255, 0.06)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        borderRadius: 6,
+                        padding: "3px 8px",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        color: isSpeakingPrompt ? "#0d0a18" : "#cbd5e1",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                      }}
+                      title="Listen to question pronunciation"
+                    >
+                      <span>{isSpeakingPrompt ? "⏹️ Stop" : "🔊 Listen"}</span>
+                    </button>
+                  )}
                 </div>
 
-                <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                  {fmtTime(currentTime)} / {fmtTime(duration)}
-                </span>
+                {/* Content: Multi-question list vs Single Question Prompt */}
+                {parsedQuestions.length > 1 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    {parsedQuestions.map((item, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "0.75rem",
+                          background: "rgba(255, 255, 255, 0.025)",
+                          border: "1px solid rgba(255, 255, 255, 0.05)",
+                          borderRadius: 10,
+                          padding: "0.7rem 0.9rem",
+                        }}
+                      >
+                        <span style={{
+                          minWidth: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          background: questionConfig.theme.badgeBg,
+                          color: questionConfig.theme.primary,
+                          border: `1px solid ${questionConfig.theme.primary}`,
+                          fontSize: "0.72rem",
+                          fontWeight: 800,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginTop: "2px",
+                        }}>
+                          {item.num || idx + 1}
+                        </span>
+                        <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#f8fafc", lineHeight: 1.45 }}>
+                          {item.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{
+                    fontSize: "1.18rem",
+                    fontWeight: 600,
+                    color: "#ffffff",
+                    lineHeight: 1.5,
+                    letterSpacing: "-0.01em",
+                  }}>
+                    {today.question || today.prompt || (questionType === "story_audio" ? "Listen to the audio story and summarize what happened in your own words." : "What's on your mind today? Share your thoughts clearly.")}
+                  </div>
+                )}
+
+                {today.imageInstructions && (
+                  <div style={{ marginTop: "0.75rem", fontSize: "0.84rem", color: "#94a3b8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.6rem" }}>
+                    💡 {today.imageInstructions}
+                  </div>
+                )}
               </div>
 
               {/* Target Vocabulary Section (Matching Screenshot) */}
@@ -1612,7 +1884,7 @@ export default function ModernDashboardView({
                     </span>
                   </div>
                   <div
-                    className={`vocab-goal-pill ${plannedCount >= 3 ? "goal-met" : ""}`}
+                    className={`vocab-goal-pill ${plannedCount >= (questionType === "picture_description" ? 2 : 3) ? "goal-met" : ""}`}
                     style={{
                       fontSize: "0.72rem",
                       fontWeight: 700,
@@ -1621,7 +1893,7 @@ export default function ModernDashboardView({
                       transition: "all 0.15s ease",
                     }}
                   >
-                    🎯 Goal: {plannedCount} / {Math.min(3, vocabList.length)} words (+30 pts)
+                    🎯 Goal: {plannedCount} / {Math.min(questionType === "picture_description" ? 2 : 3, vocabList.length)} words (+{questionType === "picture_description" ? "10" : "30"} pts)
                   </div>
                 </div>
 
@@ -1744,18 +2016,12 @@ export default function ModernDashboardView({
                     RULES TO REMEMBER
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                    <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                      <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                      <span>Minimum 60 seconds speaking</span>
-                    </div>
-                    <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                      <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                      <span>Use at least 2 target words</span>
-                    </div>
-                    <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                      <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                      <span>No script reading - speak naturally</span>
-                    </div>
+                    {questionConfig.rules.map((rule, idx) => (
+                      <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <span style={rule.highlight ? { fontWeight: 600, color: "#ffffff" } : {}}>{rule.text}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1786,7 +2052,7 @@ export default function ModernDashboardView({
                   onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                 >
                   <span style={{ fontSize: "1.1rem" }}>🎥</span>
-                  <span>Record summary</span>
+                  <span>{questionConfig.recordButtonLabel}</span>
                 </button>
 
                 <button
@@ -1813,7 +2079,7 @@ export default function ModernDashboardView({
                   onMouseLeave={e => e.currentTarget.style.background = "#181427"}
                 >
                   <span>📁</span>
-                  <span>Upload summary</span>
+                  <span>{questionConfig.uploadButtonLabel}</span>
                 </button>
 
                 <input

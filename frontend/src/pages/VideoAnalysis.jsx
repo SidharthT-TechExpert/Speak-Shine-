@@ -13,6 +13,13 @@ import { useVideoFrameHash } from "../hooks/useVideoFrameHash.js";
 import { evaluateSubmitGate, getDurationLimits } from "../utils/videoSubmitGate.js";
 import { saveDraft, loadDraft, clearDraft } from "../utils/videoDraftDB.js";
 import MonthlyGraceCountdown from "../components/MonthlyGraceCountdown.jsx";
+import {
+  detectQuestionType,
+  getQuestionUIConfig,
+  parseQuestionItems,
+  DEFAULT_MONTHLY_REFLECTION_QUESTIONS,
+  DEFAULT_MONTHLY_GOALS_QUESTIONS,
+} from "../utils/questionTypes.js";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -747,7 +754,35 @@ export default function VideoAnalysis() {
 
         {/* ── Unified Daily Challenge / Question Card (Matching Dashboard Page) ── */}
         {(todayQuestion || isMonthlyGoals || isMonthlyReflection) && (() => {
-          const rawTopic = todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : "Daily Speaking Mission");
+          const effectiveToday = {
+            ...todayQuestion,
+            isPictureDescription,
+            isStorySummary,
+            isMonthlyGoals,
+            isMonthlyReflection,
+            category: todayQuestion?.category || (isStorySummary ? "Story Summary" : isPictureDescription ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
+            topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : "Daily Speaking Mission"),
+            question: todayQuestion?.question || "",
+            imageUrl: todayQuestion?.imageUrl,
+            audioUrl: todayQuestion?.audioUrl,
+          };
+
+          const qType = detectQuestionType(effectiveToday);
+          const qConfig = getQuestionUIConfig(qType, effectiveToday);
+
+          const parsedQItems = (() => {
+            if (qType === "monthly_reflection") {
+              const parsed = parseQuestionItems(effectiveToday.question);
+              return (parsed.length > 1) ? parsed : DEFAULT_MONTHLY_REFLECTION_QUESTIONS.map((q, i) => ({ num: String(i + 1), text: q }));
+            }
+            if (qType === "monthly_goals") {
+              const parsed = parseQuestionItems(effectiveToday.question);
+              return (parsed.length > 1) ? parsed : DEFAULT_MONTHLY_GOALS_QUESTIONS.map((q, i) => ({ num: String(i + 1), text: q }));
+            }
+            return parseQuestionItems(effectiveToday.question || "");
+          })();
+
+          const rawTopic = effectiveToday.topic || "Daily Speaking Mission";
           const topicClean = rawTopic.replace(/^["']|["']$/g, '');
           const titleParts = topicClean.split(" ");
           const mainTitlePart = titleParts.length > 1 ? titleParts.slice(0, -1).join(" ") : titleParts[0];
@@ -800,14 +835,14 @@ export default function VideoAnalysis() {
               {/* Left Challenge Card */}
               <div className="speakshine-hero-left-card" style={{
                 background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
-                border: "1px solid rgba(124, 111, 255, 0.25)",
+                border: `1px solid ${qConfig.theme.border || "rgba(124, 111, 255, 0.25)"}`,
                 borderRadius: 18,
                 padding: "1.75rem 2rem",
                 position: "relative",
                 boxShadow: "0 12px 40px rgba(0, 0, 0, 0.45)",
               }}>
-                {/* Header: Live dot + Category pill */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+                {/* Header: Live dot + Category pill with dynamic theme */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.95rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                     <span style={{
                       width: 8, height: 8, borderRadius: "50%",
@@ -818,118 +853,47 @@ export default function VideoAnalysis() {
                     </span>
                   </div>
                   <span style={{
-                    background: "rgba(255, 255, 255, 0.06)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: 6,
-                    padding: "3px 8px",
-                    fontSize: "0.68rem",
+                    background: qConfig.theme.badgeBg,
+                    border: `1px solid ${qConfig.theme.border}`,
+                    borderRadius: 999,
+                    padding: "4px 12px",
+                    fontSize: "0.72rem",
                     fontWeight: 800,
-                    letterSpacing: "0.08em",
-                    color: "#cbd5e1",
+                    letterSpacing: "0.06em",
+                    color: qConfig.theme.primary,
                     textTransform: "uppercase",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
                   }}>
-                    {isStorySummary ? "STORY SUMMARY" : isPictureDescription ? "PICTURE DESCRIPTION" : (todayQuestion?.category || "DAILY CHALLENGE")}
+                    <span>✦</span> {qConfig.badgeLabel}
                   </span>
                 </div>
 
                 {/* Title with Editorial Serif Styling */}
-                <h1 style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "2.35rem",
-                  fontWeight: 400,
-                  color: "#ffffff",
-                  lineHeight: 1.15,
-                  marginBottom: "0.75rem",
-                  letterSpacing: "-0.01em",
-                }}>
-                  {mainTitlePart}{" "}
-                  <span style={{ fontStyle: "italic", color: "#c4b5fd" }}>
-                    {italicTitlePart}
-                  </span>
-                </h1>
-
-                {/* Question / Prompt */}
-                <p style={{
-                  fontSize: "0.9rem",
-                  color: "#94a3b8",
-                  lineHeight: 1.55,
-                  marginBottom: "1.35rem",
-                  maxWidth: "680px",
-                }}>
-                  {todayQuestion?.question || (isMonthlyGoals ? "Record a video detailing your personal learning milestones, dreams, and specific goals for this month." : isMonthlyReflection ? "Answer all monthly reflection questions below to assess your growth and learning progress." : "Record your response to today's speaking prompt.")}
-                </p>
-
-                {/* Waveform Audio Player ("LISTEN FIRST") for Story Summary / Audio Prompts */}
-                {(isStorySummary || audioSrc) && (
-                  <div className="speakshine-audio-bar" style={{
-                    borderRadius: 12,
-                    padding: "0.75rem 1.1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1rem",
-                    marginBottom: "1.75rem",
-                  }}>
-                    <button
-                      type="button"
-                      onClick={togglePlay}
-                      title={isPlaying ? "Pause audio" : "Play audio"}
-                      className="audio-play-btn"
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "50%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        flexShrink: 0,
-                        transition: "transform 0.15s ease",
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
-                      onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                    >
-                      {isPlaying ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                          <rect x="6" y="4" width="4" height="16" />
-                          <rect x="14" y="4" width="4" height="16" />
-                        </svg>
-                      ) : (
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
-                          <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                      )}
-                    </button>
-
-                    {/* Waveform Bars (Clickable Scrubbing) */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "32px", cursor: "pointer" }}>
-                      {WAVE_PATTERN.map((height, i) => {
-                        const isPassed = i <= activeWaveIndex;
-                        return (
-                          <div
-                            key={i}
-                            className={`audio-wave-bar ${isPassed ? "active" : ""}`}
-                            onClick={() => seekWaveform(i)}
-                            title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
-                            style={{
-                              flex: 1,
-                              height: `${height}px`,
-                              borderRadius: 2,
-                              transition: "background 0.15s ease",
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                      {fmtTime(currentTime)} / {fmtTime(duration)}
-                    </span>
+                <div style={{ marginBottom: "1rem" }}>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", marginBottom: "0.35rem" }}>
+                    {qType === "picture_description" ? "CHALLENGE THEME" : qType === "story_audio" ? "STORY TITLE" : "TOPIC"}
                   </div>
-                )}
+                  <h1 style={{
+                    fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                    fontSize: "2.3rem",
+                    fontWeight: 700,
+                    color: "#ffffff",
+                    lineHeight: 1.18,
+                    margin: 0,
+                    letterSpacing: "-0.01em",
+                  }}>
+                    {mainTitlePart}{" "}
+                    <span style={{ fontStyle: "italic", color: qConfig.theme.primary, fontWeight: 400 }}>
+                      {italicTitlePart}
+                    </span>
+                  </h1>
+                </div>
 
-                {/* Specialized Mode: Picture Description */}
+                {/* ── 1. Specialized Mode: Picture Description ── */}
                 {todayQuestion && isPictureDescription && todayQuestion.imageUrl && (
-                  <div style={{ marginBottom: "1.25rem", borderRadius: 14, overflow: "hidden", position: "relative", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ marginBottom: "1.35rem", borderRadius: 14, overflow: "hidden", position: "relative", border: `1px solid ${qConfig.theme.border || "rgba(255,255,255,0.08)"}` }}>
                     <img
                       src={todayQuestion.imageUrl}
                       alt={todayQuestion.topic || "Picture description"}
@@ -953,41 +917,195 @@ export default function VideoAnalysis() {
                         cursor: "pointer", backdropFilter: "blur(6px)",
                       }}
                     >⛶ View Full Screen</button>
+                    {todayQuestion.imagePhotographer && (
+                      <div style={{ fontSize: "0.72rem", color: "#64748b", padding: "4px 8px", textAlign: "right" }}>
+                        Photo by {todayQuestion.imagePhotographer}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Specialized Mode: Monthly Goals / Reflection questions */}
-                {(isMonthlyGoals || isMonthlyReflection) && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "1.25rem" }}>
-                    {(isMonthlyGoals ? [
-                      "What is your main goal for this month in the program?",
-                      "What is your dream or target you are working toward right now?",
-                      "What specific steps will you take this month to improve your communication?",
-                      "What was your biggest challenge last month and how will you overcome it?",
-                    ] : [
-                      "How many reviews did you attend this month?",
-                      "How many reviews passed and how many failed? Why?",
-                      "What is your current growth and progress in the program?",
-                      "What did you do this month to improve your communication skills?",
-                    ]).map((q, idx) => (
-                      <div key={idx} style={{
-                        display: "flex", alignItems: "center", gap: "0.75rem",
-                        background: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.05)",
-                        borderRadius: 10, padding: "0.6rem 0.85rem",
-                        fontSize: "0.85rem", color: "#e2e8f0",
-                      }}>
-                        <span style={{
-                          width: 20, height: 20, borderRadius: "50%",
-                          background: "rgba(124, 111, 255, 0.2)", color: "#c4b5fd",
-                          fontSize: "0.72rem", fontWeight: 800,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>{idx + 1}</span>
-                        <span>{q}</span>
+                {/* ── 2. Specialized Mode: Story Audio Waveform Player ── */}
+                {qType === "story_audio" && qConfig.hasAudio && audioSrc && (
+                  <div style={{ marginBottom: "1.35rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: qConfig.theme.primary, textTransform: "uppercase" }}>
+                        🎧 LISTEN TO THE STORY
+                      </span>
+                      <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
+                        Listen once before recording summary
+                      </span>
+                    </div>
+                    <div className="speakshine-audio-bar" style={{
+                      borderRadius: 12,
+                      padding: "0.75rem 1.1rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "1rem",
+                      background: "rgba(255, 255, 255, 0.04)",
+                      border: `1px solid ${qConfig.theme.border}`,
+                    }}>
+                      <button
+                        type="button"
+                        onClick={togglePlay}
+                        title={isPlaying ? "Pause audio" : "Play audio"}
+                        className="audio-play-btn"
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          background: qConfig.theme.primary,
+                          color: "#0d0a18",
+                          border: "none",
+                          transition: "transform 0.15s ease",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                        onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                      >
+                        {isPlaying ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16" />
+                            <rect x="14" y="4" width="4" height="16" />
+                          </svg>
+                        ) : (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Waveform Bars */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "32px", cursor: "pointer" }}>
+                        {WAVE_PATTERN.map((height, i) => {
+                          const isPassed = i <= activeWaveIndex;
+                          return (
+                            <div
+                              key={i}
+                              className={`audio-wave-bar ${isPassed ? "active" : ""}`}
+                              onClick={() => seekWaveform(i)}
+                              title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
+                              style={{
+                                flex: 1,
+                                height: `${height}px`,
+                                borderRadius: 2,
+                                background: isPassed ? qConfig.theme.primary : "rgba(255, 255, 255, 0.18)",
+                                transition: "background 0.15s ease",
+                              }}
+                            />
+                          );
+                        })}
                       </div>
-                    ))}
+
+                      <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "#e2e8f0" }}>
+                        {fmtTime(currentTime)} / {fmtTime(duration)}
+                      </span>
+                    </div>
                   </div>
                 )}
+
+                {/* ── 3. Speaking Task / Question Prompt Card (Hero for all types) ── */}
+                <div style={{
+                  background: "rgba(255, 255, 255, 0.03)",
+                  border: `1px solid ${qConfig.theme.border || "rgba(255, 255, 255, 0.08)"}`,
+                  borderRadius: 14,
+                  padding: "1.15rem 1.35rem",
+                  marginBottom: "1.35rem",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem", flexWrap: "wrap", gap: "0.4rem" }}>
+                    <span style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      color: qConfig.theme.primary,
+                      textTransform: "uppercase",
+                    }}>
+                      {qConfig.promptLabel}
+                    </span>
+                    {(qType === "standard_question" || qType === "picture_description") && (
+                      <button
+                        type="button"
+                        onClick={() => handleSpeak(parsedQItems.map(q => q.text).join(". "), "", "", 999)}
+                        style={{
+                          background: "rgba(255, 255, 255, 0.06)",
+                          border: "1px solid rgba(255, 255, 255, 0.1)",
+                          borderRadius: 6,
+                          padding: "3px 8px",
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          color: "#cbd5e1",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                        }}
+                        title="Listen to question pronunciation"
+                      >
+                        <span>🔊 Listen</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {parsedQItems.length > 1 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                      {parsedQItems.map((item, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "0.75rem",
+                            background: "rgba(255, 255, 255, 0.025)",
+                            border: "1px solid rgba(255, 255, 255, 0.05)",
+                            borderRadius: 10,
+                            padding: "0.7rem 0.9rem",
+                          }}
+                        >
+                          <span style={{
+                            minWidth: 22,
+                            height: 22,
+                            borderRadius: "50%",
+                            background: qConfig.theme.badgeBg,
+                            color: qConfig.theme.primary,
+                            border: `1px solid ${qConfig.theme.primary}`,
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: "2px",
+                          }}>
+                            {item.num || idx + 1}
+                          </span>
+                          <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#f8fafc", lineHeight: 1.45 }}>
+                            {item.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      fontSize: "1.18rem",
+                      fontWeight: 600,
+                      color: "#ffffff",
+                      lineHeight: 1.5,
+                      letterSpacing: "-0.01em",
+                    }}>
+                      {todayQuestion?.question || (isMonthlyGoals ? "Record a video detailing your personal learning milestones, dreams, and specific goals for this month." : isMonthlyReflection ? "Answer all monthly reflection questions below to assess your growth and learning progress." : "What's on your mind today? Share your thoughts clearly.")}
+                    </div>
+                  )}
+
+                  {todayQuestion?.imageInstructions && (
+                    <div style={{ marginTop: "0.75rem", fontSize: "0.84rem", color: "#94a3b8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.6rem" }}>
+                      💡 {todayQuestion.imageInstructions}
+                    </div>
+                  )}
+                </div>
 
                 {/* Target Vocabulary Section (Matching Screenshot) */}
                 {normalizedVocab.length > 0 && (
@@ -1104,11 +1222,7 @@ export default function VideoAnalysis() {
                   <span style={{ color: "#fbbf24" }}>💡</span>
                   <span>
                     <strong>Tip:</strong>{" "}
-                    {isStorySummary
-                      ? "Listen carefully to the key events and characters. Summarize the story in your own words with good pacing!"
-                      : isPictureDescription
-                      ? "Describe the setting, emotions, and subtle details in full connected sentences."
-                      : "Speak clearly and confidently into the camera. Use target vocabulary to earn extra points!"}
+                    {qConfig.tip}
                   </span>
                 </div>
               </div>
@@ -1209,18 +1323,12 @@ export default function VideoAnalysis() {
                       RULES TO REMEMBER
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span>Minimum 60 seconds speaking</span>
-                      </div>
-                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span>Use at least 2 target words</span>
-                      </div>
-                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span>No script reading - speak naturally</span>
-                      </div>
+                      {qConfig.rules.map((rule, idx) => (
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                          <span style={rule.highlight ? { fontWeight: 600, color: "#ffffff" } : {}}>{rule.text}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1251,7 +1359,7 @@ export default function VideoAnalysis() {
                     onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                   >
                     <span style={{ fontSize: "1.1rem" }}>🎥</span>
-                    <span>Record summary</span>
+                    <span>{qConfig.recordButtonLabel}</span>
                   </button>
 
                   <button
@@ -1278,7 +1386,7 @@ export default function VideoAnalysis() {
                     onMouseLeave={e => e.currentTarget.style.background = "#181427"}
                   >
                     <span>📁</span>
-                    <span>Upload summary</span>
+                    <span>{qConfig.uploadButtonLabel}</span>
                   </button>
                 </div>
               </div>
