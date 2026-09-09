@@ -774,6 +774,7 @@ function buildGuestData() {
       ],
       vocabWordCount: 5,
       vocabRequiredCount: 3,
+      vocabLevel: "B2",
     },
     stats: { total: 87, completed: 23, pending: 64 },
     topStreak: [

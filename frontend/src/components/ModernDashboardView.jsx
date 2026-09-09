@@ -15,6 +15,8 @@ import {
   detectQuestionType,
   getQuestionUIConfig,
   parseQuestionItems,
+  getCefrInfo,
+  CEFR_LEVEL_MAP,
   DEFAULT_MONTHLY_REFLECTION_QUESTIONS,
   DEFAULT_MONTHLY_GOALS_QUESTIONS,
 } from "../utils/questionTypes.js";
@@ -406,27 +408,34 @@ export default function ModernDashboardView({
   const VOCAB_STORAGE_KEY = "speakshine_planned_vocab_v1";
   const SIXTEEN_HOURS_MS = 16 * 60 * 60 * 1000;
 
+  const targetWordCount = Number(today.vocabWordCount) || (Array.isArray(today.vocabulary) && today.vocabulary.length > 0 ? today.vocabulary.length : 5);
+  const targetRequiredCount = Number(today.vocabRequiredCount) || (questionType === "picture_description" ? 1 : (questionType === "story_audio" ? 1 : 3));
+  const vocabLevel = today.vocabLevel || "B2";
+  const cefrInfo = getCefrInfo(vocabLevel);
+
   const defaultVocabulary = [
     { word: "Inevitable", meaning: "Certain to happen; unavoidable", example: "With regular practice, rapid improvement in speaking fluency is inevitable.", bonus: "+10 pts" },
-    { word: "Serendipity", meaning: "Finding valuable things not sought", example: "The serendipity of meeting her at the wrong delivery turned into a lasting friendship.", bonus: "+15 pts" },
+    { word: "Serendipity", meaning: "Finding valuable things not sought", example: "The serendipity of meeting her at the wrong delivery turned into a lasting friendship.", bonus: "+10 pts" },
     { word: "Reluctant", meaning: "Unwilling and hesitant", example: "He was reluctant to speak at first, but gained confidence quickly.", bonus: "+10 pts" },
+    { word: "Articulate", meaning: "Able to express thoughts clearly", example: "She was articulate and confident during the discussion.", bonus: "+10 pts" },
+    { word: "Perseverance", meaning: "Continued effort despite difficulties", example: "Through perseverance, he mastered speaking English with high confidence.", bonus: "+10 pts" },
   ];
 
   const vocabList = (today.vocabulary && today.vocabulary.length > 0)
-    ? today.vocabulary.slice(0, 3).map((v, i) => {
+    ? today.vocabulary.slice(0, targetWordCount).map((v, i) => {
         let word = "";
         let meaning = "";
         let example = "";
         if (typeof v === "string") {
           const parts = v.split(/\s*[-—:]\s*/);
-          word = parts[0]?.trim() || defaultVocabulary[i]?.word;
-          meaning = parts[1]?.trim() || defaultVocabulary[i]?.meaning;
+          word = parts[0]?.trim() || defaultVocabulary[i]?.word || `Word ${i + 1}`;
+          meaning = parts[1]?.trim() || defaultVocabulary[i]?.meaning || "";
           if (parts.length >= 3) {
             example = parts.slice(2).join(" — ").trim();
           }
         } else if (v && typeof v === "object") {
-          word = v.word || v.Word || v.term || defaultVocabulary[i]?.word;
-          meaning = v.meaning || v.Meaning || v.definition || defaultVocabulary[i]?.meaning;
+          word = v.word || v.Word || v.term || defaultVocabulary[i]?.word || `Word ${i + 1}`;
+          meaning = v.meaning || v.Meaning || v.definition || defaultVocabulary[i]?.meaning || "";
           example = v.example || v.Example || v.sentence || v.sampleSentence || "";
         }
 
@@ -441,18 +450,21 @@ export default function ModernDashboardView({
             articulate: "She was able to articulate her ideas clearly during the presentation.",
             perseverance: "Through perseverance and daily speaking drills, he mastered clear pronunciation.",
             cohesion: "Using linking words gave great cohesion to her story summary.",
+            thrilling: "That thrilling adventure was an unforgettable experience.",
+            intrepid: "An intrepid mindset helps overcome unexpected obstacles.",
+            trek: "Our morning trek across the hills offered breathtaking views.",
           };
-          example = defaults[wLower] || defaultVocabulary[i]?.example || (word ? `The speaker used "${word}" clearly in the story summary.` : "");
+          example = defaults[wLower] || defaultVocabulary[i]?.example || (word ? `The speaker used "${word}" clearly in the speaking response.` : "");
         }
 
         return {
           word,
           meaning,
           example,
-          bonus: i === 1 ? "+15 pts" : "+10 pts",
+          bonus: "+10 pts",
         };
       })
-    : defaultVocabulary;
+    : defaultVocabulary.slice(0, targetWordCount);
 
   const [plannedWords, setPlannedWords] = useState(() => {
     try {
@@ -483,7 +495,7 @@ export default function ModernDashboardView({
   };
 
   const plannedCount = Object.values(plannedWords).filter(Boolean).length;
-  const plannedBonusPts = plannedCount * 10 + (plannedWords[1] ? 5 : 0);
+  const plannedBonusPts = plannedCount * 10;
 
   // ── Vocabulary Pronunciation Audio Handler ──────────────────────────────────
   const [speakingVocabIndex, setSpeakingVocabIndex] = useState(null);
@@ -1877,14 +1889,35 @@ export default function ModernDashboardView({
               {/* Target Vocabulary Section (Matching Screenshot) */}
               <div style={{ marginTop: "1rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
                     <span style={{ fontSize: "1.05rem" }}>📚</span>
                     <span className="vocab-section-title">
                       TODAY'S VOCABULARY CHALLENGE
                     </span>
+                    <span
+                      className="vocab-strength-badge"
+                      title={`CEFR Level ${vocabLevel}: ${cefrInfo?.desc || "Curated vocabulary"}`}
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        padding: "2px 8px",
+                        borderRadius: 99,
+                        background: cefrInfo?.bg || "rgba(168, 85, 247, 0.15)",
+                        border: `1px solid ${cefrInfo?.border || "rgba(168, 85, 247, 0.35)"}`,
+                        color: cefrInfo?.color || "#c084fc",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <span>⚡</span>
+                      <span>{cefrInfo?.label || `${vocabLevel} Level`}</span>
+                    </span>
                   </div>
                   <div
-                    className={`vocab-goal-pill ${plannedCount >= (questionType === "picture_description" ? 2 : 3) ? "goal-met" : ""}`}
+                    className={`vocab-goal-pill ${plannedCount >= targetRequiredCount ? "goal-met" : ""}`}
                     style={{
                       fontSize: "0.72rem",
                       fontWeight: 700,
@@ -1893,7 +1926,7 @@ export default function ModernDashboardView({
                       transition: "all 0.15s ease",
                     }}
                   >
-                    🎯 Goal: {plannedCount} / {Math.min(questionType === "picture_description" ? 2 : 3, vocabList.length)} words (+{questionType === "picture_description" ? "10" : "30"} pts)
+                    🎯 Goal: {plannedCount} / {Math.min(targetRequiredCount, vocabList.length)} words (+{Math.min(targetRequiredCount, vocabList.length) * 10} pts)
                   </div>
                 </div>
 
@@ -2302,18 +2335,29 @@ export default function ModernDashboardView({
                       RULES TO REMEMBER
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span>Minimum 60 seconds speaking</span>
-                      </div>
-                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span>Use at least 2 target words</span>
-                      </div>
-                      <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span>No script reading - speak naturally</span>
-                      </div>
+                      {qConfig.rules && qConfig.rules.length > 0 ? (
+                        qConfig.rules.map((rule, idx) => (
+                          <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                            <span>{rule.text}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                            <span>Minimum 60 seconds speaking</span>
+                          </div>
+                          <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                            <span>Use at least {targetRequiredCount} target words ({vocabLevel} level)</span>
+                          </div>
+                          <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                            <span>No script reading - speak naturally</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 

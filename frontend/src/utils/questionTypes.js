@@ -123,17 +123,39 @@ export const DEFAULT_MONTHLY_GOALS_QUESTIONS = [
   "What was your biggest challenge last month and how will you overcome it?",
 ];
 
+export const CEFR_LEVEL_MAP = {
+  A1: { label: "A1 Beginner", desc: "Basic words", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", border: "rgba(56, 189, 248, 0.35)" },
+  A2: { label: "A2 Elementary", desc: "Practical words", color: "#34d399", bg: "rgba(52, 211, 153, 0.12)", border: "rgba(52, 211, 153, 0.35)" },
+  B1: { label: "B1 Intermediate", desc: "Conversational words", color: "#fbbf24", bg: "rgba(251, 191, 36, 0.12)", border: "rgba(251, 191, 36, 0.35)" },
+  B2: { label: "B2 Upper-Intermediate", desc: "Rich, professional words", color: "#c084fc", bg: "rgba(192, 132, 252, 0.12)", border: "rgba(192, 132, 252, 0.35)" },
+  C1: { label: "C1 Advanced", desc: "Fluent expressions", color: "#f472b6", bg: "rgba(244, 114, 182, 0.12)", border: "rgba(244, 114, 182, 0.35)" },
+  C2: { label: "C2 Proficient", desc: "Complex vocabulary", color: "#fb7185", bg: "rgba(251, 113, 133, 0.12)", border: "rgba(251, 113, 133, 0.35)" },
+};
+
+export function getCefrInfo(level = "B2") {
+  const norm = String(level || "B2").toUpperCase().trim();
+  return CEFR_LEVEL_MAP[norm] || CEFR_LEVEL_MAP.B2;
+}
+
 /**
  * Returns configuration, button labels, rules, and badges for a given question type.
  */
 export function getQuestionUIConfig(type, today = {}) {
   const theme = getCategoryTheme(today.category || today.topic, today.contentType);
+  const reqCount = Number(today.vocabRequiredCount) || (type === "picture_description" ? 1 : (type === "story_audio" ? 1 : 3));
+  const totalCount = Number(today.vocabWordCount) || (Array.isArray(today.vocabulary) && today.vocabulary.length > 0 ? today.vocabulary.length : 5);
+  const vocabLevel = today.vocabLevel || "B2";
+  const cefrInfo = getCefrInfo(vocabLevel);
 
   switch (type) {
     case "picture_description":
       return {
         type,
         theme,
+        reqCount,
+        totalCount,
+        vocabLevel,
+        cefrInfo,
         badgeLabel: today.category || "Picture Description",
         badgeSubtext: "Visual Fluency Challenge",
         promptLabel: "👁️ YOUR OBSERVATION TASK",
@@ -143,7 +165,7 @@ export function getQuestionUIConfig(type, today = {}) {
         rules: [
           { text: "Describe subjects, actions & setting", highlight: true },
           { text: "Aim for 45–90 seconds of fluent speaking" },
-          { text: "Incorporate today's descriptive vocabulary" },
+          { text: `Use at least ${reqCount} target vocabulary word${reqCount > 1 ? "s" : ""} (${vocabLevel})` },
         ],
         hasAudio: false,
         hasImage: Boolean(today.imageUrl),
@@ -154,6 +176,10 @@ export function getQuestionUIConfig(type, today = {}) {
       return {
         type,
         theme,
+        reqCount,
+        totalCount,
+        vocabLevel,
+        cefrInfo,
         badgeLabel: today.category || "Story Summary",
         badgeSubtext: "Listening & Retelling Challenge",
         promptLabel: "🎧 STORY SUMMARY TASK",
@@ -162,7 +188,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload summary",
         rules: [
           { text: "Listen to the complete audio story first", highlight: true },
-          { text: "Retell key events in your own natural words" },
+          { text: `Retell in your own words using at least ${reqCount} target word${reqCount > 1 ? "s" : ""}` },
           { text: "Minimum 60 seconds speaking (max 3 mins)" },
         ],
         hasAudio: Boolean(today.audioUrl),
@@ -174,6 +200,10 @@ export function getQuestionUIConfig(type, today = {}) {
       return {
         type,
         theme,
+        reqCount,
+        totalCount,
+        vocabLevel,
+        cefrInfo,
         badgeLabel: "Monthly Reflection",
         badgeSubtext: "End of Month Progress Review",
         promptLabel: "📋 REFLECTION QUESTIONS",
@@ -194,6 +224,10 @@ export function getQuestionUIConfig(type, today = {}) {
       return {
         type,
         theme,
+        reqCount,
+        totalCount,
+        vocabLevel,
+        cefrInfo,
         badgeLabel: "Monthly Goal Setting",
         badgeSubtext: "New Month Target Setting",
         promptLabel: "🎯 GOAL SETTING QUESTIONS",
@@ -215,6 +249,10 @@ export function getQuestionUIConfig(type, today = {}) {
       return {
         type: "standard_question",
         theme,
+        reqCount,
+        totalCount,
+        vocabLevel,
+        cefrInfo,
         badgeLabel: today.category || "Daily Challenge",
         badgeSubtext: "Daily Speaking Mission",
         promptLabel: "💬 TODAY'S QUESTION",
@@ -223,7 +261,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload video",
         rules: [
           { text: "Minimum 60 seconds continuous speaking", highlight: true },
-          { text: "Use at least 2 target vocabulary words" },
+          { text: `Use at least ${reqCount} of today's ${totalCount} target words (${vocabLevel} level)` },
           { text: "No script reading — speak naturally" },
         ],
         hasAudio: Boolean(today.audioUrl),

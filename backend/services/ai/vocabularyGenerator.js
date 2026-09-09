@@ -45,7 +45,16 @@ const FALLBACK_VOCABULARY = {
 
 function getFallbackWords(topic, count = 5) {
   const match = Object.keys(FALLBACK_VOCABULARY).find(k => (topic || "").toLowerCase().includes(k.toLowerCase())) || "General";
-  const list = FALLBACK_VOCABULARY[match] || FALLBACK_VOCABULARY["General"];
+  let list = [...(FALLBACK_VOCABULARY[match] || FALLBACK_VOCABULARY["General"])];
+  if (list.length < count) {
+    const all = Object.values(FALLBACK_VOCABULARY).flat();
+    for (const item of all) {
+      if (!list.some(existing => existing.word.toLowerCase() === item.word.toLowerCase())) {
+        list.push(item);
+      }
+      if (list.length >= count) break;
+    }
+  }
   return list.slice(0, count);
 }
 
@@ -184,8 +193,10 @@ export async function ensureTodayVocabulary() {
     const status = await Status.findOne().lean();
 
     // Read dynamic settings (admin-configurable)
-    const isPicture = status?.isPictureDescriptionDay;
-    const isStory = status?.isStorySummaryDay;
+    const isStory = status?.todayContentType === "story_audio"
+      || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+    const isPicture = status?.todayContentType === "picture_description"
+      || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
     const wordCount = Math.max(1, Math.min(10,
       isPicture ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
       : isStory ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
@@ -193,9 +204,9 @@ export async function ensureTodayVocabulary() {
     ));
     const level     = status?.vocabLevel || "B2";
 
-    // Already have enough words for today — return them
+    // Already have enough words for today — return them sliced to configured wordCount
     if (status?.todayVocabulary && status.todayVocabulary.length >= wordCount) {
-      return status.todayVocabulary;
+      return status.todayVocabulary.slice(0, wordCount);
     }
 
     // Need a question to generate words from

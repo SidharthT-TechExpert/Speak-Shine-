@@ -206,6 +206,7 @@ function buildGuestPreviewData() {
       ],
       vocabWordCount: 5,
       vocabRequiredCount: 3,
+      vocabLevel: "B2",
       durationLimits: {
         minSeconds: 60,
         maxSeconds: 300,

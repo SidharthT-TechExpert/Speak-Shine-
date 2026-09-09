@@ -96,7 +96,27 @@ export async function getTodayOverview() {
       imagePhotographer: isQuestionSentToday ? (status?.todayImagePhotographer || null) : null,
       imageInstructions: isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
       posterImage: isQuestionSentToday ? getPosterImage(status) : null,
-      vocabulary: isQuestionSentToday ? (status?.todayVocabulary || []) : [],
+      vocabulary: isQuestionSentToday
+        ? (status?.todayVocabulary || []).slice(
+            0,
+            activePictureTask(status)
+              ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+              : activeStoryTask(status)
+              ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+              : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
+          )
+        : [],
+      vocabWordCount: activePictureTask(status)
+        ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+        : activeStoryTask(status)
+        ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+        : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
+      vocabRequiredCount: activePictureTask(status)
+        ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
+        : activeStoryTask(status)
+        ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
+        : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3),
+      vocabLevel: status?.vocabLevel || "B2",
     },
     stats: {
       total: users.length,
@@ -365,7 +385,14 @@ export async function getUserProfile(phone) {
       imagePhotographerUrl: isQuestionSentToday ? (status?.todayImagePhotographerUrl || null) : null,
       imageSearchQuery:     isQuestionSentToday ? (status?.todayImageSearchQuery || null) : null,
       imageInstructions:    isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
-      vocabulary: await vocabularyPromise,
+      vocabulary: (await vocabularyPromise).slice(
+        0,
+        activePictureTask(status)
+          ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+          : activeStoryTask(status)
+          ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+          : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
+      ),
       allowPrivateVideos: status?.allowPrivateVideos ?? true,
       enableBackgroundBlur: status?.enableBackgroundBlur ?? false,
       vocabWordCount: activePictureTask(status)
@@ -378,6 +405,7 @@ export async function getUserProfile(phone) {
         : activeStoryTask(status)
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3),
+      vocabLevel: status?.vocabLevel || "B2",
       vocabNormalWordCount: status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5,
       vocabNormalRequiredCount: status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3,
       vocabStoryWordCount: status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5,
@@ -1092,6 +1120,13 @@ export async function updateSettings(input, ...rest) {
   }
 
   await Status.updateOne({}, { $set: updates }, { upsert: true });
+
+  if (updates.todayVocabulary !== undefined) {
+    // Regenerate today's vocabulary in background with newly configured counts & strength
+    import("../ai/vocabularyGenerator.js").then(({ ensureTodayVocabulary }) => {
+      ensureTodayVocabulary().catch(err => console.warn("[Dashboard] Vocabulary regeneration on settings update failed:", err.message));
+    }).catch(() => {});
+  }
   
   return { success: true, ...updates };
 }

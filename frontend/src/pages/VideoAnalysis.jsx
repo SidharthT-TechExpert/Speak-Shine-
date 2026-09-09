@@ -17,6 +17,8 @@ import {
   detectQuestionType,
   getQuestionUIConfig,
   parseQuestionItems,
+  getCefrInfo,
+  CEFR_LEVEL_MAP,
   DEFAULT_MONTHLY_REFLECTION_QUESTIONS,
   DEFAULT_MONTHLY_GOALS_QUESTIONS,
 } from "../utils/questionTypes.js";
@@ -206,6 +208,7 @@ export default function VideoAnalysis() {
   const [todayVocabulary, setTodayVocabulary] = useState([]);
   const [vocabWordCount, setVocabWordCount] = useState(5);
   const [vocabRequiredCount, setVocabRequiredCount] = useState(3);
+  const [vocabLevel, setVocabLevel] = useState("B2");
   const [isMonthlyReflection, setIsMonthlyReflection] = useState(false);
   const [isMonthlyGoals, setIsMonthlyGoals] = useState(false);
   const [isStorySummary, setIsStorySummary] = useState(false);
@@ -493,6 +496,7 @@ export default function VideoAnalysis() {
         if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
         if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
         if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
+        if (t?.vocabLevel) setVocabLevel(t.vocabLevel);
         if (t?.durationLimits) setDurationLimits(t.durationLimits);
       }).catch(() => {}).finally(() => {
         setIsLoadingQuestion(false);
@@ -529,6 +533,7 @@ export default function VideoAnalysis() {
       if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
       if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
       if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
+      if (t?.vocabLevel) setVocabLevel(t.vocabLevel);
       if (r.data?.today?.allowPrivateVideos !== undefined) setAllowPrivateVideos(r.data.today.allowPrivateVideos);
       if (r.data?.today?.enableBackgroundBlur !== undefined) setEnableBackgroundBlur(r.data.today.enableBackgroundBlur);
       if (t?.durationLimits) setDurationLimits(t.durationLimits);
@@ -760,6 +765,10 @@ export default function VideoAnalysis() {
             isStorySummary,
             isMonthlyGoals,
             isMonthlyReflection,
+            vocabWordCount,
+            vocabRequiredCount,
+            vocabLevel,
+            vocabulary: todayVocabulary,
             category: todayQuestion?.category || (isStorySummary ? "Story Summary" : isPictureDescription ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
             topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : "Daily Speaking Mission"),
             question: todayQuestion?.question || "",
@@ -789,7 +798,7 @@ export default function VideoAnalysis() {
           const italicTitlePart = titleParts.length > 1 ? titleParts[titleParts.length - 1] : "";
 
           const normalizedVocab = (todayVocabulary && todayVocabulary.length > 0)
-            ? todayVocabulary.slice(0, 5).map((v, i) => {
+            ? todayVocabulary.slice(0, vocabWordCount || todayVocabulary.length).map((v, i) => {
                 let word = "";
                 let meaning = "";
                 let example = "";
@@ -1111,10 +1120,31 @@ export default function VideoAnalysis() {
                 {normalizedVocab.length > 0 && (
                   <div style={{ marginTop: "1.25rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
                         <span style={{ fontSize: "1.05rem" }}>📚</span>
                         <span className="vocab-section-title">
                           TODAY'S VOCABULARY CHALLENGE
+                        </span>
+                        <span
+                          className="vocab-strength-badge"
+                          title={`CEFR Level ${vocabLevel}: ${qConfig.cefrInfo?.desc || "Curated vocabulary"}`}
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 800,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            padding: "2px 8px",
+                            borderRadius: 99,
+                            background: qConfig.cefrInfo?.bg || "rgba(168, 85, 247, 0.15)",
+                            border: `1px solid ${qConfig.cefrInfo?.border || "rgba(168, 85, 247, 0.35)"}`,
+                            color: qConfig.cefrInfo?.color || "#c084fc",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <span>⚡</span>
+                          <span>{qConfig.cefrInfo?.label || `${vocabLevel} Level`}</span>
                         </span>
                       </div>
                       <div
@@ -1127,7 +1157,7 @@ export default function VideoAnalysis() {
                           transition: "all 0.15s ease",
                         }}
                       >
-                        🎯 Goal: {plannedCount} / {Math.min(vocabRequiredCount || 3, normalizedVocab.length)} words (+30 pts)
+                        🎯 Goal: {plannedCount} / {Math.min(vocabRequiredCount || 3, normalizedVocab.length)} words (+{Math.min(vocabRequiredCount || 3, normalizedVocab.length) * 10} pts)
                       </div>
                     </div>
 
