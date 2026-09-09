@@ -421,7 +421,7 @@ export default function Layout({ children, title, subtitle }) {
               </div>
             )}
 
-            {/* Mobile Hamburger Toggle - ALWAYS VISIBLE */}
+            {/* Mobile Hamburger Toggle - hidden on laptop and desktop */}
             <button
               type="button"
               className={`hamburger lg:hidden ${menuOpen ? "open" : ""}`}
@@ -431,7 +431,6 @@ export default function Layout({ children, title, subtitle }) {
                 flexShrink: 0,
                 width: 32,
                 height: 32,
-                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 padding: "6px",

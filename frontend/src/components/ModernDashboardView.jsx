@@ -1334,7 +1334,7 @@ export default function ModernDashboardView({
               </div>
             )}
 
-            {/* Hamburger for mobile / tablet - ALWAYS VISIBLE */}
+            {/* Hamburger for mobile / tablet - hidden on laptop and desktop */}
             <button
               type="button"
               className={`hamburger lg:hidden ${mobileNavOpen ? "open" : ""}`}
@@ -1344,7 +1344,6 @@ export default function ModernDashboardView({
                 flexShrink: 0,
                 width: 32,
                 height: 32,
-                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 padding: "6px",

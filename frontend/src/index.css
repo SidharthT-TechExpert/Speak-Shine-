@@ -190,6 +190,15 @@ input, select, textarea { font-family: inherit; outline: none; -webkit-appearanc
 .hamburger.open span:nth-child(2) { opacity: 0; }
 .hamburger.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
+/* Strictly hide hamburger on laptops and desktops */
+@media (min-width: 1024px) {
+  .hamburger,
+  .speakshine-topbar .hamburger,
+  .speakshine-topbar-right .hamburger {
+    display: none !important;
+  }
+}
+
 /* Mobile drawer */
 .mobile-nav { display: none; position: fixed; top: 60px; left: 0; right: 0; bottom: 0; background: rgba(5,5,15,0.98); z-index: 150; flex-direction: column; padding: 1.25rem 1rem; gap: 0.4rem; animation: slideDown 0.2s ease; }
 .mobile-nav.open { display: flex; }
