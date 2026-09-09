@@ -324,7 +324,14 @@ export async function refreshAccessToken(refreshToken, ipAddress) {
   }
 
   // Find user
-  const auth = await Auth.findById(decoded.id);
+  let auth;
+  try {
+    auth = await Auth.findById(decoded.id);
+  } catch {
+    const error = new Error("Invalid refresh token");
+    error.statusCode = 401;
+    throw error;
+  }
   if (!auth || !auth.isActive) {
     const error = new Error("Invalid refresh token");
     error.statusCode = 401;

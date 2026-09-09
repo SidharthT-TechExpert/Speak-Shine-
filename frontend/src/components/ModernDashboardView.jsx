@@ -2501,8 +2501,8 @@ export default function ModernDashboardView({
                       RULES TO REMEMBER
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                      {qConfig.rules && qConfig.rules.length > 0 ? (
-                        qConfig.rules.map((rule, idx) => (
+                      {questionConfig?.rules && questionConfig.rules.length > 0 ? (
+                        questionConfig.rules.map((rule, idx) => (
                           <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
                             <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                             <span>{rule.text}</span>

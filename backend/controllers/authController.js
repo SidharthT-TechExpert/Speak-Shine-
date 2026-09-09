@@ -73,13 +73,21 @@ export async function refresh(req, res, next) {
   try {
     // Accept from cookie first, fall back to body (for backward compat during migration)
     const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken;
+    if (!refreshToken) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: "No refresh token provided" });
+    }
     const result = await authService.refreshAccessToken(refreshToken, req.ip);
     // Rotate both cookies
     setAuthCookies(res, result.accessToken, result.refreshToken);
     res.json({ success: true, expiresIn: result.expiresIn });
   } catch (error) {
     clearAuthCookies(res);
-    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    const status = error.statusCode || (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError" || error.name === "CastError" ? 401 : 500);
+    if (status !== 500) {
+      return res.status(status).json({ error: error.message || "Invalid or expired session" });
+    }
+    console.error("[Refresh] Error:", error.message);
     res.status(500).json({ error: "Token refresh failed" });
   }
 }

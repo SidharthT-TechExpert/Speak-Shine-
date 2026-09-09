@@ -26,5 +26,5 @@ backend/config/dev.config.js
 .env.local
 .env.*.local
 dev.md
-auth/
-.auth/
+/auth/
+/.auth/
