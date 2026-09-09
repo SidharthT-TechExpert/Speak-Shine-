@@ -1323,7 +1323,6 @@ export default function ModernDashboardView({
               <span style={{ color: "#fbbf24" }}>⭐</span>
               <span>{totalPoints} Pts</span>
             </div>
-            <ThemeToggle compact />
             {isLoggedIn && (
               <div
                 className="speakshine-avatar hidden sm:flex"
@@ -3297,13 +3296,8 @@ export default function ModernDashboardView({
             );
           })()}
 
-          {/* ── Section 4: Performance Analytics & Leaderboard (Screenshots 3, 4, 5) ── */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
-            gap: "1.25rem",
-            alignItems: "start",
-          }}>
+          {/* ── Section 4: Performance Analytics & Leaderboard ── */}
+          <div className="speakshine-perf-analytics-grid">
             {/* Left Column: Performance Center with 3 Tabs */}
             <div className="speakshine-card-box" style={{
               background: "#0d0a18",
@@ -3379,7 +3373,7 @@ export default function ModernDashboardView({
               </div>
 
               {/* Metric Averages Row */}
-              <div className="perf-metric-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+              <div className="perf-metric-grid">
                 <div className="perf-metric-card">
                   <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     FLUENCY
@@ -3740,9 +3734,11 @@ export default function ModernDashboardView({
                   gap: "0.45rem",
                   fontSize: "0.7rem",
                   fontWeight: 600,
-                  padding: "3px 9px",
+                  padding: "4px 10px",
                   borderRadius: 99,
                   marginBottom: "1.2rem",
+                  maxWidth: "100%",
+                  flexWrap: "wrap",
                 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
                   <span>{groupName.toUpperCase()} · {memberCount} MEMBERS · {submittedCount} SUBMITTED · {pendingCount} PENDING</span>

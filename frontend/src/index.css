@@ -6222,6 +6222,65 @@ audio { border-radius: 12px; }
 }
 
 /* ── Performance Center Base Styles ── */
+.speakshine-perf-analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  width: 100%;
+}
+
+.perf-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .speakshine-perf-analytics-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .perf-metric-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .perf-tab-wrapper {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .perf-tab-btn {
+    padding: 0.35rem 0.65rem !important;
+    font-size: 0.76rem !important;
+    white-space: nowrap !important;
+  }
+  .speakshine-card-box {
+    padding: 1.15rem 1rem !important;
+    border-radius: 16px !important;
+  }
+}
+
+@media (max-width: 440px) {
+  .perf-metric-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+  }
+  .perf-metric-card {
+    padding: 0.75rem 0.65rem !important;
+  }
+  .perf-metric-val {
+    font-size: 1.2rem !important;
+  }
+}
+
 .perf-center-title {
   color: #716c85;
 }

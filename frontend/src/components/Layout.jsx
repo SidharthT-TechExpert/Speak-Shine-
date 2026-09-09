@@ -412,7 +412,6 @@ export default function Layout({ children, title, subtitle }) {
                 </div>
               </>
             )}
-            <ThemeToggle compact />
             {isLoggedIn && (
               <div
                 className="speakshine-avatar disabled hidden sm:flex"
