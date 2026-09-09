@@ -217,18 +217,9 @@ input, select, textarea { font-family: inherit; outline: none; -webkit-appearanc
 .header-nav .nav-link { flex-shrink: 0; }
 
 /* Collapse header nav earlier for slightly wider screens */
-@media (max-width: 1280px) {
-  .header-nav { display: none; }
-  .hamburger { display: flex; }
-  .brand { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-  .header-right { gap: 0.5rem; }
-}
-
-/* Collapse header nav earlier for tablet widths to avoid overflow */
-@media (max-width: 1100px) {
+/* Collapse header nav for mobile / tablet widths below 900px */
+@media (max-width: 900px) {
   .app-header { padding: 0 0.9rem; }
-  .header-nav { display: none; }
-  .hamburger { display: flex; }
   .brand { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .brand span:last-child { display: inline-block; }
   .brand-emoji { font-size: 1.2rem; }
@@ -6019,6 +6010,37 @@ audio { border-radius: 12px; }
 .light .speakshine-kpi-bar div > div:nth-child(2) {
   color: #0f172a !important;
 }
+
+/* Light mode for Question Prompt Box and Text */
+[data-theme="light"] .speakshine-prompt-box,
+.light .speakshine-prompt-box {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .speakshine-question-text,
+.light .speakshine-question-text,
+[data-theme="light"] .speakshine-prompt-box .speakshine-question-text,
+.light .speakshine-prompt-box .speakshine-question-text,
+[data-theme="light"] .speakshine-prompt-box div.speakshine-question-text,
+.light .speakshine-prompt-box div.speakshine-question-text {
+  color: #0f172a !important;
+}
+
+
+[data-theme="light"] .speakshine-question-item-row,
+.light .speakshine-question-item-row {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .speakshine-tts-btn,
+.light .speakshine-tts-btn {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
 
 [data-theme="light"] .speakshine-card-box,
 .light .speakshine-card-box {

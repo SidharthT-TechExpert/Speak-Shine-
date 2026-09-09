@@ -1953,7 +1953,7 @@ export default function ModernDashboardView({
               )}
 
               {/* ── 3. SPEAKING TASK / QUESTION PROMPT CARD (HERO FOR ALL TYPES) ── */}
-              <div style={{
+              <div className="speakshine-prompt-box" style={{
                 background: "rgba(255, 255, 255, 0.03)",
                 border: `1px solid ${questionConfig.theme.border || "rgba(255, 255, 255, 0.08)"}`,
                 borderRadius: 14,
@@ -1976,6 +1976,7 @@ export default function ModernDashboardView({
                   {(questionType === "standard_question" || questionType === "picture_description") && (
                     <button
                       type="button"
+                      className="speakshine-tts-btn"
                       onClick={() => handleSpeakPrompt(parsedQuestions.map(q => q.text).join(". "))}
                       style={{
                         background: isSpeakingPrompt ? questionConfig.theme.primary : "rgba(255, 255, 255, 0.06)",
@@ -2003,6 +2004,7 @@ export default function ModernDashboardView({
                     {parsedQuestions.map((item, idx) => (
                       <div
                         key={idx}
+                        className="speakshine-question-item-row"
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -2030,14 +2032,14 @@ export default function ModernDashboardView({
                         }}>
                           {item.num || idx + 1}
                         </span>
-                        <span style={{ fontSize: "0.95rem", fontWeight: 600, color: "#f8fafc", lineHeight: 1.45 }}>
+                        <span className="speakshine-question-text" style={{ fontSize: "0.95rem", fontWeight: 600, color: "#f8fafc", lineHeight: 1.45 }}>
                           {item.text}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div style={{
+                  <div className="speakshine-question-text" style={{
                     fontSize: "1.18rem",
                     fontWeight: 600,
                     color: "#ffffff",
