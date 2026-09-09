@@ -6224,10 +6224,34 @@ audio { border-radius: 12px; }
 /* ── Performance Center Base Styles ── */
 .speakshine-perf-analytics-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(340px, 1fr) minmax(0, 1.75fr);
   gap: 1.25rem;
   align-items: start;
   width: 100%;
+}
+
+.speakshine-leaderboard-col {
+  order: 1;
+}
+
+.speakshine-perf-center-col {
+  order: 2;
+}
+
+@media (max-width: 1024px) {
+  .speakshine-perf-analytics-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1.25rem !important;
+  }
+  .speakshine-leaderboard-col {
+    order: 1 !important;
+    width: 100% !important;
+  }
+  .speakshine-perf-center-col {
+    order: 2 !important;
+    width: 100% !important;
+  }
 }
 
 .perf-metric-grid {
@@ -6235,13 +6259,6 @@ audio { border-radius: 12px; }
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 1.5rem;
-}
-
-@media (max-width: 1024px) {
-  .speakshine-perf-analytics-grid {
-    grid-template-columns: 1fr !important;
-    gap: 1.25rem !important;
-  }
 }
 
 @media (max-width: 768px) {

@@ -3299,7 +3299,7 @@ export default function ModernDashboardView({
           {/* ── Section 4: Performance Analytics & Leaderboard ── */}
           <div className="speakshine-perf-analytics-grid">
             {/* Left Column: Performance Center with 3 Tabs */}
-            <div className="speakshine-card-box" style={{
+            <div className="speakshine-card-box speakshine-perf-center-col" style={{
               background: "#0d0a18",
               border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: 18,
@@ -3668,7 +3668,7 @@ export default function ModernDashboardView({
             </div>
 
             {/* Right Column: Leaderboard & Community Card (Screenshot 5) */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div className="speakshine-leaderboard-col" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               {/* Leaderboard Box */}
               <div
                 ref={leaderboardRef}
