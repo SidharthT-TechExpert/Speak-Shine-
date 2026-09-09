@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import api, { ensureFreshToken } from "../api/client";
 import { getSharedSocket } from "../hooks/useSocket";
+import { useTheme } from "./ThemeContext.jsx";
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,7 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const COOKIE_AUTH_SENTINEL = "cookie-session";
 
 export function AuthProvider({ children }) {
+  const { applyTheme } = useTheme();
   // User profile lives in memory only — never persisted to localStorage
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
@@ -52,13 +54,20 @@ export function AuthProvider({ children }) {
         try {
           const { data } = await api.get("/users/me");
           if (!cancelled && data?.auth) {
+            const userTheme = data.auth.theme || (data.auth.isDark === false ? "light" : "dark");
+            const isDarkVal = data.auth.isDark ?? (userTheme !== "light");
             setUser({
               phone: data.auth.phone,
               role:  data.auth.role,
               name:  data.auth.name,
               // paid comes from the User tracking document
               paid:  data.user?.paid ?? false,
+              theme: userTheme,
+              isDark: isDarkVal,
             });
+            if (userTheme) {
+              applyTheme(userTheme);
+            }
             // After migration: no localStorage token → use sentinel for socket
             setToken(localStorage.getItem("token") || COOKIE_AUTH_SENTINEL);
             scheduleRefresh();
@@ -71,7 +80,7 @@ export function AuthProvider({ children }) {
     })();
 
     return () => { cancelled = true; };
-  }, [scheduleRefresh]);
+  }, [scheduleRefresh, applyTheme]);
 
   const clearSession = useCallback(() => {
     localStorage.removeItem("token");
@@ -87,8 +96,12 @@ export function AuthProvider({ children }) {
     // Tokens are set as httpOnly cookies by the server — just store user in memory
     setUser(userData);
     setToken(COOKIE_AUTH_SENTINEL);
+    const userTheme = userData?.theme || (userData?.isDark === false ? "light" : (userData?.isDark ? "dark" : null));
+    if (userTheme) {
+      applyTheme(userTheme);
+    }
     scheduleRefresh();
-  }, [scheduleRefresh]);
+  }, [scheduleRefresh, applyTheme]);
 
   const logout = useCallback(async () => {
     try {

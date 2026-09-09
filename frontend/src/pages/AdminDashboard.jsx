@@ -2494,7 +2494,6 @@ export default function AdminDashboard() {
                       <span className="live-dot" />
                       API Synced
                     </span>
-                    <ThemeToggle compact />
                     <button
                       className={`cmd-refresh-btn${refreshing ? " spinning" : ""}`}
                       onClick={async () => {

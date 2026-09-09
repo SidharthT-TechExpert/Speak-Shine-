@@ -53,6 +53,8 @@ export async function login(req, res, next) {
       phone: result.phone,
       paid: result.paid,
       expiresIn: result.expiresIn,
+      theme: result.theme,
+      isDark: result.isDark,
     });
   } catch (error) {
     if (error.statusCode) {

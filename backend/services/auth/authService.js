@@ -291,6 +291,8 @@ export async function loginUser(phone, password, ipAddress) {
     name: auth.name,
     phone: auth.phone,
     paid,
+    theme: auth.theme || "dark",
+    isDark: auth.isDark ?? (auth.theme !== "light"),
   };
 }
 

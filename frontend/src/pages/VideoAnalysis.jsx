@@ -1175,7 +1175,7 @@ export default function VideoAnalysis() {
                               transition: "all 0.15s ease",
                             }}
                           >
-                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
                               <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                                   <div className="vocab-num-badge">0{i + 1}</div>
@@ -1196,7 +1196,7 @@ export default function VideoAnalysis() {
                                 )}
                               </div>
 
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0, marginTop: "2px" }}>
+                              <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto" style={{ marginTop: "2px" }}>
                                 <button
                                   type="button"
                                   onClick={() => handleSpeak(v.word, v.meaning, v.example, i)}
@@ -1258,17 +1258,18 @@ export default function VideoAnalysis() {
               </div>
 
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
-              <div className="speakshine-hero-right-card" style={{
+              <div className="speakshine-hero-right-card h-fit self-start lg:sticky lg:top-[80px]" style={{
                 background: "#0d0a18",
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 18,
-                padding: "1.75rem",
+                padding: "1.25rem 1.25rem 1.35rem",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "space-between",
+                gap: "0.85rem",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
               }}>
                 <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.65rem" }}>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.5rem" }}>
                     WINDOW CLOSES AT MIDNIGHT
                   </div>
 
@@ -1332,10 +1333,10 @@ export default function VideoAnalysis() {
                     display: "flex",
                     alignItems: "center",
                     gap: "0.45rem",
-                    fontSize: "0.8rem",
+                    fontSize: "0.78rem",
                     color: "#f87171",
                     fontWeight: 600,
-                    marginBottom: "1.35rem",
+                    marginBottom: "0.75rem",
                   }}>
                     <span>⚠️</span>
                     <span>Submit before midnight to start streak</span>
@@ -1346,15 +1347,15 @@ export default function VideoAnalysis() {
                     background: "rgba(255, 255, 255, 0.03)",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
                     borderRadius: 12,
-                    padding: "1rem",
-                    marginBottom: "1.5rem",
+                    padding: "0.85rem",
+                    marginBottom: "0.25rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.55rem" }}>
                       RULES TO REMEMBER
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {qConfig.rules.map((rule, idx) => (
-                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: "#e2e8f0" }}>
                           <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
                           <span style={rule.highlight ? { fontWeight: 600, color: "#ffffff" } : {}}>{rule.text}</span>
                         </div>
@@ -1364,7 +1365,7 @@ export default function VideoAnalysis() {
                 </div>
 
                 {/* Action Buttons: Record & Upload */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginTop: "auto" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                   <button
                     type="button"
                     onClick={() => scrollToStudio("record")}
@@ -1374,7 +1375,7 @@ export default function VideoAnalysis() {
                       color: "#ffffff",
                       border: "none",
                       borderRadius: 12,
-                      padding: "0.9rem",
+                      padding: "0.85rem",
                       fontWeight: 700,
                       fontSize: "0.92rem",
                       cursor: "pointer",
@@ -1402,7 +1403,7 @@ export default function VideoAnalysis() {
                       color: "#cbd5e1",
                       border: "1px solid rgba(255, 255, 255, 0.08)",
                       borderRadius: 12,
-                      padding: "0.8rem",
+                      padding: "0.75rem",
                       fontWeight: 600,
                       fontSize: "0.88rem",
                       cursor: "pointer",

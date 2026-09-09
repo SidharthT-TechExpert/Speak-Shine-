@@ -8,6 +8,8 @@ const authSchema = new mongoose.Schema({
   name: { type: String, default: null },
   email: { type: String, default: null },                // admin email for OTP verification
   isActive: { type: Boolean, default: true },
+  theme: { type: String, enum: ["dark", "light"], default: "dark" },
+  isDark: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   
   // Security: Account lockout after failed login attempts

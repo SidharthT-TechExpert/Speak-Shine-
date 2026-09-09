@@ -70,6 +70,10 @@ const userSchema = new mongoose.Schema({
   // Legacy fields — kept for DB compatibility, no longer used in business logic
   fine: { type: Number, default: 0 },
   weeklyFine: { type: Number, default: 0 },
+
+  // ── Appearance / Theme Preference ───────────────────────────────────────
+  theme: { type: String, enum: ["dark", "light"], default: "dark" },
+  isDark: { type: Boolean, default: true },
 });
 
 userSchema.index({ phone: 1 });

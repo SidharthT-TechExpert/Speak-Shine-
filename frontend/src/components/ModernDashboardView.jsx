@@ -4,7 +4,6 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid
 } from "recharts";
-import NotificationBell from "./NotificationBell.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import Modal from "./Modal.jsx";
@@ -240,6 +239,22 @@ export default function ModernDashboardView({
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const mobileDrawerRef = useRef(null);
+  const mobileBackdropRef = useRef(null);
+  const heroGridRef = useRef(null);
+
+  // GSAP animation for mobile navigation drawer
+  useEffect(() => {
+    if (!mobileDrawerRef.current || !mobileBackdropRef.current) return;
+    if (mobileNavOpen) {
+      gsap.to(mobileBackdropRef.current, { opacity: 1, duration: 0.25, pointerEvents: "auto" });
+      gsap.to(mobileDrawerRef.current, { x: "0%", duration: 0.35, ease: "power3.out", pointerEvents: "auto" });
+    } else {
+      gsap.to(mobileBackdropRef.current, { opacity: 0, duration: 0.2, pointerEvents: "none" });
+      gsap.to(mobileDrawerRef.current, { x: "-100%", duration: 0.25, ease: "power3.in", pointerEvents: "none" });
+    }
+  }, [mobileNavOpen]);
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -613,6 +628,19 @@ export default function ModernDashboardView({
     if (h < 17) return "afternoon";
     return "evening";
   };
+
+  // GSAP entrance animation for hero cards on state or challenge change
+  useEffect(() => {
+    if (!heroGridRef.current) return;
+    const cards = heroGridRef.current.querySelectorAll(".speakshine-hero-left-card, .speakshine-hero-right-card");
+    if (cards && cards.length > 0) {
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.45, stagger: 0.1, ease: "power2.out" }
+      );
+    }
+  }, [today?.topic, today?.question, isTodaySubmitted]);
 
   // ── File Upload Handler ─────────────────────────────────────────────────────
   const handleFileUploadClick = () => {
@@ -1111,6 +1139,14 @@ export default function ModernDashboardView({
           </Link>
         </nav>
 
+        {/* Appearance / Theme Mode Selector */}
+        <div className="speakshine-sidebar-theme" style={{ padding: "0 1.25rem", marginBottom: "0.85rem" }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c7793", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.45rem" }}>
+            Appearance
+          </div>
+          <ThemeToggle />
+        </div>
+
         {/* Freeze Tokens Bottom Box (Screenshot 1) */}
         <div className="speakshine-freeze-box">
           <div className="freeze-title">FREEZE TOKENS</div>
@@ -1138,15 +1174,138 @@ export default function ModernDashboardView({
         </div>
       </aside>
 
+      {/* ── Mobile Navigation Drawer with GSAP ── */}
+      <div
+        ref={mobileBackdropRef}
+        className="speakshine-mobile-backdrop lg:hidden"
+        style={{ opacity: 0, pointerEvents: "none" }}
+        onClick={() => setMobileNavOpen(false)}
+      />
+      <div
+        ref={mobileDrawerRef}
+        className="speakshine-mobile-drawer lg:hidden"
+        style={{ transform: "translateX(-100%)", pointerEvents: "none" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+          <Link to="/dashboard" className="speakshine-sidebar-brand" onClick={() => setMobileNavOpen(false)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
+                fill="url(#goldStarGradDrawer)"
+              />
+              <defs>
+                <linearGradient id="goldStarGradDrawer" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#fbbf24" />
+                  <stop offset="1" stopColor="#f59e0b" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <span className="brand-logo-text">Speak &amp; Shine</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(false)}
+            style={{
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "none",
+              borderRadius: "8px",
+              color: "#e2e8f0",
+              width: 32,
+              height: 32,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.1rem",
+            }}
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
+        </div>
+
+        <nav className="speakshine-sidebar-nav" style={{ flex: 1 }}>
+          <Link to="/dashboard" className="speakshine-nav-item active" onClick={() => setMobileNavOpen(false)}>
+            <span className="nav-icon">⏱</span>
+            <span>Dashboard</span>
+          </Link>
+          <Link to="/record" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
+            <span className="nav-icon">📹</span>
+            <span>Video analysis</span>
+          </Link>
+          <Link to="/community" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
+            <span className="nav-icon">👥</span>
+            <span>Community</span>
+          </Link>
+          <Link to="/live/rooms" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
+            <span className="nav-icon">📡</span>
+            <span>Live rooms</span>
+          </Link>
+          <Link to="/payment-history" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
+            <span className="nav-icon">💳</span>
+            <span>Payments</span>
+          </Link>
+
+          {(user?.role === "admin" || user?.role === "admins") && (
+            <Link to="/admin" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
+              <span className="nav-icon">🛡️</span>
+              <span>Admin</span>
+            </Link>
+          )}
+          {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
+            <Link to="/trainer" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
+              <span className="nav-icon">🎓</span>
+              <span>Trainer</span>
+            </Link>
+          )}
+        </nav>
+
+        <div style={{ marginTop: "auto", marginBottom: "1rem" }}>
+          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#8e8a9f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
+            Appearance
+          </div>
+          <ThemeToggle />
+        </div>
+
+        <div className="speakshine-freeze-box">
+          <div className="freeze-title">FREEZE TOKENS</div>
+          <div className="freeze-val">
+            {profile?.freezeTokens ?? user?.freezeTokens ?? 0}{" "}
+            <span style={{ fontSize: "0.85rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
+          </div>
+          <div className="freeze-desc">
+            Earn tokens by completing 7-day streak milestones.
+          </div>
+          {isLoggedIn && (
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                handleLogout();
+              }}
+              className="freeze-link speakshine-sidebar-logout"
+              title="Log Out"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" x2="9" y1="12" y2="12" />
+              </svg>
+              <span>Log out</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ── Main Content Canvas ── */}
       <div className="speakshine-main">
         {/* Top Header Bar (Screenshot 1) */}
         <header className="speakshine-topbar">
-          <div className="speakshine-topbar-left">
-            <span className="speakshine-topbar-greeting">
+          <div className="speakshine-topbar-left" style={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
+            <span className="speakshine-topbar-greeting" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
               Good {getGreeting()}, {displayName} 👋
             </span>
-            <span className="speakshine-topbar-subtitle">
+            <span className="speakshine-topbar-subtitle hidden md:block" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {isTodaySubmitted
                 ? "🎉 Today's speaking mission accomplished! Your streak is secured."
                 : isQuestionActive
@@ -1155,20 +1314,19 @@ export default function ModernDashboardView({
             </span>
           </div>
 
-          <div className="speakshine-topbar-right">
-            <div className="speakshine-pill streak">
+          <div className="speakshine-topbar-right" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <div className="speakshine-pill streak" style={{ flexShrink: 0 }}>
               <span>🔥</span>
-              <span>{streak} Day streak</span>
+              <span>{streak} Day</span>
             </div>
-            <div className="speakshine-pill points">
+            <div className="speakshine-pill points hidden sm:inline-flex" style={{ flexShrink: 0 }}>
               <span style={{ color: "#fbbf24" }}>⭐</span>
-              <span>{totalPoints} Points</span>
+              <span>{totalPoints} Pts</span>
             </div>
             <ThemeToggle compact />
-            <NotificationBell token={localStorage.getItem("token")} />
             {isLoggedIn && (
               <div
-                className="speakshine-avatar"
+                className="speakshine-avatar hidden sm:flex"
                 onClick={handleLogout}
                 style={{ cursor: "pointer" }}
                 title={`${displayName} (${user?.email || ""}) · Click to log out`}
@@ -1176,6 +1334,28 @@ export default function ModernDashboardView({
                 {avatarInitials}
               </div>
             )}
+
+            {/* Hamburger for mobile / tablet - ALWAYS VISIBLE */}
+            <button
+              type="button"
+              className={`hamburger lg:hidden ${mobileNavOpen ? "open" : ""}`}
+              onClick={() => setMobileNavOpen(o => !o)}
+              aria-label="Toggle mobile menu"
+              style={{
+                flexShrink: 0,
+                width: 32,
+                height: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "6px",
+                marginLeft: "2px",
+              }}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
           </div>
         </header>
 
@@ -1184,12 +1364,7 @@ export default function ModernDashboardView({
           {/* ── Section 1: Hero Section (Submitted Accomplishment OR Active Question OR 12 AM Reset Countdown Layout) ── */}
           {isTodaySubmitted ? (
             /* ── Section 1A: Daily Mission Accomplishment Hero Setup (Submitted Users) ── */
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
-              gap: "1.25rem",
-              marginBottom: "1.25rem",
-            }}>
+            <div ref={heroGridRef} className="speakshine-hero-grid w-full">
               {/* Left Accomplishment Card */}
               <div className="speakshine-hero-left-card" style={{
                 background: "linear-gradient(145deg, #0d2818 0%, #081a10 50%, #0f172a 100%)",
@@ -1578,12 +1753,7 @@ export default function ModernDashboardView({
               </div>
             </div>
           ) : isQuestionActive ? (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
-              gap: "1.25rem",
-              marginBottom: "1.25rem",
-            }}>
+            <div ref={heroGridRef} className="speakshine-hero-grid w-full">
             {/* Left Challenge Card */}
             <div className="speakshine-hero-left-card" style={{
               background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
@@ -1944,7 +2114,7 @@ export default function ModernDashboardView({
                           transition: "all 0.15s ease",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
                               <div className="vocab-num-badge">0{i + 1}</div>
@@ -1965,7 +2135,7 @@ export default function ModernDashboardView({
                             )}
                           </div>
 
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0, marginTop: "2px" }}>
+                          <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto" style={{ marginTop: "2px" }}>
                             <button
                               type="button"
                               onClick={() => handleSpeakVocab(v.word, v.meaning, v.example, i)}
@@ -2005,22 +2175,23 @@ export default function ModernDashboardView({
               </div>
             </div>
 
-            {/* Right Action & Countdown Card (Screenshot 1) */}
-            <div className="speakshine-hero-right-card" style={{
-              background: "#0d0a18",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+            {/* Right Action & Countdown Card */}
+            <div className="speakshine-hero-right-card h-fit self-start lg:sticky lg:top-[80px]" style={{
+              background: isDark ? "#0d0a18" : "#ffffff",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
               borderRadius: 18,
-              padding: "1.75rem",
+              padding: "1.25rem 1.25rem 1.35rem",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "space-between",
+              gap: "0.85rem",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
             }}>
               <div>
-                <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.65rem" }}>
+                <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#716c85" : "#64748b", textTransform: "uppercase", marginBottom: "0.5rem" }}>
                   WINDOW CLOSES AT MIDNIGHT
                 </div>
 
-                {/* 3 Digital Countdown Timer Boxes (Screenshot 1) */}
+                {/* 3 Digital Countdown Timer Boxes */}
                 <MidnightCountdownTimer />
 
                 {/* Streak Warning */}
@@ -2028,31 +2199,31 @@ export default function ModernDashboardView({
                   display: "flex",
                   alignItems: "center",
                   gap: "0.45rem",
-                  fontSize: "0.8rem",
+                  fontSize: "0.78rem",
                   color: "#f87171",
                   fontWeight: 600,
-                  marginBottom: "1.35rem",
+                  marginBottom: "0.75rem",
                 }}>
                   <span>⚠️</span>
                   <span>{streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}</span>
                 </div>
 
-                {/* Rules to Remember (Screenshot 1) */}
+                {/* Rules to Remember */}
                 <div className="speakshine-rules-box" style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: "1px solid rgba(255, 255, 255, 0.06)",
+                  background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                  border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.06)",
                   borderRadius: 12,
-                  padding: "1rem",
-                  marginBottom: "1.5rem",
+                  padding: "0.85rem",
+                  marginBottom: "0.25rem",
                 }}>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase", marginBottom: "0.55rem" }}>
                     RULES TO REMEMBER
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                     {questionConfig.rules.map((rule, idx) => (
-                      <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
+                      <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155" }}>
                         <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span style={rule.highlight ? { fontWeight: 600, color: "#ffffff" } : {}}>{rule.text}</span>
+                        <span style={rule.highlight ? { fontWeight: 600, color: isDark ? "#ffffff" : "#0f172a" } : {}}>{rule.text}</span>
                       </div>
                     ))}
                   </div>
@@ -2060,7 +2231,7 @@ export default function ModernDashboardView({
               </div>
 
               {/* Action Buttons: Record & Upload */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem", marginTop: "auto" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 <button
                   type="button"
                   onClick={() => navigate("/record#video-studio-container")}
@@ -2070,7 +2241,7 @@ export default function ModernDashboardView({
                     color: "#ffffff",
                     border: "none",
                     borderRadius: 12,
-                    padding: "0.9rem",
+                    padding: "0.85rem",
                     fontWeight: 700,
                     fontSize: "0.92rem",
                     cursor: "pointer",
@@ -2094,11 +2265,11 @@ export default function ModernDashboardView({
                   className="speakshine-btn-secondary"
                   style={{
                     width: "100%",
-                    background: "#181427",
-                    color: "#cbd5e1",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    background: isDark ? "#181427" : "#f1f5f9",
+                    color: isDark ? "#cbd5e1" : "#1e293b",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.08)",
                     borderRadius: 12,
-                    padding: "0.8rem",
+                    padding: "0.75rem",
                     fontWeight: 600,
                     fontSize: "0.88rem",
                     cursor: "pointer",
@@ -2108,8 +2279,8 @@ export default function ModernDashboardView({
                     gap: "0.5rem",
                     transition: "background 0.15s ease",
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#221c37"}
-                  onMouseLeave={e => e.currentTarget.style.background = "#181427"}
+                  onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
+                  onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
                 >
                   <span>📁</span>
                   <span>{questionConfig.uploadButtonLabel}</span>
@@ -2127,12 +2298,7 @@ export default function ModernDashboardView({
           </div>
           ) : (
             /* ── Daily 12 AM Reset: Rearranged Mission Countdown & Readiness Hero ── */
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.85fr) minmax(320px, 1fr)",
-              gap: "1.25rem",
-              marginBottom: "1.25rem",
-            }}>
+            <div ref={heroGridRef} className="speakshine-hero-grid w-full">
               {/* Left: Countdown & Rest Card */}
               <div className="speakshine-hero-left-card" style={{
                 background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",

@@ -205,7 +205,14 @@ export default function Login({ loginFor = "user" }) {
         setServerError("Trainer credentials required.");
         return;
       }
-      login({ phone: data.phone, role: data.role, name: data.name, paid: data.paid ?? false });
+      login({
+        phone: data.phone,
+        role: data.role,
+        name: data.name,
+        paid: data.paid ?? false,
+        theme: data.theme,
+        isDark: data.isDark,
+      });
       if (loginFor === "trainer" && ["admin", "admins"].includes(data.role)) navigate("/trainer", { replace: true });
       else if (data.role === "admin" || data.role === "admins") navigate("/admin", { replace: true });
       else if (data.role === "trainer") navigate("/trainer",   { replace: true });

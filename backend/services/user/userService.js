@@ -147,7 +147,7 @@ export async function getUserProfile(userId) {
 
   const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "") : "";
   const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
-  const user = await User.findOne({ phone: { $in: phoneCandidates } }).select("name phone paid streak earnedBadges monthlyScore weeklySubmissions").lean();
+  const user = await User.findOne({ phone: { $in: phoneCandidates } }).select("name phone paid streak earnedBadges monthlyScore weeklySubmissions theme isDark").lean();
   return { auth, user: user || null };
 }
 
@@ -746,4 +746,35 @@ export async function createUserAccount(phone, password, name, role, actionToken
   }
 
   return { success: true, message: `Account created for ${name}` };
+}
+
+/**
+ * Update theme preference for user
+ */
+export async function updateUserTheme(userId, { theme, isDark }) {
+  const normalizedTheme = theme === "light" ? "light" : "dark";
+  const normalizedIsDark = typeof isDark === "boolean" ? isDark : (normalizedTheme === "dark");
+
+  const auth = await Auth.findByIdAndUpdate(
+    userId,
+    { $set: { theme: normalizedTheme, isDark: normalizedIsDark } },
+    { new: true }
+  ).select("phone theme isDark").lean();
+
+  if (!auth) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Also update corresponding User document if present
+  if (auth.phone) {
+    const stripped = auth.phone.replace(/^(\+91|91)/, "");
+    await User.updateMany(
+      { $or: [{ phone: auth.phone }, { phone: stripped }, { phone: `91${stripped}` }, { phone: `+91${stripped}` }] },
+      { $set: { theme: normalizedTheme, isDark: normalizedIsDark } }
+    );
+  }
+
+  return { theme: normalizedTheme, isDark: normalizedIsDark };
 }

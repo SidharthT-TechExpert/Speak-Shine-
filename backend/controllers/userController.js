@@ -317,3 +317,21 @@ export async function createUserAccount(req, res) {
     res.status(500).json({ error: "Failed to create account. Please try again." });
   }
 }
+
+/**
+ * PATCH /api/users/me/theme
+ * Update current user's theme preference
+ */
+export async function updateMyTheme(req, res) {
+  try {
+    const { theme, isDark } = req.body;
+    const result = await userService.updateUserTheme(req.user.id, { theme, isDark });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[UpdateMyTheme] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}

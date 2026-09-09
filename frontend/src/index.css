@@ -110,7 +110,12 @@ html { scroll-behavior: smooth; }
   --header-shadow: 0 1px 3px rgba(30,40,60,0.04), 0 4px 16px rgba(30,40,60,0.03);
 }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+}
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-display: swap;
@@ -120,6 +125,8 @@ body {
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
   overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
   background-image:
     radial-gradient(ellipse at 20% 0%, rgba(139,92,246,0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 0%, rgba(6,182,212,0.06) 0%, transparent 50%);
@@ -5348,14 +5355,18 @@ audio { border-radius: 12px; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 2.5rem 1.25rem;
+  justify-content: flex-start;
+  padding: 2.5rem 1.25rem 3rem;
   background: 
     radial-gradient(ellipse at 50% 0%, rgba(124, 111, 255, 0.12) 0%, transparent 60%),
     radial-gradient(ellipse at 85% 85%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
     #06050b;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -5365,7 +5376,7 @@ audio { border-radius: 12px; }
   top: -150px;
   left: 50%;
   transform: translateX(-50%);
-  width: 650px;
+  width: min(650px, 100vw);
   height: 350px;
   background: radial-gradient(circle, rgba(124, 111, 255, 0.18) 0%, rgba(124, 111, 255, 0) 70%);
   pointer-events: none;
@@ -5382,6 +5393,81 @@ audio { border-radius: 12px; }
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.06);
   position: relative;
   z-index: 1;
+}
+
+@media (max-width: 640px) {
+  .speakshine-auth-page {
+    padding: 1.25rem 0.85rem 2rem;
+    justify-content: flex-start;
+  }
+  .speakshine-auth-card {
+    padding: 1.35rem 1.15rem 1.2rem;
+    border-radius: 18px;
+    max-width: 100%;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  }
+  .speakshine-auth-brand {
+    margin-bottom: 0.85rem;
+  }
+  .speakshine-brand-emblem {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    margin-bottom: 0.45rem;
+  }
+  .speakshine-brand-emblem svg {
+    width: 24px;
+    height: 24px;
+  }
+  .speakshine-auth-title {
+    font-size: 1.3rem;
+    margin-bottom: 0.2rem;
+  }
+  .speakshine-auth-subtitle {
+    font-size: 0.78rem;
+    line-height: 1.3;
+  }
+  .speakshine-role-tabs {
+    margin-bottom: 1rem;
+    padding: 3px;
+    border-radius: 10px;
+  }
+  .speakshine-role-tab {
+    padding: 0.42rem 0.35rem;
+    font-size: 0.74rem;
+  }
+  .speakshine-form-group {
+    margin-bottom: 0.75rem;
+  }
+  .speakshine-form-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+  .speakshine-input {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.88rem;
+    border-radius: 10px;
+  }
+  .speakshine-submit-btn {
+    padding: 0.72rem 1rem;
+    font-size: 0.88rem;
+    border-radius: 10px;
+    margin-top: 0.35rem;
+  }
+  .speakshine-preview-btn {
+    padding: 0.62rem 0.8rem;
+    font-size: 0.78rem;
+    margin-top: 0.75rem;
+    border-radius: 10px;
+  }
+  .speakshine-feature-badges {
+    gap: 0.45rem;
+    margin-top: 1rem;
+  }
+  .speakshine-feature-badge {
+    font-size: 0.7rem;
+    padding: 0.28rem 0.55rem;
+  }
 }
 
 .speakshine-auth-brand {
@@ -5586,14 +5672,126 @@ audio { border-radius: 12px; }
 
 .speakshine-hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr);
   gap: 1.25rem;
   margin-bottom: 1.25rem;
+  width: 100%;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1080px) {
   .speakshine-hero-grid {
     grid-template-columns: 1fr !important;
+    gap: 1.25rem;
+  }
+}
+
+/* Mobile drawer backdrop and panel */
+.speakshine-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999;
+}
+
+.speakshine-mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 85vw;
+  background: #090712;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="light"] .speakshine-mobile-drawer,
+.light .speakshine-mobile-drawer {
+  background: #ffffff;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 1024px) {
+  .speakshine-sidebar {
+    display: none !important;
+  }
+  .speakshine-topbar {
+    padding: 0.85rem 1rem;
+    max-width: 100vw;
+  }
+  .speakshine-topbar .hamburger {
+    display: flex !important;
+  }
+  .speakshine-canvas {
+    padding: 1rem 0.75rem 2.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .speakshine-topbar {
+    padding: 0.65rem 0.65rem;
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+  .speakshine-topbar-left {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .speakshine-topbar-greeting {
+    font-size: 0.92rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .speakshine-topbar-subtitle {
+    display: none !important;
+  }
+  .speakshine-topbar-right {
+    gap: 0.3rem !important;
+    flex-shrink: 0;
+  }
+  .speakshine-topbar-right .hamburger {
+    display: flex !important;
+    flex-shrink: 0 !important;
+  }
+  .speakshine-pill {
+    padding: 0.22rem 0.48rem !important;
+    font-size: 0.7rem !important;
+  }
+  .speakshine-canvas {
+    padding: 0.75rem 0.5rem 2rem;
+  }
+  .admin-command-bar {
+    padding: 0.5rem 0.65rem;
+    gap: 0.5rem;
+  }
+  .admin-cmd-right {
+    gap: 0.35rem;
+  }
+  .status-pill {
+    padding: 0.18rem 0.45rem;
+    font-size: 0.68rem;
+  }
+  .cmd-refresh-btn {
+    padding: 0.22rem 0.6rem;
+    font-size: 0.72rem;
+  }
+  .admin-mobile-tab-pill {
+    padding: 0.32rem 0.55rem;
+    font-size: 0.74rem;
+  }
+  .ribbon-arrow-btn {
+    width: 22px;
+    height: 28px;
+    font-size: 1rem;
   }
 }
 

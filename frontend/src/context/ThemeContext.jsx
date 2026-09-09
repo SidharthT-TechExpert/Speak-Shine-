@@ -1,10 +1,12 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import api from "../api/client";
 
 const ThemeContext = createContext({
   theme: "dark",
   isDark: true,
   toggleTheme: () => {},
   setTheme: () => {},
+  applyTheme: () => {},
 });
 
 const THEME_KEY = "speakshine-theme";
@@ -40,18 +42,50 @@ export function ThemeProvider({ children }) {
     }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-  };
+  const setTheme = useCallback((newTheme, syncToDb = true) => {
+    if (newTheme !== "dark" && newTheme !== "light") return;
+    setThemeState(newTheme);
 
-  const setTheme = (newTheme) => {
-    if (newTheme === "dark" || newTheme === "light") {
-      setThemeState(newTheme);
+    try {
+      localStorage.setItem(THEME_KEY, newTheme);
+    } catch {
+      // ignore
     }
-  };
+
+    if (syncToDb) {
+      api.patch("/users/me/theme", {
+        theme: newTheme,
+        isDark: newTheme === "dark",
+      }).catch(() => {
+        // Silently catch unauthenticated or network errors
+      });
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const nextTheme = prev === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem(THEME_KEY, nextTheme);
+      } catch {
+        // ignore
+      }
+      api.patch("/users/me/theme", {
+        theme: nextTheme,
+        isDark: nextTheme === "dark",
+      }).catch(() => {
+        // Silently catch unauthenticated or network errors
+      });
+      return nextTheme;
+    });
+  }, []);
+
+  const applyTheme = useCallback((newTheme) => {
+    setTheme(newTheme, false);
+  }, [setTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme, applyTheme }}>
       {children}
     </ThemeContext.Provider>
   );

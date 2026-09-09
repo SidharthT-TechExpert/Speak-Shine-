@@ -5,7 +5,6 @@ import api from "../api/client.js";
 import { getSharedSocket } from "../hooks/useSocket.js";
 
 const Modal = lazy(() => import("./Modal.jsx"));
-const NotificationBell = lazy(() => import("./NotificationBell.jsx"));
 import ThemeToggle from "./ThemeToggle.jsx";
 
 // ── Live session banner (shown on all pages when a session goes live) ────────
@@ -331,6 +330,14 @@ export default function Layout({ children, title, subtitle }) {
           )}
         </nav>
 
+        {/* Appearance / Theme Mode Selector */}
+        <div className="speakshine-sidebar-theme" style={{ padding: "0 1.25rem", marginBottom: "0.85rem", marginTop: isStaffRoute ? "auto" : 0 }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c7793", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.45rem" }}>
+            Appearance
+          </div>
+          <ThemeToggle />
+        </div>
+
         {/* Freeze Tokens Bottom Box (Hidden on staff routes) */}
         {!isStaffRoute && (
           <div className="speakshine-freeze-box">
@@ -364,16 +371,16 @@ export default function Layout({ children, title, subtitle }) {
       <div className="speakshine-main">
         {/* Top Header Bar */}
         <header className="speakshine-topbar">
-          <div className="speakshine-topbar-left">
-            <span className="speakshine-topbar-greeting">
+          <div className="speakshine-topbar-left" style={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
+            <span className="speakshine-topbar-greeting" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
               Good {getGreeting()}, {displayName} 👋
             </span>
-            <span className="speakshine-topbar-subtitle">
+            <span className="speakshine-topbar-subtitle hidden md:block" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {getComputedSubtitle()}
             </span>
           </div>
 
-          <div className="speakshine-topbar-right">
+          <div className="speakshine-topbar-right" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
             {isStaffRoute ? (
               <div
                 className="speakshine-pill"
@@ -382,58 +389,59 @@ export default function Layout({ children, title, subtitle }) {
                   background: isAdminRoute ? "rgba(239, 68, 68, 0.14)" : "rgba(168, 85, 247, 0.14)",
                   color: isAdminRoute ? "#fca5a5" : "#d8b4fe",
                   fontWeight: 700,
-                  fontSize: "0.82rem",
-                  padding: "0.4rem 0.9rem",
+                  fontSize: "0.78rem",
+                  padding: "0.3rem 0.6rem",
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.45rem",
+                  gap: "0.35rem",
+                  flexShrink: 0,
                 }}
               >
                 <span>{isAdminRoute ? "🛡️" : "🎓"}</span>
-                <span>{isAdminRoute ? "Admin Portal" : "Trainer Workspace"}</span>
+                <span className="hidden sm:inline">{isAdminRoute ? "Admin Portal" : "Trainer Workspace"}</span>
               </div>
             ) : (
               <>
-                <div className="speakshine-pill streak">
+                <div className="speakshine-pill streak" style={{ flexShrink: 0 }}>
                   <span>🔥</span>
-                  <span>{streak} Day streak</span>
+                  <span>{streak} Day</span>
                 </div>
-                <div className="speakshine-pill points">
+                <div className="speakshine-pill points hidden sm:inline-flex" style={{ flexShrink: 0 }}>
                   <span style={{ color: "#fbbf24" }}>⭐</span>
-                  <span>{totalPoints} Points</span>
+                  <span>{totalPoints} Pts</span>
                 </div>
               </>
             )}
             <ThemeToggle compact />
-            <Suspense fallback={<div style={{ width: 34, height: 34 }} />}>
-              <NotificationBell token={localStorage.getItem("token")} />
-            </Suspense>
             {isLoggedIn && (
               <div
-                className="speakshine-avatar disabled"
+                className="speakshine-avatar disabled hidden sm:flex"
                 title={`${displayName} (${user?.email || ""})`}
               >
                 {avatarInitials}
               </div>
             )}
 
-            {/* Mobile Hamburger Toggle */}
+            {/* Mobile Hamburger Toggle - ALWAYS VISIBLE */}
             <button
-              className={`hamburger${menuOpen ? " open" : ""}`}
+              type="button"
+              className={`hamburger lg:hidden ${menuOpen ? "open" : ""}`}
               onClick={() => setMenuOpen(o => !o)}
-              aria-label="Menu"
+              aria-label="Toggle mobile menu"
               style={{
-                display: "none",
-                background: "transparent",
-                border: "none",
-                color: "#fff",
-                cursor: "pointer",
-                padding: "0.5rem",
+                flexShrink: 0,
+                width: 32,
+                height: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "6px",
+                marginLeft: "2px",
               }}
             >
-              <span style={{ display: "block", width: 20, height: 2, background: "#fff", marginBottom: 4 }} />
-              <span style={{ display: "block", width: 20, height: 2, background: "#fff", marginBottom: 4 }} />
-              <span style={{ display: "block", width: 20, height: 2, background: "#fff" }} />
+              <span />
+              <span />
+              <span />
             </button>
           </div>
         </header>
@@ -467,40 +475,85 @@ export default function Layout({ children, title, subtitle }) {
       {/* Mobile Drawer */}
       {menuOpen && (
         <div
+          className="speakshine-mobile-backdrop lg:hidden"
           onClick={() => setMenuOpen(false)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
-          }}
         >
           <div
+            className="speakshine-mobile-drawer"
             onClick={e => e.stopPropagation()}
-            style={{
-              width: 260, height: "100%", background: "#090710",
-              padding: "1.5rem 1rem", display: "flex", flexDirection: "column",
-              boxShadow: "0 0 30px rgba(0,0,0,0.8)",
-            }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.5rem" }}>
-              <span style={{ fontSize: "1.2rem", color: "#fbbf24" }}>✦</span>
-              <span style={{ fontWeight: 800, color: "#fff", fontSize: "1.1rem" }}>Speak &amp; Shine</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+              <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="speakshine-sidebar-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
+                    fill="url(#goldStarGradLayoutDrawer)"
+                  />
+                  <defs>
+                    <linearGradient id="goldStarGradLayoutDrawer" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#fbbf24" />
+                      <stop offset="1" stopColor="#f59e0b" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span className="brand-logo-text">Speak &amp; Shine</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "none",
+                  borderRadius: "8px",
+                  color: "#e2e8f0",
+                  width: 32,
+                  height: 32,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1.1rem",
+                }}
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
             </div>
-            <nav style={{ display: "flex", flexDirection: "column", gap: "0.4rem", flex: 1 }}>
+
+            <nav className="speakshine-sidebar-nav" style={{ flex: 1 }}>
               <Link to="/dashboard" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}>
-                <span>⏱</span> <span>Dashboard</span>
+                <span className="nav-icon">⏱</span>
+                <span>Dashboard</span>
               </Link>
               <Link to="/record" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}>
-                <span>📹</span> <span>Video analysis</span>
+                <span className="nav-icon">📹</span>
+                <span>Video analysis</span>
               </Link>
               <Link to="/community" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}>
-                <span>👥</span> <span>Community</span>
+                <span className="nav-icon">👥</span>
+                <span>Community</span>
               </Link>
               <Link to="/live/rooms" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}>
-                <span>📡</span> <span>Live rooms</span>
+                <span className="nav-icon">📡</span>
+                <span>Live rooms</span>
               </Link>
               <Link to="/payment-history" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}>
-                <span>💳</span> <span>Payments</span>
+                <span className="nav-icon">💳</span>
+                <span>Payments</span>
               </Link>
+
+              {(user?.role === "admin" || user?.role === "admins") && (
+                <Link to="/admin" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}>
+                  <span className="nav-icon">🛡️</span>
+                  <span>Admin</span>
+                </Link>
+              )}
+              {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
+                <Link to="/trainer" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}>
+                  <span className="nav-icon">🎓</span>
+                  <span>Trainer</span>
+                </Link>
+              )}
             </nav>
 
             <div style={{ marginTop: "auto", marginBottom: "1rem" }}>
@@ -512,12 +565,18 @@ export default function Layout({ children, title, subtitle }) {
 
             {isLoggedIn && (
               <button
+                type="button"
                 onClick={handleLogout}
                 style={{
                   background: "rgba(248,113,113,0.1)",
-                  border: "1px solid rgba(248,113,113,0.3)", color: "#f87171",
-                  padding: "0.75rem", borderRadius: 10, fontWeight: 700,
-                  cursor: "pointer", textAlign: "center",
+                  border: "1px solid rgba(248,113,113,0.3)",
+                  color: "#f87171",
+                  padding: "0.75rem",
+                  borderRadius: 10,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  width: "100%",
                 }}
               >
                 Log Out

@@ -12,6 +12,7 @@ const router = express.Router();
 // ── User List & Profile ──────────────────────────────────────────────────────
 router.get("/", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getAllUsers);
 router.get("/me", authMiddleware, userController.getMyProfile);
+router.patch("/me/theme", authMiddleware, userController.updateMyTheme);
 router.get("/:phone", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getUserByPhone);
 
 // ── User Management (Admin) ──────────────────────────────────────────────────
