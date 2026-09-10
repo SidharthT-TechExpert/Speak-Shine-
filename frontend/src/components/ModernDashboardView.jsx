@@ -2310,53 +2310,69 @@ export default function ModernDashboardView({
                       background: isDark ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.05)",
                       border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.2)",
                       borderRadius: 12,
-                      padding: "0.65rem 0.85rem",
-                      marginBottom: "0.55rem",
+                      padding: "0.75rem 0.9rem",
+                      marginBottom: "0.65rem",
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem", flexWrap: "wrap", gap: "0.4rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                      {/* Row 1: Title and CEFR Difficulty Badge */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
                           <span style={{ fontSize: "0.85rem" }}>✨</span>
                           <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
-                            BONUS VOCABULARY KEYWORDS
-                          </span>
-                          <span style={{
-                            fontSize: "0.62rem",
-                            fontWeight: 800,
-                            letterSpacing: "0.04em",
-                            padding: "2px 7px",
-                            borderRadius: "999px",
-                            background: cefrInfo?.bg || (isDark ? "rgba(192, 132, 252, 0.16)" : "rgba(124, 58, 237, 0.1)"),
-                            border: `1px solid ${cefrInfo?.border || (isDark ? "rgba(192, 132, 252, 0.4)" : "rgba(124, 58, 237, 0.3)")}`,
-                            color: cefrInfo?.color || (isDark ? "#c084fc" : "#7c3aed"),
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            textTransform: "uppercase",
-                          }}>
-                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: cefrInfo?.color || "#c084fc" }} />
-                            {cefrInfo?.label || `${vocabLevel} Level`}
+                            BONUS VOCABULARY
                           </span>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                          <span style={{
-                            fontSize: "0.64rem",
-                            fontWeight: 800,
-                            letterSpacing: "0.03em",
-                            color: isDark ? "#cbd5e1" : "#475569",
-                            background: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)",
-                            padding: "2px 7px",
-                            borderRadius: 6,
-                            border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)",
-                            textTransform: "uppercase",
-                          }}>
-                            🎯 {Math.min(targetRequiredCount, vocabList.length)} Required
-                          </span>
-                          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a" }}>
-                            +10 pts each
-                          </span>
-                        </div>
+                        <span style={{
+                          fontSize: "0.62rem",
+                          fontWeight: 800,
+                          letterSpacing: "0.04em",
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          background: cefrInfo?.bg || (isDark ? "rgba(192, 132, 252, 0.16)" : "rgba(124, 58, 237, 0.1)"),
+                          border: `1px solid ${cefrInfo?.border || (isDark ? "rgba(192, 132, 252, 0.4)" : "rgba(124, 58, 237, 0.3)")}`,
+                          color: cefrInfo?.color || (isDark ? "#c084fc" : "#7c3aed"),
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          textTransform: "uppercase",
+                        }}>
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: cefrInfo?.color || "#c084fc" }} />
+                          {cefrInfo?.label || `${vocabLevel} Level`}
+                        </span>
                       </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+
+                      {/* Row 2: Target Requirement & Bonus Points */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
+                        <span style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          color: isDark ? "#cbd5e1" : "#475569",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}>
+                          <span>🎯</span>
+                          <span>Use at least <strong>{Math.min(targetRequiredCount, vocabList.length)} of {vocabList.length}</strong> words</span>
+                        </span>
+                        <span style={{
+                          fontSize: "0.65rem",
+                          fontWeight: 800,
+                          color: isDark ? "#4ade80" : "#16a34a",
+                          background: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.1)",
+                          border: isDark ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(34, 197, 94, 0.25)",
+                          padding: "1px 7px",
+                          borderRadius: 6,
+                        }}>
+                          +10 pts each
+                        </span>
+                      </div>
+
+                      {/* Row 3: Keyword Buttons (Spanning 100% Width, Zero Empty Space!) */}
+                      <div style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "0.4rem",
+                        width: "100%",
+                      }}>
                         {vocabList.slice(0, 5).map((v, i) => {
                           const isPlanned = !!plannedWords[i];
                           const isSpeaking = speakingVocabIndex === i;
@@ -2371,23 +2387,39 @@ export default function ModernDashboardView({
                               }}
                               title={`${v.word}: ${v.meaning || "Click to hear pronunciation & plan"}`}
                               style={{
-                                background: isPlanned ? "linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.12) 100%)" : (isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff"),
-                                border: isPlanned ? "1px solid rgba(74, 222, 128, 0.5)" : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)"),
+                                flex: 1,
+                                minWidth: "95px",
+                                background: isPlanned
+                                  ? "linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(16, 185, 129, 0.14) 100%)"
+                                  : (isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff"),
+                                border: isPlanned
+                                  ? "1px solid rgba(74, 222, 128, 0.55)"
+                                  : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)"),
                                 color: isPlanned ? (isDark ? "#86efac" : "#15803d") : (isDark ? "#e2e8f0" : "#1e293b"),
+                                boxShadow: isPlanned
+                                  ? "0 2px 8px rgba(34, 197, 94, 0.15)"
+                                  : (isDark ? "0 2px 6px rgba(0, 0, 0, 0.2)" : "0 1px 3px rgba(0, 0, 0, 0.05)"),
                                 borderRadius: 8,
-                                padding: "3px 8px",
-                                fontSize: "0.72rem",
+                                padding: "0.45rem 0.55rem",
+                                fontSize: "0.74rem",
                                 fontWeight: 700,
                                 cursor: "pointer",
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "4px",
-                                transition: "all 0.15s ease",
+                                justifyContent: "center",
+                                gap: "5px",
+                                transition: "all 0.18s ease",
                               }}
                             >
-                              <span>{isPlanned ? "✓" : "✦"}</span>
-                              <span>{v.word}</span>
-                              <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>{isSpeaking ? "🔊" : "🔈"}</span>
+                              <span style={{ fontSize: "0.72rem", color: isPlanned ? "#22c55e" : (isDark ? "#a78bfa" : "#7c3aed") }}>
+                                {isPlanned ? "✓" : "✦"}
+                              </span>
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {v.word}
+                              </span>
+                              <span style={{ fontSize: "0.68rem", opacity: 0.75, flexShrink: 0 }}>
+                                {isSpeaking ? "🔊" : "🔈"}
+                              </span>
                             </button>
                           );
                         })}
