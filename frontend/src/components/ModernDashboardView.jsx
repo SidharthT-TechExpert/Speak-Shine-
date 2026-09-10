@@ -2173,14 +2173,17 @@ export default function ModernDashboardView({
             <div className="speakshine-hero-right-col flex flex-col gap-4" onWheel={handleHeroWheel}>
               {/* Right Action & Countdown Card */}
               <div className="speakshine-hero-right-card" style={{
-                background: isDark ? "#0d0a18" : "#ffffff",
-                border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
+                background: isDark
+                  ? "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.1) 0%, rgba(13, 10, 24, 0.98) 70%)"
+                  : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.06) 0%, #ffffff 70%)",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
                 borderRadius: 18,
                 padding: "1.25rem 1.25rem 1.35rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.85rem",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+                boxShadow: isDark ? "0 10px 30px rgba(0, 0, 0, 0.35)" : "0 10px 30px rgba(0, 0, 0, 0.05)",
+                position: "relative",
               }}>
                 <div>
                   {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
@@ -2222,10 +2225,10 @@ export default function ModernDashboardView({
                   {/* Rules to Remember */}
                   <div className="speakshine-rules-box" style={{
                     background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
-                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.06)",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                     borderRadius: 12,
                     padding: "0.85rem",
-                    marginBottom: "0.25rem",
+                    marginBottom: "0.55rem",
                   }}>
                     <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase", marginBottom: "0.55rem" }}>
                       RULES TO REMEMBER
@@ -2239,6 +2242,107 @@ export default function ModernDashboardView({
                       ))}
                     </div>
                   </div>
+
+                  {/* Target Vocabulary Quick-Glance Pill Strip (Bonus Keywords) */}
+                  {vocabList && vocabList.length > 0 && (
+                    <div style={{
+                      background: isDark ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.05)",
+                      border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.2)",
+                      borderRadius: 12,
+                      padding: "0.65rem 0.85rem",
+                      marginBottom: "0.55rem",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                          <span style={{ fontSize: "0.85rem" }}>✨</span>
+                          <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
+                            BONUS VOCABULARY KEYWORDS
+                          </span>
+                        </div>
+                        <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a" }}>
+                          +10 pts each
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                        {vocabList.slice(0, 5).map((v, i) => {
+                          const isPlanned = !!plannedWords[i];
+                          const isSpeaking = speakingVocabIndex === i;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePlanned(i);
+                                handleSpeakVocab(v.word, v.meaning, v.example, i);
+                              }}
+                              title={`${v.word}: ${v.meaning || "Click to hear pronunciation & plan"}`}
+                              style={{
+                                background: isPlanned ? "linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.12) 100%)" : (isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff"),
+                                border: isPlanned ? "1px solid rgba(74, 222, 128, 0.5)" : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)"),
+                                color: isPlanned ? (isDark ? "#86efac" : "#15803d") : (isDark ? "#e2e8f0" : "#1e293b"),
+                                borderRadius: 8,
+                                padding: "3px 8px",
+                                fontSize: "0.72rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <span>{isPlanned ? "✓" : "✦"}</span>
+                              <span>{v.word}</span>
+                              <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>{isSpeaking ? "🔊" : "🔈"}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timing Sweet Spot Visual Gauge */}
+                  <div style={{
+                    background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid rgba(0, 0, 0, 0.06)",
+                    borderRadius: 12,
+                    padding: "0.6rem 0.85rem",
+                    marginBottom: "0.25rem",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                      <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        TIMING SWEET SPOT
+                      </span>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
+                        ⏱️ 45s – 90s Ideal
+                      </span>
+                    </div>
+                    {/* Visual Sweet Spot Progress Bar */}
+                    <div style={{
+                      height: 6,
+                      borderRadius: 99,
+                      background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}>
+                      <div style={{
+                        position: "absolute",
+                        left: "35%",
+                        width: "45%",
+                        height: "100%",
+                        borderRadius: 99,
+                        background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
+                        boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
+                      }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
+                      <span>0s min</span>
+                      <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>45s min target</span>
+                      <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>90s optimal</span>
+                      <span>120s limit</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Action Buttons: Record & Upload */}
@@ -2248,7 +2352,7 @@ export default function ModernDashboardView({
                     onClick={() => navigate("/record#video-studio-container")}
                     style={{
                       width: "100%",
-                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 50%, #d97706 100%)",
                       color: "#ffffff",
                       border: "none",
                       borderRadius: 12,
@@ -2260,13 +2364,19 @@ export default function ModernDashboardView({
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "0.5rem",
-                      boxShadow: "0 4px 20px rgba(249, 115, 22, 0.4)",
-                      transition: "transform 0.15s ease",
+                      boxShadow: "0 4px 22px rgba(249, 115, 22, 0.45)",
+                      transition: "all 0.15s ease",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                    onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 8px 28px rgba(249, 115, 22, 0.55)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 22px rgba(249, 115, 22, 0.45)";
+                    }}
                   >
-                    <span style={{ fontSize: "1.1rem" }}>🎥</span>
+                    <span style={{ fontSize: "1.15rem" }}>🎥</span>
                     <span>{questionConfig.recordButtonLabel}</span>
                   </button>
 
@@ -2278,7 +2388,7 @@ export default function ModernDashboardView({
                       width: "100%",
                       background: isDark ? "#181427" : "#f1f5f9",
                       color: isDark ? "#cbd5e1" : "#1e293b",
-                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.08)",
+                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
                       borderRadius: 12,
                       padding: "0.75rem",
                       fontWeight: 600,
@@ -2304,6 +2414,76 @@ export default function ModernDashboardView({
                     style={{ display: "none" }}
                     onChange={handleFileChange}
                   />
+                </div>
+
+                {/* Daily Submission Rewards & Benefits Strip (Fills empty space with high-value perks) */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "0.55rem",
+                  marginTop: "0.2rem",
+                }}>
+                  <div style={{
+                    background: isDark ? "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.05) 100%)" : "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
+                    border: isDark ? "1px solid rgba(249, 115, 22, 0.25)" : "1px solid rgba(249, 115, 22, 0.35)",
+                    borderRadius: 10,
+                    padding: "0.6rem 0.5rem",
+                    textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>🔥</div>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
+                      {streak > 0 ? `${streak + 1} Days` : "Day 1"}
+                    </div>
+                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isDark ? "#fb923c" : "#ea580c", textTransform: "uppercase", marginTop: "2px" }}>
+                      Streak Locked
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: isDark ? "linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%)" : "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
+                    border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.35)",
+                    borderRadius: 10,
+                    padding: "0.6rem 0.5rem",
+                    textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>⚡</div>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
+                      Instant AI
+                    </div>
+                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isDark ? "#c084fc" : "#9333ea", textTransform: "uppercase", marginTop: "2px" }}>
+                      Scorecard
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: isDark ? "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.05) 100%)" : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                    border: isDark ? "1px solid rgba(34, 197, 94, 0.25)" : "1px solid rgba(34, 197, 94, 0.35)",
+                    borderRadius: 10,
+                    padding: "0.6rem 0.5rem",
+                    textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>💎</div>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
+                      +85-100 pts
+                    </div>
+                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a", textTransform: "uppercase", marginTop: "2px" }}>
+                      XP Reward
+                    </div>
+                  </div>
+                </div>
+
+                {/* Privacy & Instant Grading Security Seal */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.45rem",
+                  fontSize: "0.68rem",
+                  color: isDark ? "#94a3b8" : "#64748b",
+                  paddingTop: "0.2rem",
+                }}>
+                  <span style={{ color: "#22c55e" }}>🛡️</span>
+                  <span>100% Private &amp; Secure · AI Feedback within 60s</span>
                 </div>
               </div>
 
