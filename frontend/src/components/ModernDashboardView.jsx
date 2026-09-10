@@ -295,6 +295,7 @@ export default function ModernDashboardView({
   const questionConfig = getQuestionUIConfig(questionType, today);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
+  const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
 
   const parsedQuestions = useMemo(() => {
     if (questionType === "monthly_reflection") {
@@ -2180,7 +2181,7 @@ export default function ModernDashboardView({
                 </div>
               </div>
 
-              {/* Target Vocabulary Section Card (Moved to right column empty space) */}
+              {/* Target Vocabulary Section Card (Collapsible Dropdown on Dashboard) */}
               {vocabList && vocabList.length > 0 && (
                 <div
                   className="speakshine-hero-right-card speakshine-vocab-card-box"
@@ -2188,14 +2189,27 @@ export default function ModernDashboardView({
                     background: isDark ? "#0d0a18" : "#ffffff",
                     border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
                     borderRadius: 18,
-                    padding: "1.25rem 1.25rem 1.35rem",
+                    padding: vocabDropdownOpen ? "1.25rem 1.25rem 1.35rem" : "0.95rem 1.15rem",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "0.85rem",
+                    gap: vocabDropdownOpen ? "0.85rem" : "0.55rem",
                     boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {/* Collapsible Header Bar */}
+                  <div
+                    onClick={() => setVocabDropdownOpen(prev => !prev)}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      gap: "0.5rem",
+                    }}
+                    title={vocabDropdownOpen ? "Click to collapse vocabulary challenge" : "Click to expand vocabulary challenge words"}
+                  >
                     <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
                       <span style={{ fontSize: "1.05rem" }}>📚</span>
                       <span className="vocab-section-title" style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em" }}>
@@ -2223,96 +2237,197 @@ export default function ModernDashboardView({
                         <span>{cefrInfo?.label || `${vocabLevel} Level`}</span>
                       </span>
                     </div>
-                    <div
-                      className={`vocab-goal-pill ${plannedCount >= targetRequiredCount ? "goal-met" : ""}`}
-                      style={{
-                        fontSize: "0.72rem",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      🎯 Goal: {plannedCount} / {Math.min(targetRequiredCount, vocabList.length)} words (+{Math.min(targetRequiredCount, vocabList.length) * 10} pts)
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                      <div
+                        className={`vocab-goal-pill ${plannedCount >= targetRequiredCount ? "goal-met" : ""}`}
+                        style={{
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 99,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        🎯 {plannedCount}/{Math.min(targetRequiredCount, vocabList.length)}
+                      </div>
+
+                      {/* Dropdown Action Toggle Button */}
+                      <button
+                        type="button"
+                        className="speakshine-vocab-dropdown-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVocabDropdownOpen(prev => !prev);
+                        }}
+                        style={{
+                          background: vocabDropdownOpen ? "rgba(168, 85, 247, 0.2)" : (isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9"),
+                          border: vocabDropdownOpen ? "1px solid rgba(168, 85, 247, 0.4)" : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.1)"),
+                          color: vocabDropdownOpen ? "#c084fc" : (isDark ? "#e2e8f0" : "#1e293b"),
+                          borderRadius: 8,
+                          padding: "4px 9px",
+                          fontSize: "0.74rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          transition: "all 0.2s ease",
+                        }}
+                        title={vocabDropdownOpen ? "Collapse words" : "Expand words"}
+                      >
+                        <span>{vocabDropdownOpen ? "Hide" : "View"}</span>
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{
+                            transform: vocabDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                            transition: "transform 0.2s ease",
+                          }}
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-                    {vocabList.map((v, i) => {
-                      const isPlanned = !!plannedWords[i];
-                      const isSpeaking = speakingVocabIndex === i;
-                      return (
-                        <div
-                          key={i}
-                          className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
-                          style={{
-                            borderRadius: 12,
-                            padding: "0.85rem 0.95rem",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                            {/* Header row: badge + word + buttons */}
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
-                                <div className="vocab-num-badge">0{i + 1}</div>
-                                <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
-                                  {v.word}
-                                </span>
-                              </div>
+                  {/* Compact Chips Preview when Collapsed */}
+                  {!vocabDropdownOpen && (
+                    <div
+                      onClick={() => setVocabDropdownOpen(true)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        flexWrap: "wrap",
+                        cursor: "pointer",
+                        paddingTop: "0.1rem",
+                      }}
+                      title="Click to view definitions, examples, and pronunciation"
+                    >
+                      {vocabList.map((v, i) => {
+                        const isPlanned = !!plannedWords[i];
+                        return (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: "0.72rem",
+                              fontWeight: 600,
+                              padding: "2px 8px",
+                              borderRadius: 6,
+                              background: isPlanned ? "rgba(34, 197, 94, 0.14)" : (isDark ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9"),
+                              border: isPlanned ? "1px solid rgba(34, 197, 94, 0.38)" : (isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.06)"),
+                              color: isPlanned ? "#4ade80" : (isDark ? "#cbd5e1" : "#475569"),
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <span style={{ opacity: 0.6, fontSize: "0.64rem" }}>0{i + 1}</span>
+                            <span>{v.word}</span>
+                            {isPlanned && <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>}
+                          </span>
+                        );
+                      })}
+                      <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", fontStyle: "italic", marginLeft: "auto" }}>
+                        Click to expand ▾
+                      </span>
+                    </div>
+                  )}
 
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSpeakVocab(v.word, v.meaning, v.example, i)}
-                                  className="vocab-listen-btn"
-                                  title="Listen to full pronunciation and example sentence"
-                                  style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
-                                >
-                                  {isSpeaking ? "🔊" : "🔈"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => togglePlanned(i)}
-                                  className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
-                                  style={{
-                                    borderRadius: 8,
-                                    padding: "4px 8px",
-                                    fontSize: "0.72rem",
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    transition: "all 0.15s ease",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {isPlanned ? "✓ Planned" : "+ Plan to use"}
-                                </button>
+                  {/* Expanded Full Vocabulary Cards */}
+                  {vocabDropdownOpen && (
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", marginTop: "0.15rem" }}>
+                        {vocabList.map((v, i) => {
+                          const isPlanned = !!plannedWords[i];
+                          const isSpeaking = speakingVocabIndex === i;
+                          return (
+                            <div
+                              key={i}
+                              className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
+                              style={{
+                                borderRadius: 12,
+                                padding: "0.85rem 0.95rem",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                                {/* Header row: badge + word + buttons */}
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
+                                    <div className="vocab-num-badge">0{i + 1}</div>
+                                    <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
+                                      {v.word}
+                                    </span>
+                                  </div>
+
+                                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSpeakVocab(v.word, v.meaning, v.example, i);
+                                      }}
+                                      className="vocab-listen-btn"
+                                      title="Listen to full pronunciation and example sentence"
+                                      style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
+                                    >
+                                      {isSpeaking ? "🔊" : "🔈"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        togglePlanned(i);
+                                      }}
+                                      className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
+                                      style={{
+                                        borderRadius: 8,
+                                        padding: "4px 8px",
+                                        fontSize: "0.72rem",
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        transition: "all 0.15s ease",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {isPlanned ? "✓ Planned" : "+ Plan to use"}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Meaning */}
+                                {v.meaning && (
+                                  <div className="vocab-meaning-text" style={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
+                                    — {v.meaning}
+                                  </div>
+                                )}
+
+                                {/* Example sentence */}
+                                {v.example && (
+                                  <div className="vocab-example-bubble" style={{ fontSize: "0.8rem", marginTop: "2px" }}>
+                                    💬 <span style={{ fontStyle: "italic" }}>"{v.example}"</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
+                          );
+                        })}
+                      </div>
 
-                            {/* Meaning */}
-                            {v.meaning && (
-                              <div className="vocab-meaning-text" style={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
-                                — {v.meaning}
-                              </div>
-                            )}
-
-                            {/* Example sentence */}
-                            {v.example && (
-                              <div className="vocab-example-bubble" style={{ fontSize: "0.8rem", marginTop: "2px" }}>
-                                💬 <span style={{ fontStyle: "italic" }}>"{v.example}"</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="vocab-footer-hint" style={{ fontSize: "0.74rem" }}>
-                    <span>✨</span>
-                    <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
-                  </div>
+                      <div className="vocab-footer-hint" style={{ fontSize: "0.74rem" }}>
+                        <span>✨</span>
+                        <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
