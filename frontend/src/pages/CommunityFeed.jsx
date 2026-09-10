@@ -1522,14 +1522,21 @@ export default function CommunityFeed() {
           {/* ── Left Column: Controls & Video Feed ── */}
           <div style={{ minWidth: 0 }}>
             {/* Filter Tabs & Search Bar */}
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "0.75rem",
-              marginBottom: "1.25rem",
-            }}>
+            <div
+              className="community-feed-filter-bar"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+                marginBottom: "1.25rem",
+                position: "sticky",
+                top: 0,
+                zIndex: 25,
+                padding: "0.6rem 0",
+              }}
+            >
               {/* Segmented Filter Pills */}
               <div style={{
                 display: "inline-flex",
@@ -2182,7 +2189,17 @@ export default function CommunityFeed() {
           </div>
 
           {/* ── Right Column: Community Sidebar Widgets (Matching Modern Dashboard) ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div
+            className="community-sidebar-col"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.25rem",
+              position: "sticky",
+              top: "1rem",
+              alignSelf: "start",
+            }}
+          >
 
             {/* Widget 1: Today's Mission Prompt */}
             <div className="speakshine-card-box" style={{

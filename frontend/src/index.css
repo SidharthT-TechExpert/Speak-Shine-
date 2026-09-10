@@ -5337,10 +5337,43 @@ audio { border-radius: 12px; }
   gap: 1.5rem;
   align-items: start;
 }
+.speakshine-shell .community-sidebar-col {
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.speakshine-shell .community-sidebar-col::-webkit-scrollbar {
+  display: none;
+}
+.speakshine-shell .community-feed-filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  padding: 0.65rem 0;
+  margin-bottom: 1.25rem;
+  background: rgba(10, 7, 20, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+[data-theme="light"] .speakshine-shell .community-feed-filter-bar,
+.light .speakshine-shell .community-feed-filter-bar {
+  background: rgba(248, 250, 252, 0.92) !important;
+}
 @media (max-width: 1024px) {
   .speakshine-shell .community-feed-layout {
     grid-template-columns: 1fr;
     gap: 1.25rem;
+  }
+  .speakshine-shell .community-sidebar-col {
+    position: static !important;
+    max-height: none !important;
+  }
+  .speakshine-shell .community-feed-filter-bar {
+    position: static !important;
   }
 }
 .speakshine-shell .community-card,
