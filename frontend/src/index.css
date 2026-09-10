@@ -5337,17 +5337,46 @@ audio { border-radius: 12px; }
   gap: 1.5rem;
   align-items: start;
 }
-.speakshine-shell .community-sidebar-col {
-  position: sticky;
-  top: 1rem;
-  align-self: start;
-  max-height: calc(100vh - 2rem);
+.speakshine-shell .community-feed-main-col {
+  max-height: calc(100vh - 110px);
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-x: hidden;
+  padding-right: 8px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 111, 255, 0.25) transparent;
 }
+.speakshine-shell .community-sidebar-col {
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 111, 255, 0.25) transparent;
+}
+.speakshine-shell .community-feed-main-col::-webkit-scrollbar,
 .speakshine-shell .community-sidebar-col::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+.speakshine-shell .community-feed-main-col::-webkit-scrollbar-track,
+.speakshine-shell .community-sidebar-col::-webkit-scrollbar-track {
+  background: transparent;
+}
+.speakshine-shell .community-feed-main-col::-webkit-scrollbar-thumb,
+.speakshine-shell .community-sidebar-col::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+}
+.speakshine-shell .community-feed-main-col::-webkit-scrollbar-thumb:hover,
+.speakshine-shell .community-sidebar-col::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 111, 255, 0.45);
+}
+[data-theme="light"] .speakshine-shell .community-feed-main-col::-webkit-scrollbar-thumb,
+.light .speakshine-shell .community-feed-main-col::-webkit-scrollbar-thumb,
+[data-theme="light"] .speakshine-shell .community-sidebar-col::-webkit-scrollbar-thumb,
+.light .speakshine-shell .community-sidebar-col::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15) !important;
 }
 .speakshine-shell .community-feed-filter-bar {
   position: sticky;
@@ -5355,22 +5384,24 @@ audio { border-radius: 12px; }
   z-index: 25;
   padding: 0.65rem 0;
   margin-bottom: 1.25rem;
-  background: rgba(10, 7, 20, 0.92);
+  background: rgba(10, 7, 20, 0.94);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 [data-theme="light"] .speakshine-shell .community-feed-filter-bar,
 .light .speakshine-shell .community-feed-filter-bar {
-  background: rgba(248, 250, 252, 0.92) !important;
+  background: rgba(248, 250, 252, 0.94) !important;
 }
 @media (max-width: 1024px) {
   .speakshine-shell .community-feed-layout {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
+  .speakshine-shell .community-feed-main-col,
   .speakshine-shell .community-sidebar-col {
-    position: static !important;
     max-height: none !important;
+    overflow-y: visible !important;
+    padding-right: 0 !important;
   }
   .speakshine-shell .community-feed-filter-bar {
     position: static !important;

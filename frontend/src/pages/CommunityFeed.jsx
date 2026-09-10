@@ -1519,8 +1519,8 @@ export default function CommunityFeed() {
         {/* ── Section 2: 2-Column Responsive Dashboard Layout ── */}
         <div className="community-feed-layout">
 
-          {/* ── Left Column: Controls & Video Feed ── */}
-          <div style={{ minWidth: 0 }}>
+          {/* ── Left Column: Controls & Video Feed (Independent Scrolling Window) ── */}
+          <div className="community-feed-main-col" style={{ minWidth: 0 }}>
             {/* Filter Tabs & Search Bar */}
             <div
               className="community-feed-filter-bar"
@@ -2188,16 +2188,13 @@ export default function CommunityFeed() {
             </div>
           </div>
 
-          {/* ── Right Column: Community Sidebar Widgets (Matching Modern Dashboard) ── */}
+          {/* ── Right Column: Community Sidebar Widgets (Independent Scrolling Window) ── */}
           <div
             className="community-sidebar-col"
             style={{
               display: "flex",
               flexDirection: "column",
               gap: "1.25rem",
-              position: "sticky",
-              top: "1rem",
-              alignSelf: "start",
             }}
           >
 
