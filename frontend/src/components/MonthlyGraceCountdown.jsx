@@ -8,6 +8,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useTheme } from "../context/ThemeContext.jsx";
 import { getMonthlyGracePeriodStatus, formatRemainingTime } from "../utils/gracePeriodUtils.js";
 
 const InvoiceModal = lazy(() => import("./InvoiceModal.jsx"));
@@ -27,6 +28,8 @@ const DEFAULT_PLAN_AMOUNT = 5;
 
 export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
   const { user, login } = useAuth();
+  const themeContext = useTheme();
+  const isDark = themeContext ? themeContext.isDark : (document.documentElement.getAttribute("data-theme") !== "light" && !document.documentElement.classList.contains("light"));
   const [status, setStatus] = useState(() => getMonthlyGracePeriodStatus());
   const [planAmount, setPlanAmount] = useState(DEFAULT_PLAN_AMOUNT);
   const [loading, setLoading] = useState(false);
@@ -78,8 +81,12 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
           </Suspense>
         )}
         <div style={{
-          background: "linear-gradient(135deg, rgba(16, 40, 24, 0.85) 0%, rgba(10, 26, 16, 0.85) 100%)",
-          border: "1px solid rgba(74, 222, 128, 0.35)",
+          background: isDark
+            ? "linear-gradient(135deg, rgba(16, 40, 24, 0.85) 0%, rgba(10, 26, 16, 0.85) 100%)"
+            : "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%)",
+          border: isDark
+            ? "1px solid rgba(74, 222, 128, 0.35)"
+            : "1.5px solid #86efac",
           borderRadius: 16,
           padding: "0.9rem 1.25rem",
           marginBottom: "1.25rem",
@@ -88,42 +95,47 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: "0.75rem",
-          boxShadow: "0 6px 20px rgba(0, 0, 0, 0.25), 0 0 15px rgba(74, 222, 128, 0.08)",
+          boxShadow: isDark
+            ? "0 6px 20px rgba(0, 0, 0, 0.25), 0 0 15px rgba(74, 222, 128, 0.08)"
+            : "0 4px 18px rgba(34, 197, 94, 0.12), 0 1px 3px rgba(0, 0, 0, 0.03)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div style={{
               width: 38,
               height: 38,
               borderRadius: "50%",
-              background: "rgba(74, 222, 128, 0.15)",
-              border: "1px solid rgba(74, 222, 128, 0.4)",
+              background: isDark ? "rgba(74, 222, 128, 0.15)" : "#22c55e",
+              border: isDark ? "1px solid rgba(74, 222, 128, 0.4)" : "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: "1.1rem",
-              color: "#4ade80",
+              color: isDark ? "#4ade80" : "#ffffff",
+              boxShadow: isDark ? "none" : "0 2px 8px rgba(34, 197, 94, 0.35)",
+              flexShrink: 0,
             }}>
               ✓
             </div>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: "#ffffff" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.92rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a" }}>
                   {status.monthName} Membership Active
                 </span>
                 <span style={{
                   fontSize: "0.7rem",
                   fontWeight: 800,
-                  color: "#4ade80",
-                  background: "rgba(74, 222, 128, 0.15)",
-                  border: "1px solid rgba(74, 222, 128, 0.3)",
+                  color: isDark ? "#4ade80" : "#15803d",
+                  background: isDark ? "rgba(74, 222, 128, 0.15)" : "#dcfce7",
+                  border: isDark ? "1px solid rgba(74, 222, 128, 0.3)" : "1px solid #86efac",
                   padding: "0.15rem 0.5rem",
                   borderRadius: 10,
                   textTransform: "uppercase",
+                  letterSpacing: "0.03em",
                 }}>
                   Paid Member
                 </span>
               </div>
-              <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", marginTop: "0.15rem" }}>
                 Unlimited speaking submissions and AI evaluations active for all of {status.monthName} {status.year}.
               </div>
             </div>
@@ -134,9 +146,9 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
               type="button"
               onClick={() => setShowInvoiceModal(true)}
               style={{
-                background: "rgba(74, 222, 128, 0.12)",
-                border: "1px solid rgba(74, 222, 128, 0.35)",
-                color: "#86efac",
+                background: isDark ? "rgba(74, 222, 128, 0.12)" : "#ffffff",
+                border: isDark ? "1px solid rgba(74, 222, 128, 0.35)" : "1.5px solid #86efac",
+                color: isDark ? "#86efac" : "#15803d",
                 borderRadius: 10,
                 padding: "0.45rem 0.9rem",
                 fontSize: "0.8rem",
@@ -145,6 +157,8 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.35rem",
+                boxShadow: isDark ? "none" : "0 1px 3px rgba(34, 197, 94, 0.15)",
+                transition: "all 0.15s ease",
               }}
             >
               <span>📄</span> Invoice
@@ -294,14 +308,20 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
       )}
 
       <div style={{
-        background: "linear-gradient(135deg, #1c1438 0%, #150f28 50%, #0d0a1c 100%)",
-        border: "1.5px solid rgba(167, 139, 250, 0.4)",
+        background: isDark
+          ? "linear-gradient(135deg, #1c1438 0%, #150f28 50%, #0d0a1c 100%)"
+          : "linear-gradient(135deg, #faf5ff 0%, #f5f3ff 50%, #ede9fe 100%)",
+        border: isDark
+          ? "1.5px solid rgba(167, 139, 250, 0.4)"
+          : "1.5px solid #c4b5fd",
         borderRadius: 20,
         padding: "1.25rem 1.5rem",
         marginBottom: "1.25rem",
         position: "relative",
         overflow: "hidden",
-        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px rgba(124, 111, 255, 0.15)",
+        boxShadow: isDark
+          ? "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px rgba(124, 111, 255, 0.15)"
+          : "0 10px 30px rgba(109, 40, 217, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)",
       }}>
         {/* Glow ambient background decoration */}
         <div style={{
@@ -311,7 +331,9 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
           width: 160,
           height: 160,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(124, 111, 255, 0.22) 0%, transparent 70%)",
+          background: isDark
+            ? "radial-gradient(circle, rgba(124, 111, 255, 0.22) 0%, transparent 70%)"
+            : "radial-gradient(circle, rgba(167, 139, 250, 0.25) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
 
@@ -326,9 +348,9 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
           <div style={{ flex: "1 1 320px", minWidth: 260 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
               <span style={{
-                background: "rgba(251, 191, 36, 0.15)",
-                border: "1px solid rgba(251, 191, 36, 0.4)",
-                color: "#fbbf24",
+                background: isDark ? "rgba(251, 191, 36, 0.15)" : "#fef3c7",
+                border: isDark ? "1px solid rgba(251, 191, 36, 0.4)" : "1px solid #fcd34d",
+                color: isDark ? "#fbbf24" : "#b45309",
                 fontSize: "0.74rem",
                 fontWeight: 800,
                 padding: "0.2rem 0.6rem",
@@ -342,7 +364,7 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: "#fbbf24",
+                  background: isDark ? "#fbbf24" : "#f59e0b",
                   display: "inline-block",
                   animation: "pulse 1.5s infinite",
                 }} />
@@ -350,8 +372,9 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
               </span>
 
               <span style={{
-                background: "rgba(124, 111, 255, 0.15)",
-                color: "#c4b5fd",
+                background: isDark ? "rgba(124, 111, 255, 0.15)" : "#ede9fe",
+                border: isDark ? "none" : "1px solid #ddd6fe",
+                color: isDark ? "#c4b5fd" : "#6d28d9",
                 fontSize: "0.72rem",
                 fontWeight: 700,
                 padding: "0.2rem 0.55rem",
@@ -364,7 +387,7 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
             <h3 style={{
               fontSize: "1.15rem",
               fontWeight: 800,
-              color: "#ffffff",
+              color: isDark ? "#ffffff" : "#1e1b4b",
               marginBottom: "0.35rem",
               lineHeight: 1.3,
             }}>
@@ -372,7 +395,7 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
             </h3>
 
             <p style={{
-              color: "#cbd5e1",
+              color: isDark ? "#cbd5e1" : "#475569",
               fontSize: "0.84rem",
               lineHeight: 1.5,
               margin: 0,
@@ -395,52 +418,53 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
               display: "flex",
               alignItems: "center",
               gap: "0.35rem",
-              background: "rgba(0, 0, 0, 0.4)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
+              background: isDark ? "rgba(0, 0, 0, 0.4)" : "#ffffff",
+              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1.5px solid #e2e8f0",
+              boxShadow: isDark ? "none" : "0 2px 8px rgba(0, 0, 0, 0.04)",
               padding: "0.45rem 0.65rem",
               borderRadius: 14,
             }}>
               {days > 0 && (
                 <>
                   <div style={{ textAlign: "center", minWidth: 38 }}>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fbbf24", fontFamily: "monospace" }}>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 900, color: isDark ? "#fbbf24" : "#7c3aed", fontFamily: "monospace" }}>
                       {String(days).padStart(2, "0")}
                     </div>
-                    <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                    <div style={{ fontSize: "0.58rem", color: isDark ? "var(--muted)" : "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
                       DAYS
                     </div>
                   </div>
-                  <span style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.9rem" }}>:</span>
+                  <span style={{ color: isDark ? "#fbbf24" : "#a78bfa", fontWeight: 800, fontSize: "0.9rem" }}>:</span>
                 </>
               )}
 
               <div style={{ textAlign: "center", minWidth: 38 }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fbbf24", fontFamily: "monospace" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: isDark ? "#fbbf24" : "#7c3aed", fontFamily: "monospace" }}>
                   {String(hours).padStart(2, "0")}
                 </div>
-                <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                <div style={{ fontSize: "0.58rem", color: isDark ? "var(--muted)" : "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
                   HOURS
                 </div>
               </div>
 
-              <span style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.9rem" }}>:</span>
+              <span style={{ color: isDark ? "#fbbf24" : "#a78bfa", fontWeight: 800, fontSize: "0.9rem" }}>:</span>
 
               <div style={{ textAlign: "center", minWidth: 38 }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fbbf24", fontFamily: "monospace" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: isDark ? "#fbbf24" : "#7c3aed", fontFamily: "monospace" }}>
                   {String(minutes).padStart(2, "0")}
                 </div>
-                <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                <div style={{ fontSize: "0.58rem", color: isDark ? "var(--muted)" : "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
                   MINS
                 </div>
               </div>
 
-              <span style={{ color: "#fbbf24", fontWeight: 800, fontSize: "0.9rem" }}>:</span>
+              <span style={{ color: isDark ? "#fbbf24" : "#a78bfa", fontWeight: 800, fontSize: "0.9rem" }}>:</span>
 
               <div style={{ textAlign: "center", minWidth: 38 }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#f87171", fontFamily: "monospace" }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: isDark ? "#f87171" : "#dc2626", fontFamily: "monospace" }}>
                   {String(seconds).padStart(2, "0")}
                 </div>
-                <div style={{ fontSize: "0.58rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase" }}>
+                <div style={{ fontSize: "0.58rem", color: isDark ? "var(--muted)" : "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
                   SECS
                 </div>
               </div>
@@ -486,11 +510,11 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
         {error && (
           <div style={{
             marginTop: "0.75rem",
-            background: "rgba(248, 113, 113, 0.12)",
-            border: "1px solid rgba(248, 113, 113, 0.35)",
+            background: isDark ? "rgba(248, 113, 113, 0.12)" : "#fef2f2",
+            border: isDark ? "1px solid rgba(248, 113, 113, 0.35)" : "1px solid #fecaca",
             borderRadius: 10,
             padding: "0.5rem 0.85rem",
-            color: "#f87171",
+            color: isDark ? "#f87171" : "#dc2626",
             fontSize: "0.8rem",
             display: "flex",
             alignItems: "center",
