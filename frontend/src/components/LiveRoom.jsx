@@ -1013,6 +1013,10 @@ export default function LiveRoom({ sessionId, userRole, onLeave }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
+    if (!sessionId || sessionId === "rooms") {
+      onLeave?.();
+      return;
+    }
     (async () => {
       try {
         const [sRes, tRes] = await Promise.all([api.get(`/live-sessions/${sessionId}`), api.post(`/live-sessions/${sessionId}/token`)]);
@@ -1021,7 +1025,7 @@ export default function LiveRoom({ sessionId, userRole, onLeave }) {
       } catch (e) { setError(e.response?.data?.error || "Failed to join session"); }
       finally { setLoading(false); }
     })();
-  }, [sessionId]);
+  }, [sessionId, onLeave]);
 
   if (loading) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: "1rem", background: "#07071a" }}>

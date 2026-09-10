@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
@@ -10,6 +10,12 @@ export default function LiveSession() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // If the URL is /live/rooms, redirect to the Live Rooms lobby page
+  if (id === "rooms" || !id) {
+    return <Navigate to="/live/rooms" replace />;
+  }
+
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,7 +37,7 @@ export default function LiveSession() {
   
   const handleLeave = () => { 
     setInRoom(false); 
-    navigate("/dashboard"); 
+    navigate("/live/rooms"); 
   };
 
   if (loading) return (

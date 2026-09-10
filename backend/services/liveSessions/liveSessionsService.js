@@ -3,6 +3,7 @@
  * Business logic for live video sessions with LiveKit
  */
 
+import mongoose from "mongoose";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import LiveSession from "../../../models/liveSessionSchema.js";
 import { expireLiveSessionChat } from "../chat/chatService.js";
@@ -13,6 +14,17 @@ const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 
 if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
   console.warn("[LiveKit] WARNING: LIVEKIT_API_KEY or LIVEKIT_API_SECRET not set");
+}
+
+/**
+ * Validate MongoDB ObjectId to prevent unhandled CastErrors
+ */
+function assertValidObjectId(id) {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    const error = new Error("Session not found");
+    error.statusCode = 404;
+    throw error;
+  }
 }
 
 /**
@@ -51,6 +63,7 @@ export async function listSessions(status) {
  * Get session by ID
  */
 export async function getSessionById(sessionId) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   
   if (!session) {
@@ -92,6 +105,7 @@ export async function createSession(title, scheduledAt, description, createdBy, 
  */
 export async function startSession(sessionId, io) {
   checkLiveKitConfigured();
+  assertValidObjectId(sessionId);
 
   const session = await LiveSession.findById(sessionId);
 
@@ -145,6 +159,7 @@ export async function startSession(sessionId, io) {
  */
 export async function generateSessionToken(sessionId, identity, name, isAdmin) {
   checkLiveKitConfigured();
+  assertValidObjectId(sessionId);
 
   const session = await LiveSession.findById(sessionId);
 
@@ -216,6 +231,7 @@ export async function generateSessionToken(sessionId, identity, name, isAdmin) {
  * End a session (admin/trainer only)
  */
 export async function endSession(sessionId, io) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   
   if (!session) {
@@ -257,6 +273,7 @@ export async function endSession(sessionId, io) {
  * Cancel a scheduled session (admin/trainer only)
  */
 export async function cancelSession(sessionId) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   
   if (!session) {
@@ -279,6 +296,7 @@ export async function cancelSession(sessionId) {
  * Mute a participant's microphone (admin/trainer)
  */
 export async function muteParticipant(sessionId, participantIdentity) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   if (!session) { const e = new Error("Session not found"); e.statusCode = 404; throw e; }
 
@@ -300,6 +318,7 @@ export async function muteParticipant(sessionId, participantIdentity) {
  * Disable a participant's camera (admin/trainer)
  */
 export async function disableParticipantVideo(sessionId, participantIdentity) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   if (!session) { const e = new Error("Session not found"); e.statusCode = 404; throw e; }
 
@@ -322,6 +341,7 @@ export async function disableParticipantVideo(sessionId, participantIdentity) {
  * They will need admin/trainer approval to rejoin.
  */
 export async function kickParticipant(sessionId, participantIdentity, io) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   if (!session) { const e = new Error("Session not found"); e.statusCode = 404; throw e; }
 
@@ -355,6 +375,7 @@ export async function kickParticipant(sessionId, participantIdentity, io) {
  * Approve a banned participant to rejoin (admin/trainer)
  */
 export async function approveParticipant(sessionId, participantIdentity) {
+  assertValidObjectId(sessionId);
   const session = await LiveSession.findById(sessionId);
   if (!session) { const e = new Error("Session not found"); e.statusCode = 404; throw e; }
 

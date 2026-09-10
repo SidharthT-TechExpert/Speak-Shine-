@@ -19,6 +19,7 @@ const TrainerDashboard= lazy(() => import("./pages/TrainerDashboard.jsx"));
 const VideoAnalysis   = lazy(() => import("./pages/VideoAnalysis.jsx"));
 const CommunityFeed   = lazy(() => import("./pages/CommunityFeed.jsx"));
 const LiveSession     = lazy(() => import("./pages/LiveSession.jsx"));
+const LiveRooms       = lazy(() => import("./pages/LiveRooms.jsx"));
 const NotFound        = lazy(() => import("./pages/NotFound.jsx"));
 const PaymentWall     = lazy(() => import("./pages/PaymentWall.jsx"));
 const PaymentHistory  = lazy(() => import("./pages/PaymentHistory.jsx"));
@@ -80,10 +81,10 @@ function PaidRoute({ children }) {
   return children;
 }
 
-// Hide ChatLauncher on live session pages
+// Hide ChatLauncher on live session interactive rooms (keep on /live/rooms directory)
 function ChatLauncherConditional() {
   const location = useLocation();
-  if (location.pathname.startsWith("/live/")) return null;
+  if (location.pathname.startsWith("/live/") && location.pathname !== "/live/rooms") return null;
   return <ChatLauncher />;
 }
 
@@ -183,6 +184,11 @@ function AppRoutes() {
                 <PaidRoute><VideoAnalysis /></PaidRoute>
               } />
               <Route path="/community" element={<CommunityFeed />} />
+              <Route path="/live/rooms" element={
+                <ProtectedRoute roles={["user","admin","admins","trainer","viewer"]} loginPath="/login">
+                  <LiveRooms />
+                </ProtectedRoute>
+              } />
               <Route path="/payment" element={<PaymentWall />} />
               <Route path="/payment-history" element={
                 <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
