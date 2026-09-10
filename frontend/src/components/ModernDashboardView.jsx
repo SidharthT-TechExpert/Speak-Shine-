@@ -4334,12 +4334,78 @@ export default function ModernDashboardView({
                   fontWeight: 600,
                   padding: "4px 10px",
                   borderRadius: 99,
-                  marginBottom: "1.2rem",
+                  marginBottom: "0.85rem",
                   maxWidth: "100%",
                   flexWrap: "wrap",
                 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
                   <span>{groupName.toUpperCase()} · {memberCount} MEMBERS · {submittedCount} SUBMITTED · {pendingCount} PENDING</span>
+                </div>
+
+                {/* All-Time Record Callout */}
+                <div
+                  className="all-time-record-box"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "0.95rem 1.15rem",
+                    borderRadius: 14,
+                    background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
+                    border: "1px solid rgba(251, 191, 36, 0.28)",
+                    boxShadow: "0 6px 20px rgba(245, 158, 11, 0.08)",
+                    marginBottom: "1rem",
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "transform 0.2s ease, border-color 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.5)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.28)";
+                  }}
+                >
+                  <div style={{
+                    position: "absolute", top: 0, right: 0, bottom: 0, width: "35%",
+                    background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.12) 0%, transparent 70%)",
+                    pointerEvents: "none",
+                  }} />
+
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: "0.4rem",
+                      fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em",
+                      color: "#fbbf24", textTransform: "uppercase", marginBottom: "3px",
+                    }}>
+                      <span>⭐</span>
+                      <span>ALL-TIME GROUP RECORD</span>
+                    </div>
+                    <div style={{ fontSize: "0.85rem", color: "#f1f0f5", fontWeight: 600 }}>
+                      {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    position: "relative", zIndex: 1,
+                    display: "flex", alignItems: "baseline", gap: "3px",
+                  }}>
+                    <span style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "2.35rem",
+                      fontWeight: 800,
+                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      lineHeight: 1,
+                      filter: "drop-shadow(0 2px 8px rgba(245, 158, 11, 0.35))",
+                    }}>
+                      {recordScore}
+                    </span>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
+                  </div>
                 </div>
 
                 {/* Ranked Peer Rows (Scrollable Container) */}
@@ -4544,72 +4610,6 @@ export default function ModernDashboardView({
                     <span style={{ fontSize: "0.85rem" }}>↓</span>
                   </div>
                 )}
-
-                {/* All-Time Record Callout */}
-                <div
-                  className="all-time-record-box"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "0.95rem 1.15rem",
-                    borderRadius: 14,
-                    background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
-                    border: "1px solid rgba(251, 191, 36, 0.28)",
-                    boxShadow: "0 6px 20px rgba(245, 158, 11, 0.08)",
-                    marginBottom: "1.1rem",
-                    position: "relative",
-                    overflow: "hidden",
-                    transition: "transform 0.2s ease, border-color 0.2s ease",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.5)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.28)";
-                  }}
-                >
-                  <div style={{
-                    position: "absolute", top: 0, right: 0, bottom: 0, width: "35%",
-                    background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.12) 0%, transparent 70%)",
-                    pointerEvents: "none",
-                  }} />
-
-                  <div style={{ position: "relative", zIndex: 1 }}>
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: "0.4rem",
-                      fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em",
-                      color: "#fbbf24", textTransform: "uppercase", marginBottom: "3px",
-                    }}>
-                      <span>⭐</span>
-                      <span>ALL-TIME GROUP RECORD</span>
-                    </div>
-                    <div style={{ fontSize: "0.85rem", color: "#f1f0f5", fontWeight: 600 }}>
-                      {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    position: "relative", zIndex: 1,
-                    display: "flex", alignItems: "baseline", gap: "3px",
-                  }}>
-                    <span style={{
-                      fontFamily: "Georgia, 'Times New Roman', serif",
-                      fontSize: "2.35rem",
-                      fontWeight: 800,
-                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      lineHeight: 1,
-                      filter: "drop-shadow(0 2px 8px rgba(245, 158, 11, 0.35))",
-                    }}>
-                      {recordScore}
-                    </span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
-                  </div>
-                </div>
 
                 {/* Group Member Stats: 3 Micro-Cards */}
                 <div className="leaderboard-stat-grid" style={{
