@@ -5685,6 +5685,14 @@ audio { border-radius: 12px; }
   }
 }
 
+.speakshine-hero-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+  width: 100%;
+}
+
 /* Mobile drawer backdrop and panel */
 .speakshine-mobile-backdrop {
   position: fixed;

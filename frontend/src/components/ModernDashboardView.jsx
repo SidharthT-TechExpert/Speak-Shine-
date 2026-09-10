@@ -2055,245 +2055,266 @@ export default function ModernDashboardView({
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Target Vocabulary Section (Matching Screenshot) */}
-              <div style={{ marginTop: "1rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "1.05rem" }}>📚</span>
-                    <span className="vocab-section-title">
-                      TODAY'S VOCABULARY CHALLENGE
-                    </span>
-                    <span
-                      className="vocab-strength-badge"
-                      title={`CEFR Level ${vocabLevel}: ${cefrInfo?.desc || "Curated vocabulary"}`}
-                      style={{
-                        fontSize: "0.68rem",
-                        fontWeight: 800,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        background: cefrInfo?.bg || "rgba(168, 85, 247, 0.15)",
-                        border: `1px solid ${cefrInfo?.border || "rgba(168, 85, 247, 0.35)"}`,
-                        color: cefrInfo?.color || "#c084fc",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <span>⚡</span>
-                      <span>{cefrInfo?.label || `${vocabLevel} Level`}</span>
-                    </span>
+            {/* Right Column: Action Card + Target Vocabulary Card in Empty Space */}
+            <div className="speakshine-hero-right-col flex flex-col gap-4">
+              {/* Right Action & Countdown Card */}
+              <div className="speakshine-hero-right-card" style={{
+                background: isDark ? "#0d0a18" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
+                borderRadius: 18,
+                padding: "1.25rem 1.25rem 1.35rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.85rem",
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+              }}>
+                <div>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#716c85" : "#64748b", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+                    WINDOW CLOSES AT MIDNIGHT
                   </div>
-                  <div
-                    className={`vocab-goal-pill ${plannedCount >= targetRequiredCount ? "goal-met" : ""}`}
-                    style={{
-                      fontSize: "0.72rem",
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 99,
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    🎯 Goal: {plannedCount} / {Math.min(targetRequiredCount, vocabList.length)} words (+{Math.min(targetRequiredCount, vocabList.length) * 10} pts)
+
+                  {/* 3 Digital Countdown Timer Boxes */}
+                  <MidnightCountdownTimer />
+
+                  {/* Streak Warning */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.78rem",
+                    color: "#f87171",
+                    fontWeight: 600,
+                    marginBottom: "0.75rem",
+                  }}>
+                    <span>⚠️</span>
+                    <span>{streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}</span>
+                  </div>
+
+                  {/* Rules to Remember */}
+                  <div className="speakshine-rules-box" style={{
+                    background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.06)",
+                    borderRadius: 12,
+                    padding: "0.85rem",
+                    marginBottom: "0.25rem",
+                  }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase", marginBottom: "0.55rem" }}>
+                      RULES TO REMEMBER
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                      {questionConfig.rules.map((rule, idx) => (
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155" }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                          <span style={rule.highlight ? { fontWeight: 600, color: isDark ? "#ffffff" : "#0f172a" } : {}}>{rule.text}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-                  {vocabList.map((v, i) => {
-                    const isPlanned = !!plannedWords[i];
-                    const isSpeaking = speakingVocabIndex === i;
-                    return (
-                      <div
-                        key={i}
-                        className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
+                {/* Action Buttons: Record & Upload */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/record#video-studio-container")}
+                    style={{
+                      width: "100%",
+                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: 12,
+                      padding: "0.85rem",
+                      fontWeight: 700,
+                      fontSize: "0.92rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      boxShadow: "0 4px 20px rgba(249, 115, 22, 0.4)",
+                      transition: "transform 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                  >
+                    <span style={{ fontSize: "1.1rem" }}>🎥</span>
+                    <span>{questionConfig.recordButtonLabel}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleFileUploadClick}
+                    className="speakshine-btn-secondary"
+                    style={{
+                      width: "100%",
+                      background: isDark ? "#181427" : "#f1f5f9",
+                      color: isDark ? "#cbd5e1" : "#1e293b",
+                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.08)",
+                      borderRadius: 12,
+                      padding: "0.75rem",
+                      fontWeight: 600,
+                      fontSize: "0.88rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      transition: "background 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
+                    onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
+                  >
+                    <span>📁</span>
+                    <span>{questionConfig.uploadButtonLabel}</span>
+                  </button>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*,audio/*"
+                    style={{ display: "none" }}
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </div>
+
+              {/* Target Vocabulary Section Card (Moved to right column empty space) */}
+              {vocabList && vocabList.length > 0 && (
+                <div
+                  className="speakshine-hero-right-card speakshine-vocab-card-box"
+                  style={{
+                    background: isDark ? "#0d0a18" : "#ffffff",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
+                    borderRadius: 18,
+                    padding: "1.25rem 1.25rem 1.35rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.85rem",
+                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "1.05rem" }}>📚</span>
+                      <span className="vocab-section-title" style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em" }}>
+                        TODAY'S VOCABULARY CHALLENGE
+                      </span>
+                      <span
+                        className="vocab-strength-badge"
+                        title={`CEFR Level ${vocabLevel}: ${cefrInfo?.desc || "Curated vocabulary"}`}
                         style={{
-                          borderRadius: 12,
-                          padding: "0.85rem 1rem",
-                          transition: "all 0.15s ease",
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          padding: "2px 8px",
+                          borderRadius: 99,
+                          background: cefrInfo?.bg || "rgba(168, 85, 247, 0.15)",
+                          border: `1px solid ${cefrInfo?.border || "rgba(168, 85, 247, 0.35)"}`,
+                          color: cefrInfo?.color || "#c084fc",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
                         }}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.2rem" }}>
-                              <div className="vocab-num-badge">0{i + 1}</div>
-                              <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
-                                {v.word}
-                              </span>
-                              {v.meaning && (
-                                <span className="vocab-meaning-text">
-                                  — {v.meaning}
+                        <span>⚡</span>
+                        <span>{cefrInfo?.label || `${vocabLevel} Level`}</span>
+                      </span>
+                    </div>
+                    <div
+                      className={`vocab-goal-pill ${plannedCount >= targetRequiredCount ? "goal-met" : ""}`}
+                      style={{
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 99,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      🎯 Goal: {plannedCount} / {Math.min(targetRequiredCount, vocabList.length)} words (+{Math.min(targetRequiredCount, vocabList.length) * 10} pts)
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                    {vocabList.map((v, i) => {
+                      const isPlanned = !!plannedWords[i];
+                      const isSpeaking = speakingVocabIndex === i;
+                      return (
+                        <div
+                          key={i}
+                          className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
+                          style={{
+                            borderRadius: 12,
+                            padding: "0.85rem 0.95rem",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                            {/* Header row: badge + word + buttons */}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
+                                <div className="vocab-num-badge">0{i + 1}</div>
+                                <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
+                                  {v.word}
                                 </span>
-                              )}
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSpeakVocab(v.word, v.meaning, v.example, i)}
+                                  className="vocab-listen-btn"
+                                  title="Listen to full pronunciation and example sentence"
+                                  style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
+                                >
+                                  {isSpeaking ? "🔊" : "🔈"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePlanned(i)}
+                                  className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
+                                  style={{
+                                    borderRadius: 8,
+                                    padding: "4px 8px",
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {isPlanned ? "✓ Planned" : "+ Plan to use"}
+                                </button>
+                              </div>
                             </div>
 
+                            {/* Meaning */}
+                            {v.meaning && (
+                              <div className="vocab-meaning-text" style={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
+                                — {v.meaning}
+                              </div>
+                            )}
+
+                            {/* Example sentence */}
                             {v.example && (
-                              <div className="vocab-example-bubble">
+                              <div className="vocab-example-bubble" style={{ fontSize: "0.8rem", marginTop: "2px" }}>
                                 💬 <span style={{ fontStyle: "italic" }}>"{v.example}"</span>
                               </div>
                             )}
                           </div>
-
-                          <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto" style={{ marginTop: "2px" }}>
-                            <button
-                              type="button"
-                              onClick={() => handleSpeakVocab(v.word, v.meaning, v.example, i)}
-                              className="vocab-listen-btn"
-                              title="Listen to full pronunciation and example sentence"
-                              style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
-                            >
-                              {isSpeaking ? "🔊" : "🔈"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => togglePlanned(i)}
-                              className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
-                              style={{
-                                borderRadius: 8,
-                                padding: "4px 8px",
-                                fontSize: "0.72rem",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                transition: "all 0.15s ease",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {isPlanned ? "✓ Planned" : "+ Plan to use"}
-                            </button>
-                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="vocab-footer-hint">
-                  <span>✨</span>
-                  <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Action & Countdown Card */}
-            <div className="speakshine-hero-right-card h-fit self-start lg:sticky lg:top-[80px]" style={{
-              background: isDark ? "#0d0a18" : "#ffffff",
-              border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
-              borderRadius: 18,
-              padding: "1.25rem 1.25rem 1.35rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.85rem",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
-            }}>
-              <div>
-                <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#716c85" : "#64748b", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-                  WINDOW CLOSES AT MIDNIGHT
-                </div>
-
-                {/* 3 Digital Countdown Timer Boxes */}
-                <MidnightCountdownTimer />
-
-                {/* Streak Warning */}
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.45rem",
-                  fontSize: "0.78rem",
-                  color: "#f87171",
-                  fontWeight: 600,
-                  marginBottom: "0.75rem",
-                }}>
-                  <span>⚠️</span>
-                  <span>{streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}</span>
-                </div>
-
-                {/* Rules to Remember */}
-                <div className="speakshine-rules-box" style={{
-                  background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
-                  border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.06)",
-                  borderRadius: 12,
-                  padding: "0.85rem",
-                  marginBottom: "0.25rem",
-                }}>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase", marginBottom: "0.55rem" }}>
-                    RULES TO REMEMBER
+                      );
+                    })}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                    {questionConfig.rules.map((rule, idx) => (
-                      <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155" }}>
-                        <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                        <span style={rule.highlight ? { fontWeight: 600, color: isDark ? "#ffffff" : "#0f172a" } : {}}>{rule.text}</span>
-                      </div>
-                    ))}
+
+                  <div className="vocab-footer-hint" style={{ fontSize: "0.74rem" }}>
+                    <span>✨</span>
+                    <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
                   </div>
                 </div>
-              </div>
-
-              {/* Action Buttons: Record & Upload */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                <button
-                  type="button"
-                  onClick={() => navigate("/record#video-studio-container")}
-                  style={{
-                    width: "100%",
-                    background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: 12,
-                    padding: "0.85rem",
-                    fontWeight: 700,
-                    fontSize: "0.92rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.5rem",
-                    boxShadow: "0 4px 20px rgba(249, 115, 22, 0.4)",
-                    transition: "transform 0.15s ease",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-                >
-                  <span style={{ fontSize: "1.1rem" }}>🎥</span>
-                  <span>{questionConfig.recordButtonLabel}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleFileUploadClick}
-                  className="speakshine-btn-secondary"
-                  style={{
-                    width: "100%",
-                    background: isDark ? "#181427" : "#f1f5f9",
-                    color: isDark ? "#cbd5e1" : "#1e293b",
-                    border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.08)",
-                    borderRadius: 12,
-                    padding: "0.75rem",
-                    fontWeight: 600,
-                    fontSize: "0.88rem",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.5rem",
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
-                  onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
-                >
-                  <span>📁</span>
-                  <span>{questionConfig.uploadButtonLabel}</span>
-                </button>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*,audio/*"
-                  style={{ display: "none" }}
-                  onChange={handleFileChange}
-                />
-              </div>
+              )}
             </div>
           </div>
           ) : (
