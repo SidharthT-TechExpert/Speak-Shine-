@@ -84,58 +84,73 @@ function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", margin: "1.1rem 0 1.25rem" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", gap: "0.55rem", margin: "1.1rem 0 1.25rem" }}>
       <div className="speakshine-timer-box" style={{
-        background: isDark ? "#141024" : "#f8fafc",
+        flex: 1,
+        minWidth: 0,
+        background: isDark ? "linear-gradient(145deg, rgba(249, 115, 22, 0.16) 0%, rgba(20, 16, 38, 0.95) 100%)" : "#ffffff",
         border: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
-        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.15)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
+        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.18)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
         borderRadius: 12,
-        padding: "0.85rem 1.15rem",
+        padding: "0.85rem 0.5rem",
         textAlign: "center",
-        minWidth: 64,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.15rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.hrs}
         </div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#fdba74" : "#c2410c", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
           HRS
         </div>
       </div>
 
-      <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px" }}>:</span>
+      <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px", flexShrink: 0, userSelect: "none" }}>:</span>
 
       <div className="speakshine-timer-box" style={{
-        background: isDark ? "#141024" : "#f8fafc",
+        flex: 1,
+        minWidth: 0,
+        background: isDark ? "linear-gradient(145deg, rgba(249, 115, 22, 0.16) 0%, rgba(20, 16, 38, 0.95) 100%)" : "#ffffff",
         border: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
-        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.15)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
+        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.18)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
         borderRadius: 12,
-        padding: "0.85rem 1.15rem",
+        padding: "0.85rem 0.5rem",
         textAlign: "center",
-        minWidth: 64,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.15rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.mins}
         </div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#fdba74" : "#c2410c", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
           MINS
         </div>
       </div>
 
-      <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px" }}>:</span>
+      <span style={{ fontSize: "1.6rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.7)", paddingBottom: "14px", flexShrink: 0, userSelect: "none" }}>:</span>
 
       <div className="speakshine-timer-box" style={{
-        background: isDark ? "#141024" : "#f8fafc",
+        flex: 1,
+        minWidth: 0,
+        background: isDark ? "linear-gradient(145deg, rgba(249, 115, 22, 0.16) 0%, rgba(20, 16, 38, 0.95) 100%)" : "#ffffff",
         border: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
-        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.15)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
+        boxShadow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.18)" : "0 2px 10px rgba(249, 115, 22, 0.1)",
         borderRadius: 12,
-        padding: "0.85rem 1.15rem",
+        padding: "0.85rem 0.5rem",
         textAlign: "center",
-        minWidth: 64,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
       }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "2.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        <div className="speakshine-timer-val" style={{ fontSize: "2.15rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
           {t.secs}
         </div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#fdba74" : "#c2410c", textTransform: "uppercase", marginTop: "5px", letterSpacing: "0.09em" }}>
           SECS
         </div>
       </div>
@@ -269,6 +284,7 @@ export default function ModernDashboardView({
       durationLimits: effectiveDurationLimits,
     });
   }, [questionType, today, effectiveDurationLimits]);
+  const [urgencyCycle, setUrgencyCycle] = useState("green");
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
   const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
@@ -2194,20 +2210,45 @@ export default function ModernDashboardView({
               {/* Right Action & Countdown Card */}
               <div className="speakshine-hero-right-card" style={{
                 background: isDark
-                  ? "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.1) 0%, rgba(13, 10, 24, 0.98) 70%)"
-                  : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.06) 0%, #ffffff 70%)",
-                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+                  ? urgencyCycle === "green"
+                    ? "radial-gradient(ellipse at 85% 15%, rgba(34, 197, 94, 0.12) 0%, rgba(13, 10, 24, 0.98) 70%)"
+                    : urgencyCycle === "red"
+                    ? "radial-gradient(ellipse at 85% 15%, rgba(239, 68, 68, 0.18) 0%, rgba(15, 10, 22, 0.98) 70%)"
+                    : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.12) 0%, rgba(13, 10, 24, 0.98) 70%)"
+                  : urgencyCycle === "green"
+                  ? "radial-gradient(ellipse at 85% 15%, rgba(34, 197, 94, 0.08) 0%, #ffffff 70%)"
+                  : urgencyCycle === "red"
+                  ? "radial-gradient(ellipse at 85% 15%, rgba(239, 68, 68, 0.09) 0%, #ffffff 70%)"
+                  : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.08) 0%, #ffffff 70%)",
+                border: isDark
+                  ? urgencyCycle === "green"
+                    ? "1px solid rgba(34, 197, 94, 0.22)"
+                    : urgencyCycle === "red"
+                    ? "1px solid rgba(239, 68, 68, 0.32)"
+                    : "1px solid rgba(249, 115, 22, 0.22)"
+                  : urgencyCycle === "green"
+                  ? "1px solid rgba(34, 197, 94, 0.25)"
+                  : urgencyCycle === "red"
+                  ? "1px solid rgba(239, 68, 68, 0.3)"
+                  : "1px solid rgba(249, 115, 22, 0.25)",
                 borderRadius: 18,
                 padding: "1.25rem 1.25rem 1.35rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.85rem",
-                boxShadow: isDark ? "0 10px 30px rgba(0, 0, 0, 0.35)" : "0 10px 30px rgba(0, 0, 0, 0.05)",
+                boxShadow: isDark
+                  ? urgencyCycle === "green"
+                    ? "0 10px 30px rgba(0, 0, 0, 0.35), 0 0 25px rgba(34, 197, 94, 0.08)"
+                    : urgencyCycle === "red"
+                    ? "0 10px 30px rgba(0, 0, 0, 0.35), 0 0 25px rgba(239, 68, 68, 0.14)"
+                    : "0 10px 30px rgba(0, 0, 0, 0.35), 0 0 25px rgba(249, 115, 22, 0.08)"
+                  : "0 10px 30px rgba(0, 0, 0, 0.05)",
                 position: "relative",
+                transition: "all 0.5s ease",
               }}>
                 <div>
                   {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
-                  <MidnightCountdownTimer />
+                  <MidnightCountdownTimer onCycleChange={setUrgencyCycle} />
 
                   {/* Streak Warning Banner with Red Icon & Yellow Text */}
                   <div style={{

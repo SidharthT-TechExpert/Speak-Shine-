@@ -103,7 +103,7 @@ export async function setupManualQuestion(req, res) {
  */
 export async function publishManualQuestionNow(req, res) {
   try {
-    const Question = (await import("../../../models/questionSchema.js")).default;
+    const Question = (await import("../../models/questionSchema.js")).default;
     const question = await Question.findById(req.params.id);
     if (!question) {
       return res.status(404).json({ error: "Question not found" });

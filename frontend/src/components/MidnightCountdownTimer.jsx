@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext.jsx";
 
 // ── Isolated Countdown Timer with Green/Orange/Red Dynamic Urgency Cycle ──
-export default function MidnightCountdownTimer() {
+export default function MidnightCountdownTimer({ onCycleChange }) {
   const { isDark } = useTheme();
   const calc = () => {
     const now = new Date();
@@ -31,44 +31,74 @@ export default function MidnightCountdownTimer() {
   const [t, setT] = useState(calc);
 
   useEffect(() => {
-    const interval = setInterval(() => setT(calc()), 1000);
+    const interval = setInterval(() => {
+      const next = calc();
+      setT(next);
+      if (onCycleChange) onCycleChange(next.cycle);
+    }, 1000);
+    if (onCycleChange) onCycleChange(t.cycle);
     return () => clearInterval(interval);
-  }, []);
+  }, [onCycleChange]);
 
   const cycleConfig = {
     green: {
       color: "#22c55e",
       label: "Cycle Open · Ample Time",
-      badgeBg: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.08)",
-      badgeBorder: isDark ? "rgba(34, 197, 94, 0.35)" : "rgba(34, 197, 94, 0.3)",
-      boxBorder: isDark ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(34, 197, 94, 0.35)",
-      glow: "0 0 16px rgba(34, 197, 94, 0.12)",
-      colonColor: isDark ? "rgba(34, 197, 94, 0.7)" : "#16a34a",
+      badgeBg: isDark ? "rgba(34, 197, 94, 0.14)" : "rgba(34, 197, 94, 0.1)",
+      badgeBorder: isDark ? "rgba(34, 197, 94, 0.4)" : "rgba(34, 197, 94, 0.35)",
+      boxBg: isDark
+        ? "linear-gradient(145deg, rgba(34, 197, 94, 0.16) 0%, rgba(16, 185, 129, 0.06) 50%, rgba(13, 10, 24, 0.95) 100%)"
+        : "linear-gradient(145deg, rgba(34, 197, 94, 0.1) 0%, #ffffff 100%)",
+      boxBorder: isDark ? "1px solid rgba(34, 197, 94, 0.45)" : "1px solid rgba(34, 197, 94, 0.4)",
+      glow: isDark ? "0 4px 20px rgba(34, 197, 94, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 12px rgba(34, 197, 94, 0.12)",
+      colonColor: isDark ? "#22c55e" : "#16a34a",
+      labelColor: isDark ? "#86efac" : "#15803d",
+      containerBg: isDark ? "rgba(34, 197, 94, 0.05)" : "rgba(34, 197, 94, 0.03)",
+      containerBorder: isDark ? "rgba(34, 197, 94, 0.22)" : "rgba(34, 197, 94, 0.18)",
     },
     orange: {
       color: "#f97316",
       label: "Evening Rush",
-      badgeBg: isDark ? "rgba(249, 115, 22, 0.12)" : "rgba(249, 115, 22, 0.08)",
-      badgeBorder: isDark ? "rgba(249, 115, 22, 0.4)" : "rgba(249, 115, 22, 0.35)",
-      boxBorder: isDark ? "1px solid rgba(249, 115, 22, 0.45)" : "1px solid rgba(249, 115, 22, 0.4)",
-      glow: "0 0 18px rgba(249, 115, 22, 0.16)",
-      colonColor: isDark ? "rgba(249, 115, 22, 0.7)" : "#ea580c",
+      badgeBg: isDark ? "rgba(249, 115, 22, 0.16)" : "rgba(249, 115, 22, 0.1)",
+      badgeBorder: isDark ? "rgba(249, 115, 22, 0.45)" : "rgba(249, 115, 22, 0.35)",
+      boxBg: isDark
+        ? "linear-gradient(145deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.08) 50%, rgba(13, 10, 24, 0.95) 100%)"
+        : "linear-gradient(145deg, rgba(249, 115, 22, 0.1) 0%, #ffffff 100%)",
+      boxBorder: isDark ? "1px solid rgba(249, 115, 22, 0.5)" : "1px solid rgba(249, 115, 22, 0.4)",
+      glow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 12px rgba(249, 115, 22, 0.15)",
+      colonColor: isDark ? "#f97316" : "#ea580c",
+      labelColor: isDark ? "#fdba74" : "#c2410c",
+      containerBg: isDark ? "rgba(249, 115, 22, 0.05)" : "rgba(249, 115, 22, 0.03)",
+      containerBorder: isDark ? "rgba(249, 115, 22, 0.22)" : "rgba(249, 115, 22, 0.18)",
     },
     red: {
       color: "#ef4444",
       label: "Final Hours · Closing Soon",
-      badgeBg: isDark ? "rgba(239, 68, 68, 0.16)" : "rgba(239, 68, 68, 0.1)",
-      badgeBorder: isDark ? "rgba(239, 68, 68, 0.5)" : "rgba(239, 68, 68, 0.4)",
-      boxBorder: isDark ? "1px solid rgba(239, 68, 68, 0.55)" : "1px solid rgba(239, 68, 68, 0.45)",
-      glow: "0 0 20px rgba(239, 68, 68, 0.25)",
-      colonColor: isDark ? "rgba(239, 68, 68, 0.85)" : "#dc2626",
+      badgeBg: isDark ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.12)",
+      badgeBorder: isDark ? "rgba(239, 68, 68, 0.55)" : "rgba(239, 68, 68, 0.45)",
+      boxBg: isDark
+        ? "linear-gradient(145deg, rgba(239, 68, 68, 0.26) 0%, rgba(220, 38, 38, 0.1) 50%, rgba(15, 10, 20, 0.98) 100%)"
+        : "linear-gradient(145deg, rgba(239, 68, 68, 0.14) 0%, #ffffff 100%)",
+      boxBorder: isDark ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid rgba(239, 68, 68, 0.5)",
+      glow: isDark ? "0 4px 24px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1)" : "0 2px 14px rgba(239, 68, 68, 0.2)",
+      colonColor: isDark ? "#ef4444" : "#dc2626",
+      labelColor: isDark ? "#fca5a5" : "#b91c1c",
+      containerBg: isDark ? "rgba(239, 68, 68, 0.07)" : "rgba(239, 68, 68, 0.05)",
+      containerBorder: isDark ? "rgba(239, 68, 68, 0.28)" : "rgba(239, 68, 68, 0.22)",
     },
   }[t.cycle];
 
   return (
-    <div>
+    <div style={{
+      background: cycleConfig.containerBg,
+      border: `1px solid ${cycleConfig.containerBorder}`,
+      borderRadius: 14,
+      padding: "0.85rem 0.95rem",
+      marginBottom: "0.85rem",
+      transition: "all 0.4s ease",
+    }}>
       {/* Dynamic Urgency Cycle Header Pill */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.65rem", flexWrap: "wrap", gap: "0.4rem" }}>
         <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase" }}>
           WINDOW CLOSES AT MIDNIGHT
         </div>
@@ -77,78 +107,159 @@ export default function MidnightCountdownTimer() {
           fontWeight: 800,
           letterSpacing: "0.06em",
           textTransform: "uppercase",
-          padding: "2px 8px",
+          padding: "3px 9px",
           borderRadius: 999,
           background: cycleConfig.badgeBg,
           border: `1px solid ${cycleConfig.badgeBorder}`,
           color: cycleConfig.color,
           display: "inline-flex",
           alignItems: "center",
-          gap: "4px",
+          gap: "5px",
         }}>
           <span style={{
             width: 6,
             height: 6,
             borderRadius: "50%",
             background: cycleConfig.color,
-            boxShadow: `0 0 6px ${cycleConfig.color}`,
+            boxShadow: `0 0 8px ${cycleConfig.color}`,
           }} />
           <span>{cycleConfig.label}</span>
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
+      {/* 3 Widened, Centered Countdown Timer Boxes (Spans 100% Width, No Empty Space) */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        gap: "0.55rem",
+      }}>
         <div className="speakshine-timer-box" style={{
-          background: isDark ? "#141026" : "#ffffff",
+          flex: 1,
+          minWidth: 0,
+          background: cycleConfig.boxBg,
           border: cycleConfig.boxBorder,
           boxShadow: cycleConfig.glow,
-          borderRadius: 10,
-          padding: "0.65rem 0.85rem",
+          borderRadius: 12,
+          padding: "0.85rem 0.5rem",
           textAlign: "center",
-          minWidth: 54,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.4s ease",
         }}>
-          <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          <div className="speakshine-timer-val" style={{
+            fontSize: "2.15rem",
+            fontWeight: 800,
+            color: isDark ? "#ffffff" : "#0f172a",
+            lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.02em",
+          }}>
             {t.hrs}
           </div>
-          <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          <div style={{
+            fontSize: "0.62rem",
+            fontWeight: 800,
+            color: cycleConfig.labelColor,
+            textTransform: "uppercase",
+            marginTop: "6px",
+            letterSpacing: "0.09em",
+          }}>
             HRS
           </div>
         </div>
 
-        <span style={{ fontSize: "1.4rem", fontWeight: 800, color: cycleConfig.colonColor, paddingBottom: "12px" }}>:</span>
+        <span style={{
+          fontSize: "1.6rem",
+          fontWeight: 800,
+          color: cycleConfig.colonColor,
+          paddingBottom: "12px",
+          flexShrink: 0,
+          userSelect: "none",
+        }}>:</span>
 
         <div className="speakshine-timer-box" style={{
-          background: isDark ? "#141026" : "#ffffff",
+          flex: 1,
+          minWidth: 0,
+          background: cycleConfig.boxBg,
           border: cycleConfig.boxBorder,
           boxShadow: cycleConfig.glow,
-          borderRadius: 10,
-          padding: "0.65rem 0.85rem",
+          borderRadius: 12,
+          padding: "0.85rem 0.5rem",
           textAlign: "center",
-          minWidth: 54,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.4s ease",
         }}>
-          <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          <div className="speakshine-timer-val" style={{
+            fontSize: "2.15rem",
+            fontWeight: 800,
+            color: isDark ? "#ffffff" : "#0f172a",
+            lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.02em",
+          }}>
             {t.mins}
           </div>
-          <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          <div style={{
+            fontSize: "0.62rem",
+            fontWeight: 800,
+            color: cycleConfig.labelColor,
+            textTransform: "uppercase",
+            marginTop: "6px",
+            letterSpacing: "0.09em",
+          }}>
             MINS
           </div>
         </div>
 
-        <span style={{ fontSize: "1.4rem", fontWeight: 800, color: cycleConfig.colonColor, paddingBottom: "12px" }}>:</span>
+        <span style={{
+          fontSize: "1.6rem",
+          fontWeight: 800,
+          color: cycleConfig.colonColor,
+          paddingBottom: "12px",
+          flexShrink: 0,
+          userSelect: "none",
+        }}>:</span>
 
         <div className="speakshine-timer-box" style={{
-          background: isDark ? "#141026" : "#ffffff",
+          flex: 1,
+          minWidth: 0,
+          background: cycleConfig.boxBg,
           border: cycleConfig.boxBorder,
           boxShadow: cycleConfig.glow,
-          borderRadius: 10,
-          padding: "0.65rem 0.85rem",
+          borderRadius: 12,
+          padding: "0.85rem 0.5rem",
           textAlign: "center",
-          minWidth: 54,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.4s ease",
         }}>
-          <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          <div className="speakshine-timer-val" style={{
+            fontSize: "2.15rem",
+            fontWeight: 800,
+            color: isDark ? "#ffffff" : "#0f172a",
+            lineHeight: 1,
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.02em",
+          }}>
             {t.secs}
           </div>
-          <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
+          <div style={{
+            fontSize: "0.62rem",
+            fontWeight: 800,
+            color: cycleConfig.labelColor,
+            textTransform: "uppercase",
+            marginTop: "6px",
+            letterSpacing: "0.09em",
+          }}>
             SECS
           </div>
         </div>

@@ -178,7 +178,7 @@ export async function sendTestAdminAlert(req, res) {
     const { sendDeploymentNotification, sendAdminDirectMessage } = await import("../services/whatsapp/whatsappService.js");
     
     if (phone) {
-      const Status = (await import("../../../models/statusSchema.js")).default;
+      const Status = (await import("../../models/statusSchema.js")).default;
       await Status.updateOne({}, { $set: { adminNotifyPhone: phone } }, { upsert: true });
     }
 
