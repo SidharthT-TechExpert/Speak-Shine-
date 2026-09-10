@@ -5,6 +5,8 @@ import Layout from "../components/Layout.jsx";
 import Modal from "../components/Modal.jsx";
 import api, { getAuthToken } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useTheme } from "../context/ThemeContext.jsx";
+import MidnightCountdownTimer from "../components/MidnightCountdownTimer.jsx";
 import GuestBanner from "../components/GuestBanner.jsx";
 import { getSharedSocket } from "../hooks/useSocket.js";
 import { useNoiseCancellation } from "../hooks/useNoiseCancellation.js";
@@ -156,7 +158,9 @@ export default function VideoAnalysis() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const isGuest = !user;
+  const [streak, setStreak] = useState(0);
 
   const [mode, setMode] = useState(() => {
     return location.pathname === "/video-analysis" && !location.search.includes("record") ? "upload" : "record";
@@ -222,28 +226,7 @@ export default function VideoAnalysis() {
   const [posterSendTime, setPosterSendTime] = useState("08:00");
   const [isTodaySubmitted, setIsTodaySubmitted] = useState(false);
 
-  // ── Live Countdown to Midnight IST (Matching Dashboard Page) ────────────────
-  const [timeLeft, setTimeLeft] = useState({ hrs: "09", mins: "22", secs: "50" });
 
-  useEffect(() => {
-    const updateCountdown = () => {
-      const now = new Date();
-      const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const midnight = new Date(nowIST);
-      midnight.setDate(midnight.getDate() + 1);
-      midnight.setHours(0, 0, 0, 0);
-
-      const diffSec = Math.max(0, Math.floor((midnight - nowIST) / 1000));
-      const h = String(Math.floor(diffSec / 3600)).padStart(2, "0");
-      const m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
-      const s = String(diffSec % 60).padStart(2, "0");
-      setTimeLeft({ hrs: h, mins: m, secs: s });
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // ── Audio Player & Waveform State ───────────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false);
@@ -521,6 +504,8 @@ export default function VideoAnalysis() {
         t?.submitted
       );
       setIsTodaySubmitted(isSub);
+      const userStreak = r.data?.streakRecord?.currentStreak || r.data?.streakRecord?.streak || r.data?.profile?.streak || 0;
+      setStreak(userStreak);
       if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
       if (t?.question && active) {
         setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
@@ -1166,105 +1151,68 @@ export default function VideoAnalysis() {
               <div className="speakshine-hero-right-col flex flex-col gap-4" onWheel={handleHeroWheel}>
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
               <div className="speakshine-hero-right-card" style={{
-                background: "#0d0a18",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
+                background: isDark ? "#0d0a18" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                 borderRadius: 18,
                 padding: "1.25rem 1.25rem 1.35rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.85rem",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+                boxShadow: isDark ? "0 10px 30px rgba(0, 0, 0, 0.3)" : "0 10px 30px rgba(0, 0, 0, 0.04)",
               }}>
                 <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-                    WINDOW CLOSES AT MIDNIGHT
-                  </div>
+                  {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Dynamic Urgency Cycle */}
+                  <MidnightCountdownTimer />
 
-                  {/* 3 Digital Countdown Timer Boxes */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
-                    <div className="speakshine-timer-box" style={{
-                      background: "#161024",
-                      border: "1px solid rgba(249, 115, 22, 0.35)",
-                      borderRadius: 10,
-                      padding: "0.65rem 0.85rem",
-                      textAlign: "center",
-                      minWidth: 54,
-                    }}>
-                      <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                        {timeLeft.hrs}
-                      </div>
-                      <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                        HRS
-                      </div>
-                    </div>
-
-                    <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
-
-                    <div className="speakshine-timer-box" style={{
-                      background: "#161024",
-                      border: "1px solid rgba(249, 115, 22, 0.35)",
-                      borderRadius: 10,
-                      padding: "0.65rem 0.85rem",
-                      textAlign: "center",
-                      minWidth: 54,
-                    }}>
-                      <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                        {timeLeft.mins}
-                      </div>
-                      <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                        MINS
-                      </div>
-                    </div>
-
-                    <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
-
-                    <div className="speakshine-timer-box" style={{
-                      background: "#161024",
-                      border: "1px solid rgba(249, 115, 22, 0.35)",
-                      borderRadius: 10,
-                      padding: "0.65rem 0.85rem",
-                      textAlign: "center",
-                      minWidth: 54,
-                    }}>
-                      <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: "#ffffff", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-                        {timeLeft.secs}
-                      </div>
-                      <div style={{ fontSize: "0.6rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-                        SECS
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Streak Warning */}
+                  {/* Streak Warning Banner with Red Icon & Yellow Text */}
                   <div style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.45rem",
-                    fontSize: "0.78rem",
-                    color: "#f87171",
-                    fontWeight: 600,
-                    marginBottom: "0.75rem",
+                    gap: "0.55rem",
+                    fontSize: "0.82rem",
+                    background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.12)",
+                    border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(245, 158, 11, 0.35)",
+                    borderRadius: 10,
+                    padding: "0.55rem 0.85rem",
+                    marginBottom: "0.85rem",
                   }}>
-                    <span>⚠️</span>
-                    <span>Submit before midnight to start streak</span>
+                    <span style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.05rem",
+                      filter: "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))",
+                      color: "#ef4444",
+                      flexShrink: 0,
+                    }}>
+                      ⚠️
+                    </span>
+                    <span style={{
+                      color: isDark ? "#fbbf24" : "#b45309",
+                      fontWeight: 700,
+                      lineHeight: 1.35,
+                      letterSpacing: "-0.01em",
+                    }}>
+                      {streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}
+                    </span>
                   </div>
 
                   {/* Rules to Remember */}
                   <div className="speakshine-rules-box" style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                     borderRadius: 12,
                     padding: "0.85rem",
                     marginBottom: "0.25rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.55rem" }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase", marginBottom: "0.55rem" }}>
                       RULES TO REMEMBER
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {qConfig.rules.map((rule, idx) => (
-                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: "#e2e8f0" }}>
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#1e293b" }}>
                           <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                          <span style={rule.highlight ? { fontWeight: 600, color: "#ffffff" } : {}}>{rule.text}</span>
+                          <span style={rule.highlight ? { fontWeight: 600, color: isDark ? "#ffffff" : "#0f172a" } : {}}>{rule.text}</span>
                         </div>
                       ))}
                     </div>
@@ -1306,9 +1254,9 @@ export default function VideoAnalysis() {
                     className="speakshine-btn-secondary"
                     style={{
                       width: "100%",
-                      background: "#181427",
-                      color: "#cbd5e1",
-                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      background: isDark ? "#181427" : "#f1f5f9",
+                      color: isDark ? "#cbd5e1" : "#1e293b",
+                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
                       borderRadius: 12,
                       padding: "0.75rem",
                       fontWeight: 600,
@@ -1320,8 +1268,8 @@ export default function VideoAnalysis() {
                       gap: "0.5rem",
                       transition: "background 0.15s ease",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#201b34"}
-                    onMouseLeave={e => e.currentTarget.style.background = "#181427"}
+                    onMouseEnter={e => e.currentTarget.style.background = isDark ? "#201b34" : "#e2e8f0"}
+                    onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
                   >
                     <span>📁</span>
                     <span>{qConfig.uploadButtonLabel}</span>
@@ -1334,14 +1282,14 @@ export default function VideoAnalysis() {
                 <div
                   className="speakshine-hero-right-card speakshine-vocab-card-box"
                   style={{
-                    background: "#0d0a18",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    background: isDark ? "#0d0a18" : "#ffffff",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                     borderRadius: 18,
                     padding: vocabDropdownOpen ? "1.25rem 1.25rem 1.35rem" : "0.95rem 1.15rem",
                     display: "flex",
                     flexDirection: "column",
                     gap: vocabDropdownOpen ? "0.85rem" : "0.55rem",
-                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+                    boxShadow: isDark ? "0 10px 30px rgba(0, 0, 0, 0.3)" : "0 10px 30px rgba(0, 0, 0, 0.04)",
                     transition: "all 0.2s ease",
                   }}
                 >

@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, CartesianGrid
 } from "recharts";
 import ThemeToggle from "./ThemeToggle.jsx";
+import MidnightCountdownTimer from "./MidnightCountdownTimer.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import Modal from "./Modal.jsx";
 import gsap from "gsap";
@@ -27,86 +28,7 @@ const WAVE_PATTERN = [
   28, 22, 18, 26, 20, 14, 18, 24, 16, 22, 26, 18, 14
 ];
 
-// ── Isolated Countdown Timer (Prevents entire dashboard from re-rendering every second) ──
-function MidnightCountdownTimer() {
-  const { isDark } = useTheme();
-  const calc = () => {
-    const now = new Date();
-    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const midnight = new Date(nowIST);
-    midnight.setDate(midnight.getDate() + 1);
-    midnight.setHours(0, 0, 0, 0);
-
-    const diffSec = Math.max(0, Math.floor((midnight - nowIST) / 1000));
-    const hrs = String(Math.floor(diffSec / 3600)).padStart(2, "0");
-    const mins = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
-    const secs = String(diffSec % 60).padStart(2, "0");
-    return { hrs, mins, secs };
-  };
-
-  const [t, setT] = useState(calc);
-
-  useEffect(() => {
-    const interval = setInterval(() => setT(calc()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.75rem" }}>
-      <div className="speakshine-timer-box" style={{
-        background: isDark ? "#161024" : "#f8fafc",
-        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.4)",
-        borderRadius: 10,
-        padding: "0.65rem 0.85rem",
-        textAlign: "center",
-        minWidth: 54,
-      }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-          {t.hrs}
-        </div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-          HRS
-        </div>
-      </div>
-
-      <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
-
-      <div className="speakshine-timer-box" style={{
-        background: isDark ? "#161024" : "#f8fafc",
-        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.4)",
-        borderRadius: 10,
-        padding: "0.65rem 0.85rem",
-        textAlign: "center",
-        minWidth: 54,
-      }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-          {t.mins}
-        </div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-          MINS
-        </div>
-      </div>
-
-      <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "rgba(249, 115, 22, 0.6)", paddingBottom: "12px" }}>:</span>
-
-      <div className="speakshine-timer-box" style={{
-        background: isDark ? "#161024" : "#f8fafc",
-        border: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.4)",
-        borderRadius: 10,
-        padding: "0.65rem 0.85rem",
-        textAlign: "center",
-        minWidth: 54,
-      }}>
-        <div className="speakshine-timer-val" style={{ fontSize: "1.85rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-          {t.secs}
-        </div>
-        <div style={{ fontSize: "0.6rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginTop: "4px", letterSpacing: "0.08em" }}>
-          SECS
-        </div>
-      </div>
-    </div>
-  );
-}
+// ── Isolated Countdown Timer with Green/Orange/Red Dynamic Urgency Cycle is imported from MidnightCountdownTimer.jsx ──
 
 // ── Drop Countdown Timer for 12 AM Reset Period (Counts down to posterSendTime, e.g. 08:00 AM IST) ──
 function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
@@ -1549,9 +1471,11 @@ export default function ModernDashboardView({
             <div ref={heroGridRef} className="speakshine-hero-grid w-full">
               {/* Left Accomplishment Card */}
               <div className="speakshine-hero-left-card" onWheel={handleHeroWheel} style={{
-                background: "linear-gradient(145deg, #0d2818 0%, #081a10 50%, #0f172a 100%)",
-                border: "1px solid rgba(74, 222, 128, 0.35)",
-                boxShadow: "0 12px 40px rgba(16, 185, 129, 0.15)",
+                background: isDark
+                  ? "linear-gradient(145deg, #0d2818 0%, #081a10 50%, #0f172a 100%)"
+                  : "linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%)",
+                border: isDark ? "1px solid rgba(74, 222, 128, 0.35)" : "1px solid rgba(34, 197, 94, 0.3)",
+                boxShadow: isDark ? "0 12px 40px rgba(16, 185, 129, 0.15)" : "0 12px 40px rgba(16, 185, 129, 0.08)",
                 borderRadius: 18,
                 padding: "2rem",
                 position: "relative",
@@ -1567,7 +1491,7 @@ export default function ModernDashboardView({
                   width: 260,
                   height: 260,
                   borderRadius: "50%",
-                  background: "radial-gradient(circle, rgba(34, 197, 94, 0.18) 0%, transparent 70%)",
+                  background: isDark ? "radial-gradient(circle, rgba(34, 197, 94, 0.18) 0%, transparent 70%)" : "radial-gradient(circle, rgba(34, 197, 94, 0.08) 0%, transparent 70%)",
                   pointerEvents: "none",
                 }} />
 
@@ -1577,21 +1501,22 @@ export default function ModernDashboardView({
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                       <span style={{
                         width: 9, height: 9, borderRadius: "50%",
-                        background: "#4ade80", boxShadow: "0 0 12px #4ade80",
+                        background: isDark ? "#4ade80" : "#16a34a",
+                        boxShadow: isDark ? "0 0 12px #4ade80" : "0 0 8px rgba(22, 163, 74, 0.4)",
                       }} />
-                      <span style={{ fontSize: "0.76rem", fontWeight: 800, letterSpacing: "0.08em", color: "#4ade80", textTransform: "uppercase" }}>
+                      <span style={{ fontSize: "0.76rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#4ade80" : "#15803d", textTransform: "uppercase" }}>
                         MISSION COMPLETE · SUBMISSION VERIFIED
                       </span>
                     </div>
                     <span style={{
-                      background: "rgba(34, 197, 94, 0.15)",
-                      border: "1px solid rgba(74, 222, 128, 0.4)",
+                      background: isDark ? "rgba(34, 197, 94, 0.15)" : "rgba(34, 197, 94, 0.1)",
+                      border: isDark ? "1px solid rgba(74, 222, 128, 0.4)" : "1px solid rgba(34, 197, 94, 0.3)",
                       borderRadius: 9999,
                       padding: "4px 12px",
                       fontSize: "0.72rem",
                       fontWeight: 800,
                       letterSpacing: "0.06em",
-                      color: "#86efac",
+                      color: isDark ? "#86efac" : "#166534",
                       textTransform: "uppercase",
                       display: "inline-flex",
                       alignItems: "center",
@@ -1609,15 +1534,15 @@ export default function ModernDashboardView({
                     lineHeight: 1.15,
                     margin: "0 0 0.65rem 0",
                     letterSpacing: "-0.02em",
-                    color: "#ffffff",
+                    color: isDark ? "#ffffff" : "#0f172a",
                   }}>
-                    Terrific Speaking, <span className="story-title-italic" style={{ color: "#86efac", fontStyle: "italic", fontWeight: 400 }}>{displayName.split(" ")[0]}! 🌟</span>
+                    Terrific Speaking, <span className="story-title-italic" style={{ color: isDark ? "#86efac" : "#16a34a", fontStyle: "italic", fontWeight: 400 }}>{displayName.split(" ")[0]}! 🌟</span>
                   </h1>
 
                   {/* Motivational celebration text */}
                   <p style={{
                     fontSize: "0.94rem",
-                    color: "#cbd5e1",
+                    color: isDark ? "#cbd5e1" : "#475569",
                     lineHeight: 1.6,
                     marginBottom: "1.5rem",
                     maxWidth: "680px",
@@ -1633,89 +1558,89 @@ export default function ModernDashboardView({
                     marginBottom: "1.5rem",
                   }}>
                     <div style={{
-                      background: "rgba(0, 0, 0, 0.35)",
-                      border: "1px solid rgba(74, 222, 128, 0.25)",
+                      background: isDark ? "rgba(0, 0, 0, 0.35)" : "#f0fdf4",
+                      border: isDark ? "1px solid rgba(74, 222, 128, 0.25)" : "1px solid rgba(34, 197, 94, 0.35)",
                       borderRadius: 12,
                       padding: "0.85rem 1rem",
                       textAlign: "center",
                     }}>
                       <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>✅</div>
-                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>Submitted</div>
-                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#86efac", textTransform: "uppercase", marginTop: "3px" }}>Daily Task</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>Submitted</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: isDark ? "#86efac" : "#16a34a", textTransform: "uppercase", marginTop: "3px" }}>Daily Task</div>
                     </div>
 
                     <div style={{
-                      background: "rgba(0, 0, 0, 0.35)",
-                      border: "1px solid rgba(249, 115, 22, 0.3)",
+                      background: isDark ? "rgba(0, 0, 0, 0.35)" : "#fff7ed",
+                      border: isDark ? "1px solid rgba(249, 115, 22, 0.3)" : "1px solid rgba(249, 115, 22, 0.35)",
                       borderRadius: 12,
                       padding: "0.85rem 1rem",
                       textAlign: "center",
                     }}>
                       <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>🔥</div>
-                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>{streak} Days</div>
-                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#fb923c", textTransform: "uppercase", marginTop: "3px" }}>Streak Safe</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>{streak} Days</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: isDark ? "#fb923c" : "#ea580c", textTransform: "uppercase", marginTop: "3px" }}>Streak Safe</div>
                     </div>
 
                     <div style={{
-                      background: "rgba(0, 0, 0, 0.35)",
-                      border: "1px solid rgba(251, 191, 36, 0.3)",
+                      background: isDark ? "rgba(0, 0, 0, 0.35)" : "#fefce8",
+                      border: isDark ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(234, 179, 8, 0.35)",
                       borderRadius: 12,
                       padding: "0.85rem 1rem",
                       textAlign: "center",
                     }}>
                       <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>⭐</div>
-                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>+{todayPoints} pts</div>
-                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#fcd34d", textTransform: "uppercase", marginTop: "3px" }}>Earned Today</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>+{todayPoints} pts</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: isDark ? "#fcd34d" : "#ca8a04", textTransform: "uppercase", marginTop: "3px" }}>Earned Today</div>
                     </div>
 
                     <div style={{
-                      background: "rgba(0, 0, 0, 0.35)",
-                      border: "1px solid rgba(168, 85, 247, 0.3)",
+                      background: isDark ? "rgba(0, 0, 0, 0.35)" : "#faf5ff",
+                      border: isDark ? "1px solid rgba(168, 85, 247, 0.3)" : "1px solid rgba(168, 85, 247, 0.35)",
                       borderRadius: 12,
                       padding: "0.85rem 1rem",
                       textAlign: "center",
                     }}>
                       <div style={{ fontSize: "1.3rem", marginBottom: "0.25rem" }}>🏅</div>
-                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", lineHeight: 1.1 }}>{milestone?.currentBadge?.name || "Speaker"}</div>
-                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: "#c084fc", textTransform: "uppercase", marginTop: "3px" }}>Active Rank</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>{milestone?.currentBadge?.name || "Speaker"}</div>
+                      <div style={{ fontSize: "0.64rem", fontWeight: 700, color: isDark ? "#c084fc" : "#9333ea", textTransform: "uppercase", marginTop: "3px" }}>Active Rank</div>
                     </div>
                   </div>
 
                   {/* Submission Context Preview (Topic + Vocab Used) */}
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.07)",
+                    background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.07)" : "1px solid #e2e8f0",
                     borderRadius: 12,
                     padding: "1rem 1.25rem",
                     marginBottom: "1.5rem",
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
-                      <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase" }}>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase" }}>
                         CHALLENGE TOPIC SUBMITTED
                       </div>
-                      <span style={{ fontSize: "0.72rem", color: "#4ade80", fontWeight: 700 }}>✓ Scored by AI</span>
+                      <span style={{ fontSize: "0.72rem", color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>✓ Scored by AI</span>
                     </div>
-                    <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.65rem" }}>
+                    <div style={{ fontSize: "1.05rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.65rem" }}>
                       "{topicTitle}"
                     </div>
 
                     {/* Target Vocab Pills */}
                     {vocabList && vocabList.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, marginRight: "4px" }}>
+                        <span style={{ fontSize: "0.7rem", color: isDark ? "#64748b" : "#475569", fontWeight: 700, marginRight: "4px" }}>
                           VOCABULARY:
                         </span>
                         {vocabList.map((v, i) => (
                           <span
                             key={i}
                             style={{
-                              background: "rgba(34, 197, 94, 0.12)",
-                              border: "1px solid rgba(74, 222, 128, 0.3)",
+                              background: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.1)",
+                              border: isDark ? "1px solid rgba(74, 222, 128, 0.3)" : "1px solid rgba(34, 197, 94, 0.3)",
                               borderRadius: 6,
                               padding: "2px 8px",
                               fontSize: "0.74rem",
                               fontWeight: 600,
-                              color: "#86efac",
+                              color: isDark ? "#86efac" : "#166534",
                               display: "inline-flex",
                               alignItems: "center",
                               gap: "3px",
@@ -1761,9 +1686,9 @@ export default function ModernDashboardView({
                     onClick={() => navigate("/community")}
                     className="speakshine-btn-secondary"
                     style={{
-                      background: "#181427",
-                      color: "#cbd5e1",
-                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      background: isDark ? "#181427" : "#f1f5f9",
+                      color: isDark ? "#cbd5e1" : "#1e293b",
+                      border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid #cbd5e1",
                       borderRadius: 12,
                       padding: "0.85rem 1.25rem",
                       fontWeight: 600,
@@ -1786,7 +1711,7 @@ export default function ModernDashboardView({
                     }}
                     style={{
                       background: "transparent",
-                      color: "#94a3b8",
+                      color: isDark ? "#94a3b8" : "#475569",
                       border: "none",
                       padding: "0.85rem 1rem",
                       fontWeight: 600,
@@ -1804,24 +1729,26 @@ export default function ModernDashboardView({
 
               {/* Right: Streak Security & Daily Mission Status Card */}
               <div className="speakshine-hero-right-card" onWheel={handleHeroWheel} style={{
-                background: "linear-gradient(145deg, #120e24 0%, #0d0918 100%)",
-                border: "1px solid rgba(74, 222, 128, 0.25)",
+                background: isDark
+                  ? "linear-gradient(145deg, #120e24 0%, #0d0918 100%)"
+                  : "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
+                border: isDark ? "1px solid rgba(74, 222, 128, 0.25)" : "1px solid #e2e8f0",
                 borderRadius: 18,
                 padding: "1.75rem",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.4)",
+                boxShadow: isDark ? "0 12px 40px rgba(0, 0, 0, 0.4)" : "0 10px 30px rgba(0, 0, 0, 0.04)",
               }}>
                 <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#86efac", textTransform: "uppercase", marginBottom: "0.85rem" }}>
+                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#86efac" : "#15803d", textTransform: "uppercase", marginBottom: "0.85rem" }}>
                     DAILY MISSION STATUS
                   </div>
 
                   {/* Luminous Streak Shield Box */}
                   <div style={{
-                    background: "rgba(34, 197, 94, 0.08)",
-                    border: "1px solid rgba(74, 222, 128, 0.3)",
+                    background: isDark ? "rgba(34, 197, 94, 0.08)" : "#f0fdf4",
+                    border: isDark ? "1px solid rgba(74, 222, 128, 0.3)" : "1px solid rgba(34, 197, 94, 0.3)",
                     borderRadius: 14,
                     padding: "1.1rem",
                     marginBottom: "1.25rem",
@@ -1833,22 +1760,22 @@ export default function ModernDashboardView({
                       width: 48,
                       height: 48,
                       borderRadius: "50%",
-                      background: "rgba(34, 197, 94, 0.18)",
-                      border: "1px solid rgba(74, 222, 128, 0.5)",
+                      background: isDark ? "rgba(34, 197, 94, 0.18)" : "rgba(34, 197, 94, 0.15)",
+                      border: isDark ? "1px solid rgba(74, 222, 128, 0.5)" : "1px solid rgba(34, 197, 94, 0.4)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: "1.6rem",
                       flexShrink: 0,
-                      boxShadow: "0 0 16px rgba(34, 197, 94, 0.25)",
+                      boxShadow: isDark ? "0 0 16px rgba(34, 197, 94, 0.25)" : "0 2px 8px rgba(34, 197, 94, 0.15)",
                     }}>
                       🛡️
                     </div>
                     <div>
-                      <div style={{ fontSize: "1rem", fontWeight: 800, color: "#ffffff", marginBottom: "2px" }}>
+                      <div style={{ fontSize: "1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#065f46", marginBottom: "2px" }}>
                         Streak Locked &amp; Protected!
                       </div>
-                      <div style={{ fontSize: "0.78rem", color: "#86efac", lineHeight: 1.4 }}>
+                      <div style={{ fontSize: "0.78rem", color: isDark ? "#86efac" : "#047857", lineHeight: 1.4 }}>
                         Your {streak}-day streak is 100% safe. No fine or streak loss will occur tonight.
                       </div>
                     </div>
@@ -1856,46 +1783,46 @@ export default function ModernDashboardView({
 
                   {/* Countdown to Next Drop */}
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                     borderRadius: 12,
                     padding: "0.85rem 1rem",
                     marginBottom: "1.25rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.45rem" }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.45rem" }}>
                       NEXT CHALLENGE CYCLE
                     </div>
-                    <div style={{ fontSize: "0.82rem", color: "#cbd5e1" }}>
-                      Next speaking mission drops tomorrow at <strong style={{ color: "#ffffff" }}>{formatDropTime(targetPosterSendTime)} IST</strong>. Take today to rest your vocal cords!
+                    <div style={{ fontSize: "0.82rem", color: isDark ? "#cbd5e1" : "#334155" }}>
+                      Next speaking mission drops tomorrow at <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>{formatDropTime(targetPosterSendTime)} IST</strong>. Take today to rest your vocal cords!
                     </div>
                   </div>
 
                   {/* Checklist of Completed Requirements */}
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                     borderRadius: 12,
                     padding: "1rem",
                     marginBottom: "1.25rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginBottom: "0.75rem" }}>
                       TODAY'S VERIFIED CHECKLIST
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                        <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 800 }}>✓</span>
                         <span>Speaking video recorded &amp; uploaded</span>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                        <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 800 }}>✓</span>
                         <span>Target vocabulary integrated in speech</span>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                        <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 800 }}>✓</span>
                         <span>Fluency, grammar &amp; vocabulary scored</span>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                        <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                        <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 800 }}>✓</span>
                         <span>Streak preserved &amp; milestone points credited</span>
                       </div>
                     </div>
@@ -1910,9 +1837,9 @@ export default function ModernDashboardView({
                     className="speakshine-btn-secondary"
                     style={{
                       width: "100%",
-                      background: "#181427",
-                      color: "#cbd5e1",
-                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      background: isDark ? "#181427" : "#f1f5f9",
+                      color: isDark ? "#cbd5e1" : "#1e293b",
+                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
                       borderRadius: 12,
                       padding: "0.75rem",
                       fontWeight: 600,
@@ -1927,7 +1854,7 @@ export default function ModernDashboardView({
                     <span>🎙️</span>
                     <span>Practice Extra Take in Studio (Optional)</span>
                   </button>
-                  <div style={{ fontSize: "0.7rem", color: "#64748b", textAlign: "center", marginTop: "6px" }}>
+                  <div style={{ fontSize: "0.7rem", color: isDark ? "#64748b" : "#64748b", textAlign: "center", marginTop: "6px" }}>
                     Extra takes won't overwrite your completed score.
                   </div>
                 </div>
@@ -2256,25 +2183,40 @@ export default function ModernDashboardView({
                 boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
               }}>
                 <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#716c85" : "#64748b", textTransform: "uppercase", marginBottom: "0.5rem" }}>
-                    WINDOW CLOSES AT MIDNIGHT
-                  </div>
-
-                  {/* 3 Digital Countdown Timer Boxes */}
+                  {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
                   <MidnightCountdownTimer />
 
-                  {/* Streak Warning */}
+                  {/* Streak Warning Banner with Red Icon & Yellow Text */}
                   <div style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.45rem",
-                    fontSize: "0.78rem",
-                    color: "#f87171",
-                    fontWeight: 600,
-                    marginBottom: "0.75rem",
+                    gap: "0.55rem",
+                    fontSize: "0.82rem",
+                    background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.12)",
+                    border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(245, 158, 11, 0.35)",
+                    borderRadius: 10,
+                    padding: "0.55rem 0.85rem",
+                    marginBottom: "0.85rem",
                   }}>
-                    <span>⚠️</span>
-                    <span>{streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}</span>
+                    <span style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.05rem",
+                      filter: "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))",
+                      color: "#ef4444",
+                      flexShrink: 0,
+                    }}>
+                      ⚠️
+                    </span>
+                    <span style={{
+                      color: isDark ? "#fbbf24" : "#b45309",
+                      fontWeight: 700,
+                      lineHeight: 1.35,
+                      letterSpacing: "-0.01em",
+                    }}>
+                      {streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}
+                    </span>
                   </div>
 
                   {/* Rules to Remember */}
