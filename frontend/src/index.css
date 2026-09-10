@@ -7426,3 +7426,146 @@ audio { border-radius: 12px; }
   color: #15803d !important;
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   PAYMENT & BILLING CENTER STYLES
+   ═════════════════════════════════════════════════════════════════════════════ */
+.payment-page-container {
+  max-width: 1360px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.payment-hero-banner {
+  background: linear-gradient(135deg, rgba(20, 14, 38, 0.95) 0%, rgba(13, 10, 24, 0.95) 100%);
+  border: 1px solid rgba(124, 111, 255, 0.25);
+  border-radius: 22px;
+  padding: 1.75rem 2rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] .payment-hero-banner,
+.light .payment-hero-banner {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+.payment-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="light"] .payment-kpi-grid,
+.light .payment-kpi-grid {
+  border-top-color: #f1f5f9 !important;
+}
+
+@media (max-width: 900px) {
+  .payment-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 500px) {
+  .payment-kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.payment-kpi-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 0.75rem 0.95rem;
+}
+
+[data-theme="light"] .payment-kpi-card,
+.light .payment-kpi-card {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.payment-status-card {
+  border-radius: 20px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.payment-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .payment-benefits-grid,
+.light .payment-benefits-grid {
+  border-top-color: #e2e8f0 !important;
+}
+
+@media (max-width: 700px) {
+  .payment-benefits-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.payment-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .payment-trust-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.payment-trust-card {
+  background: #0d0a18;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 1.25rem 1.35rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+[data-theme="light"] .payment-trust-card,
+.light .payment-trust-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Responsive Table vs Mobile Cards */
+.payment-tx-desktop-table {
+  display: block;
+}
+
+.payment-tx-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .payment-tx-desktop-table {
+    display: none !important;
+  }
+  .payment-tx-mobile-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem;
+  }
+}
+
+
