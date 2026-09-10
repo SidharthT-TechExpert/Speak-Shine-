@@ -8,9 +8,11 @@
 import VideoReport from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
+import StreakRecord from "../../../models/streakRecordSchema.js";
 import { processWebVideo } from "../ai/videoProcessor.js";
 import { phoneVariants } from "../../utils/phoneVariants.js";
 import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits } from "./submitGate.js";
+import { getNewStreakBadgeIds } from "../../utils/streakBadges.js";
 import fs from "fs";
 
 // ── Concurrency limit ────────────────────────────────────────────────────────
@@ -479,14 +481,16 @@ async function processJob(job) {
       }
 
       // Fetch current user state
-      const userDoc = await User.findOne({ phone }).lean();
+      const userDoc = await User.findOne({
+        phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] },
+      }).lean();
       const alreadyScoredToday = userDoc?.lastScoreDate === todayIST;
       const prevScore = alreadyScoredToday ? (userDoc?.todayScore ?? 0) : null;
 
       if (!alreadyScoredToday) {
         // Case 1: first submission today — add score
         await User.findOneAndUpdate(
-          { phone },
+          { _id: userDoc?._id || { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } },
           {
             $inc: { monthlyScore: effectiveScore },
             $set: { lastScoreDate: todayIST, todayScore: effectiveScore },
@@ -498,7 +502,7 @@ async function processJob(job) {
         // Case 2: better score — replace today's contribution
         const improvement = effectiveScore - prevScore;
         await User.findOneAndUpdate(
-          { phone },
+          { _id: userDoc?._id || { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } },
           {
             $inc: { monthlyScore: improvement },
             $set: { todayScore: effectiveScore },
@@ -512,6 +516,71 @@ async function processJob(job) {
         scoreOutcome = "dropped";
         previousScore = prevScore;
         console.log(`[Queue] ℹ️  Re-submission score ${effectiveScore.toFixed(1)} ≤ today's best ${prevScore.toFixed(1)} for ${phone} — keeping existing score`);
+      }
+
+      // ── Atomic Streak & Milestone Update (Option B: Real-Time at Video Analysis) ──
+      // Atomically increment streak ONLY once per IST calendar day (prevents double-increment on re-submissions)
+      const userFilter = userDoc?._id
+        ? { _id: userDoc._id, lastStreakDate: { $ne: todayIST } }
+        : { phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] }, lastStreakDate: { $ne: todayIST } };
+
+      const streakUpdateResult = await User.updateOne(
+        userFilter,
+        {
+          $inc: { streak: 1 },
+          $set: {
+            lastStreakDate: todayIST,
+            completed: true,
+            fineChargedToday: false,
+          },
+        }
+      );
+
+      if (streakUpdateResult.modifiedCount === 1) {
+        // First submission of the day: award streak rewards immediately!
+        const targetUserId = userDoc?._id;
+        const updatedUser = targetUserId
+          ? await User.findById(targetUserId).lean()
+          : await User.findOne({ phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } }).lean();
+
+        const currentStreak = updatedUser?.streak || (userDoc?.streak || 0) + 1;
+        console.log(`[Queue] 🔥 Streak atomically incremented to ${currentStreak} for ${phone} (${todayIST})`);
+
+        // Check 7-day milestone for Streak Freeze award (+1 shield)
+        const FREEZE_AWARD_DAYS = 7;
+        if (currentStreak > 0 && currentStreak % FREEZE_AWARD_DAYS === 0) {
+          await User.updateOne({ _id: updatedUser._id }, { $inc: { streakFreeze: 1 } });
+          console.log(`[Queue] 🧊 Milestone reached! +1 StreakFreeze awarded to ${phone} (streak=${currentStreak})`);
+        }
+
+        // Check new streak badges earned
+        const newBadgeIds = getNewStreakBadgeIds(currentStreak, updatedUser?.earnedBadges || []);
+        if (newBadgeIds.length > 0) {
+          await User.updateOne({ _id: updatedUser._id }, { $addToSet: { earnedBadges: { $each: newBadgeIds } } });
+          console.log(`[Queue] 🏅 New streak badges earned by ${phone}: ${newBadgeIds.join(", ")}`);
+        }
+
+        // Update All-Time Streak Record (Hall of Fame)
+        try {
+          const existingRecord = await StreakRecord.findOne();
+          if (!existingRecord || currentStreak > existingRecord.streak) {
+            await StreakRecord.findOneAndUpdate(
+              {},
+              {
+                name: updatedUser?.name || updatedUser?.userId || "Unknown",
+                userId: updatedUser?.userId || null,
+                streak: currentStreak,
+                achievedAt: new Date(),
+              },
+              { upsert: true, new: true }
+            );
+            console.log(`[Queue] 🏆 New all-time streak record: ${updatedUser?.name} — ${currentStreak} days`);
+          }
+        } catch (recErr) {
+          console.error("[Queue] Streak record update failed:", recErr.message);
+        }
+      } else {
+        console.log(`[Queue] ℹ️  Streak already incremented today for ${phone} (${todayIST}) — re-submission maintains streak`);
       }
 
       // Save sundayBonus flag so the UI can show a celebration message

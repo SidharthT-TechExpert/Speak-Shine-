@@ -6,6 +6,8 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, default: null },
   completed: { type: Boolean, default: false },
   streak: { type: Number, default: 0 },
+  // lastStreakDate (YYYY-MM-DD IST) ensures atomic single-increment per day at video analysis time
+  lastStreakDate: { type: String, default: null },
   // Badge ids earned at streak milestones. Kept separately so badges survive a reset.
   earnedBadges: { type: [String], default: [] },
   consecutiveSkips: { type: Number, default: 0 },

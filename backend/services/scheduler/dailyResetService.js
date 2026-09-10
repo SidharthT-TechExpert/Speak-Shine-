@@ -31,26 +31,47 @@ export async function applyStreakUpdates() {
   try {
     const FREEZE_AWARD_DAYS = 7; // earn 1 freeze every 7-day streak
 
-    // ── 1. Submitted today → increment streak ─────────────────────────────
-    const submittedUsers = await User.find({ completed: true }).lean();
+    // ── 1. Submitted today ───────────────────────────────────────────────────
+    // Streaks are now incremented in real-time at video analysis completion (Option B)
+    // with atomic lastStreakDate guard.
+    // At midnight, we only run a safety catch-up for any user marked completed: true
+    // whose streak was not yet incremented today (e.g. manual admin override).
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const y  = nowIST.getFullYear();
+    const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+    const d  = String(nowIST.getDate()).padStart(2, "0");
+    const todayIST = `${y}-${mo}-${d}`;
+
+    // Clear fineChargedToday for all submitters
     await User.updateMany(
       { completed: true },
-      { $inc: { streak: 1 }, $set: { fineChargedToday: false } }
+      { $set: { fineChargedToday: false } }
     );
 
-    // Award +1 streakFreeze at every 7-day milestone
+    // Safety fallback: only increment submitters who were not already incremented today
+    const pendingSubmitters = await User.find({
+      completed: true,
+      lastStreakDate: { $ne: todayIST },
+    }).lean();
+
     let freezesAwarded = 0;
-    for (const u of submittedUsers) {
-      const newStreak = (u.streak || 0) + 1;
-      const newBadgeIds = getNewStreakBadgeIds(newStreak, u.earnedBadges || []);
-      if (newBadgeIds.length > 0) {
-        await User.updateOne({ _id: u._id }, { $addToSet: { earnedBadges: { $each: newBadgeIds } } });
-        console.log(`[DailyReset] 🏅 Badges awarded to ${u.name}: ${newBadgeIds.join(", ")}`);
-      }
-      if (newStreak > 0 && newStreak % FREEZE_AWARD_DAYS === 0) {
-        await User.updateOne({ _id: u._id }, { $inc: { streakFreeze: 1 } });
-        freezesAwarded++;
-        console.log(`[DailyReset] 🧊 StreakFreeze awarded to ${u.name} (streak=${newStreak})`);
+    for (const u of pendingSubmitters) {
+      const updateRes = await User.updateOne(
+        { _id: u._id, lastStreakDate: { $ne: todayIST } },
+        { $inc: { streak: 1 }, $set: { lastStreakDate: todayIST } }
+      );
+      if (updateRes.modifiedCount === 1) {
+        const newStreak = (u.streak || 0) + 1;
+        const newBadgeIds = getNewStreakBadgeIds(newStreak, u.earnedBadges || []);
+        if (newBadgeIds.length > 0) {
+          await User.updateOne({ _id: u._id }, { $addToSet: { earnedBadges: { $each: newBadgeIds } } });
+          console.log(`[DailyReset] 🏅 Badges awarded to ${u.name}: ${newBadgeIds.join(", ")}`);
+        }
+        if (newStreak > 0 && newStreak % FREEZE_AWARD_DAYS === 0) {
+          await User.updateOne({ _id: u._id }, { $inc: { streakFreeze: 1 } });
+          freezesAwarded++;
+          console.log(`[DailyReset] 🧊 StreakFreeze awarded to ${u.name} (streak=${newStreak})`);
+        }
       }
     }
 
