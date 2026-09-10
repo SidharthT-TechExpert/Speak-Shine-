@@ -14,6 +14,8 @@ export const GATE_FRAME_IDEAL = 16;
 export function getDurationLimits(flags = {}, settings = {}) {
   const maxSeconds = flags.isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
+    : flags.isWeeklyReflection
+    ? (settings.durationWeeklyMax ?? 420)
     : flags.isMonthlyGoals
     ? (settings.durationMonthlyGoalsMax ?? 600)
     : flags.isStorySummary
@@ -24,6 +26,8 @@ export function getDurationLimits(flags = {}, settings = {}) {
 
   const fullScoreSeconds = flags.isMonthlyReflection
     ? (settings.durationMonthlyReflectionFull ?? 420)
+    : flags.isWeeklyReflection
+    ? (settings.durationWeeklyFull ?? 300)
     : flags.isMonthlyGoals
     ? (settings.durationMonthlyGoalsFull ?? 420)
     : flags.isStorySummary

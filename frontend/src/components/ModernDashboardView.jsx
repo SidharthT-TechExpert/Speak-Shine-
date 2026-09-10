@@ -21,6 +21,7 @@ import {
   DEFAULT_MONTHLY_REFLECTION_QUESTIONS,
   DEFAULT_MONTHLY_GOALS_QUESTIONS,
 } from "../utils/questionTypes.js";
+import { getDurationLimits } from "../utils/videoSubmitGate.js";
 
 // ── Waveform bar patterns for realistic speech audio visualization ───────────
 const WAVE_PATTERN = [
@@ -248,7 +249,26 @@ export default function ModernDashboardView({
 
   // ── Challenge Type Detection & UI Config ────────────────────────────────────
   const questionType = detectQuestionType(today);
-  const questionConfig = getQuestionUIConfig(questionType, today);
+  const effectiveDurationLimits = useMemo(() => {
+    if (today?.durationLimits && typeof today.durationLimits === "object") {
+      return today.durationLimits;
+    }
+    const flags = {
+      isMonthlyReflection: Boolean(today?.isMonthlyReflection || questionType === "monthly_reflection"),
+      isWeeklyReflection: Boolean(today?.isWeeklyReflection),
+      isMonthlyGoals: Boolean(today?.isMonthlyGoals || questionType === "monthly_goals"),
+      isStorySummary: Boolean(today?.isStorySummary || questionType === "story_audio" || today?.contentType === "story_audio"),
+      isPictureDescription: Boolean(today?.isPictureDescription || questionType === "picture_description" || today?.contentType === "picture_description"),
+    };
+    return getDurationLimits(flags, today?.durationSettings || {});
+  }, [today, questionType]);
+
+  const questionConfig = useMemo(() => {
+    return getQuestionUIConfig(questionType, {
+      ...today,
+      durationLimits: effectiveDurationLimits,
+    });
+  }, [questionType, today, effectiveDurationLimits]);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
   const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
@@ -2303,46 +2323,60 @@ export default function ModernDashboardView({
                   )}
 
                   {/* Timing Sweet Spot Visual Gauge */}
-                  <div style={{
-                    background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
-                    border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid rgba(0, 0, 0, 0.06)",
-                    borderRadius: 12,
-                    padding: "0.6rem 0.85rem",
-                    marginBottom: "0.25rem",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                      <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        TIMING SWEET SPOT
-                      </span>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
-                        ⏱️ 45s – 90s Ideal
-                      </span>
-                    </div>
-                    {/* Visual Sweet Spot Progress Bar */}
-                    <div style={{
-                      height: 6,
-                      borderRadius: 99,
-                      background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}>
+                  {(() => {
+                    const minSec = effectiveDurationLimits?.minSeconds || 60;
+                    const fullSec = effectiveDurationLimits?.fullScoreSeconds || 300;
+                    const maxSec = effectiveDurationLimits?.maxSeconds || 300;
+                    const fullLabel = effectiveDurationLimits?.fullScoreLabel || "5 min";
+                    const maxLabel = effectiveDurationLimits?.maxLabel || "5 min";
+
+                    // Gauge calculation: scale up to maxSec (or fullSec if maxSec <= 0)
+                    const totalSec = Math.max(maxSec, fullSec, 60);
+                    const leftPercent = Math.max(0, Math.min(90, Math.round((minSec / totalSec) * 100)));
+                    const widthPercent = Math.max(8, Math.min(100 - leftPercent, Math.round(((fullSec - minSec) / totalSec) * 100) || Math.round((fullSec / totalSec) * 100)));
+
+                    return (
                       <div style={{
-                        position: "absolute",
-                        left: "35%",
-                        width: "45%",
-                        height: "100%",
-                        borderRadius: 99,
-                        background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
-                        boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
-                      }} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
-                      <span>0s min</span>
-                      <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>45s min target</span>
-                      <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>90s optimal</span>
-                      <span>120s limit</span>
-                    </div>
-                  </div>
+                        background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                        border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid rgba(0, 0, 0, 0.06)",
+                        borderRadius: 12,
+                        padding: "0.6rem 0.85rem",
+                        marginBottom: "0.25rem",
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                          <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            TIMING SWEET SPOT
+                          </span>
+                          <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
+                            ⏱️ 60s min · {fullLabel} full pts
+                          </span>
+                        </div>
+                        {/* Visual Sweet Spot Progress Bar */}
+                        <div style={{
+                          height: 6,
+                          borderRadius: 99,
+                          background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
+                          position: "relative",
+                          overflow: "hidden",
+                        }}>
+                          <div style={{
+                            position: "absolute",
+                            left: `${leftPercent}%`,
+                            width: `${widthPercent}%`,
+                            height: "100%",
+                            borderRadius: 99,
+                            background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
+                            boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
+                          }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
+                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>60s min target</span>
+                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>{fullLabel} (Full Points)</span>
+                          <span>Max: {maxLabel}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Action Buttons: Record & Upload */}

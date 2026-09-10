@@ -4,6 +4,8 @@
  * story summaries, monthly reflections, and monthly goals.
  */
 
+import { getDurationLimits } from "./videoSubmitGate.js";
+
 export const CATEGORY_THEMES = {
   "Daily Life":          { primary: "#4ade80", secondary: "#22c55e", badgeBg: "rgba(34,197,94,0.15)",   border: "rgba(74,222,128,0.3)",  gradient: "linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.03) 100%)" },
   "English Growth":      { primary: "#fbbf24", secondary: "#f59e0b", badgeBg: "rgba(251,191,36,0.15)",  border: "rgba(251,191,36,0.3)",  gradient: "linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.03) 100%)" },
@@ -147,6 +149,14 @@ export function getQuestionUIConfig(type, today = {}) {
   const vocabLevel = today.vocabLevel || "B2";
   const cefrInfo = getCefrInfo(vocabLevel);
 
+  const limits = today?.durationLimits || getDurationLimits({
+    isMonthlyReflection: type === "monthly_reflection" || Boolean(today?.isMonthlyReflection),
+    isWeeklyReflection: Boolean(today?.isWeeklyReflection),
+    isMonthlyGoals: type === "monthly_goals" || Boolean(today?.isMonthlyGoals),
+    isStorySummary: type === "story_audio" || Boolean(today?.isStorySummary),
+    isPictureDescription: type === "picture_description" || Boolean(today?.isPictureDescription),
+  }, today?.durationSettings || {});
+
   switch (type) {
     case "picture_description":
       return {
@@ -164,7 +174,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload description",
         rules: [
           { text: "Describe subjects, actions & setting", highlight: true },
-          { text: "Aim for 45–90 seconds of fluent speaking" },
+          { text: `Minimum 60 seconds (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})` },
           { text: `Use at least ${reqCount} target vocabulary word${reqCount > 1 ? "s" : ""} (${vocabLevel})` },
         ],
         hasAudio: false,
@@ -189,7 +199,7 @@ export function getQuestionUIConfig(type, today = {}) {
         rules: [
           { text: "Listen to the complete audio story first", highlight: true },
           { text: `Retell in your own words using at least ${reqCount} target word${reqCount > 1 ? "s" : ""}` },
-          { text: "Minimum 60 seconds speaking (max 3 mins)" },
+          { text: `Minimum 60 seconds speaking (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})` },
         ],
         hasAudio: Boolean(today.audioUrl),
         hasImage: false,
@@ -212,7 +222,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload reflection",
         rules: [
           { text: "Answer all reflection questions thoroughly", highlight: true },
-          { text: "Speaking duration: 3 to 7 minutes" },
+          { text: `Speaking duration: 60s to ${limits.maxLabel} (${limits.fullScoreLabel} for full points)` },
           { text: "Provide honest self-assessment of your progress" },
         ],
         hasAudio: false,
@@ -236,7 +246,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload goals",
         rules: [
           { text: "Cover all 4 goal-setting questions", highlight: true },
-          { text: "Speaking duration: 3 to 10 minutes" },
+          { text: `Speaking duration: 60s to ${limits.maxLabel} (${limits.fullScoreLabel} for full points)` },
           { text: "Define concrete habits and practice routines" },
         ],
         hasAudio: false,
@@ -260,7 +270,7 @@ export function getQuestionUIConfig(type, today = {}) {
         recordButtonLabel: "Record speaking video",
         uploadButtonLabel: "Upload video",
         rules: [
-          { text: "Minimum 60 seconds continuous speaking", highlight: true },
+          { text: `Minimum 60 seconds continuous speaking (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})`, highlight: true },
           { text: `Use at least ${reqCount} of today's ${totalCount} target words (${vocabLevel} level)` },
           { text: "No script reading — speak naturally" },
         ],

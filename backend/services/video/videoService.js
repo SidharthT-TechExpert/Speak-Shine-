@@ -821,6 +821,7 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
     const status = await Status.findOne().lean();
     const gateFlags = {
       isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+      isWeeklyReflection: status?.isWeeklyReflectionDay || false,
       isMonthlyGoals: status?.isMonthlyGoalsDay || false,
       isStorySummary: isActiveStoryTask(status),
       isPictureDescription: isActivePictureTask(status),
@@ -1136,6 +1137,7 @@ async function prepareReportAnalysis(report) {
       isPictureDescription: isPicTask || false,
       isStorySummary: isStoryTask || false,
       isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+      isWeeklyReflection: status?.isWeeklyReflectionDay || false,
       isMonthlyGoals: status?.isMonthlyGoalsDay || false,
     };
     const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
@@ -1209,6 +1211,7 @@ async function prepareReportAnalysis(report) {
         isPictureDescription: isPic || false,
         isStorySummary: isStory || false,
         isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+        isWeeklyReflection: status?.isWeeklyReflectionDay || false,
         isMonthlyGoals: status?.isMonthlyGoalsDay || false,
       };
       const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
@@ -1734,6 +1737,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
     isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+    isWeeklyReflection: status?.isWeeklyReflectionDay || false,
     isMonthlyGoals: status?.isMonthlyGoalsDay || false,
   };
   const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});

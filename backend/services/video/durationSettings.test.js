@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getDurationLimits, evaluateSubmitGate, calculateCompositeScore } from "./submitGate.js";
 import { getDurationLimits as getFrontendDurationLimits, evaluateSubmitGate as evaluateFrontendGate } from "../../../frontend/src/utils/videoSubmitGate.js";
+import { getQuestionUIConfig } from "../../../frontend/src/utils/questionTypes.js";
 
 describe("Dynamic Duration Settings & Gating", () => {
   describe("Admin Custom Settings in getDurationLimits", () => {
@@ -294,6 +295,104 @@ describe("Dynamic Duration Settings & Gating", () => {
       });
 
       expect(gate.passed).toBe(true);
+    });
+
+    it("mirrors weekly reflection settings correctly between backend and frontend", () => {
+      const customSettings = {
+        durationWeeklyMax: 480, // 8 min
+        durationWeeklyFull: 360, // 6 min
+      };
+      const frontendLimits = getFrontendDurationLimits({ isWeeklyReflection: true }, customSettings);
+      const backendLimits = getDurationLimits({ isWeeklyReflection: true }, customSettings);
+
+      expect(frontendLimits.maxSeconds).toBe(480);
+      expect(frontendLimits.fullScoreSeconds).toBe(360);
+      expect(frontendLimits.maxLabel).toBe("8 min");
+      expect(frontendLimits.fullScoreLabel).toBe("6 min");
+      expect(frontendLimits).toEqual(backendLimits);
+    });
+  });
+
+  describe("Dynamic Rule Text in getQuestionUIConfig", () => {
+    it("dynamically formats rules for Picture Description with custom admin durations", () => {
+      const today = {
+        durationSettings: {
+          durationPictureFull: 120, // 2 min
+          durationPictureMax: 180,  // 3 min
+        },
+      };
+      const config = getQuestionUIConfig("picture_description", today);
+      const durationRule = config.rules.find(r => r.text.includes("Minimum 60 seconds"));
+      expect(durationRule).toBeDefined();
+      expect(durationRule.text).toBe("Minimum 60 seconds (2 min for full points, max 3 min)");
+    });
+
+    it("dynamically formats rules for Story Summary with custom admin durations", () => {
+      const today = {
+        durationSettings: {
+          durationStoryFull: 180, // 3 min
+          durationStoryMax: 300,  // 5 min
+        },
+      };
+      const config = getQuestionUIConfig("story_audio", today);
+      const durationRule = config.rules.find(r => r.text.includes("Minimum 60 seconds"));
+      expect(durationRule).toBeDefined();
+      expect(durationRule.text).toBe("Minimum 60 seconds speaking (3 min for full points, max 5 min)");
+    });
+
+    it("dynamically formats rules for Monthly Reflection with custom admin durations", () => {
+      const today = {
+        durationSettings: {
+          durationMonthlyReflectionFull: 300, // 5 min
+          durationMonthlyReflectionMax: 420,  // 7 min
+        },
+      };
+      const config = getQuestionUIConfig("monthly_reflection", today);
+      const durationRule = config.rules.find(r => r.text.includes("Speaking duration"));
+      expect(durationRule).toBeDefined();
+      expect(durationRule.text).toBe("Speaking duration: 60s to 7 min (5 min for full points)");
+    });
+
+    it("dynamically formats rules for Monthly Goals with custom admin durations", () => {
+      const today = {
+        durationSettings: {
+          durationMonthlyGoalsFull: 420, // 7 min
+          durationMonthlyGoalsMax: 600,  // 10 min
+        },
+      };
+      const config = getQuestionUIConfig("monthly_goals", today);
+      const durationRule = config.rules.find(r => r.text.includes("Speaking duration"));
+      expect(durationRule).toBeDefined();
+      expect(durationRule.text).toBe("Speaking duration: 60s to 10 min (7 min for full points)");
+    });
+
+    it("dynamically formats rules for Standard Daily Question with custom admin durations", () => {
+      const today = {
+        durationSettings: {
+          durationDefaultFull: 180, // 3 min
+          durationDefaultMax: 300,  // 5 min
+        },
+      };
+      const config = getQuestionUIConfig("standard_question", today);
+      const durationRule = config.rules.find(r => r.text.includes("Minimum 60 seconds"));
+      expect(durationRule).toBeDefined();
+      expect(durationRule.text).toBe("Minimum 60 seconds continuous speaking (3 min for full points, max 5 min)");
+    });
+
+    it("uses precomputed today.durationLimits if present on today", () => {
+      const today = {
+        durationLimits: {
+          minSeconds: 60,
+          maxSeconds: 300,
+          fullScoreSeconds: 180,
+          minLabel: "1 min",
+          maxLabel: "5 min",
+          fullScoreLabel: "3 min",
+        },
+      };
+      const config = getQuestionUIConfig("standard_question", today);
+      const durationRule = config.rules.find(r => r.text.includes("Minimum 60 seconds"));
+      expect(durationRule.text).toBe("Minimum 60 seconds continuous speaking (3 min for full points, max 5 min)");
     });
   });
 });

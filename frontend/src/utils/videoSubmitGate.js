@@ -2,9 +2,11 @@
  * Client-side submit gate — mirrors backend submitGate.js for instant feedback.
  */
 
-export function getDurationLimits({ isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription } = {}, settings = {}) {
+export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription } = {}, settings = {}) {
   const maxSeconds = isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
+    : isWeeklyReflection
+    ? (settings.durationWeeklyMax ?? 420)
     : isMonthlyGoals
     ? (settings.durationMonthlyGoalsMax ?? 600)
     : isStorySummary
@@ -15,6 +17,8 @@ export function getDurationLimits({ isMonthlyReflection, isMonthlyGoals, isStory
 
   const fullScoreSeconds = isMonthlyReflection
     ? (settings.durationMonthlyReflectionFull ?? 420)
+    : isWeeklyReflection
+    ? (settings.durationWeeklyFull ?? 300)
     : isMonthlyGoals
     ? (settings.durationMonthlyGoalsFull ?? 420)
     : isStorySummary
@@ -41,8 +45,8 @@ function fmtDuration(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function evaluateSubmitGate({ durationSeconds, fileSizeBytes, frameCount, flags, canCompress = false, customLimits = null }) {
-  const { minSeconds, maxSeconds, fullScoreSeconds, minLabel, maxLabel } = customLimits || getDurationLimits(flags);
+export function evaluateSubmitGate({ durationSeconds, fileSizeBytes, frameCount, flags, canCompress = false, customLimits = null, settings = {} }) {
+  const { minSeconds, maxSeconds, fullScoreSeconds, minLabel, maxLabel } = customLimits || getDurationLimits(flags, settings);
   const checks = [];
   const hasDuration = !!durationSeconds && durationSeconds > 0;
 

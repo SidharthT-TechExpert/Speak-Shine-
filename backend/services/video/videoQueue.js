@@ -338,6 +338,7 @@ async function processJob(job) {
       );
       gateFlags = {
         isMonthlyReflection: challengeType === "monthly_reflection",
+        isWeeklyReflection:  challengeType === "weekly_reflection" || Boolean(status?.isWeeklyReflectionDay),
         isMonthlyGoals:      challengeType === "monthly_goals",
         isStorySummary:      challengeType === "story_summary",
         isPictureDescription: challengeType === "picture_description",

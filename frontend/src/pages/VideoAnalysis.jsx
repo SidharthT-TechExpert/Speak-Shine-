@@ -214,6 +214,7 @@ export default function VideoAnalysis() {
   const [vocabRequiredCount, setVocabRequiredCount] = useState(3);
   const [vocabLevel, setVocabLevel] = useState("B2");
   const [isMonthlyReflection, setIsMonthlyReflection] = useState(false);
+  const [isWeeklyReflection, setIsWeeklyReflection] = useState(false);
   const [isMonthlyGoals, setIsMonthlyGoals] = useState(false);
   const [isStorySummary, setIsStorySummary] = useState(false);
   const [isPictureDescription, setIsPictureDescription] = useState(false);
@@ -221,6 +222,7 @@ export default function VideoAnalysis() {
   const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
   const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
   const [durationLimits, setDurationLimits] = useState(null);
+  const [durationSettings, setDurationSettings] = useState(null);
   const [isQuestionActive, setIsQuestionActive] = useState(false);
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(true);
   const [posterSendTime, setPosterSendTime] = useState("08:00");
@@ -482,6 +484,7 @@ export default function VideoAnalysis() {
         if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
         if (t?.vocabLevel) setVocabLevel(t.vocabLevel);
         if (t?.durationLimits) setDurationLimits(t.durationLimits);
+        if (t?.durationSettings) setDurationSettings(t.durationSettings);
       }).catch(() => {}).finally(() => {
         setIsLoadingQuestion(false);
       });
@@ -493,6 +496,7 @@ export default function VideoAnalysis() {
       const t = r.data?.today;
       const active = Boolean(
         t?.isMonthlyReflection ||
+        t?.isWeeklyReflection ||
         t?.isMonthlyGoals ||
         (t?.questionSent && (t?.question || t?.topic))
       );
@@ -508,11 +512,12 @@ export default function VideoAnalysis() {
       setStreak(userStreak);
       if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
       if (t?.question && active) {
-        setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
+        setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions, durationSettings: t.durationSettings, isWeeklyReflection: t.isWeeklyReflection });
       } else {
         setTodayQuestion(null);
       }
       if (t?.isMonthlyReflection) setIsMonthlyReflection(true);
+      if (t?.isWeeklyReflection) setIsWeeklyReflection(true);
       if (t?.isMonthlyGoals) setIsMonthlyGoals(true);
       if (t?.isStorySummary || t?.contentType === "story_audio") setIsStorySummary(true);
       if (t?.isPictureDescription || t?.contentType === "picture_description") setIsPictureDescription(true);
@@ -523,6 +528,7 @@ export default function VideoAnalysis() {
       if (r.data?.today?.allowPrivateVideos !== undefined) setAllowPrivateVideos(r.data.today.allowPrivateVideos);
       if (r.data?.today?.enableBackgroundBlur !== undefined) setEnableBackgroundBlur(r.data.today.enableBackgroundBlur);
       if (t?.durationLimits) setDurationLimits(t.durationLimits);
+      if (t?.durationSettings) setDurationSettings(t.durationSettings);
     }).catch(() => {
       setIsQuestionActive(false);
     }).finally(() => {
@@ -783,6 +789,15 @@ export default function VideoAnalysis() {
           };
 
           const qType = detectQuestionType(effectiveToday);
+          const effectiveLimits = durationLimits || getDurationLimits({
+            isMonthlyReflection: Boolean(isMonthlyReflection || effectiveToday.isMonthlyReflection),
+            isWeeklyReflection: Boolean(isWeeklyReflection || effectiveToday.isWeeklyReflection),
+            isMonthlyGoals: Boolean(isMonthlyGoals || effectiveToday.isMonthlyGoals),
+            isStorySummary: Boolean(isStorySummary || effectiveToday.isStorySummary || effectiveToday.contentType === "story_audio"),
+            isPictureDescription: Boolean(isPictureDescription || effectiveToday.isPictureDescription || effectiveToday.contentType === "picture_description"),
+          }, durationSettings || todayQuestion?.durationSettings || {});
+          effectiveToday.durationLimits = effectiveLimits;
+          effectiveToday.durationSettings = durationSettings || todayQuestion?.durationSettings;
           const qConfig = getQuestionUIConfig(qType, effectiveToday);
 
           const parsedQItems = (() => {
@@ -1281,46 +1296,60 @@ export default function VideoAnalysis() {
                   )}
 
                   {/* Timing Sweet Spot Visual Gauge */}
-                  <div style={{
-                    background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
-                    border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid rgba(0, 0, 0, 0.06)",
-                    borderRadius: 12,
-                    padding: "0.6rem 0.85rem",
-                    marginBottom: "0.25rem",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                      <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        TIMING SWEET SPOT
-                      </span>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
-                        ⏱️ 45s – 90s Ideal
-                      </span>
-                    </div>
-                    {/* Visual Sweet Spot Progress Bar */}
-                    <div style={{
-                      height: 6,
-                      borderRadius: 99,
-                      background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}>
+                  {(() => {
+                    const minSec = effectiveLimits?.minSeconds || 60;
+                    const fullSec = effectiveLimits?.fullScoreSeconds || 300;
+                    const maxSec = effectiveLimits?.maxSeconds || 300;
+                    const fullLabel = effectiveLimits?.fullScoreLabel || "5 min";
+                    const maxLabel = effectiveLimits?.maxLabel || "5 min";
+
+                    // Gauge calculation: scale up to maxSec (or fullSec if maxSec <= 0)
+                    const totalSec = Math.max(maxSec, fullSec, 60);
+                    const leftPercent = Math.max(0, Math.min(90, Math.round((minSec / totalSec) * 100)));
+                    const widthPercent = Math.max(8, Math.min(100 - leftPercent, Math.round(((fullSec - minSec) / totalSec) * 100) || Math.round((fullSec / totalSec) * 100)));
+
+                    return (
                       <div style={{
-                        position: "absolute",
-                        left: "35%",
-                        width: "45%",
-                        height: "100%",
-                        borderRadius: 99,
-                        background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
-                        boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
-                      }} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
-                      <span>0s min</span>
-                      <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>45s min target</span>
-                      <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>90s optimal</span>
-                      <span>120s limit</span>
-                    </div>
-                  </div>
+                        background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                        border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid rgba(0, 0, 0, 0.06)",
+                        borderRadius: 12,
+                        padding: "0.6rem 0.85rem",
+                        marginBottom: "0.25rem",
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                          <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            TIMING SWEET SPOT
+                          </span>
+                          <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
+                            ⏱️ 60s min · {fullLabel} full pts
+                          </span>
+                        </div>
+                        {/* Visual Sweet Spot Progress Bar */}
+                        <div style={{
+                          height: 6,
+                          borderRadius: 99,
+                          background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
+                          position: "relative",
+                          overflow: "hidden",
+                        }}>
+                          <div style={{
+                            position: "absolute",
+                            left: `${leftPercent}%`,
+                            width: `${widthPercent}%`,
+                            height: "100%",
+                            borderRadius: 99,
+                            background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
+                            boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
+                          }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
+                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>60s min target</span>
+                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>{fullLabel} (Full Points)</span>
+                          <span>Max: {maxLabel}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Action Buttons: Record & Upload */}
@@ -2005,9 +2034,9 @@ export default function VideoAnalysis() {
             </div>
           </div>
         ) : mode === "upload" ? (
-          <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} />
+          <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isWeeklyReflection={isWeeklyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} durationSettings={durationSettings} allowPrivateVideos={allowPrivateVideos} />
         ) : (
-          <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
+          <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isWeeklyReflection={isWeeklyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} durationSettings={durationSettings} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
         )}
 
         {/* Report Section */}
@@ -2998,7 +3027,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
 }
 
 // ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
-function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, allowPrivateVideos = true }) {
+function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true }) {
   const [file, setFile]           = useState(null);
   const [fileDuration, setFileDuration] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -3012,8 +3041,8 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
   const uploadStartRef = useRef(null);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
-  const gateFlags = { isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription };
-  const durationLimits = dbDurationLimits || getDurationLimits(gateFlags);
+  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription };
+  const durationLimits = dbDurationLimits || getDurationLimits(gateFlags, durationSettings);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -3390,7 +3419,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isMonthlyGoals, is
 // ── Record Card ──────────────────────────────────────────────────────────────
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
 
-function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, allowPrivateVideos = true, enableBackgroundBlur = false }) {
+function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true, enableBackgroundBlur = false }) {
   const navigate = useNavigate();
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
@@ -3463,8 +3492,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isMonthl
     return seconds;
   }, []);
 
-  const gateFlags = { isMonthlyReflection, isMonthlyGoals, isStorySummary, isPictureDescription };
-  const durationLimits = dbDurationLimits || getDurationLimits(gateFlags);
+  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription };
+  const durationLimits = dbDurationLimits || getDurationLimits(gateFlags, durationSettings);
   const MAX_SECONDS = durationLimits.maxSeconds;
 
   // Enumerate devices + restore any saved draft on mount
