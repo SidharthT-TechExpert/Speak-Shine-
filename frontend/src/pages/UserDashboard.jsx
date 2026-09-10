@@ -1103,7 +1103,7 @@ export default function UserDashboard() {
   const pagedScores = reversedScores.slice((sessionPage - 1) * SESSION_PAGE_SIZE, sessionPage * SESSION_PAGE_SIZE);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#06050b", color: "#f1f0f5" }}>
+    <div className="w-full">
       {celebrationQueue[0] && (
         <BadgeCelebration
           badge={celebrationQueue[0]}

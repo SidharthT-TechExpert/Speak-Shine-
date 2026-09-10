@@ -4921,24 +4921,35 @@ audio { border-radius: 12px; }
 
 .speakshine-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  width: 100%;
+  overflow: hidden;
   background-color: #06050b;
   color: #f1f0f5;
+  position: relative;
 }
 
 /* Sidebar */
 .speakshine-sidebar {
   width: 230px;
   min-width: 230px;
+  max-width: 230px;
   background: #090710;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
   padding: 1.25rem 1rem;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: sticky;
   top: 0;
-  height: 100vh;
+  flex-shrink: 0;
   z-index: 50;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
 
 .speakshine-sidebar-brand {
@@ -5059,18 +5070,24 @@ audio { border-radius: 12px; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   background: #06050b;
+  position: relative;
 }
 
 /* Topbar */
 .speakshine-topbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 1rem 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  background: rgba(6, 5, 11, 0.75);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(9, 7, 16, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   position: sticky;
   top: 0;
   z-index: 40;
@@ -5136,7 +5153,57 @@ audio { border-radius: 12px; }
 }
 
 
-/* Canvas padding */
+/* Canvas Scroller & padding */
+.speakshine-canvas-scroller {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.speakshine-page-wrapper,
+.speakshine-dashboard-inner-container,
+.speakshine-dashboard-content-wrap {
+  width: 100%;
+}
+
+/* Modern sleek scrollbars */
+.speakshine-canvas-scroller::-webkit-scrollbar,
+.speakshine-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+.speakshine-canvas-scroller::-webkit-scrollbar-track,
+.speakshine-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.speakshine-canvas-scroller::-webkit-scrollbar-thumb,
+.speakshine-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+}
+.speakshine-canvas-scroller::-webkit-scrollbar-thumb:hover,
+.speakshine-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+[data-theme="light"] .speakshine-canvas-scroller::-webkit-scrollbar-thumb,
+.light .speakshine-canvas-scroller::-webkit-scrollbar-thumb,
+[data-theme="light"] .speakshine-sidebar::-webkit-scrollbar-thumb,
+.light .speakshine-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.14);
+}
+[data-theme="light"] .speakshine-canvas-scroller::-webkit-scrollbar-thumb:hover,
+.light .speakshine-canvas-scroller::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .speakshine-sidebar::-webkit-scrollbar-thumb:hover,
+.light .speakshine-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+
 .speakshine-canvas {
   padding: 1.75rem 2rem 3rem;
   max-width: 1360px;

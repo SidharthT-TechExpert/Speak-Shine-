@@ -22,6 +22,7 @@ const LiveSession     = lazy(() => import("./pages/LiveSession.jsx"));
 const NotFound        = lazy(() => import("./pages/NotFound.jsx"));
 const PaymentWall     = lazy(() => import("./pages/PaymentWall.jsx"));
 const PaymentHistory  = lazy(() => import("./pages/PaymentHistory.jsx"));
+import { AppShell } from "./components/Layout.jsx";
 
 function PageLoader() {
   return (
@@ -140,9 +141,6 @@ function AppRoutes() {
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
               <Routes>
-            {/* Root */}
-            <Route path="/" element={<HomeRedirect />} />
-
             {/* User auth */}
             <Route path="/login" element={
               <GuestRoute loginFor="user"><Login /></GuestRoute>
@@ -164,36 +162,44 @@ function AppRoutes() {
               <GuestRoute loginFor="trainer"><Login loginFor="trainer" /></GuestRoute>
             } />
 
-            {/* Protected pages — guests see preview mode, logged-in users see real data */}
-            <Route path="/dashboard" element={<UserDashboard />} />
-            <Route path="/video-analysis" element={
-              <PaidRoute><VideoAnalysis /></PaidRoute>
-            } />
-            <Route path="/record" element={
-              <PaidRoute><VideoAnalysis /></PaidRoute>
-            } />
-            <Route path="/community" element={<CommunityFeed />} />
-            <Route path="/payment" element={<PaymentWall />} />
-            <Route path="/payment-history" element={
-              <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
-                <PaymentHistory />
-              </ProtectedRoute>
-            } />
+            {/* Live session full-screen interactive room (no sidebar/header) */}
             <Route path="/live/:id" element={
               <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
                 <LiveSession />
               </ProtectedRoute>
             } />
-            <Route path="/admin" element={
-              <ProtectedRoute roles={["admin", "admins", "viewer"]} loginPath="/admin/login">
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/trainer" element={
-              <ProtectedRoute roles={["trainer","admin","admins","viewer"]} loginPath="/trainer/login">
-                <TrainerDashboard />
-              </ProtectedRoute>
-            } />
+
+            {/* Persistent App Shell with Sticky Header & Sidebar */}
+            <Route element={<AppShell />}>
+              {/* Root */}
+              <Route path="/" element={<HomeRedirect />} />
+
+              {/* Protected pages — guests see preview mode, logged-in users see real data */}
+              <Route path="/dashboard" element={<UserDashboard />} />
+              <Route path="/video-analysis" element={
+                <PaidRoute><VideoAnalysis /></PaidRoute>
+              } />
+              <Route path="/record" element={
+                <PaidRoute><VideoAnalysis /></PaidRoute>
+              } />
+              <Route path="/community" element={<CommunityFeed />} />
+              <Route path="/payment" element={<PaymentWall />} />
+              <Route path="/payment-history" element={
+                <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
+                  <PaymentHistory />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute roles={["admin", "admins", "viewer"]} loginPath="/admin/login">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/trainer" element={
+                <ProtectedRoute roles={["trainer","admin","admins","viewer"]} loginPath="/trainer/login">
+                  <TrainerDashboard />
+                </ProtectedRoute>
+              } />
+            </Route>
 
             {/* Catch-all - 404 Page */}
             <Route path="*" element={<NotFound />} />

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link, Outlet } from "react-router-dom";
 import api from "../api/client.js";
 import { getSharedSocket } from "../hooks/useSocket.js";
+import { useShell, ShellProvider } from "../context/ShellContext.jsx";
 
 const Modal = lazy(() => import("./Modal.jsx"));
 import ThemeToggle from "./ThemeToggle.jsx";
@@ -91,10 +92,65 @@ function useInstall() {
   return { prompt, isInstalled, install };
 }
 
-export default function Layout({ children, title, subtitle }) {
+export function AppShell() {
+  return (
+    <ShellProvider>
+      <Layout isShellRoot={true}>
+        <Outlet />
+      </Layout>
+    </ShellProvider>
+  );
+}
+
+export default function Layout({ children, title, subtitle, isShellRoot = false }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const shell = useShell();
+  const { isInsideShell, setHeaderMeta, scrollerRef, headerTitle, headerSubtitle, scrollToTop } = shell || {};
+
+  // If already inside persistent AppShell and not root shell, pass through children and sync title
+  useEffect(() => {
+    if (!isShellRoot && isInsideShell && setHeaderMeta) {
+      setHeaderMeta({ title, subtitle });
+    }
+  }, [isShellRoot, isInsideShell, title, subtitle, setHeaderMeta]);
+
+  // Reset middle screen scroll on page route transition when running as shell root
+  useEffect(() => {
+    if (isShellRoot && scrollToTop) {
+      scrollToTop();
+    }
+  }, [isShellRoot, location.pathname, scrollToTop]);
+
+  if (!isShellRoot && isInsideShell) {
+    return (
+      <div className="speakshine-page-wrapper">
+        {/* Read-only banner for viewer accounts */}
+        {user?.role === "viewer" && (
+          <div style={{
+            background: "rgba(251,191,36,0.1)",
+            border: "1px solid rgba(251,191,36,0.3)",
+            borderRadius: "10px",
+            padding: "0.6rem 1rem",
+            marginBottom: "1rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.6rem",
+            fontSize: "0.82rem",
+            color: "#fbbf24",
+            fontWeight: 500,
+          }}>
+            <span style={{ fontSize: "1rem" }}>👁️</span>
+            <span><strong>Read-only mode</strong> — You can view all pages but cannot make any changes.</span>
+          </div>
+        )}
+        {children}
+      </div>
+    );
+  }
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showIOSHint, setShowIOSHint] = useState(false);
@@ -178,7 +234,9 @@ export default function Layout({ children, title, subtitle }) {
   };
 
   const getComputedSubtitle = () => {
+    if (headerSubtitle) return headerSubtitle;
     if (subtitle) return subtitle;
+    if (headerTitle) return `${headerTitle} · Speak & Shine`;
     const path = location.pathname;
     if (path.startsWith("/admin")) {
       return "Control center for members, automated curriculum, live rooms & system settings.";
@@ -444,29 +502,31 @@ export default function Layout({ children, title, subtitle }) {
           </div>
         </header>
 
-        {/* Canvas Body */}
-        <main className="speakshine-canvas">
-          {/* Read-only banner for viewer accounts */}
-          {user?.role === "viewer" && (
-            <div style={{
-              background: "rgba(251,191,36,0.1)",
-              border: "1px solid rgba(251,191,36,0.3)",
-              borderRadius: "10px",
-              padding: "0.6rem 1rem",
-              marginBottom: "1rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.6rem",
-              fontSize: "0.82rem",
-              color: "#fbbf24",
-              fontWeight: 500,
-            }}>
-              <span style={{ fontSize: "1rem" }}>👁️</span>
-              <span><strong>Read-only mode</strong> — You can view all pages but cannot make any changes.</span>
-            </div>
-          )}
+        {/* Canvas Body - Middle Screen Scroll Container */}
+        <main className="speakshine-canvas-scroller" ref={scrollerRef}>
+          <div className="speakshine-canvas">
+            {/* Read-only banner for viewer accounts */}
+            {user?.role === "viewer" && (
+              <div style={{
+                background: "rgba(251,191,36,0.1)",
+                border: "1px solid rgba(251,191,36,0.3)",
+                borderRadius: "10px",
+                padding: "0.6rem 1rem",
+                marginBottom: "1rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                fontSize: "0.82rem",
+                color: "#fbbf24",
+                fontWeight: 500,
+              }}>
+                <span style={{ fontSize: "1rem" }}>👁️</span>
+                <span><strong>Read-only mode</strong> — You can view all pages but cannot make any changes.</span>
+              </div>
+            )}
 
-          {children}
+            {children}
+          </div>
         </main>
       </div>
 

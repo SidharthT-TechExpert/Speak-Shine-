@@ -10,6 +10,7 @@ import Modal from "./Modal.jsx";
 import gsap from "gsap";
 import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
 import api from "../api/client.js";
+import { useShell } from "../context/ShellContext.jsx";
 import {
   detectQuestionType,
   getQuestionUIConfig,
@@ -268,6 +269,8 @@ export default function ModernDashboardView({
 }) {
   const { isDark } = useTheme();
   const navigate = useNavigate();
+  const shell = useShell();
+  const isInsideShell = shell?.isInsideShell;
   const fileInputRef = useRef(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -632,6 +635,18 @@ export default function ModernDashboardView({
       return getISTDateKey(d) === todayISTDateKey;
     }))
   );
+
+  // Sync page title and computed status subtitle with persistent AppShell
+  useEffect(() => {
+    if (isInsideShell && shell?.setHeaderMeta) {
+      const sub = isTodaySubmitted
+        ? "🎉 Today's speaking mission accomplished! Your streak is secured."
+        : isQuestionActive
+        ? "Here's your speaking mission for today."
+        : `Daily reset complete · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)}`;
+      shell.setHeaderMeta({ title: "Dashboard", subtitle: sub });
+    }
+  }, [isInsideShell, isTodaySubmitted, isQuestionActive, targetPosterSendTime, shell]);
 
   // Find latest/today's score for today's points display
   const todayScoreObj = scores.slice().reverse().find(s => {
@@ -1146,7 +1161,7 @@ export default function ModernDashboardView({
   const italicTitlePart = titleParts.length > 1 ? titleParts[titleParts.length - 1] : "";
 
   return (
-    <div className="speakshine-shell">
+    <div className={isInsideShell ? "w-full" : "speakshine-shell"}>
       {/* ── Logout confirmation modal ── */}
       {showLogoutModal && (
         <Modal
@@ -1254,268 +1269,260 @@ export default function ModernDashboardView({
       )}
 
       {/* ── Left Sidebar Navigation (Screenshot 1) ── */}
-      <aside className="speakshine-sidebar">
-        {/* Brand Header with Gold Star Logo */}
-        <Link to="/dashboard" className="speakshine-sidebar-brand">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
-              fill="url(#goldStarGrad)"
-            />
-            <defs>
-              <linearGradient id="goldStarGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#fbbf24" />
-                <stop offset="1" stopColor="#f59e0b" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <span className="brand-logo-text">Speak &amp; Shine</span>
-        </Link>
-
-        {/* Navigation Items */}
-        <nav className="speakshine-sidebar-nav">
-          <Link to="/dashboard" className="speakshine-nav-item active">
-            <span className="nav-icon">⏱</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link to="/record" className="speakshine-nav-item">
-            <span className="nav-icon">📹</span>
-            <span>Video analysis</span>
-          </Link>
-          <Link to="/community" className="speakshine-nav-item">
-            <span className="nav-icon">👥</span>
-            <span>Community</span>
-          </Link>
-          <Link to="/live/rooms" className="speakshine-nav-item">
-            <span className="nav-icon">📡</span>
-            <span>Live rooms</span>
-          </Link>
-          <Link to="/payment-history" className="speakshine-nav-item">
-            <span className="nav-icon">💳</span>
-            <span>Payments</span>
-          </Link>
-        </nav>
-
-        {/* Appearance / Theme Mode Selector */}
-        <div className="speakshine-sidebar-theme" style={{ padding: "0 1.25rem", marginBottom: "0.85rem" }}>
-          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c7793", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.45rem" }}>
-            Appearance
-          </div>
-          <ThemeToggle />
-        </div>
-
-        {/* Freeze Tokens Bottom Box (Screenshot 1) */}
-        <div className="speakshine-freeze-box">
-          <div className="freeze-title">FREEZE TOKENS</div>
-          <div className="freeze-val">
-            {freezeTokens} <span style={{ fontSize: "1rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
-          </div>
-          <div className="freeze-desc">
-            Earn tokens by completing 7-day streak milestones.
-          </div>
-          {isLoggedIn && (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="freeze-link speakshine-sidebar-logout"
-              title="Log Out"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" x2="9" y1="12" y2="12" />
+      {!isInsideShell && (
+        <>
+          <aside className="speakshine-sidebar">
+            {/* Brand Header with Gold Star Logo */}
+            <Link to="/dashboard" className="speakshine-sidebar-brand">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
+                  fill="url(#goldStarGrad)"
+                />
+                <defs>
+                  <linearGradient id="goldStarGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#fbbf24" />
+                    <stop offset="1" stopColor="#f59e0b" />
+                  </linearGradient>
+                </defs>
               </svg>
-              <span>Log out</span>
-            </button>
-          )}
-        </div>
-      </aside>
+              <span className="brand-logo-text">Speak &amp; Shine</span>
+            </Link>
 
-      {/* ── Mobile Navigation Drawer with GSAP ── */}
-      <div
-        ref={mobileBackdropRef}
-        className="speakshine-mobile-backdrop lg:hidden"
-        style={{ opacity: 0, pointerEvents: "none" }}
-        onClick={() => setMobileNavOpen(false)}
-      />
-      <div
-        ref={mobileDrawerRef}
-        className="speakshine-mobile-drawer lg:hidden"
-        style={{ transform: "translateX(-100%)", pointerEvents: "none" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-          <Link to="/dashboard" className="speakshine-sidebar-brand" onClick={() => setMobileNavOpen(false)}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
-                fill="url(#goldStarGradDrawer)"
-              />
-              <defs>
-                <linearGradient id="goldStarGradDrawer" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#fbbf24" />
-                  <stop offset="1" stopColor="#f59e0b" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <span className="brand-logo-text">Speak &amp; Shine</span>
-          </Link>
-          <button
-            type="button"
+            {/* Navigation Items */}
+            <nav className="speakshine-sidebar-nav">
+              <Link to="/dashboard" className="speakshine-nav-item active">
+                <span className="nav-icon">⏱</span>
+                <span>Dashboard</span>
+              </Link>
+              <Link to="/record" className="speakshine-nav-item">
+                <span className="nav-icon">📹</span>
+                <span>Video analysis</span>
+              </Link>
+              <Link to="/community" className="speakshine-nav-item">
+                <span className="nav-icon">👥</span>
+                <span>Community</span>
+              </Link>
+              <Link to="/live/rooms" className="speakshine-nav-item">
+                <span className="nav-icon">📡</span>
+                <span>Live rooms</span>
+              </Link>
+              <Link to="/payment-history" className="speakshine-nav-item">
+                <span className="nav-icon">💳</span>
+                <span>Payments</span>
+              </Link>
+            </nav>
+
+            {/* Appearance / Theme Mode Selector */}
+            <div className="speakshine-sidebar-theme" style={{ padding: "0 1.25rem", marginBottom: "0.85rem" }}>
+              <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c7793", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.45rem" }}>
+                Appearance
+              </div>
+              <ThemeToggle />
+            </div>
+
+            {/* Freeze Tokens Bottom Box (Screenshot 1) */}
+            <div className="speakshine-freeze-box">
+              <div className="freeze-title">FREEZE TOKENS</div>
+              <div className="freeze-val">
+                {freezeTokens} <span style={{ fontSize: "1rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
+              </div>
+              <div className="freeze-desc">
+                Earn tokens by completing 7-day streak milestones.
+              </div>
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="freeze-link speakshine-sidebar-logout"
+                  title="Log Out"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" x2="9" y1="12" y2="12" />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              )}
+            </div>
+          </aside>
+
+          {/* ── Mobile Navigation Drawer with GSAP ── */}
+          <div
+            ref={mobileBackdropRef}
+            className="speakshine-mobile-backdrop lg:hidden"
+            style={{ opacity: 0, pointerEvents: "none" }}
             onClick={() => setMobileNavOpen(false)}
-            style={{
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "none",
-              borderRadius: "8px",
-              color: "#e2e8f0",
-              width: 32,
-              height: 32,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.1rem",
-            }}
-            aria-label="Close menu"
+          />
+          <div
+            ref={mobileDrawerRef}
+            className="speakshine-mobile-drawer lg:hidden"
+            style={{ transform: "translateX(-100%)", pointerEvents: "none" }}
           >
-            ✕
-          </button>
-        </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+              <Link to="/dashboard" onClick={() => setMobileNavOpen(false)} className="speakshine-sidebar-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
+                    fill="url(#goldStarGradMobile)"
+                  />
+                  <defs>
+                    <linearGradient id="goldStarGradMobile" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#fbbf24" />
+                      <stop offset="1" stopColor="#f59e0b" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span className="brand-logo-text">Speak &amp; Shine</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "none",
+                  borderRadius: "8px",
+                  color: "#e2e8f0",
+                  width: 32,
+                  height: 32,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1.1rem",
+                }}
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+            </div>
 
-        <nav className="speakshine-sidebar-nav" style={{ flex: 1 }}>
-          <Link to="/dashboard" className="speakshine-nav-item active" onClick={() => setMobileNavOpen(false)}>
-            <span className="nav-icon">⏱</span>
-            <span>Dashboard</span>
-          </Link>
-          <Link to="/record" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
-            <span className="nav-icon">📹</span>
-            <span>Video analysis</span>
-          </Link>
-          <Link to="/community" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
-            <span className="nav-icon">👥</span>
-            <span>Community</span>
-          </Link>
-          <Link to="/live/rooms" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
-            <span className="nav-icon">📡</span>
-            <span>Live rooms</span>
-          </Link>
-          <Link to="/payment-history" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
-            <span className="nav-icon">💳</span>
-            <span>Payments</span>
-          </Link>
+            <nav className="speakshine-sidebar-nav" style={{ flex: 1 }}>
+              <Link to="/dashboard" onClick={() => setMobileNavOpen(false)} className="speakshine-nav-item active">
+                <span className="nav-icon">⏱</span>
+                <span>Dashboard</span>
+              </Link>
+              <Link to="/record" onClick={() => setMobileNavOpen(false)} className="speakshine-nav-item">
+                <span className="nav-icon">📹</span>
+                <span>Video analysis</span>
+              </Link>
+              <Link to="/community" onClick={() => setMobileNavOpen(false)} className="speakshine-nav-item">
+                <span className="nav-icon">👥</span>
+                <span>Community</span>
+              </Link>
+              <Link to="/live/rooms" onClick={() => setMobileNavOpen(false)} className="speakshine-nav-item">
+                <span className="nav-icon">📡</span>
+                <span>Live rooms</span>
+              </Link>
+              <Link to="/payment-history" onClick={() => setMobileNavOpen(false)} className="speakshine-nav-item">
+                <span className="nav-icon">💳</span>
+                <span>Payments</span>
+              </Link>
+            </nav>
 
-          {(user?.role === "admin" || user?.role === "admins") && (
-            <Link to="/admin" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
-              <span className="nav-icon">🛡️</span>
-              <span>Admin</span>
-            </Link>
-          )}
-          {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
-            <Link to="/trainer" className="speakshine-nav-item" onClick={() => setMobileNavOpen(false)}>
-              <span className="nav-icon">🎓</span>
-              <span>Trainer</span>
-            </Link>
-          )}
-        </nav>
+            <div style={{ marginTop: "auto", marginBottom: "1rem" }}>
+              <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c7793", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.45rem" }}>
+                Appearance
+              </div>
+              <ThemeToggle />
+            </div>
 
-        <div style={{ marginTop: "auto", marginBottom: "1rem" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#8e8a9f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
-            Appearance
+            <div className="speakshine-freeze-box" style={{ margin: 0, width: "100%" }}>
+              <div className="freeze-title">FREEZE TOKENS</div>
+              <div className="freeze-val">
+                {freezeTokens} <span style={{ fontSize: "1rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
+              </div>
+              <div className="freeze-desc">
+                Earn tokens by completing 7-day streak milestones.
+              </div>
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    handleLogout();
+                  }}
+                  className="freeze-link speakshine-sidebar-logout"
+                  title="Log Out"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" x2="9" y1="12" y2="12" />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              )}
+            </div>
           </div>
-          <ThemeToggle />
-        </div>
-
-        <div className="speakshine-freeze-box">
-          <div className="freeze-title">FREEZE TOKENS</div>
-          <div className="freeze-val">
-            {profile?.freezeTokens ?? user?.freezeTokens ?? 0}{" "}
-            <span style={{ fontSize: "0.85rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
-          </div>
-          <div className="freeze-desc">
-            Earn tokens by completing 7-day streak milestones.
-          </div>
-          {isLoggedIn && (
-            <button
-              type="button"
-              onClick={() => {
-                setMobileNavOpen(false);
-                handleLogout();
-              }}
-              className="freeze-link speakshine-sidebar-logout"
-              title="Log Out"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" x2="9" y1="12" y2="12" />
-              </svg>
-              <span>Log out</span>
-            </button>
-          )}
-        </div>
-      </div>
+        </>
+      )}
 
       {/* ── Main Content Canvas ── */}
-      <div className="speakshine-main">
+      <div className={isInsideShell ? "w-full" : "speakshine-main"}>
         {/* Top Header Bar (Screenshot 1) */}
-        <header className="speakshine-topbar">
-          <div className="speakshine-topbar-left" style={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
-            <span className="speakshine-topbar-greeting" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
-              Good {getGreeting()}, {displayName} 👋
-            </span>
-            <span className="speakshine-topbar-subtitle hidden md:block" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {isTodaySubmitted
-                ? "🎉 Today's speaking mission accomplished! Your streak is secured."
-                : isQuestionActive
-                ? "Here's your speaking mission for today."
-                : `Daily reset complete · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)}`}
-            </span>
-          </div>
+        {!isInsideShell && (
+          <header className="speakshine-topbar">
+            <div className="speakshine-topbar-left" style={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
+              <span className="speakshine-topbar-greeting" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
+                Good {getGreeting()}, {displayName} 👋
+              </span>
+              <span className="speakshine-topbar-subtitle hidden md:block" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {isTodaySubmitted
+                  ? "🎉 Today's speaking mission accomplished! Your streak is secured."
+                  : isQuestionActive
+                  ? "Here's your speaking mission for today."
+                  : `Daily reset complete · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)}`}
+              </span>
+            </div>
 
-          <div className="speakshine-topbar-right" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
-            <div className="speakshine-pill streak" style={{ flexShrink: 0 }}>
-              <span>🔥</span>
-              <span>{streak} Day</span>
-            </div>
-            <div className="speakshine-pill points hidden sm:inline-flex" style={{ flexShrink: 0 }}>
-              <span style={{ color: "#fbbf24" }}>⭐</span>
-              <span>{totalPoints} Pts</span>
-            </div>
-            {isLoggedIn && (
-              <div
-                className="speakshine-avatar hidden sm:flex"
-                onClick={handleLogout}
-                style={{ cursor: "pointer" }}
-                title={`${displayName} (${user?.email || ""}) · Click to log out`}
-              >
-                {avatarInitials}
+            <div className="speakshine-topbar-right" style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <div className="speakshine-pill streak" style={{ flexShrink: 0 }}>
+                <span>🔥</span>
+                <span>{streak} Day</span>
               </div>
-            )}
+              <div className="speakshine-pill points hidden sm:inline-flex" style={{ flexShrink: 0 }}>
+                <span style={{ color: "#fbbf24" }}>⭐</span>
+                <span>{totalPoints} Pts</span>
+              </div>
+              {isLoggedIn && (
+                <div
+                  className="speakshine-avatar hidden sm:flex"
+                  onClick={handleLogout}
+                  style={{ cursor: "pointer" }}
+                  title={`${displayName} (${user?.email || ""}) · Click to log out`}
+                >
+                  {avatarInitials}
+                </div>
+              )}
 
-            {/* Hamburger for mobile / tablet - hidden on laptop and desktop */}
-            <button
-              type="button"
-              className={`hamburger lg:hidden ${mobileNavOpen ? "open" : ""}`}
-              onClick={() => setMobileNavOpen(o => !o)}
-              aria-label="Toggle mobile menu"
-              style={{
-                flexShrink: 0,
-                width: 32,
-                height: 32,
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "6px",
-                marginLeft: "2px",
-              }}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          </div>
-        </header>
+              {/* Hamburger for mobile / tablet - hidden on laptop and desktop */}
+              <button
+                type="button"
+                className={`hamburger lg:hidden ${mobileNavOpen ? "open" : ""}`}
+                onClick={() => setMobileNavOpen(o => !o)}
+                aria-label="Toggle mobile menu"
+                style={{
+                  flexShrink: 0,
+                  width: 32,
+                  height: 32,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "6px",
+                  marginLeft: "2px",
+                }}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+            </div>
+          </header>
+        )}
 
         {/* Canvas Body */}
-        <main className="speakshine-canvas">
+        <main className={isInsideShell ? "w-full" : "speakshine-canvas"}>
           {/* ── Section 1: Hero Section (Submitted Accomplishment OR Active Question OR 12 AM Reset Countdown Layout) ── */}
           {isTodaySubmitted ? (
             /* ── Section 1A: Daily Mission Accomplishment Hero Setup (Submitted Users) ── */
