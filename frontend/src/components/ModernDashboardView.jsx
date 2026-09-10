@@ -219,6 +219,37 @@ function MissionDropCountdownTimer({ posterSendTime = "08:00" }) {
   );
 }
 
+// Reliable date-to-IST formatting helpers (avoids browser-dependent double-shift bugs)
+const getISTDateKey = (rawDate) => {
+  if (!rawDate) return null;
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    return null;
+  }
+};
+
+const getISTWeekday = (rawDate) => {
+  if (!rawDate) return null;
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      weekday: "short",
+    }).format(d);
+  } catch {
+    return null;
+  }
+};
+
 export default function ModernDashboardView({
   user,
   profile = {},
@@ -589,8 +620,8 @@ export default function ModernDashboardView({
   );
   const freezeTokens = profile.streakFreeze ?? 0;
 
-  // Determine if today's challenge/task has been submitted
-  const nowISTDateStr = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toDateString();
+  // Determine if today's challenge/task has been submitted (matching exact calendar date in IST)
+  const todayISTDateKey = getISTDateKey(new Date());
   const isTodaySubmitted = Boolean(
     profile?.completedToday === true ||
     profile?.completed === true ||
@@ -598,18 +629,14 @@ export default function ModernDashboardView({
     today?.isSubmitted === true ||
     (scores.length > 0 && scores.some(s => {
       const d = s.createdAt || s.date || s.submittedAt;
-      if (!d) return false;
-      const sISTDateStr = new Date(new Date(d).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toDateString();
-      return sISTDateStr === nowISTDateStr;
+      return getISTDateKey(d) === todayISTDateKey;
     }))
   );
 
   // Find latest/today's score for today's points display
   const todayScoreObj = scores.slice().reverse().find(s => {
     const d = s.createdAt || s.date || s.submittedAt;
-    if (!d) return false;
-    const sISTDateStr = new Date(new Date(d).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toDateString();
-    return sISTDateStr === nowISTDateStr;
+    return getISTDateKey(d) === todayISTDateKey;
   }) || scores[scores.length - 1];
 
   const todayPoints = todayScoreObj?.points != null
@@ -621,18 +648,15 @@ export default function ModernDashboardView({
 
   // ── KPI Metrics Calculations (Monthly Sessions, Speak Time, Weekly Progress) ──
   const kpiMetrics = useMemo(() => {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const curYear = nowIST.getFullYear();
-    const curMonth = nowIST.getMonth(); // 0-indexed: 0 = Jan, 8 = Sep
+    const todayDateKey = getISTDateKey(new Date()); // e.g. "2026-09-10"
+    const todayWeekday = getISTWeekday(new Date()); // e.g. "Thu"
+    const curMonthKey = todayDateKey ? todayDateKey.slice(0, 7) : ""; // "YYYY-MM"
 
-    // 1. Sessions completed this month
+    // 1. Sessions completed this month (strictly matching current month in IST)
     const thisMonthScores = (scores || []).filter(s => {
       const raw = s?.createdAt || s?.date || s?.submittedAt;
-      if (!raw) return false;
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) return false;
-      const sd = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      return sd.getFullYear() === curYear && sd.getMonth() === curMonth;
+      const dKey = getISTDateKey(raw);
+      return Boolean(dKey && curMonthKey && dKey.startsWith(curMonthKey));
     });
 
     const monthCountBase = Math.max(
@@ -696,34 +720,39 @@ export default function ModernDashboardView({
     const avgSpeakFormatted = formatSpeakTime(avgSeconds);
 
     // 3. This week completion count and active days (Sunday 00:00:00 to Saturday 23:59:59 IST)
-    const day = nowIST.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-    const startOfWeek = new Date(nowIST);
-    startOfWeek.setDate(nowIST.getDate() - day);
-    startOfWeek.setHours(0, 0, 0, 0);
+    const DAY_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const todayDayIndex = DAY_ORDER.indexOf(todayWeekday); // 0 = Sun, 1 = Mon, ..., 6 = Sat
 
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
+    // Generate exact YYYY-MM-DD date keys for the 7 days of the current week (Sunday to Saturday)
+    const [curYear, curMonth, curDay] = (todayDateKey || "").split("-").map(Number);
+    const baseDate = new Date(Date.UTC(curYear, (curMonth || 1) - 1, curDay || 1));
+    const sundayDate = new Date(baseDate);
+    sundayDate.setUTCDate(baseDate.getUTCDate() - (todayDayIndex >= 0 ? todayDayIndex : 0));
+
+    const weekDateMap = {}; // { "YYYY-MM-DD": "DayAbbrev" }
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sundayDate);
+      d.setUTCDate(sundayDate.getUTCDate() + i);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dayStr = String(d.getUTCDate()).padStart(2, "0");
+      const key = `${y}-${m}-${dayStr}`;
+      weekDateMap[key] = DAY_ORDER[i];
+    }
 
     const activeDaysSet = new Set();
     (scores || []).forEach(s => {
       const raw = s?.createdAt || s?.date || s?.submittedAt;
-      if (!raw) return;
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) return;
-      const sd = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      if (sd >= startOfWeek && sd <= endOfWeek) {
-        const dName = sd.toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
-        activeDaysSet.add(dName);
+      const dKey = getISTDateKey(raw);
+      if (dKey && weekDateMap[dKey]) {
+        activeDaysSet.add(weekDateMap[dKey]);
       }
     });
 
-    if (isTodaySubmitted) {
-      const todayDayName = nowIST.toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
-      activeDaysSet.add(todayDayName);
+    if (isTodaySubmitted && todayWeekday) {
+      activeDaysSet.add(todayWeekday);
     }
 
-    const DAY_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const activeDaysList = DAY_ORDER.filter(d => activeDaysSet.has(d));
 
     // The weekly completion count strictly matches the exact number of active days
@@ -744,7 +773,7 @@ export default function ModernDashboardView({
       weeklyCount,
       weeklyDaysSubtitle,
     };
-  }, [scores, profile?.monthlySubmissions, profile?.totalSessions, profile?.totalRecordedSeconds, profile?.weeklySubmissions, isTodaySubmitted]);
+  }, [scores, profile?.monthlySubmissions, profile?.totalSessions, profile?.totalRecordedSeconds, isTodaySubmitted]);
 
   const displayName = user?.name || profile?.name || "Jane Doe";
   const avatarInitials = displayName.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "JD";
