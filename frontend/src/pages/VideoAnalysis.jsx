@@ -933,7 +933,10 @@ export default function VideoAnalysis() {
                         objectFit: "cover",
                         display: "block",
                         borderRadius: 14,
+                        cursor: "zoom-in",
                       }}
+                      onClick={() => setPicturePreviewOpen(true)}
+                      title="Click to view full screen"
                       loading="lazy"
                     />
                     <button
@@ -941,12 +944,26 @@ export default function VideoAnalysis() {
                       onClick={() => setPicturePreviewOpen(true)}
                       style={{
                         position: "absolute", top: "0.75rem", right: "0.75rem",
-                        border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10,
-                        padding: "0.45rem 0.75rem", background: "rgba(0,0,0,0.75)",
+                        border: "1px solid rgba(255,255,255,0.35)", borderRadius: 10,
+                        padding: "0.45rem 0.75rem", background: "rgba(0,0,0,0.8)",
                         color: "#fff", fontSize: "0.78rem", fontWeight: 700,
                         cursor: "pointer", backdropFilter: "blur(6px)",
+                        display: "flex", alignItems: "center", gap: "0.35rem",
+                        boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+                        transition: "all 0.15s ease",
                       }}
-                    >⛶ View Full Screen</button>
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "rgba(0,0,0,0.95)";
+                        e.currentTarget.style.transform = "scale(1.04)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "rgba(0,0,0,0.8)";
+                        e.currentTarget.style.transform = "scale(1)";
+                      }}
+                    >
+                      <span>⛶</span>
+                      <span>View Full Screen</span>
+                    </button>
                     {todayQuestion.imagePhotographer && (
                       <div style={{ fontSize: "0.72rem", color: "#64748b", padding: "4px 8px", textAlign: "right" }}>
                         Photo by {todayQuestion.imagePhotographer}
@@ -2307,6 +2324,111 @@ export default function VideoAnalysis() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Fullscreen Image Preview Modal (Picture Description) ── */}
+        {picturePreviewOpen && todayQuestion?.imageUrl && (
+          <div
+            onClick={() => setPicturePreviewOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 99999,
+              background: "rgba(0, 0, 0, 0.92)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "1.5rem",
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: "relative",
+                maxWidth: "94vw",
+                maxHeight: "90vh",
+                borderRadius: 16,
+                overflow: "hidden",
+                boxShadow: "0 25px 60px rgba(0,0,0,0.8)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "#080612",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <img
+                src={todayQuestion.imageUrl}
+                alt={todayQuestion.topic || "Picture challenge full view"}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  maxHeight: "84vh",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setPicturePreviewOpen(false)}
+                aria-label="Close fullscreen preview"
+                style={{
+                  position: "absolute",
+                  top: "1rem",
+                  right: "1rem",
+                  background: "rgba(0,0,0,0.75)",
+                  border: "1px solid rgba(255,255,255,0.3)",
+                  borderRadius: "50%",
+                  width: 40,
+                  height: 40,
+                  color: "#ffffff",
+                  fontSize: "1.2rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(6px)",
+                  transition: "transform 0.15s ease, background 0.15s ease",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "scale(1.1)";
+                  e.currentTarget.style.background = "rgba(239, 68, 68, 0.85)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.background = "rgba(0,0,0,0.75)";
+                }}
+              >
+                ✕
+              </button>
+              {(todayQuestion.imagePhotographer || todayQuestion.imageInstructions || todayQuestion.question) && (
+                <div style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)",
+                  padding: "2rem 1.5rem 1rem",
+                  color: "#f1f5f9",
+                  fontSize: "0.88rem",
+                  pointerEvents: "none",
+                }}>
+                  <div style={{ fontWeight: 600, lineHeight: 1.4, maxWidth: 900 }}>
+                    {todayQuestion.imageInstructions || todayQuestion.question}
+                  </div>
+                  {todayQuestion.imagePhotographer && (
+                    <div style={{ fontSize: "0.76rem", color: "#94a3b8", marginTop: 6 }}>
+                      📷 Photo by {todayQuestion.imagePhotographer}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

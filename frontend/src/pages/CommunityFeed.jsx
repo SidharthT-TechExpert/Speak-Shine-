@@ -1249,6 +1249,16 @@ export default function CommunityFeed() {
   // Fetch today's mission and cohort leaderboard data to match dashboard layout
   const [dashboardData, setDashboardData] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
+
+  useEffect(() => {
+    if (!picturePreviewOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setPicturePreviewOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [picturePreviewOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -2282,15 +2292,20 @@ export default function CommunityFeed() {
                 <>
                   {/* Picture Preview (for picture description days) */}
                   {todayMission.isPictureDescription && todayMission.imageUrl && (
-                    <div style={{
-                      position: "relative",
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      marginBottom: "0.85rem",
-                      border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid #e2e8f0",
-                      maxHeight: 170,
-                      background: isDark ? "#06040d" : "#f1f5f9",
-                    }}>
+                    <div
+                      style={{
+                        position: "relative",
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        marginBottom: "0.85rem",
+                        border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid #e2e8f0",
+                        maxHeight: 170,
+                        background: isDark ? "#06040d" : "#f1f5f9",
+                        cursor: "zoom-in",
+                      }}
+                      onClick={() => setPicturePreviewOpen(true)}
+                      title="Click to view full screen"
+                    >
                       <img
                         src={todayMission.imageUrl}
                         alt={topicTitle}
@@ -2301,6 +2316,32 @@ export default function CommunityFeed() {
                           display: "block",
                         }}
                       />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPicturePreviewOpen(true);
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: 6,
+                          right: 6,
+                          background: "rgba(0, 0, 0, 0.75)",
+                          border: "1px solid rgba(255, 255, 255, 0.3)",
+                          color: "#ffffff",
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          borderRadius: 6,
+                          padding: "2px 6px",
+                          cursor: "pointer",
+                          backdropFilter: "blur(4px)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        <span>⛶</span> Full Screen
+                      </button>
                       {todayMission.imagePhotographer && (
                         <div style={{
                           position: "absolute",
@@ -2635,6 +2676,111 @@ export default function CommunityFeed() {
 
           </div>
         </div>
+
+        {/* ── Fullscreen Image Preview Modal (Picture Description) ── */}
+        {picturePreviewOpen && todayMission?.imageUrl && (
+          <div
+            onClick={() => setPicturePreviewOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 99999,
+              background: "rgba(0, 0, 0, 0.92)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "1.5rem",
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: "relative",
+                maxWidth: "94vw",
+                maxHeight: "90vh",
+                borderRadius: 16,
+                overflow: "hidden",
+                boxShadow: "0 25px 60px rgba(0,0,0,0.8)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "#080612",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <img
+                src={todayMission.imageUrl}
+                alt={topicTitle || "Picture challenge full view"}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  maxHeight: "84vh",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setPicturePreviewOpen(false)}
+                aria-label="Close fullscreen preview"
+                style={{
+                  position: "absolute",
+                  top: "1rem",
+                  right: "1rem",
+                  background: "rgba(0,0,0,0.75)",
+                  border: "1px solid rgba(255,255,255,0.3)",
+                  borderRadius: "50%",
+                  width: 40,
+                  height: 40,
+                  color: "#ffffff",
+                  fontSize: "1.2rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(6px)",
+                  transition: "transform 0.15s ease, background 0.15s ease",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "scale(1.1)";
+                  e.currentTarget.style.background = "rgba(239, 68, 68, 0.85)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.background = "rgba(0,0,0,0.75)";
+                }}
+              >
+                ✕
+              </button>
+              {(todayMission.imagePhotographer || todayMission.imageInstructions || todayMission.question) && (
+                <div style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)",
+                  padding: "2rem 1.5rem 1rem",
+                  color: "#f1f5f9",
+                  fontSize: "0.88rem",
+                  pointerEvents: "none",
+                }}>
+                  <div style={{ fontWeight: 600, lineHeight: 1.4, maxWidth: 900 }}>
+                    {todayMission.imageInstructions || todayMission.question}
+                  </div>
+                  {todayMission.imagePhotographer && (
+                    <div style={{ fontSize: "0.76rem", color: "#94a3b8", marginTop: 6 }}>
+                      📷 Photo by {todayMission.imagePhotographer}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
