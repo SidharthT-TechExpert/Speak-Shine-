@@ -276,7 +276,7 @@ export async function publishManualQuestion(q) {
       todayImagePhotographer: q.imagePhotographer || null,
       todayImagePhotographerUrl: q.imagePhotographerUrl || null,
       todayImageSearchQuery: q.imageSearchQuery || null,
-      todayImageInstructions: q.imageInstructions || (isPicture ? q.question : null),
+      todayImageInstructions: q.imageInstructions || null,
       todayPosterImage: null,
       todayVocabulary: [],
     }

@@ -1112,7 +1112,9 @@ export default function VideoAnalysis() {
                     </div>
                   )}
 
-                  {todayQuestion?.imageInstructions && (
+                  {todayQuestion?.imageInstructions &&
+                    todayQuestion.imageInstructions.trim().toLowerCase() !== (todayQuestion.question || "").trim().toLowerCase() &&
+                    todayQuestion.imageInstructions.trim().toLowerCase() !== (todayQuestion.prompt || "").trim().toLowerCase() && (
                     <div style={{ marginTop: "0.75rem", fontSize: "0.84rem", color: "#94a3b8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.6rem" }}>
                       💡 {todayQuestion.imageInstructions}
                     </div>

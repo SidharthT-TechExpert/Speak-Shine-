@@ -2050,7 +2050,9 @@ export default function ModernDashboardView({
                   </div>
                 )}
 
-                {today.imageInstructions && (
+                {today.imageInstructions &&
+                  today.imageInstructions.trim().toLowerCase() !== (today.question || "").trim().toLowerCase() &&
+                  today.imageInstructions.trim().toLowerCase() !== (today.prompt || "").trim().toLowerCase() && (
                   <div style={{ marginTop: "0.75rem", fontSize: "0.84rem", color: "#94a3b8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.6rem" }}>
                     💡 {today.imageInstructions}
                   </div>
