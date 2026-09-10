@@ -5347,6 +5347,9 @@ audio { border-radius: 12px; }
   scrollbar-color: rgba(124, 111, 255, 0.25) transparent;
 }
 .speakshine-shell .community-sidebar-col {
+  position: sticky;
+  top: 1rem;
+  align-self: start;
   max-height: calc(100vh - 110px);
   overflow-y: auto;
   overflow-x: hidden;

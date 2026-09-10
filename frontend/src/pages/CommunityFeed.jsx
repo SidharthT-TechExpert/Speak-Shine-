@@ -1248,12 +1248,37 @@ export default function CommunityFeed() {
 
   // Fetch today's mission and cohort leaderboard data to match dashboard layout
   const [dashboardData, setDashboardData] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    api.get("/dashboard/me")
-      .then(res => setDashboardData(res.data))
-      .catch(() => {});
+    let isMounted = true;
+    setDashboardLoading(true);
+    const fetchMissionData = async () => {
+      try {
+        if (user) {
+          const res = await api.get("/dashboard/me");
+          if (isMounted && res.data) {
+            setDashboardData(res.data);
+            setDashboardLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load /dashboard/me in community:", err?.message);
+      }
+      try {
+        const fallback = await api.get("/dashboard");
+        if (isMounted && fallback.data) {
+          setDashboardData(fallback.data);
+        }
+      } catch (fallbackErr) {
+        console.warn("Failed to load fallback /dashboard in community:", fallbackErr?.message);
+      } finally {
+        if (isMounted) setDashboardLoading(false);
+      }
+    };
+    fetchMissionData();
+    return () => { isMounted = false; };
   }, [user]);
 
   // Filter & Search state
@@ -1329,8 +1354,10 @@ export default function CommunityFeed() {
 
   // Mission & Cohort Leaderboard info
   const todayMission = dashboardData?.today || {};
-  const topicTitle = todayMission.topic || todayMission.question || "Speaking Challenge";
-  const topicQuestion = todayMission.question || "Share your authentic perspective and practice your daily mission.";
+  const isQuestionSent = Boolean(todayMission.questionSent !== false && (todayMission.topic || todayMission.question));
+  const topicTitle = todayMission.topic || todayMission.question || (isQuestionSent ? "Daily Speaking Mission" : "Preparing Next Mission...");
+  const topicQuestion = todayMission.imageInstructions || todayMission.question || todayMission.prompt || (isQuestionSent ? "Share your authentic perspective and practice your daily mission." : `Today's mission will be released at ${todayMission.posterSendTime || "08:00 AM"} IST. Stay tuned!`);
+  const isSubmittedToday = Boolean(todayMission.isSubmitted || todayMission.submitted || user?.completed);
   const cohortName = dashboardData?.profile?.group || user?.group || "Beta";
   const rawLeaderboard = dashboardData?.leaderboard || dashboardData?.topStreak || [];
 
@@ -2208,56 +2235,206 @@ export default function CommunityFeed() {
               position: "relative",
               overflow: "hidden",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
-                <span style={{ fontSize: "1rem" }}>⭐</span>
-                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fbbf24" }}>
-                  TODAY'S MISSION
-                </span>
-              </div>
-
+              {/* Radial subtle ambient glow */}
               <div style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "1.15rem",
-                fontWeight: 700,
-                color: isDark ? "#ffffff" : "#0f172a",
-                marginBottom: "0.5rem",
-                lineHeight: 1.35,
-              }}>
-                {topicTitle}
+                position: "absolute", top: -30, right: -30, width: 140, height: 140,
+                background: "radial-gradient(circle, rgba(124, 111, 255, 0.15) 0%, transparent 70%)",
+                pointerEvents: "none",
+              }} />
+
+              {/* Header Badge Strip */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                  <span style={{ fontSize: "1rem" }}>⭐</span>
+                  <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fbbf24" }}>
+                    TODAY'S MISSION
+                  </span>
+                </div>
+
+                <div style={{
+                  fontSize: "0.65rem",
+                  fontWeight: 800,
+                  padding: "2px 8px",
+                  borderRadius: 99,
+                  background: isDark ? "rgba(124, 111, 255, 0.12)" : "rgba(124, 111, 255, 0.08)",
+                  border: isDark ? "1px solid rgba(124, 111, 255, 0.25)" : "1px solid rgba(124, 111, 255, 0.2)",
+                  color: isDark ? "#c4b5fd" : "#6d28d9",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}>
+                  {todayMission.isPictureDescription ? "🖼️ Picture Challenge"
+                    : todayMission.isStorySummary ? "🎙️ Audio Story"
+                    : todayMission.isMonthlyReflection ? "🪞 Reflection"
+                    : todayMission.isWeeklyReflection ? "📈 Reflection"
+                    : todayMission.isMonthlyGoals ? "🎯 Goals"
+                    : "🎙️ Speaking Mission"}
+                </div>
               </div>
 
-              <p style={{
-                fontSize: "0.82rem",
-                color: isDark ? "#94a3b8" : "#64748b",
-                lineHeight: 1.5,
-                marginBottom: "1.15rem",
-              }}>
-                {topicQuestion}
-              </p>
+              {/* Loading Skeleton */}
+              {dashboardLoading && !dashboardData ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", padding: "0.5rem 0" }}>
+                  <div style={{ height: 20, width: "70%", borderRadius: 6, background: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9" }} />
+                  <div style={{ height: 40, width: "100%", borderRadius: 6, background: isDark ? "rgba(255,255,255,0.04)" : "#f8fafc" }} />
+                  <div style={{ height: 36, width: "100%", borderRadius: 10, background: isDark ? "rgba(124,111,255,0.1)" : "#ede9fe" }} />
+                </div>
+              ) : (
+                <>
+                  {/* Picture Preview (for picture description days) */}
+                  {todayMission.isPictureDescription && todayMission.imageUrl && (
+                    <div style={{
+                      position: "relative",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      marginBottom: "0.85rem",
+                      border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid #e2e8f0",
+                      maxHeight: 170,
+                      background: isDark ? "#06040d" : "#f1f5f9",
+                    }}>
+                      <img
+                        src={todayMission.imageUrl}
+                        alt={topicTitle}
+                        style={{
+                          width: "100%",
+                          maxHeight: 170,
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                      {todayMission.imagePhotographer && (
+                        <div style={{
+                          position: "absolute",
+                          bottom: 6,
+                          right: 6,
+                          fontSize: "0.62rem",
+                          background: "rgba(0, 0, 0, 0.7)",
+                          color: "#ffffff",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          backdropFilter: "blur(4px)",
+                          pointerEvents: "none",
+                        }}>
+                          📷 {todayMission.imagePhotographer}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-              <Link
-                to="/record"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.45rem",
-                  width: "100%",
-                  padding: "0.65rem 1rem",
-                  borderRadius: 12,
-                  background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
-                  color: "#ffffff",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  fontSize: "0.82rem",
-                  boxShadow: "0 4px 16px rgba(124, 111, 255, 0.35)",
-                  boxSizing: "border-box",
-                }}
-              >
-                <span>📹</span>
-                <span>Record Your Submission</span>
-                <span>↗</span>
-              </Link>
+                  {/* Topic Title */}
+                  <div style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "1.18rem",
+                    fontWeight: 700,
+                    color: isDark ? "#ffffff" : "#0f172a",
+                    marginBottom: "0.45rem",
+                    lineHeight: 1.35,
+                  }}>
+                    {topicTitle}
+                  </div>
+
+                  {/* Topic Question / Instructions */}
+                  <p style={{
+                    fontSize: "0.82rem",
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    lineHeight: 1.5,
+                    marginBottom: todayMission.vocabulary?.length ? "0.75rem" : "1.15rem",
+                  }}>
+                    {topicQuestion}
+                  </p>
+
+                  {/* Vocabulary Mini-Strip */}
+                  {Array.isArray(todayMission.vocabulary) && todayMission.vocabulary.length > 0 && (
+                    <div style={{ marginBottom: "1.1rem" }}>
+                      <div style={{
+                        fontSize: "0.66rem",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: isDark ? "#818cf8" : "#4f46e5",
+                        marginBottom: "0.4rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.3rem",
+                      }}>
+                        <span>💎</span>
+                        <span>Key Vocabulary</span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                        {todayMission.vocabulary.slice(0, 3).map((v, i) => {
+                          const word = typeof v === "string" ? v : v.word;
+                          const meaning = typeof v === "object" ? v.meaning : "";
+                          return (
+                            <span
+                              key={v._id || word || i}
+                              title={meaning || word}
+                              style={{
+                                fontSize: "0.72rem",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                                background: isDark ? "rgba(124, 111, 255, 0.12)" : "rgba(124, 111, 255, 0.07)",
+                                border: isDark ? "1px solid rgba(124, 111, 255, 0.28)" : "1px solid rgba(124, 111, 255, 0.2)",
+                                color: isDark ? "#c4b5fd" : "#6d28d9",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {word}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status Banner if Completed */}
+                  {isSubmittedToday && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.45rem",
+                      padding: "0.45rem 0.75rem",
+                      borderRadius: 10,
+                      background: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.08)",
+                      border: "1px solid rgba(34, 197, 94, 0.3)",
+                      color: "#22c55e",
+                      fontSize: "0.76rem",
+                      fontWeight: 700,
+                      marginBottom: "0.85rem",
+                    }}>
+                      <span>✓</span>
+                      <span>You completed today's mission!</span>
+                    </div>
+                  )}
+
+                  {/* Primary CTA Link */}
+                  <Link
+                    to="/record"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.45rem",
+                      width: "100%",
+                      padding: "0.65rem 1rem",
+                      borderRadius: 12,
+                      background: isSubmittedToday
+                        ? (isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9")
+                        : "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
+                      color: isSubmittedToday ? (isDark ? "#c4b5fd" : "#4f46e5") : "#ffffff",
+                      border: isSubmittedToday ? (isDark ? "1px solid rgba(124, 111, 255, 0.3)" : "1px solid #cbd5e1") : "none",
+                      textDecoration: "none",
+                      fontWeight: 700,
+                      fontSize: "0.82rem",
+                      boxShadow: isSubmittedToday ? "none" : "0 4px 16px rgba(124, 111, 255, 0.35)",
+                      boxSizing: "border-box",
+                      transition: "transform 0.15s ease",
+                    }}
+                  >
+                    <span>📹</span>
+                    <span>{isSubmittedToday ? "Record Another Take" : "Record Your Submission"}</span>
+                    <span>↗</span>
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Widget 2: Cohort Leaderboard */}
