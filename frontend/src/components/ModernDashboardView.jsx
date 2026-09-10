@@ -619,6 +619,138 @@ export default function ModernDashboardView({
   // Dynamic milestone progress using official 20 streak badges
   const milestone = getBadgeProgress(streak);
 
+  // ── KPI Metrics Calculations (Monthly Sessions, Speak Time, Weekly Progress) ──
+  const kpiMetrics = useMemo(() => {
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const curYear = nowIST.getFullYear();
+    const curMonth = nowIST.getMonth(); // 0-indexed: 0 = Jan, 8 = Sep
+
+    // 1. Sessions completed this month
+    const thisMonthScores = (scores || []).filter(s => {
+      const raw = s?.createdAt || s?.date || s?.submittedAt;
+      if (!raw) return false;
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return false;
+      const sd = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      return sd.getFullYear() === curYear && sd.getMonth() === curMonth;
+    });
+
+    const monthCountBase = Math.max(
+      profile?.monthlySubmissions ?? 0,
+      thisMonthScores.length
+    );
+    const thisMonthCompleted = Math.max(monthCountBase, isTodaySubmitted ? 1 : 0);
+    const allTimeCompleted = Math.max(profile?.totalSessions ?? 0, (scores || []).length, thisMonthCompleted);
+
+    // 2. Speak time (total and average per session)
+    const parseSec = (value) => {
+      if (value == null || value === "") return null;
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (/^\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
+        const parts = trimmed.split(":").map(p => Number(p));
+        if (parts.every(part => Number.isFinite(part))) {
+          if (parts.length === 2) return parts[0] * 60 + parts[1];
+          if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+      }
+      return null;
+    };
+
+    let totalDurationSum = 0;
+    let scoredSessionsWithDuration = 0;
+
+    (scores || []).forEach(s => {
+      const dur = parseSec(s?.duration ?? s?.videoDuration ?? s?.recordedDuration ?? s?.durationSeconds);
+      if (dur != null && dur > 0) {
+        totalDurationSum += dur;
+        scoredSessionsWithDuration += 1;
+      }
+    });
+
+    const totalSpeakSeconds = Math.max(
+      profile?.totalRecordedSeconds ?? 0,
+      totalDurationSum
+    );
+
+    const formatSpeakTime = (sec) => {
+      if (sec == null || sec <= 0) return "0m 00s";
+      const totalSec = Math.round(sec);
+      const hrs = Math.floor(totalSec / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      const secs = totalSec % 60;
+      if (hrs > 0) {
+        return `${hrs}h ${mins}m`;
+      }
+      return `${mins}m ${String(secs).padStart(2, "0")}s`;
+    };
+
+    const countForAvg = scoredSessionsWithDuration > 0
+      ? scoredSessionsWithDuration
+      : (allTimeCompleted > 0 ? allTimeCompleted : ((scores || []).length || 1));
+
+    const avgSeconds = totalSpeakSeconds > 0 ? Math.round(totalSpeakSeconds / countForAvg) : 0;
+
+    const totalSpeakFormatted = formatSpeakTime(totalSpeakSeconds);
+    const avgSpeakFormatted = formatSpeakTime(avgSeconds);
+
+    // 3. This week completion count and active days (Monday 00:00:00 to Sunday 23:59:59 IST)
+    const day = nowIST.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(nowIST);
+    monday.setDate(nowIST.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const activeDaysSet = new Set();
+    (scores || []).forEach(s => {
+      const raw = s?.createdAt || s?.date || s?.submittedAt;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return;
+      const sd = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      if (sd >= monday && sd <= sunday) {
+        const dName = sd.toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
+        activeDaysSet.add(dName);
+      }
+    });
+
+    if (isTodaySubmitted) {
+      const todayDayName = nowIST.toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
+      activeDaysSet.add(todayDayName);
+    }
+
+    const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const activeDaysList = DAY_ORDER.filter(d => activeDaysSet.has(d));
+
+    const weeklyCount = Math.min(
+      7,
+      Math.max(activeDaysList.length, profile?.weeklySubmissions ?? 0, isTodaySubmitted ? 1 : 0)
+    );
+
+    let weeklyDaysSubtitle = "No sessions yet this week";
+    if (activeDaysList.length === 7) {
+      weeklyDaysSubtitle = "Active every day this week! 🔥";
+    } else if (activeDaysList.length > 0) {
+      weeklyDaysSubtitle = `Active on ${activeDaysList.join(", ")}`;
+    } else if (weeklyCount > 0) {
+      weeklyDaysSubtitle = `${weeklyCount} session${weeklyCount > 1 ? "s" : ""} completed`;
+    }
+
+    return {
+      thisMonthCompleted,
+      allTimeCompleted,
+      totalSpeakFormatted,
+      avgSpeakFormatted,
+      weeklyCount,
+      weeklyDaysSubtitle,
+    };
+  }, [scores, profile?.monthlySubmissions, profile?.totalSessions, profile?.totalRecordedSeconds, profile?.weeklySubmissions, isTodaySubmitted]);
+
   const displayName = user?.name || profile?.name || "Jane Doe";
   const avatarInitials = displayName.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "JD";
   const isLoggedIn = Boolean(user && profile?.name !== "Preview User");
@@ -2718,20 +2850,20 @@ export default function ModernDashboardView({
               </div>
               <div style={{ fontSize: "0.74rem", color: "#f97316", fontWeight: 600, marginTop: "2px", display: "flex", alignItems: "center", gap: "3px" }}>
                 <span>🔥</span>
-                <span>+1 from yesterday</span>
+                <span>{isTodaySubmitted ? "+1 from yesterday" : (streak > 0 ? "Submit today to maintain" : "Start your streak today")}</span>
               </div>
             </div>
 
             {/* KPI 2 */}
             <div>
               <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                TOTAL SESSIONS
+                THIS MONTH
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                {scores.length || 2} Completed
+                {kpiMetrics.thisMonthCompleted} Completed
               </div>
               <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: "2px" }}>
-                Top 40% of cohort
+                {kpiMetrics.allTimeCompleted} total all-time
               </div>
             </div>
 
@@ -2741,10 +2873,10 @@ export default function ModernDashboardView({
                 SPEAK TIME
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                4m 32s
+                {kpiMetrics.totalSpeakFormatted}
               </div>
               <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: "2px" }}>
-                Avg 2m 16s / session
+                Avg {kpiMetrics.avgSpeakFormatted} / session
               </div>
             </div>
 
@@ -2754,10 +2886,10 @@ export default function ModernDashboardView({
                 THIS WEEK
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                2/7 Days
+                {kpiMetrics.weeklyCount}/7 Days
               </div>
               <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: "2px" }}>
-                Active on Mon, Tue
+                {kpiMetrics.weeklyDaysSubtitle}
               </div>
             </div>
 
