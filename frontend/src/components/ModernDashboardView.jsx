@@ -2313,16 +2313,48 @@ export default function ModernDashboardView({
                       padding: "0.65rem 0.85rem",
                       marginBottom: "0.55rem",
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem", flexWrap: "wrap", gap: "0.4rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
                           <span style={{ fontSize: "0.85rem" }}>✨</span>
                           <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
                             BONUS VOCABULARY KEYWORDS
                           </span>
+                          <span style={{
+                            fontSize: "0.62rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.04em",
+                            padding: "2px 7px",
+                            borderRadius: "999px",
+                            background: cefrInfo?.bg || (isDark ? "rgba(192, 132, 252, 0.16)" : "rgba(124, 58, 237, 0.1)"),
+                            border: `1px solid ${cefrInfo?.border || (isDark ? "rgba(192, 132, 252, 0.4)" : "rgba(124, 58, 237, 0.3)")}`,
+                            color: cefrInfo?.color || (isDark ? "#c084fc" : "#7c3aed"),
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            textTransform: "uppercase",
+                          }}>
+                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: cefrInfo?.color || "#c084fc" }} />
+                            {cefrInfo?.label || `${vocabLevel} Level`}
+                          </span>
                         </div>
-                        <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a" }}>
-                          +10 pts each
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                          <span style={{
+                            fontSize: "0.64rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.03em",
+                            color: isDark ? "#cbd5e1" : "#475569",
+                            background: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)",
+                            padding: "2px 7px",
+                            borderRadius: 6,
+                            border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)",
+                            textTransform: "uppercase",
+                          }}>
+                            🎯 {Math.min(targetRequiredCount, vocabList.length)} Required
+                          </span>
+                          <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a" }}>
+                            +10 pts each
+                          </span>
+                        </div>
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
                         {vocabList.slice(0, 5).map((v, i) => {
