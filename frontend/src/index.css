@@ -6472,16 +6472,26 @@ audio { border-radius: 12px; }
   display: grid;
   grid-template-columns: minmax(340px, 1fr) minmax(0, 1.75fr);
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
   width: 100%;
 }
 
 .speakshine-leaderboard-col {
   order: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.speakshine-leaderboard-box {
+  height: 100%;
 }
 
 .speakshine-perf-center-col {
   order: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 @media (max-width: 1024px) {
@@ -6497,6 +6507,12 @@ audio { border-radius: 12px; }
   .speakshine-perf-center-col {
     order: 2 !important;
     width: 100% !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .perf-insight-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -6769,6 +6785,23 @@ audio { border-radius: 12px; }
 
 [data-theme="light"] .perf-session-row td.sub-text,
 .light .perf-session-row td.sub-text {
+  color: #64748b !important;
+}
+
+/* Performance Insights Light Mode */
+[data-theme="light"] .perf-insight-card,
+.light .perf-insight-card {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .perf-insight-val,
+.light .perf-insight-val {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .perf-insight-sub,
+.light .perf-insight-sub {
   color: #64748b !important;
 }
 

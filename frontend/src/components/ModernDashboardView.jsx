@@ -875,7 +875,55 @@ export default function ModernDashboardView({
   const pointsOnly = useMemo(() => chartPointsData.map(d => d.pts).filter(p => p != null && !isNaN(p)), [chartPointsData]);
   const pointsAvg = pointsOnly.length ? Math.round(pointsOnly.reduce((a, b) => a + b, 0) / pointsOnly.length) : 0;
   const pointsBest = pointsOnly.length ? Math.max(...pointsOnly) : 0;
-  const pointsMaxDomain = Math.max(100, Math.ceil((pointsBest + 10) / 10) * 10);
+  const pointsMaxDomain = Math.max(50, Math.ceil((pointsBest + 5) / 10) * 10);
+
+  // ── Session Performance Insights (Top Strength, Focus Area, Recent Momentum) ──
+  const sessionInsights = useMemo(() => {
+    const flScore = Number(rubricAverages.fluency) || 0;
+    const grScore = Number(rubricAverages.grammar) || 0;
+    const cfScore = Number(rubricAverages.confidence) || 0;
+    const vbScore = Number(rubricAverages.vocabulary) || 0;
+
+    const skills = [
+      { name: "Fluency", score: flScore, sub: "Smooth rhythm & flow" },
+      { name: "Grammar", score: grScore, sub: "Structure & correctness" },
+      { name: "Confidence", score: cfScore, sub: "Vocal poise & delivery" },
+      { name: "Vocabulary", score: vbScore, sub: "Rich lexical variety" },
+    ];
+
+    const sorted = [...skills].sort((a, b) => b.score - a.score);
+    const topSkill = sorted[0] || { name: "Fluency", score: flScore, sub: "Smooth rhythm & flow" };
+    const focusSkill = sorted[sorted.length - 1] || { name: "Grammar", score: grScore, sub: "Structure & correctness" };
+
+    const recent5 = chartPointsData.slice(-5);
+    const recent5Avg = recent5.length ? Math.round(recent5.reduce((sum, d) => sum + (d.pts || 0), 0) / recent5.length) : pointsAvg;
+    const diff = recent5Avg - pointsAvg;
+
+    let momentumLabel = "Steady Pace";
+    let momentumDiff = `${diff >= 0 ? "+" : ""}${diff} pts`;
+    let momentumPositive = diff >= 0;
+    let momentumSub = "Consistent with lifetime average";
+
+    if (diff > 2) {
+      momentumLabel = "Upward Surge";
+      momentumSub = `+${diff} pts above average`;
+    } else if (diff < -2) {
+      momentumLabel = "Needs Focus";
+      momentumSub = `${diff} pts below average`;
+    }
+
+    return {
+      topSkill,
+      focusSkill,
+      momentum: {
+        label: momentumLabel,
+        diff: momentumDiff,
+        positive: momentumPositive,
+        subtitle: momentumSub,
+      },
+      evaluatedCount: chartPointsData.length,
+    };
+  }, [rubricAverages, chartPointsData, pointsAvg]);
 
   // ── Tab 2: Score History Multi-Line Chart Data (Fluency, Grammar, Confidence, Vocab) ──
   const chartHistoryData = useMemo(() => {
@@ -3902,6 +3950,10 @@ export default function ModernDashboardView({
               border: "1px solid rgba(255, 255, 255, 0.06)",
               borderRadius: 18,
               padding: "1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              boxSizing: "border-box",
             }}>
               {/* Header with Title & Tabs */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -4263,6 +4315,113 @@ export default function ModernDashboardView({
                   )}
                 </div>
               )}
+
+              {/* Session Performance Insights (Equalizes height with Leaderboard and fills empty space) */}
+              <div className="perf-session-insights" style={{
+                marginTop: "auto",
+                paddingTop: "1.25rem",
+                borderTop: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "0.75rem",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}>
+                  <div style={{
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                  }}>
+                    <span>💡</span>
+                    <span>SESSION PERFORMANCE INSIGHTS</span>
+                  </div>
+                  <div style={{
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    color: "#a78bfa",
+                    background: "rgba(167, 139, 250, 0.12)",
+                    padding: "3px 9px",
+                    borderRadius: 99,
+                    border: "1px solid rgba(167, 139, 250, 0.25)",
+                  }}>
+                    {chartPointsData.length} Sessions Logged
+                  </div>
+                </div>
+
+                <div className="perf-insight-grid" style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "0.75rem",
+                }}>
+                  {/* Card 1: Top Strength */}
+                  <div className="perf-insight-card" style={{
+                    background: isDark
+                      ? "linear-gradient(135deg, rgba(34, 197, 94, 0.09) 0%, rgba(13, 10, 24, 0.95) 100%)"
+                      : "#f0fdf4",
+                    border: isDark ? "1px solid rgba(34, 197, 94, 0.28)" : "1px solid #bbf7d0",
+                    borderRadius: 12,
+                    padding: "0.75rem 0.85rem",
+                  }}>
+                    <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#22c55e", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
+                      🏆 TOP STRENGTH
+                    </div>
+                    <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {sessionInsights.topSkill.name} <span style={{ color: "#22c55e", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.topSkill.score}/10)</span>
+                    </div>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                      {sessionInsights.topSkill.sub}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Growth Focus */}
+                  <div className="perf-insight-card" style={{
+                    background: isDark
+                      ? "linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(13, 10, 24, 0.95) 100%)"
+                      : "#fffbeb",
+                    border: isDark ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid #fde68a",
+                    borderRadius: 12,
+                    padding: "0.75rem 0.85rem",
+                  }}>
+                    <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#f59e0b", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
+                      🎯 GROWTH FOCUS
+                    </div>
+                    <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {sessionInsights.focusSkill.name} <span style={{ color: "#f59e0b", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.focusSkill.score}/10)</span>
+                    </div>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                      {sessionInsights.focusSkill.sub}
+                    </div>
+                  </div>
+
+                  {/* Card 3: Recent Momentum */}
+                  <div className="perf-insight-card" style={{
+                    background: isDark
+                      ? "linear-gradient(135deg, rgba(168, 85, 247, 0.09) 0%, rgba(13, 10, 24, 0.95) 100%)"
+                      : "#faf5ff",
+                    border: isDark ? "1px solid rgba(168, 85, 247, 0.28)" : "1px solid #e9d5ff",
+                    borderRadius: 12,
+                    padding: "0.75rem 0.85rem",
+                  }}>
+                    <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#a855f7", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
+                      ⚡ RECENT MOMENTUM
+                    </div>
+                    <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {sessionInsights.momentum.label} <span style={{ color: sessionInsights.momentum.positive ? "#22c55e" : "#a855f7", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.momentum.diff})</span>
+                    </div>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                      {sessionInsights.momentum.subtitle}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Right Column: Leaderboard & Community Card (Screenshot 5) */}
