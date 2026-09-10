@@ -436,6 +436,26 @@ export default function ModernDashboardView({
     setCurrentTime(0);
   };
 
+  // Dynamic smooth scrolling bridge: forwards scroll to canvas scroller once a column reaches its boundary
+  const handleHeroWheel = useCallback((e) => {
+    const el = e.currentTarget;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 2;
+    const isAtTop = el.scrollTop <= 0;
+
+    if (e.deltaY > 0 && isAtBottom) {
+      const scroller = document.querySelector(".speakshine-canvas-scroller");
+      if (scroller) {
+        scroller.scrollBy({ top: e.deltaY, behavior: "auto" });
+      }
+    } else if (e.deltaY < 0 && isAtTop) {
+      const scroller = document.querySelector(".speakshine-canvas-scroller");
+      if (scroller && scroller.scrollTop > 0) {
+        scroller.scrollBy({ top: e.deltaY, behavior: "auto" });
+      }
+    }
+  }, []);
+
   const seekWaveform = (index) => {
     const targetTime = (index / WAVE_PATTERN.length) * (duration || 104);
     if (audioRef.current && !isNaN(audioRef.current.duration)) {
@@ -1528,7 +1548,7 @@ export default function ModernDashboardView({
             /* ── Section 1A: Daily Mission Accomplishment Hero Setup (Submitted Users) ── */
             <div ref={heroGridRef} className="speakshine-hero-grid w-full">
               {/* Left Accomplishment Card */}
-              <div className="speakshine-hero-left-card" style={{
+              <div className="speakshine-hero-left-card" onWheel={handleHeroWheel} style={{
                 background: "linear-gradient(145deg, #0d2818 0%, #081a10 50%, #0f172a 100%)",
                 border: "1px solid rgba(74, 222, 128, 0.35)",
                 boxShadow: "0 12px 40px rgba(16, 185, 129, 0.15)",
@@ -1538,7 +1558,6 @@ export default function ModernDashboardView({
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                overflow: "hidden",
               }}>
                 {/* Decorative background glow */}
                 <div style={{
@@ -1784,7 +1803,7 @@ export default function ModernDashboardView({
               </div>
 
               {/* Right: Streak Security & Daily Mission Status Card */}
-              <div className="speakshine-hero-right-card" style={{
+              <div className="speakshine-hero-right-card" onWheel={handleHeroWheel} style={{
                 background: "linear-gradient(145deg, #120e24 0%, #0d0918 100%)",
                 border: "1px solid rgba(74, 222, 128, 0.25)",
                 borderRadius: 18,
@@ -1917,7 +1936,7 @@ export default function ModernDashboardView({
           ) : isQuestionActive ? (
             <div ref={heroGridRef} className="speakshine-hero-grid w-full">
             {/* Left Challenge Card */}
-            <div className="speakshine-hero-left-card" style={{
+            <div className="speakshine-hero-left-card" onWheel={handleHeroWheel} style={{
               background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
               border: `1px solid ${questionConfig.theme.border || "rgba(124, 111, 255, 0.25)"}`,
               borderRadius: 18,
@@ -2224,7 +2243,7 @@ export default function ModernDashboardView({
             </div>
 
             {/* Right Column: Action Card + Target Vocabulary Card in Empty Space */}
-            <div className="speakshine-hero-right-col flex flex-col gap-4">
+            <div className="speakshine-hero-right-col flex flex-col gap-4" onWheel={handleHeroWheel}>
               {/* Right Action & Countdown Card */}
               <div className="speakshine-hero-right-card" style={{
                 background: isDark ? "#0d0a18" : "#ffffff",
@@ -2601,7 +2620,7 @@ export default function ModernDashboardView({
             /* ── Daily 12 AM Reset: Rearranged Mission Countdown & Readiness Hero ── */
             <div ref={heroGridRef} className="speakshine-hero-grid w-full">
               {/* Left: Countdown & Rest Card */}
-              <div className="speakshine-hero-left-card" style={{
+              <div className="speakshine-hero-left-card" onWheel={handleHeroWheel} style={{
                 background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
                 border: "1px solid rgba(124, 111, 255, 0.25)",
                 borderRadius: 18,
@@ -2750,7 +2769,7 @@ export default function ModernDashboardView({
               </div>
 
               {/* Right: Daily Protocol & Warm-Up Card */}
-              <div className="speakshine-hero-right-card" style={{
+              <div className="speakshine-hero-right-card" onWheel={handleHeroWheel} style={{
                 background: "#0d0a18",
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 18,
@@ -2859,6 +2878,22 @@ export default function ModernDashboardView({
               </div>
             </div>
           )}
+
+          {/* Dynamic section bridge / scroll indicator */}
+          <div className="speakshine-hero-scroll-indicator hidden lg:flex">
+            <button
+              type="button"
+              onClick={() => {
+                const kpi = document.querySelector(".speakshine-kpi-bar");
+                if (kpi) kpi.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="speakshine-next-section-pill"
+              title="Explore your streak stats and milestone roadmap"
+            >
+              <span>Explore monthly statistics &amp; streak roadmap</span>
+              <span style={{ fontSize: "0.82rem", animation: "bounceSubtle 2s infinite" }}>↓</span>
+            </button>
+          </div>
 
           {/* ── Section 2: 5 KPI Metrics Row (Screenshot 2) ── */}
           <div className="speakshine-kpi-bar" style={{

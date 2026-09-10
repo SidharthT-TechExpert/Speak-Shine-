@@ -5745,10 +5745,102 @@ audio { border-radius: 12px; }
   width: 100%;
 }
 
-@media (max-width: 1080px) {
+@media (min-width: 1025px) {
+  .speakshine-hero-grid {
+    height: calc(100vh - 120px);
+    max-height: 840px;
+    min-height: 560px;
+    align-items: stretch;
+    margin-bottom: 1.25rem;
+  }
+
+  .speakshine-hero-left-card {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+
+  .speakshine-hero-right-col,
+  .speakshine-hero-grid > .speakshine-hero-right-card {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+    padding-right: 4px;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+
+  /* Sleek custom scrollbars for separate scrolling columns */
+  .speakshine-hero-left-card::-webkit-scrollbar,
+  .speakshine-hero-right-col::-webkit-scrollbar,
+  .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar {
+    width: 5px;
+  }
+  .speakshine-hero-left-card::-webkit-scrollbar-track,
+  .speakshine-hero-right-col::-webkit-scrollbar-track,
+  .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .speakshine-hero-left-card::-webkit-scrollbar-thumb,
+  .speakshine-hero-right-col::-webkit-scrollbar-thumb,
+  .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 99px;
+  }
+  .speakshine-hero-left-card::-webkit-scrollbar-thumb:hover,
+  .speakshine-hero-right-col::-webkit-scrollbar-thumb:hover,
+  .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  [data-theme="light"] .speakshine-hero-left-card,
+  .light .speakshine-hero-left-card,
+  [data-theme="light"] .speakshine-hero-right-col,
+  .light .speakshine-hero-right-col,
+  [data-theme="light"] .speakshine-hero-grid > .speakshine-hero-right-card,
+  .light .speakshine-hero-grid > .speakshine-hero-right-card {
+    scrollbar-color: rgba(0, 0, 0, 0.14) transparent;
+  }
+  [data-theme="light"] .speakshine-hero-left-card::-webkit-scrollbar-thumb,
+  .light .speakshine-hero-left-card::-webkit-scrollbar-thumb,
+  [data-theme="light"] .speakshine-hero-right-col::-webkit-scrollbar-thumb,
+  .light .speakshine-hero-right-col::-webkit-scrollbar-thumb,
+  [data-theme="light"] .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-thumb,
+  .light .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.14);
+  }
+  [data-theme="light"] .speakshine-hero-left-card::-webkit-scrollbar-thumb:hover,
+  .light .speakshine-hero-left-card::-webkit-scrollbar-thumb:hover,
+  [data-theme="light"] .speakshine-hero-right-col::-webkit-scrollbar-thumb:hover,
+  .light .speakshine-hero-right-col::-webkit-scrollbar-thumb:hover,
+  [data-theme="light"] .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-thumb:hover,
+  .light .speakshine-hero-grid > .speakshine-hero-right-card::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.28);
+  }
+}
+
+@media (max-width: 1024px) {
   .speakshine-hero-grid {
     grid-template-columns: 1fr !important;
     gap: 1.25rem;
+    height: auto !important;
+  }
+  .speakshine-hero-left-card,
+  .speakshine-hero-right-col {
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
   }
 }
 
@@ -5758,6 +5850,54 @@ audio { border-radius: 12px; }
   gap: 1.25rem;
   min-width: 0;
   width: 100%;
+}
+
+.speakshine-hero-scroll-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: -0.25rem 0 1.25rem;
+}
+
+.speakshine-next-section-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.speakshine-next-section-pill:hover {
+  background: rgba(124, 111, 255, 0.12);
+  border-color: rgba(124, 111, 255, 0.35);
+  color: #c4b5fd;
+  transform: translateY(1px);
+}
+
+[data-theme="light"] .speakshine-next-section-pill,
+.light .speakshine-next-section-pill {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #64748b;
+}
+
+[data-theme="light"] .speakshine-next-section-pill:hover,
+.light .speakshine-next-section-pill:hover {
+  background: rgba(124, 111, 255, 0.08);
+  border-color: rgba(124, 111, 255, 0.3);
+  color: #6366f1;
+}
+
+@keyframes bounceSubtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
 }
 
 /* Mobile drawer backdrop and panel */

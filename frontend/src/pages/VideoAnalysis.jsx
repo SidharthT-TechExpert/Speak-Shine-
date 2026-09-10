@@ -712,6 +712,26 @@ export default function VideoAnalysis() {
     return h > 0 ? `${h}h ${m}m remaining` : `${m}m remaining`;
   };
 
+  // Dynamic smooth scrolling bridge: forwards scroll to canvas scroller once a column reaches its boundary
+  const handleHeroWheel = useCallback((e) => {
+    const el = e.currentTarget;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 2;
+    const isAtTop = el.scrollTop <= 0;
+
+    if (e.deltaY > 0 && isAtBottom) {
+      const scroller = document.querySelector(".speakshine-canvas-scroller");
+      if (scroller) {
+        scroller.scrollBy({ top: e.deltaY, behavior: "auto" });
+      }
+    } else if (e.deltaY < 0 && isAtTop) {
+      const scroller = document.querySelector(".speakshine-canvas-scroller");
+      if (scroller && scroller.scrollTop > 0) {
+        scroller.scrollBy({ top: e.deltaY, behavior: "auto" });
+      }
+    }
+  }, []);
+
   return (
     <Layout title="Video Analysis">
       {modal && (
@@ -843,7 +863,7 @@ export default function VideoAnalysis() {
           return (
             <div className="speakshine-hero-grid">
               {/* Left Challenge Card */}
-              <div className="speakshine-hero-left-card" style={{
+              <div className="speakshine-hero-left-card" onWheel={handleHeroWheel} style={{
                 background: "linear-gradient(145deg, #141026 0%, #0d0a18 100%)",
                 border: `1px solid ${qConfig.theme.border || "rgba(124, 111, 255, 0.25)"}`,
                 borderRadius: 18,
@@ -1143,7 +1163,7 @@ export default function VideoAnalysis() {
               </div>
 
               {/* Right Column: Action Card + Target Vocabulary Card in Empty Space */}
-              <div className="speakshine-hero-right-col flex flex-col gap-4">
+              <div className="speakshine-hero-right-col flex flex-col gap-4" onWheel={handleHeroWheel}>
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
               <div className="speakshine-hero-right-card" style={{
                 background: "#0d0a18",
@@ -1562,6 +1582,22 @@ export default function VideoAnalysis() {
           </div>
           );
         })()}
+
+        {/* Dynamic section bridge / scroll indicator */}
+        <div className="speakshine-hero-scroll-indicator hidden lg:flex">
+          <button
+            type="button"
+            onClick={() => {
+              const studio = document.querySelector("#video-studio-container, .studio-container");
+              if (studio) studio.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className="speakshine-next-section-pill"
+            title="Proceed to Recording Studio & Analysis"
+          >
+            <span>Proceed to Recording Studio &amp; AI Analysis</span>
+            <span style={{ fontSize: "0.82rem", animation: "bounceSubtle 2s infinite" }}>↓</span>
+          </button>
+        </div>
 
         {/* Accomplishment celebration banner if today's task is already submitted */}
         {isTodaySubmitted && (
