@@ -376,7 +376,7 @@ export default function VideoAnalysis() {
 
   // ── Vocabulary Audio Pronunciation Handler ──────────────────────────────────
   const [speakingVocabIndex, setSpeakingVocabIndex] = useState(null);
-  const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
+  const [vocabDropdownOpen, setVocabDropdownOpen] = useState(true);
   const vocabAudioRef = useRef(null);
 
   const handleSpeakVocab = (rawWord, rawMeaning, rawExample, idx) => {
@@ -508,7 +508,11 @@ export default function VideoAnalysis() {
         t?.submitted
       );
       setIsTodaySubmitted(isSub);
-      const userStreak = r.data?.streakRecord?.currentStreak || r.data?.streakRecord?.streak || r.data?.profile?.streak || 0;
+      const userStreak = (r.data?.profile?.streak !== undefined && r.data?.profile?.streak !== null)
+        ? r.data.profile.streak
+        : (r.data?.myStreakEntry?.streak !== undefined && r.data?.myStreakEntry?.streak !== null)
+        ? r.data.myStreakEntry.streak
+        : (user?.streak ?? 0);
       setStreak(userStreak);
       if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
       if (t?.question && active) {
@@ -1057,39 +1061,60 @@ export default function VideoAnalysis() {
 
                 {/* ── 3. Speaking Task / Question Prompt Card (Hero for all types) ── */}
                 <div className="speakshine-prompt-box" style={{
-                  background: "rgba(255, 255, 255, 0.03)",
-                  border: `1px solid ${qConfig.theme.border || "rgba(255, 255, 255, 0.08)"}`,
-                  borderRadius: 14,
-                  padding: "1.15rem 1.35rem",
+                  background: isDark
+                    ? "linear-gradient(135deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 100%)"
+                    : "linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)",
+                  border: `1px solid ${qConfig.theme.border || (isDark ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0")}`,
+                  borderLeft: `4px solid ${qConfig.theme.primary || "#38bdf8"}`,
+                  borderRadius: 16,
+                  padding: "1.25rem 1.45rem",
                   marginBottom: "1.35rem",
+                  boxShadow: isDark
+                    ? "0 8px 24px rgba(0, 0, 0, 0.25), 0 0 15px rgba(56, 189, 248, 0.05)"
+                    : "0 4px 18px rgba(0, 0, 0, 0.04)",
+                  position: "relative",
+                  overflow: "hidden",
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.65rem", flexWrap: "wrap", gap: "0.4rem" }}>
-                    <span style={{
-                      fontSize: "0.72rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.08em",
-                      color: qConfig.theme.primary,
-                      textTransform: "uppercase",
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.45rem",
+                      background: qConfig.theme.badgeBg || (isDark ? "rgba(56, 189, 248, 0.12)" : "rgba(56, 189, 248, 0.1)"),
+                      border: `1px solid ${qConfig.theme.border || (isDark ? "rgba(56, 189, 248, 0.3)" : "rgba(56, 189, 248, 0.35)")}`,
+                      padding: "0.22rem 0.65rem",
+                      borderRadius: 8,
                     }}>
-                      {qConfig.promptLabel}
-                    </span>
+                      <span style={{
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.06em",
+                        color: qConfig.theme.primary,
+                        textTransform: "uppercase",
+                      }}>
+                        {qConfig.promptLabel}
+                      </span>
+                    </div>
+
                     {(qType === "standard_question" || qType === "picture_description") && (
                       <button
                         type="button"
                         className="speakshine-tts-btn"
                         onClick={() => handleSpeak(parsedQItems.map(q => q.text).join(". "), "", "", 999)}
                         style={{
-                          background: "rgba(255, 255, 255, 0.06)",
-                          border: "1px solid rgba(255, 255, 255, 0.1)",
-                          borderRadius: 6,
-                          padding: "3px 8px",
-                          fontSize: "0.72rem",
+                          background: isDark ? "rgba(255, 255, 255, 0.07)" : "#f1f5f9",
+                          border: isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid #cbd5e1",
+                          borderRadius: 8,
+                          padding: "4px 10px",
+                          fontSize: "0.74rem",
                           fontWeight: 700,
-                          color: "#cbd5e1",
+                          color: isDark ? "#e2e8f0" : "#334155",
                           cursor: "pointer",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "0.35rem",
+                          transition: "all 0.15s ease",
+                          boxShadow: isDark ? "none" : "0 1px 2px rgba(0, 0, 0, 0.05)",
                         }}
                         title="Listen to question pronunciation"
                       >
@@ -1099,7 +1124,7 @@ export default function VideoAnalysis() {
                   </div>
 
                   {parsedQItems.length > 1 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                       {parsedQItems.map((item, idx) => (
                         <div
                           key={idx}
@@ -1107,21 +1132,21 @@ export default function VideoAnalysis() {
                           style={{
                             display: "flex",
                             alignItems: "flex-start",
-                            gap: "0.75rem",
-                            background: "rgba(255, 255, 255, 0.025)",
-                            border: "1px solid rgba(255, 255, 255, 0.05)",
-                            borderRadius: 10,
-                            padding: "0.7rem 0.9rem",
+                            gap: "0.85rem",
+                            background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                            border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
+                            borderRadius: 12,
+                            padding: "0.8rem 1rem",
                           }}
                         >
                           <span style={{
-                            minWidth: 22,
-                            height: 22,
+                            minWidth: 24,
+                            height: 24,
                             borderRadius: "50%",
                             background: qConfig.theme.badgeBg,
                             color: qConfig.theme.primary,
                             border: `1px solid ${qConfig.theme.primary}`,
-                            fontSize: "0.72rem",
+                            fontSize: "0.74rem",
                             fontWeight: 800,
                             display: "flex",
                             alignItems: "center",
@@ -1131,7 +1156,7 @@ export default function VideoAnalysis() {
                           }}>
                             {item.num || idx + 1}
                           </span>
-                          <span className="speakshine-question-text" style={{ fontSize: "0.95rem", fontWeight: 600, color: "#f8fafc", lineHeight: 1.45 }}>
+                          <span className="speakshine-question-text" style={{ fontSize: "1rem", fontWeight: 600, color: isDark ? "#f8fafc" : "#0f172a", lineHeight: 1.6 }}>
                             {item.text}
                           </span>
                         </div>
@@ -1139,11 +1164,11 @@ export default function VideoAnalysis() {
                     </div>
                   ) : (
                     <div className="speakshine-question-text" style={{
-                      fontSize: "1.18rem",
+                      fontSize: "1.14rem",
                       fontWeight: 600,
-                      color: "#ffffff",
-                      lineHeight: 1.5,
-                      letterSpacing: "-0.01em",
+                      color: isDark ? "#ffffff" : "#0f172a",
+                      lineHeight: 1.65,
+                      letterSpacing: "-0.012em",
                     }}>
                       {todayQuestion?.question || (isMonthlyGoals ? "Record a video detailing your personal learning milestones, dreams, and specific goals for this month." : isMonthlyReflection ? "Answer all monthly reflection questions below to assess your growth and learning progress." : "What's on your mind today? Share your thoughts clearly.")}
                     </div>
@@ -1152,8 +1177,19 @@ export default function VideoAnalysis() {
                   {todayQuestion?.imageInstructions &&
                     todayQuestion.imageInstructions.trim().toLowerCase() !== (todayQuestion.question || "").trim().toLowerCase() &&
                     todayQuestion.imageInstructions.trim().toLowerCase() !== (todayQuestion.prompt || "").trim().toLowerCase() && (
-                    <div style={{ marginTop: "0.75rem", fontSize: "0.84rem", color: "#94a3b8", fontStyle: "italic", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.6rem" }}>
-                      💡 {todayQuestion.imageInstructions}
+                    <div style={{
+                      marginTop: "0.85rem",
+                      fontSize: "0.85rem",
+                      color: isDark ? "#94a3b8" : "#64748b",
+                      borderTop: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
+                      paddingTop: "0.7rem",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "0.45rem",
+                      lineHeight: 1.5,
+                    }}>
+                      <span>💡</span>
+                      <span>{todayQuestion.imageInstructions}</span>
                     </div>
                   )}
                 </div>
@@ -1199,38 +1235,57 @@ export default function VideoAnalysis() {
                   {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
                   <MidnightCountdownTimer />
 
-                  {/* Streak Warning Banner with Red Icon & Yellow Text */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.55rem",
-                    fontSize: "0.82rem",
-                    background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.12)",
-                    border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(245, 158, 11, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.55rem 0.85rem",
-                    marginBottom: "0.85rem",
-                  }}>
-                    <span style={{
-                      display: "inline-flex",
+                  {/* Streak Status Banner */}
+                  {isTodaySubmitted ? (
+                    <div style={{
+                      display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "1.05rem",
-                      filter: "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))",
-                      color: "#ef4444",
-                      flexShrink: 0,
+                      gap: "0.55rem",
+                      fontSize: "0.82rem",
+                      background: isDark ? "rgba(34, 197, 94, 0.1)" : "rgba(34, 197, 94, 0.12)",
+                      border: isDark ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(34, 197, 94, 0.35)",
+                      borderRadius: 10,
+                      padding: "0.55rem 0.85rem",
+                      marginBottom: "0.85rem",
                     }}>
-                      ⚠️
-                    </span>
-                    <span style={{
-                      color: isDark ? "#fbbf24" : "#b45309",
-                      fontWeight: 700,
-                      lineHeight: 1.35,
-                      letterSpacing: "-0.01em",
+                      <span style={{ fontSize: "1.05rem", color: "#22c55e", flexShrink: 0 }}>✓</span>
+                      <span style={{ color: isDark ? "#4ade80" : "#15803d", fontWeight: 700, lineHeight: 1.35 }}>
+                        {streak > 0 ? `${streak}-day streak secured! Today's mission completed.` : "Today's speaking mission accomplished!"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.55rem",
+                      fontSize: "0.82rem",
+                      background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.12)",
+                      border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(245, 158, 11, 0.35)",
+                      borderRadius: 10,
+                      padding: "0.55rem 0.85rem",
+                      marginBottom: "0.85rem",
                     }}>
-                      {streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}
-                    </span>
-                  </div>
+                      <span style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "1.05rem",
+                        filter: "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))",
+                        color: "#ef4444",
+                        flexShrink: 0,
+                      }}>
+                        ⚠️
+                      </span>
+                      <span style={{
+                        color: isDark ? "#fbbf24" : "#b45309",
+                        fontWeight: 700,
+                        lineHeight: 1.35,
+                        letterSpacing: "-0.01em",
+                      }}>
+                        {streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Rules to Remember */}
                   <div className="speakshine-rules-box" style={{
@@ -1519,10 +1574,10 @@ export default function VideoAnalysis() {
                   }}>
                     <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>🔥</div>
                     <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
-                      {streak > 0 ? `${streak + 1} Days` : "Day 1"}
+                      {streak > 0 ? `${streak} Days` : (isTodaySubmitted ? "1 Day" : "Day 0")}
                     </div>
-                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isDark ? "#fb923c" : "#ea580c", textTransform: "uppercase", marginTop: "2px" }}>
-                      Streak Locked
+                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isTodaySubmitted ? (isDark ? "#4ade80" : "#15803d") : (isDark ? "#fb923c" : "#ea580c"), textTransform: "uppercase", marginTop: "2px" }}>
+                      {isTodaySubmitted ? "Streak Secured" : (streak > 0 ? "Current Streak" : "Start Streak")}
                     </div>
                   </div>
 
