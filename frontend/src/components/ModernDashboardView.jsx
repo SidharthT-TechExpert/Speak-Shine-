@@ -695,16 +695,15 @@ export default function ModernDashboardView({
     const totalSpeakFormatted = formatSpeakTime(totalSpeakSeconds);
     const avgSpeakFormatted = formatSpeakTime(avgSeconds);
 
-    // 3. This week completion count and active days (Monday 00:00:00 to Sunday 23:59:59 IST)
+    // 3. This week completion count and active days (Sunday 00:00:00 to Saturday 23:59:59 IST)
     const day = nowIST.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const monday = new Date(nowIST);
-    monday.setDate(nowIST.getDate() + mondayOffset);
-    monday.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(nowIST);
+    startOfWeek.setDate(nowIST.getDate() - day);
+    startOfWeek.setHours(0, 0, 0, 0);
 
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
 
     const activeDaysSet = new Set();
     (scores || []).forEach(s => {
@@ -713,7 +712,7 @@ export default function ModernDashboardView({
       const d = new Date(raw);
       if (isNaN(d.getTime())) return;
       const sd = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      if (sd >= monday && sd <= sunday) {
+      if (sd >= startOfWeek && sd <= endOfWeek) {
         const dName = sd.toLocaleString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
         activeDaysSet.add(dName);
       }
@@ -724,21 +723,17 @@ export default function ModernDashboardView({
       activeDaysSet.add(todayDayName);
     }
 
-    const DAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const DAY_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const activeDaysList = DAY_ORDER.filter(d => activeDaysSet.has(d));
 
-    const weeklyCount = Math.min(
-      7,
-      Math.max(activeDaysList.length, profile?.weeklySubmissions ?? 0, isTodaySubmitted ? 1 : 0)
-    );
+    // The weekly completion count strictly matches the exact number of active days
+    const weeklyCount = activeDaysList.length;
 
     let weeklyDaysSubtitle = "No sessions yet this week";
-    if (activeDaysList.length === 7) {
+    if (weeklyCount === 7) {
       weeklyDaysSubtitle = "Active every day this week! 🔥";
-    } else if (activeDaysList.length > 0) {
-      weeklyDaysSubtitle = `Active on ${activeDaysList.join(", ")}`;
     } else if (weeklyCount > 0) {
-      weeklyDaysSubtitle = `${weeklyCount} session${weeklyCount > 1 ? "s" : ""} completed`;
+      weeklyDaysSubtitle = `Active on ${activeDaysList.join(", ")}`;
     }
 
     return {
