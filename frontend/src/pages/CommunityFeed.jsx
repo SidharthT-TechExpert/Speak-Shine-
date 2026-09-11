@@ -426,18 +426,34 @@ function DetailedReport({ a }) {
       )}
 
       {/* Grammar errors */}
-      {a.grammarErrors?.length > 0 && (
-        <Section title="❌ Grammar Issues">
-          {a.grammarErrors.map((e, i) => (
-            <div key={i} style={{ marginBottom: "0.5rem", paddingLeft: "0.5rem", borderLeft: "3px solid var(--danger)" }}>
-              <span style={{ color: "var(--muted)", fontStyle: "italic" }}>"{e.original}"</span>
-              {" → "}
-              <strong style={{ color: "var(--success)" }}>"{e.correction}"</strong>
-              {e.rule && <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}> ({e.rule})</span>}
-            </div>
-          ))}
-        </Section>
-      )}
+      {(() => {
+        const validGrammarErrors = (a.grammarErrors || []).filter(e => {
+          const o = (e?.original || "").trim().toLowerCase();
+          const c = (e?.correction || "").trim().toLowerCase();
+          const rule = (e?.rule || "").toLowerCase();
+          if (!o || !c) return false;
+          // In spoken audio, words that sound identical (homophones, apostrophes) are STT spelling artifacts, not speech errors
+          if (o.replace(/[^a-z0-9]/g, "") === c.replace(/[^a-z0-9]/g, "")) return false;
+          if (/possessive pronoun|apostrophe|contraction|did you mean .*instead of|homophone|spelling of/i.test(rule)) return false;
+          if (/^(the|a|an)$/i.test(c) && o.split(/\s+/).length > 1) return false;
+          return true;
+        });
+
+        if (!validGrammarErrors.length) return null;
+
+        return (
+          <Section title="❌ Grammar Issues">
+            {validGrammarErrors.map((e, i) => (
+              <div key={i} style={{ marginBottom: "0.5rem", paddingLeft: "0.5rem", borderLeft: "3px solid var(--danger)" }}>
+                <span style={{ color: "var(--muted)", fontStyle: "italic" }}>"{e.original}"</span>
+                {" → "}
+                <strong style={{ color: "var(--success)" }}>"{e.correction}"</strong>
+                {e.rule && <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}> ({e.rule})</span>}
+              </div>
+            ))}
+          </Section>
+        );
+      })()}
 
       {/* Strong points */}
       {a.strongPoints?.length > 0 && (

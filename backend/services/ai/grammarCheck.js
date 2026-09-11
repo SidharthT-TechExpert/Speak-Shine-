@@ -13,6 +13,19 @@ const IGNORED_RULE_IDS = [
   "DOUBLE_PUNCTUATION",
   "UNLIKELY_OPENING_PUNCTUATION",
   "WORD_CONTAINS_UNDERSCORE",
+  "IT_S_ITS",
+  "ITS_IT_S",
+  "THEIR_THERE",
+  "THERE_THEIR",
+  "YOUR_YOU_RE",
+  "YOU_RE_YOUR",
+  "WHO_S_WHOSE",
+  "WHOSE_WHO_S",
+  "POSSESSIVE_APOSTROPHE",
+  "CONTRACTION_APOSTROPHE",
+  "CONFUSED_WORDS",
+  "HOMOPHONES",
+  "ENGLISH_WORD_REPEAT_RULE",
 ];
 
 // Category IDs to ignore (too noisy for spoken English / STT)
@@ -21,6 +34,7 @@ const IGNORED_CATEGORIES = [
   "PUNCTUATION",
   "CASING",
   "COMPOUNDING", // often false positives on spoken fragments
+  "CONFUSED_WORDS",
 ];
 
 /** True when correction only changes letter case (STT has no caps). */
@@ -29,6 +43,41 @@ export function isOnlyCapitalizationChange(original, correction) {
   const c = (correction || "").trim();
   if (!o || !c) return false;
   return o.toLowerCase() === c.toLowerCase() && o !== c;
+}
+
+/** Spoken sound is identical for homophones / contractions / apostrophe changes (STT artifacts). */
+export function isSpokenHomophoneOrPunctuationNoise(original, correction) {
+  const o = (original || "").trim().toLowerCase();
+  const c = (correction || "").trim().toLowerCase();
+  if (!o || !c) return false;
+
+  // 1. Exact match when stripping apostrophes, hyphens, and punctuation (e.g. "it's" vs "its", "let's" vs "lets")
+  const oClean = o.replace(/[^a-z0-9]/g, "");
+  const cClean = c.replace(/[^a-z0-9]/g, "");
+  if (oClean && oClean === cClean) return true;
+
+  // 2. Common spoken homophone pairs (sound identical in speech — STT spelling choice)
+  const pair = `${o}:${c}`;
+  const reversePair = `${c}:${o}`;
+  const HOMOPHONES = new Set([
+    "it's:its", "its:it's",
+    "they're:their", "their:they're", "there:their", "their:there", "there:they're", "they're:there",
+    "you're:your", "your:you're",
+    "who's:whose", "whose:who's",
+    "we're:were", "were:we're",
+    "hear:here", "here:hear",
+    "to:too", "too:to", "to:two", "two:to",
+    "passed:past", "past:passed",
+    "affect:effect", "effect:affect",
+    "loose:lose", "lose:loose",
+    "by:buy", "buy:by", "bye:by",
+    "right:write", "write:right",
+    "weather:whether", "whether:weather",
+    "peace:piece", "piece:peace",
+  ]);
+  if (HOMOPHONES.has(pair) || HOMOPHONES.has(reversePair)) return true;
+
+  return false;
 }
 
 /** STT often duplicates words/syllables: "i I", "the the". */
@@ -41,7 +90,7 @@ export function isSttRepetitionFix(original, correction) {
 }
 
 /**
- * Keep only substantive grammar mistakes — not STT/capitalization noise.
+ * Keep only substantive grammar mistakes — not STT, writing, or apostrophe noise.
  */
 export function filterGrammarErrors(errors) {
   return (errors || []).filter((e) => {
@@ -49,9 +98,22 @@ export function filterGrammarErrors(errors) {
     const correction = (e?.correction || "").trim();
     const rule = (e?.rule || "").toLowerCase();
 
-    if (!original || !correction || original.length < 4) return false;
+    if (!original || !correction || original.length < 3) return false;
     if (isOnlyCapitalizationChange(original, correction)) return false;
     if (isSttRepetitionFix(original, correction)) return false;
+    if (isSpokenHomophoneOrPunctuationNoise(original, correction)) return false;
+
+    // Filter out rules describing apostrophes, possessives, or written spelling
+    if (
+      /possessive pronoun|apostrophe|contraction|did you mean .*instead of|homophone|spelling of|confused word/i.test(rule)
+    ) {
+      return false;
+    }
+
+    // Filter out nonsensical corrections where an isolated article replaces a multi-word phrase (e.g. "the everyone" -> "the")
+    if (/^(the|a|an)$/i.test(correction) && original.split(/\s+/).length > 1) {
+      return false;
+    }
 
     if (
       /capitaliz|casing|typograph|proper noun|brand name|spelling of/i.test(rule) ||
