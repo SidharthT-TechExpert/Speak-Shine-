@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 /**
  * Shown to unauthenticated (guest) users at the top of any page.
@@ -8,6 +9,24 @@ import api from "../api/client.js";
  */
 export default function GuestBanner() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Guard: if user is logged in, never display the guest preview banner
+  const hasAuth = Boolean(
+    user ||
+    (() => {
+      try {
+        const u = localStorage.getItem("speakshine_user");
+        if (u && JSON.parse(u)?.phone) return true;
+        const p = localStorage.getItem("speakshine_profile_cache");
+        if (p && JSON.parse(p)?.name && JSON.parse(p).name !== "Preview User") return true;
+      } catch {}
+      return false;
+    })()
+  );
+
+  if (hasAuth) return null;
+
   const [slots, setSlots] = useState({ slotsLeft: 5, totalSlots: 20, percentFull: 75, isFull: false });
 
   useEffect(() => {

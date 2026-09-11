@@ -793,12 +793,24 @@ function buildGuestData() {
 
 export default function UserDashboard() {
   const { user, logout } = useAuth();
-  const isGuest = !user;
+  const cached = getCachedDashboard();
+  const hasRealUser = Boolean(
+    user ||
+    (cached?.profile?.name && cached.profile.name !== "Preview User") ||
+    (() => {
+      try {
+        const u = localStorage.getItem("speakshine_user");
+        if (u && JSON.parse(u)?.phone) return true;
+        const p = localStorage.getItem("speakshine_profile_cache");
+        return Boolean(p && JSON.parse(p)?.name && JSON.parse(p).name !== "Preview User");
+      } catch { return false; }
+    })()
+  );
+  const isGuest = !hasRealUser;
 
-  const cached = isGuest ? null : getCachedDashboard();
-  const [data, setData] = useState(() => isGuest ? buildGuestData() : cached);
+  const [data, setData] = useState(() => (hasRealUser && cached) ? cached : (hasRealUser ? null : buildGuestData()));
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(!isGuest && !cached);
+  const [loading, setLoading] = useState(hasRealUser && !cached);
   const [liveSessions, setLiveSessions] = useState([]);
   const [sessionPage, setSessionPage] = useState(1);
   const [celebrationQueue, setCelebrationQueue] = useState([]);
@@ -849,7 +861,7 @@ export default function UserDashboard() {
   };
 
   useEffect(() => {
-    if (isGuest) return; // guests already have dummy data
+    if (isGuest && !hasRealUser) return; // only pure guests skip fetching
     const fetchData = () => {
       Promise.all([
         api.get("/dashboard/me"),
@@ -860,7 +872,11 @@ export default function UserDashboard() {
         setLiveSessions((ls.data || []).filter(s => s.status === "live" || s.status === "scheduled"));
       })
         .catch(err => {
-          if (!getCachedDashboard()) setError(err.response?.data?.error || "Failed to load data");
+          if (err.response?.status === 401 && !user) {
+            setData(buildGuestData());
+          } else if (!getCachedDashboard()) {
+            setError(err.response?.data?.error || "Failed to load data");
+          }
         })
         .finally(() => setLoading(false));
     };
@@ -871,7 +887,7 @@ export default function UserDashboard() {
       setCachedDashboard(d.data);
     }).catch(() => { }), 30_000);
     return () => clearInterval(interval);
-  }, [isGuest]);
+  }, [isGuest, hasRealUser, user]);
 
   if (loading) return <Layout title="My Dashboard"><div className="spinner-wrap"><div className="spinner" /><p style={{ color: "var(--muted)" }}>Loading…</p></div></Layout>;
   if (error) return <Layout title="My Dashboard"><div className="error-box"><p>{error}</p><button className="btn-primary" style={{ marginTop: "1rem" }} onClick={() => window.location.reload()}>Retry</button></div></Layout>;

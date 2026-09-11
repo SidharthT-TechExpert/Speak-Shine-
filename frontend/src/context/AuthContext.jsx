@@ -13,8 +13,15 @@ const COOKIE_AUTH_SENTINEL = "cookie-session";
 
 export function AuthProvider({ children }) {
   const { applyTheme } = useTheme();
-  // User profile lives in memory only — never persisted to localStorage
-  const [user, setUser] = useState(null);
+  // Restore user from localStorage immediately so page reloads never flash guest mode
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("speakshine_user") || localStorage.getItem("user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [booting, setBooting] = useState(true);
   // token is exposed for socket connections — uses legacy localStorage value
   // or the sentinel string when fully on cookie auth
@@ -41,60 +48,103 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Boot: try to restore session via cookie-based silent refresh
-  useEffect(() => {
-    let cancelled = false;
-    localStorage.removeItem("user"); // wipe stale persisted data
-
-    (async () => {
-      const sessionValid = await ensureFreshToken();
-      if (cancelled) return;
-
-      if (sessionValid) {
-        try {
-          const { data } = await api.get("/users/me");
-          if (!cancelled && data?.auth) {
-            const userTheme = data.auth.theme || (data.auth.isDark === false ? "light" : "dark");
-            const isDarkVal = data.auth.isDark ?? (userTheme !== "light");
-            setUser({
-              phone: data.auth.phone,
-              role:  data.auth.role,
-              name:  data.auth.name,
-              // paid comes from the User tracking document
-              paid:  data.user?.paid ?? false,
-              theme: userTheme,
-              isDark: isDarkVal,
-            });
-            if (userTheme) {
-              applyTheme(userTheme);
-            }
-            // After migration: no localStorage token → use sentinel for socket
-            setToken(localStorage.getItem("token") || COOKIE_AUTH_SENTINEL);
-            scheduleRefresh();
-          }
-        } catch (err) {
-          console.warn("[Auth] Failed to load profile on boot:", err?.message);
-        }
-      }
-      if (!cancelled) setBooting(false);
-    })();
-
-    return () => { cancelled = true; };
-  }, [scheduleRefresh, applyTheme]);
-
   const clearSession = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("speakshine_user");
     localStorage.removeItem("dashboard_cache");
     stopRefresh();
     setUser(null);
     setToken(null);
   }, [stopRefresh]);
 
+  // Boot: verify active session via access_token cookie, or fall back to silent refresh
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // 1. First test current session directly (browser sends access_token cookie)
+        const { data } = await api.get("/users/me");
+        if (!cancelled && data?.auth) {
+          const userTheme = data.auth.theme || (data.auth.isDark === false ? "light" : "dark");
+          const isDarkVal = data.auth.isDark ?? (userTheme !== "light");
+          const userData = {
+            phone: data.auth.phone,
+            role:  data.auth.role,
+            name:  data.auth.name,
+            paid:  data.user?.paid ?? false,
+            theme: userTheme,
+            isDark: isDarkVal,
+          };
+          setUser(userData);
+          try {
+            localStorage.setItem("speakshine_user", JSON.stringify(userData));
+          } catch {}
+          if (userTheme) {
+            applyTheme(userTheme);
+          }
+          setToken(localStorage.getItem("token") || COOKIE_AUTH_SENTINEL);
+          scheduleRefresh();
+          if (!cancelled) setBooting(false);
+          return;
+        }
+      } catch (err) {
+        // 2. If access_token expired (401), attempt silent refresh
+        if (err.response?.status === 401) {
+          try {
+            const sessionValid = await ensureFreshToken();
+            if (!cancelled && sessionValid) {
+              const { data } = await api.get("/users/me");
+              if (!cancelled && data?.auth) {
+                const userTheme = data.auth.theme || (data.auth.isDark === false ? "light" : "dark");
+                const isDarkVal = data.auth.isDark ?? (userTheme !== "light");
+                const userData = {
+                  phone: data.auth.phone,
+                  role:  data.auth.role,
+                  name:  data.auth.name,
+                  paid:  data.user?.paid ?? false,
+                  theme: userTheme,
+                  isDark: isDarkVal,
+                };
+                setUser(userData);
+                try {
+                  localStorage.setItem("speakshine_user", JSON.stringify(userData));
+                } catch {}
+                if (userTheme) {
+                  applyTheme(userTheme);
+                }
+                setToken(localStorage.getItem("token") || COOKIE_AUTH_SENTINEL);
+                scheduleRefresh();
+                if (!cancelled) setBooting(false);
+                return;
+              }
+            }
+          } catch (refreshErr) {
+            console.warn("[Auth] Refresh failed on boot:", refreshErr?.message);
+          }
+          // Server explicitly returned 401 on both access and refresh
+          if (!cancelled) {
+            clearSession();
+          }
+        } else {
+          // Temporary network failure or 5xx server restart — preserve user session from localStorage
+          console.warn("[Auth] Server unavailable or network drop on boot, retaining cached session:", err?.message);
+        }
+      }
+      if (!cancelled) setBooting(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [scheduleRefresh, applyTheme, clearSession]);
+
   const login = useCallback((userData) => {
-    // Tokens are set as httpOnly cookies by the server — just store user in memory
+    // Tokens are set as httpOnly cookies by the server — store user in memory and localStorage
     setUser(userData);
+    try {
+      localStorage.setItem("speakshine_user", JSON.stringify(userData));
+    } catch {}
     setToken(COOKIE_AUTH_SENTINEL);
     const userTheme = userData?.theme || (userData?.isDark === false ? "light" : (userData?.isDark ? "dark" : null));
     if (userTheme) {
