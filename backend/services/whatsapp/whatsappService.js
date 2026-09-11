@@ -428,9 +428,8 @@ export async function initWhatsAppBot() {
               const responseText =
                 `🏷️ *Group Details*\n\n` +
                 `📌 *Group Name:* ${groupName}\n` +
-                `🆔 *Full Group JID:*\n\`${jid}\`\n\n` +
-                `🔢 *Group ID Number:*\n\`${numericId}\`\n\n` +
-                `_💡 You can set either the Full Group JID (\`${jid}\`) or just the Number (\`${numericId}\`) as TARGET_GROUP in your Speak & Shine settings._`;
+                `🆔 *Group ID:*\n\`${numericId}\`\n\n` +
+                `_💡 Set this ID as TARGET_GROUP in your Speak & Shine settings._`;
 
               await sock.sendMessage(jid, { text: responseText }, { quoted: msg });
             } else if (jid.endsWith("@s.whatsapp.net")) {
