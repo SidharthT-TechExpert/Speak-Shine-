@@ -828,6 +828,49 @@ export const DEFAULT_SUBMISSION_TEMPLATES = {
 };
 
 /**
+ * Extracts the user's WhatsApp mention tag and target JID(s).
+ * Normalizes Indian numbers (e.g. 10 digits starting with 6-9 -> 91<phone>@s.whatsapp.net)
+ * and includes any companion/LID JIDs in the mentions array.
+ *
+ * @param {object} user
+ * @returns {{ mentionTag: string, jids: string[] }}
+ */
+export function getUserMentionInfo(user = {}) {
+  const jids = [];
+  let mentionTag = "";
+
+  // 1. Clean phone number
+  const rawPhone = user.phone || "";
+  let cleanPhone = String(rawPhone).replace(/[^0-9]/g, "");
+  if (cleanPhone.length === 10 && /^[6-9]/.test(cleanPhone)) {
+    cleanPhone = `91${cleanPhone}`;
+  }
+
+  // 2. Check userId and authUserId
+  const candidateIds = [user.userId, user.authUserId].filter(Boolean);
+  for (const cid of candidateIds) {
+    const s = String(cid).trim();
+    if (s.endsWith("@s.whatsapp.net") || s.endsWith("@lid")) {
+      if (!jids.includes(s)) jids.push(s);
+      if (!mentionTag) {
+        mentionTag = s.replace(/@.*$/, "").replace(/:.*$/, "");
+      }
+    }
+  }
+
+  // 3. If phone is available, prefer phone for clean mention tag
+  if (cleanPhone && cleanPhone.length >= 10) {
+    const phoneJid = `${cleanPhone}@s.whatsapp.net`;
+    if (!jids.includes(phoneJid)) {
+      jids.push(phoneJid);
+    }
+    mentionTag = cleanPhone;
+  }
+
+  return { mentionTag, jids };
+}
+
+/**
  * Render dynamic submission report template with live data tokens.
  */
 export function buildSubmissionReportMessage({
@@ -884,11 +927,15 @@ export function buildSubmissionReportMessage({
     submittedListStr = "_No submissions yet today._";
   }
 
-  // Build pending list string
+  // Build pending list string with WhatsApp mentions
   let pendingListStr = "";
   if (pendingUsers.length > 0) {
     pendingListStr = pendingUsers.map((u, i) => {
       const displayName = u.name || `Student ${u.phone ? u.phone.slice(-4) : i + 1}`;
+      const { mentionTag } = getUserMentionInfo(u);
+      if (mentionTag) {
+        return `${i + 1}. @${mentionTag} (${displayName})`;
+      }
       return `${i + 1}. ${displayName}`;
     }).join("\n");
   } else {
@@ -937,13 +984,37 @@ export function buildSubmissionReportMessage({
  */
 export async function getSubmissionReportSummary() {
   try {
-    const paidUsers = await User.find({ paid: true }).sort({ name: 1 }).lean();
-    const status = await Status.findOne().lean();
-    const submittedUsers = paidUsers.filter(u => u.completed);
-    const pendingUsers = paidUsers.filter(u => !u.completed);
+    const [paidUsers, status, authRecords] = await Promise.all([
+      User.find({ paid: true }).sort({ name: 1 }).lean(),
+      Status.findOne().lean(),
+      Auth.find({}).select("phone userId name").lean().catch(() => []),
+    ]);
+
+    const authByPhone = {};
+    for (const a of (authRecords || [])) {
+      if (a.phone) {
+        const clean = String(a.phone).replace(/[^0-9]/g, "");
+        authByPhone[clean] = a;
+        if (clean.startsWith("91")) authByPhone[clean.slice(2)] = a;
+        else authByPhone[`91${clean}`] = a;
+      }
+    }
+
+    const enrichedPaidUsers = paidUsers.map(u => {
+      const cleanPhone = String(u.phone || "").replace(/[^0-9]/g, "");
+      const matchedAuth = authByPhone[cleanPhone] || {};
+      return {
+        ...u,
+        userId: u.userId || matchedAuth.userId,
+        authUserId: matchedAuth.userId,
+      };
+    });
+
+    const submittedUsers = enrichedPaidUsers.filter(u => u.completed);
+    const pendingUsers = enrichedPaidUsers.filter(u => !u.completed);
     
     const previewMessage = buildSubmissionReportMessage({
-      paidUsers,
+      paidUsers: enrichedPaidUsers,
       submittedUsers,
       pendingUsers,
       status,
@@ -951,7 +1022,7 @@ export async function getSubmissionReportSummary() {
     });
 
     return {
-      totalPaid: paidUsers.length,
+      totalPaid: enrichedPaidUsers.length,
       submittedCount: submittedUsers.length,
       pendingCount: pendingUsers.length,
       submittedNames: submittedUsers.map(u => u.name || `User ${u.phone ? u.phone.slice(-4) : ""}`).filter(Boolean),
@@ -976,10 +1047,11 @@ export async function sendDailySubmissionReportToGroup(options = {}) {
   // Ensure WhatsApp socket is connected (auto-connects from MongoDB if needed)
   await ensureWhatsAppConnected(15000);
 
-  // 1. Fetch all PAID users only
-  const [paidUsers, status] = await Promise.all([
+  // 1. Fetch all PAID users and Auth records to resolve JIDs
+  const [paidUsers, status, authRecords] = await Promise.all([
     User.find({ paid: true }).sort({ name: 1 }).lean(),
     Status.findOne().lean(),
+    Auth.find({}).select("phone userId name").lean().catch(() => []),
   ]);
 
   if (!paidUsers || paidUsers.length === 0) {
@@ -987,8 +1059,28 @@ export async function sendDailySubmissionReportToGroup(options = {}) {
     return { success: false, message: "No paid users found in the system." };
   }
 
-  const submittedUsers = paidUsers.filter(u => u.completed);
-  const pendingUsers = paidUsers.filter(u => !u.completed);
+  const authByPhone = {};
+  for (const a of (authRecords || [])) {
+    if (a.phone) {
+      const clean = String(a.phone).replace(/[^0-9]/g, "");
+      authByPhone[clean] = a;
+      if (clean.startsWith("91")) authByPhone[clean.slice(2)] = a;
+      else authByPhone[`91${clean}`] = a;
+    }
+  }
+
+  const enrichedPaidUsers = paidUsers.map(u => {
+    const cleanPhone = String(u.phone || "").replace(/[^0-9]/g, "");
+    const matchedAuth = authByPhone[cleanPhone] || {};
+    return {
+      ...u,
+      userId: u.userId || matchedAuth.userId,
+      authUserId: matchedAuth.userId,
+    };
+  });
+
+  const submittedUsers = enrichedPaidUsers.filter(u => u.completed);
+  const pendingUsers = enrichedPaidUsers.filter(u => !u.completed);
 
   // Match slot options
   const timeSlot = options.timeSlot || null;
@@ -1006,7 +1098,7 @@ export async function sendDailySubmissionReportToGroup(options = {}) {
   }
 
   const message = buildSubmissionReportMessage({
-    paidUsers,
+    paidUsers: enrichedPaidUsers,
     submittedUsers,
     pendingUsers,
     status,
@@ -1015,8 +1107,17 @@ export async function sendDailySubmissionReportToGroup(options = {}) {
     timeSlot,
   });
 
-  console.log(`[WhatsApp] 📤 Dispatching submission report (${templateType}) to ${targetGroup}...`);
-  await sock.sendMessage(targetGroup, { text: message });
+  // Collect all unique JIDs to mention in the message
+  const mentions = [];
+  for (const u of pendingUsers) {
+    const { jids } = getUserMentionInfo(u);
+    for (const j of jids) {
+      if (!mentions.includes(j)) mentions.push(j);
+    }
+  }
+
+  console.log(`[WhatsApp] 📤 Dispatching submission report (${templateType}) to ${targetGroup} with ${mentions.length} mentions...`);
+  await sock.sendMessage(targetGroup, { text: message, mentions });
   console.log(`[WhatsApp] ✅ Submission report sent successfully to ${targetGroup}!`);
 
   const totalPaid = paidUsers.length;
