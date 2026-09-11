@@ -205,6 +205,12 @@ export default function Login({ loginFor = "user" }) {
         setServerError("Trainer credentials required.");
         return;
       }
+      if (data.token || data.accessToken) {
+        localStorage.setItem("token", data.token || data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
       login({
         phone: data.phone,
         role: data.role,

@@ -12,11 +12,15 @@ const ACCESS_TOKEN_MAX_AGE = process.env.ACCESS_TOKEN_MAX_AGE
   ? Number(process.env.ACCESS_TOKEN_MAX_AGE)
   : 24 * 60 * 60 * 1000;
 
-function setAuthCookies(res, accessToken, refreshToken) {
+function setAuthCookies(res, accessToken, refreshToken, req = null) {
+  // If req is provided, check if the request is actually secure (https or forwarded https)
+  // Over plain HTTP (like http://localhost:5173), setting secure: true causes browsers to reject the cookie!
+  const isSecure = isProd && (req ? (req.secure || req.headers?.["x-forwarded-proto"] === "https") : true);
+
   // Access token cookie — 24 hours
   res.cookie("access_token", accessToken, {
     httpOnly: true,
-    secure: isProd,
+    secure: isSecure,
     sameSite: "lax",
     maxAge: ACCESS_TOKEN_MAX_AGE,
     path: "/",
@@ -24,7 +28,7 @@ function setAuthCookies(res, accessToken, refreshToken) {
   // Refresh token cookie — 30 days, httpOnly
   res.cookie("refresh_token", refreshToken, {
     httpOnly: true,
-    secure: isProd,
+    secure: isSecure,
     sameSite: "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     path: "/",
@@ -44,10 +48,13 @@ export async function login(req, res, next) {
     const { phone, password } = req.body;
     const result = await authService.loginUser(phone, password, req.ip);
     // Set tokens as httpOnly cookies
-    setAuthCookies(res, result.accessToken, result.refreshToken);
-    // Return user info (no tokens in body — they're in cookies)
+    setAuthCookies(res, result.accessToken, result.refreshToken, req);
+    // Return user info AND tokens for dual persistence (cookies + localStorage fallback)
     res.json({
       success: true,
+      token: result.accessToken,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       role: result.role,
       name: result.name,
       phone: result.phone,
@@ -67,11 +74,11 @@ export async function login(req, res, next) {
 
 /**
  * POST /api/auth/refresh
- * Reads refresh token from cookie, issues new tokens as cookies.
+ * Reads refresh token from cookie or request body, issues new tokens as cookies and response JSON.
  */
 export async function refresh(req, res, next) {
   try {
-    // Accept from cookie first, fall back to body (for backward compat during migration)
+    // Accept from cookie first, fall back to body (for backward compat / localStorage fallback)
     const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken;
     if (!refreshToken) {
       clearAuthCookies(res);
@@ -79,8 +86,14 @@ export async function refresh(req, res, next) {
     }
     const result = await authService.refreshAccessToken(refreshToken, req.ip);
     // Rotate both cookies
-    setAuthCookies(res, result.accessToken, result.refreshToken);
-    res.json({ success: true, expiresIn: result.expiresIn });
+    setAuthCookies(res, result.accessToken, result.refreshToken, req);
+    res.json({
+      success: true,
+      token: result.accessToken,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn
+    });
   } catch (error) {
     clearAuthCookies(res);
     const status = error.statusCode || (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError" || error.name === "CastError" ? 401 : 500);

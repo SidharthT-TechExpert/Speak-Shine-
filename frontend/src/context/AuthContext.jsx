@@ -145,7 +145,7 @@ export function AuthProvider({ children }) {
     try {
       localStorage.setItem("speakshine_user", JSON.stringify(userData));
     } catch {}
-    setToken(COOKIE_AUTH_SENTINEL);
+    setToken(localStorage.getItem("token") || COOKIE_AUTH_SENTINEL);
     const userTheme = userData?.theme || (userData?.isDark === false ? "light" : (userData?.isDark ? "dark" : null));
     if (userTheme) {
       applyTheme(userTheme);
@@ -155,7 +155,8 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try {
-      await api.post("/auth/logout", {});
+      const refreshToken = localStorage.getItem("refreshToken");
+      await api.post("/auth/logout", { refreshToken });
     } catch {}
     clearSession();
   }, [clearSession]);

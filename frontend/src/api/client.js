@@ -29,9 +29,19 @@ function onTokenRefreshed() {
 }
 
 async function refreshAccessToken() {
-  // Token is in httpOnly cookie — just call /refresh, server rotates both cookies
+  const localRefreshToken = localStorage.getItem("refreshToken");
   try {
-    await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+    const res = await axios.post(`${BASE_URL}/auth/refresh`, {
+      refreshToken: localRefreshToken || undefined,
+    }, { withCredentials: true });
+
+    if (res.data?.accessToken || res.data?.token) {
+      localStorage.setItem("token", res.data.accessToken || res.data.token);
+    }
+    if (res.data?.refreshToken) {
+      localStorage.setItem("refreshToken", res.data.refreshToken);
+    }
+
     // Reconnect socket after token rotation
     try { reconnectSocketWithNewToken(); } catch {}
     return true;
@@ -42,6 +52,7 @@ async function refreshAccessToken() {
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
+      localStorage.removeItem("speakshine_user");
     }
     throw error;
   }
@@ -156,11 +167,21 @@ export async function ensureFreshToken() {
     localStorage.removeItem("refreshToken");
   }
 
-  // Try silent refresh using the httpOnly refresh_token cookie
+  // Try silent refresh using the httpOnly refresh_token cookie or body fallback
   // Retry up to 3 times on temporary network/5xx server updates before declaring session lost
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+      const localRefreshToken = localStorage.getItem("refreshToken");
+      const res = await axios.post(`${BASE_URL}/auth/refresh`, {
+        refreshToken: localRefreshToken || undefined,
+      }, { withCredentials: true });
+
+      if (res.data?.accessToken || res.data?.token) {
+        localStorage.setItem("token", res.data.accessToken || res.data.token);
+      }
+      if (res.data?.refreshToken) {
+        localStorage.setItem("refreshToken", res.data.refreshToken);
+      }
       return true;
     } catch (err) {
       const status = err.response?.status;
