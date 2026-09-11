@@ -58,6 +58,24 @@ function broadcastStatus() {
 }
 
 /**
+ * Normalizes any WhatsApp group JID.
+ * Accepts either the full JID (e.g. 120363123456789012@g.us) or just the numeric group ID (120363123456789012)
+ * and guarantees it ends with @g.us.
+ *
+ * @param {string} jid
+ * @returns {string}
+ */
+export function formatGroupJid(jid) {
+  if (!jid) return "";
+  const cleaned = String(jid).trim();
+  if (cleaned.endsWith("@g.us") || cleaned.endsWith("@s.whatsapp.net")) {
+    return cleaned;
+  }
+  return `${cleaned}@g.us`;
+}
+
+
+/**
  * Restores all Baileys auth files from MongoDB into AUTH_DIR.
  * Ensures the session survives container destruction, server restarts, and deployments.
  */
@@ -406,11 +424,13 @@ export async function initWhatsAppBot() {
                 // Ignore metadata error and fallback to default
               }
 
+              const numericId = jid.replace(/@g\.us$/, "");
               const responseText =
                 `🏷️ *Group Details*\n\n` +
                 `📌 *Group Name:* ${groupName}\n` +
-                `🆔 *Group JID:*\n\`${jid}\`\n\n` +
-                `_💡 You can copy this Group JID and set it as TARGET_GROUP in your Speak & Shine settings._`;
+                `🆔 *Full Group JID:*\n\`${jid}\`\n\n` +
+                `🔢 *Group ID Number:*\n\`${numericId}\`\n\n` +
+                `_💡 You can set either the Full Group JID (\`${jid}\`) or just the Number (\`${numericId}\`) as TARGET_GROUP in your Speak & Shine settings._`;
 
               await sock.sendMessage(jid, { text: responseText }, { quoted: msg });
             } else if (jid.endsWith("@s.whatsapp.net")) {
@@ -476,7 +496,8 @@ async function clearAuthDir() {
  * Returns current status of the WhatsApp bot.
  */
 export function getStatus() {
-  const targetGroup = process.env.TARGET_GROUP || "";
+  const rawTargetGroup = process.env.TARGET_GROUP || "";
+  const targetGroup = formatGroupJid(rawTargetGroup);
   const savedPhone = getSavedPhone();
   const hasCreds = hasSavedCredentials();
 
@@ -585,11 +606,12 @@ export async function logoutWhatsAppBot() {
  * @param {string} [options.targetGroup] - override target group if needed
  */
 export async function sendDailyPosterToGroup(options = {}) {
-  const targetGroup = options.targetGroup || process.env.TARGET_GROUP;
+  const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
 
-  if (!targetGroup) {
+  if (!rawTargetGroup) {
     throw new Error("TARGET_GROUP is not configured. Please set TARGET_GROUP in Infisical or environment.");
   }
+  const targetGroup = formatGroupJid(rawTargetGroup);
 
   // Ensure WhatsApp socket is connected (auto-connects from MongoDB if needed)
   await ensureWhatsAppConnected(15000);
@@ -946,10 +968,11 @@ export async function getSubmissionReportSummary() {
  * Sends a daily submission status report listing submitted vs pending (paid) users to TARGET_GROUP.
  */
 export async function sendDailySubmissionReportToGroup(options = {}) {
-  const targetGroup = options.targetGroup || process.env.TARGET_GROUP;
-  if (!targetGroup) {
+  const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
+  if (!rawTargetGroup) {
     throw new Error("TARGET_GROUP is not configured in .env");
   }
+  const targetGroup = formatGroupJid(rawTargetGroup);
 
   // Ensure WhatsApp socket is connected (auto-connects from MongoDB if needed)
   await ensureWhatsAppConnected(15000);
@@ -1408,10 +1431,11 @@ export async function getMonthEndPrizeReportSummary(options = {}) {
  * Dispatch Month-End Prize Distribution Report to WhatsApp Group.
  */
 export async function sendMonthEndPrizeReportToGroup(options = {}) {
-  const targetGroup = options.targetGroup || process.env.TARGET_GROUP;
-  if (!targetGroup) {
+  const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
+  if (!rawTargetGroup) {
     throw new Error("TARGET_GROUP is not configured in .env");
   }
+  const targetGroup = formatGroupJid(rawTargetGroup);
 
   // Fetch summary data with any overrides
   const summary = await getMonthEndPrizeReportSummary(options);
