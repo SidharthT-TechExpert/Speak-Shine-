@@ -288,8 +288,6 @@ export default function ModernDashboardView({
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
   const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
-  const [leftVocabOpen, setLeftVocabOpen] = useState(false);
-  const [rightVocabOpen, setRightVocabOpen] = useState(false);
 
   const parsedQuestions = useMemo(() => {
     if (questionType === "monthly_reflection") {
@@ -593,266 +591,6 @@ export default function ModernDashboardView({
 
     audio.onerror = fallbackTTS;
     audio.play().catch(fallbackTTS);
-  };
-
-  const renderVocabChallenge = (isOpen, setIsOpen, isLeftColumn = false) => {
-    if (!vocabList || vocabList.length === 0) return null;
-    return (
-      <div
-        className={isLeftColumn ? "speakshine-vocab-card-box" : "speakshine-hero-right-card speakshine-vocab-card-box"}
-        style={{
-          background: isLeftColumn
-            ? (isDark ? "rgba(255, 255, 255, 0.025)" : "#ffffff")
-            : (isDark ? "#0d0a18" : "#ffffff"),
-          border: isLeftColumn
-            ? (isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0")
-            : (isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)"),
-          borderRadius: isLeftColumn ? 16 : 18,
-          padding: isOpen ? "1.25rem 1.25rem 1.35rem" : "0.95rem 1.15rem",
-          display: "flex",
-          flexDirection: "column",
-          gap: isOpen ? "0.85rem" : "0.55rem",
-          boxShadow: isLeftColumn
-            ? (isDark ? "0 8px 24px rgba(0, 0, 0, 0.25)" : "0 4px 16px rgba(0, 0, 0, 0.04)")
-            : "0 10px 30px rgba(0, 0, 0, 0.3)",
-          transition: "all 0.2s ease",
-          marginTop: isLeftColumn ? "0.95rem" : 0,
-          width: isLeftColumn ? "100%" : undefined,
-        }}
-      >
-        {/* Collapsible Header Bar */}
-        <div
-          onClick={() => setIsOpen(prev => !prev)}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            cursor: "pointer",
-            userSelect: "none",
-            gap: "0.5rem",
-          }}
-          title={isOpen ? "Click to collapse vocabulary challenge" : "Click to expand vocabulary challenge words"}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "1.05rem" }}>📚</span>
-            <span className="vocab-section-title" style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.06em" }}>
-              TODAY'S VOCABULARY CHALLENGE
-            </span>
-            <span
-              className="vocab-strength-badge"
-              title={`CEFR Level ${vocabLevel}: ${cefrInfo?.desc || "Curated vocabulary"}`}
-              style={{
-                fontSize: "0.68rem",
-                fontWeight: 800,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                padding: "2px 8px",
-                borderRadius: 99,
-                background: cefrInfo?.bg || "rgba(168, 85, 247, 0.15)",
-                border: `1px solid ${cefrInfo?.border || "rgba(168, 85, 247, 0.35)"}`,
-                color: cefrInfo?.color || "#c084fc",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
-              <span>⚡</span>
-              <span>{cefrInfo?.label || `${vocabLevel} Level`}</span>
-            </span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
-            <div
-              className={`vocab-goal-pill ${plannedCount >= targetRequiredCount ? "goal-met" : ""}`}
-              style={{
-                fontSize: "0.72rem",
-                fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: 99,
-                transition: "all 0.15s ease",
-              }}
-            >
-              🎯 {plannedCount}/{Math.min(targetRequiredCount, vocabList.length)}
-            </div>
-
-            {/* Dropdown Action Toggle Button */}
-            <button
-              type="button"
-              className="speakshine-vocab-dropdown-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(prev => !prev);
-              }}
-              style={{
-                background: isOpen ? "rgba(168, 85, 247, 0.2)" : (isDark ? "rgba(255, 255, 255, 0.06)" : "#f1f5f9"),
-                border: isOpen ? "1px solid rgba(168, 85, 247, 0.4)" : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.1)"),
-                color: isOpen ? "#c084fc" : (isDark ? "#e2e8f0" : "#1e293b"),
-                borderRadius: 8,
-                padding: "4px 9px",
-                fontSize: "0.74rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                transition: "all 0.2s ease",
-              }}
-              title={isOpen ? "Collapse words" : "Expand words"}
-            >
-              <span>{isOpen ? "Hide" : "View"}</span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 0.2s ease",
-                }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Compact Chips Preview when Collapsed */}
-        {!isOpen && (
-          <div
-            onClick={() => setIsOpen(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              flexWrap: "wrap",
-              cursor: "pointer",
-              paddingTop: "0.1rem",
-            }}
-            title="Click to view definitions, examples, and pronunciation"
-          >
-            {vocabList.map((v, i) => {
-              const isPlanned = !!plannedWords[i];
-              return (
-                <span
-                  key={i}
-                  style={{
-                    fontSize: "0.72rem",
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 6,
-                    background: isPlanned ? "rgba(34, 197, 94, 0.14)" : (isDark ? "rgba(255, 255, 255, 0.04)" : "#f1f5f9"),
-                    border: isPlanned ? "1px solid rgba(34, 197, 94, 0.38)" : (isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.06)"),
-                    color: isPlanned ? "#4ade80" : (isDark ? "#cbd5e1" : "#475569"),
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "4px",
-                  }}
-                >
-                  <span style={{ opacity: 0.6, fontSize: "0.64rem" }}>0{i + 1}</span>
-                  <span>{v.word}</span>
-                  {isPlanned && <span style={{ color: "#4ade80", fontWeight: 800 }}>✓</span>}
-                </span>
-              );
-            })}
-            <span style={{ fontSize: "0.68rem", color: "#94a3b8", fontStyle: "italic", marginLeft: "auto" }}>
-              Click to expand ▾
-            </span>
-          </div>
-        )}
-
-        {/* Expanded Full Vocabulary Cards */}
-        {isOpen && (
-          <>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", marginTop: "0.15rem" }}>
-              {vocabList.map((v, i) => {
-                const isPlanned = !!plannedWords[i];
-                const isSpeaking = speakingVocabIndex === i;
-                return (
-                  <div
-                    key={i}
-                    className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
-                    style={{
-                      borderRadius: 12,
-                      padding: "0.85rem 0.95rem",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                      {/* Header row: badge + word + buttons */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
-                          <div className="vocab-num-badge">0{i + 1}</div>
-                          <span className="vocab-word-title" style={{ fontWeight: 800, fontSize: "0.98rem" }}>
-                            {v.word}
-                          </span>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSpeakVocab(v.word, v.meaning, v.example, i);
-                            }}
-                            className="vocab-listen-btn"
-                            title="Listen to full pronunciation and example sentence"
-                            style={isSpeaking ? { background: "var(--primary, #7c6fff)", color: "#fff", transform: "scale(1.15)" } : {}}
-                          >
-                            {isSpeaking ? "🔊" : "🔈"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePlanned(i);
-                            }}
-                            className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
-                            style={{
-                              borderRadius: 8,
-                              padding: "4px 8px",
-                              fontSize: "0.72rem",
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              transition: "all 0.15s ease",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {isPlanned ? "✓ Planned" : "+ Plan to use"}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Meaning */}
-                      {v.meaning && (
-                        <div className="vocab-meaning-text" style={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
-                          — {v.meaning}
-                        </div>
-                      )}
-
-                      {/* Example sentence */}
-                      {v.example && (
-                        <div className="vocab-example-bubble" style={{ fontSize: "0.8rem", marginTop: "2px" }}>
-                          💬 <span style={{ fontStyle: "italic" }}>"{v.example}"</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="vocab-footer-hint" style={{ fontSize: "0.74rem" }}>
-              <span>✨</span>
-              <span>Speak naturally: past tense &amp; plurals are automatically recognized!</span>
-            </div>
-          </>
-        )}
-      </div>
-    );
   };
 
 
@@ -2613,8 +2351,130 @@ export default function ModernDashboardView({
                 )}
               </div>
 
-              {/* Target Vocabulary Section Card (Directly Below Question Prompt - Default Hidden) */}
-              {renderVocabChallenge(leftVocabOpen, setLeftVocabOpen, true)}
+              {/* Bonus Vocabulary Card (Moved to Left Below Question Prompt) */}
+              {vocabList && vocabList.length > 0 && (
+                <div style={{
+                  background: isDark ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.05)",
+                  border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.2)",
+                  borderRadius: 14,
+                  padding: "0.85rem 1rem",
+                  marginTop: "0.95rem",
+                  width: "100%",
+                  boxShadow: isDark ? "0 4px 18px rgba(0, 0, 0, 0.2)" : "0 2px 8px rgba(124, 58, 237, 0.04)",
+                }}>
+                  {/* Row 1: Title and CEFR Difficulty Badge */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span style={{ fontSize: "0.9rem" }}>✨</span>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
+                        BONUS VOCABULARY
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: "0.64rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.04em",
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      background: cefrInfo?.bg || (isDark ? "rgba(192, 132, 252, 0.16)" : "rgba(124, 58, 237, 0.1)"),
+                      border: `1px solid ${cefrInfo?.border || (isDark ? "rgba(192, 132, 252, 0.4)" : "rgba(124, 58, 237, 0.3)")}`,
+                      color: cefrInfo?.color || (isDark ? "#c084fc" : "#7c3aed"),
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      textTransform: "uppercase",
+                    }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: cefrInfo?.color || "#c084fc" }} />
+                      {cefrInfo?.label || `${vocabLevel} Level`}
+                    </span>
+                  </div>
+
+                  {/* Row 2: Target Requirement & Bonus Points */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
+                    <span style={{
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      color: isDark ? "#cbd5e1" : "#475569",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}>
+                      <span>🎯</span>
+                      <span>Use at least <strong>{Math.min(targetRequiredCount, vocabList.length)} of {vocabList.length}</strong> words</span>
+                    </span>
+                    <span style={{
+                      fontSize: "0.66rem",
+                      fontWeight: 800,
+                      color: isDark ? "#4ade80" : "#16a34a",
+                      background: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.1)",
+                      border: isDark ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(34, 197, 94, 0.25)",
+                      padding: "1px 7px",
+                      borderRadius: 6,
+                    }}>
+                      +10 pts each
+                    </span>
+                  </div>
+
+                  {/* Row 3: Keyword Buttons */}
+                  <div style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.45rem",
+                    width: "100%",
+                  }}>
+                    {vocabList.slice(0, 5).map((v, i) => {
+                      const isPlanned = !!plannedWords[i];
+                      const isSpeaking = speakingVocabIndex === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePlanned(i);
+                            handleSpeakVocab(v.word, v.meaning, v.example, i);
+                          }}
+                          title={`${v.word}: ${v.meaning || "Click to hear pronunciation & plan"}`}
+                          style={{
+                            flex: 1,
+                            minWidth: "105px",
+                            background: isPlanned
+                              ? "linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(16, 185, 129, 0.14) 100%)"
+                              : (isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff"),
+                            border: isPlanned
+                              ? "1px solid rgba(74, 222, 128, 0.55)"
+                              : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)"),
+                            color: isPlanned ? (isDark ? "#86efac" : "#15803d") : (isDark ? "#e2e8f0" : "#1e293b"),
+                            boxShadow: isPlanned
+                              ? "0 2px 8px rgba(34, 197, 94, 0.15)"
+                              : (isDark ? "0 2px 6px rgba(0, 0, 0, 0.2)" : "0 1px 3px rgba(0, 0, 0, 0.05)"),
+                            borderRadius: 8,
+                            padding: "0.5rem 0.65rem",
+                            fontSize: "0.76rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            transition: "all 0.18s ease",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.72rem", color: isPlanned ? "#22c55e" : (isDark ? "#a78bfa" : "#7c3aed") }}>
+                            {isPlanned ? "✓" : "✦"}
+                          </span>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {v.word}
+                          </span>
+                          <span style={{ fontSize: "0.68rem", opacity: 0.75, flexShrink: 0 }}>
+                            {isSpeaking ? "🔊" : "🔈"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: Action Card + Target Vocabulary Card in Empty Space */}
@@ -2735,128 +2595,6 @@ export default function ModernDashboardView({
                     </div>
                   </div>
 
-                  {/* Target Vocabulary Quick-Glance Pill Strip (Bonus Keywords) */}
-                  {vocabList && vocabList.length > 0 && (
-                    <div style={{
-                      background: isDark ? "rgba(124, 58, 237, 0.08)" : "rgba(124, 58, 237, 0.05)",
-                      border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.2)",
-                      borderRadius: 12,
-                      padding: "0.75rem 0.9rem",
-                      marginBottom: "0.65rem",
-                    }}>
-                      {/* Row 1: Title and CEFR Difficulty Badge */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                          <span style={{ fontSize: "0.85rem" }}>✨</span>
-                          <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
-                            BONUS VOCABULARY
-                          </span>
-                        </div>
-                        <span style={{
-                          fontSize: "0.62rem",
-                          fontWeight: 800,
-                          letterSpacing: "0.04em",
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          background: cefrInfo?.bg || (isDark ? "rgba(192, 132, 252, 0.16)" : "rgba(124, 58, 237, 0.1)"),
-                          border: `1px solid ${cefrInfo?.border || (isDark ? "rgba(192, 132, 252, 0.4)" : "rgba(124, 58, 237, 0.3)")}`,
-                          color: cefrInfo?.color || (isDark ? "#c084fc" : "#7c3aed"),
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          textTransform: "uppercase",
-                        }}>
-                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: cefrInfo?.color || "#c084fc" }} />
-                          {cefrInfo?.label || `${vocabLevel} Level`}
-                        </span>
-                      </div>
-
-                      {/* Row 2: Target Requirement & Bonus Points */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
-                        <span style={{
-                          fontSize: "0.68rem",
-                          fontWeight: 700,
-                          color: isDark ? "#cbd5e1" : "#475569",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}>
-                          <span>🎯</span>
-                          <span>Use at least <strong>{Math.min(targetRequiredCount, vocabList.length)} of {vocabList.length}</strong> words</span>
-                        </span>
-                        <span style={{
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          color: isDark ? "#4ade80" : "#16a34a",
-                          background: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.1)",
-                          border: isDark ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(34, 197, 94, 0.25)",
-                          padding: "1px 7px",
-                          borderRadius: 6,
-                        }}>
-                          +10 pts each
-                        </span>
-                      </div>
-
-                      {/* Row 3: Keyword Buttons (Spanning 100% Width, Zero Empty Space!) */}
-                      <div style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: "0.4rem",
-                        width: "100%",
-                      }}>
-                        {vocabList.slice(0, 5).map((v, i) => {
-                          const isPlanned = !!plannedWords[i];
-                          const isSpeaking = speakingVocabIndex === i;
-                          return (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePlanned(i);
-                                handleSpeakVocab(v.word, v.meaning, v.example, i);
-                              }}
-                              title={`${v.word}: ${v.meaning || "Click to hear pronunciation & plan"}`}
-                              style={{
-                                flex: 1,
-                                minWidth: "95px",
-                                background: isPlanned
-                                  ? "linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(16, 185, 129, 0.14) 100%)"
-                                  : (isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff"),
-                                border: isPlanned
-                                  ? "1px solid rgba(74, 222, 128, 0.55)"
-                                  : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)"),
-                                color: isPlanned ? (isDark ? "#86efac" : "#15803d") : (isDark ? "#e2e8f0" : "#1e293b"),
-                                boxShadow: isPlanned
-                                  ? "0 2px 8px rgba(34, 197, 94, 0.15)"
-                                  : (isDark ? "0 2px 6px rgba(0, 0, 0, 0.2)" : "0 1px 3px rgba(0, 0, 0, 0.05)"),
-                                borderRadius: 8,
-                                padding: "0.45rem 0.55rem",
-                                fontSize: "0.74rem",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "5px",
-                                transition: "all 0.18s ease",
-                              }}
-                            >
-                              <span style={{ fontSize: "0.72rem", color: isPlanned ? "#22c55e" : (isDark ? "#a78bfa" : "#7c3aed") }}>
-                                {isPlanned ? "✓" : "✦"}
-                              </span>
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {v.word}
-                              </span>
-                              <span style={{ fontSize: "0.68rem", opacity: 0.75, flexShrink: 0 }}>
-                                {isSpeaking ? "🔊" : "🔈"}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Timing Sweet Spot Visual Gauge */}
                   {(() => {
@@ -3056,9 +2794,6 @@ export default function ModernDashboardView({
                   <span>100% Private &amp; Secure · AI Feedback within 60s</span>
                 </div>
               </div>
-
-              {/* Target Vocabulary Section Card (Collapsible Dropdown on Right Side - Default Hidden) */}
-              {renderVocabChallenge(rightVocabOpen, setRightVocabOpen, false)}
             </div>
           </div>
           ) : (
