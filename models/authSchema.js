@@ -20,11 +20,13 @@ const authSchema = new mongoose.Schema({
   otpExpiry: { type: Date, default: null },
   otpAttempts: { type: Number, default: 0 },
   
-  // Security: Refresh token rotation
+  // Security: Refresh token rotation with grace period
   refreshTokens: [{ 
     token: String, 
     expiresAt: Date,
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    rotatedAt: { type: Date, default: null },
+    replacedBy: { type: String, default: null },
   }],
 });
 

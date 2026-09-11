@@ -6,7 +6,7 @@
 import argon2 from "argon2";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { randomInt } from "crypto";
+import { randomInt, randomUUID } from "crypto";
 import Auth from "../../../models/authSchema.js";
 import User from "../../../models/userSchema.js";
 import PendingRegistration from "../../../models/pendingRegistrationSchema.js";
@@ -16,10 +16,10 @@ import { validatePassword } from "../../utils/validationUtils.js";
 const OTP_TTL = 300; // 5 minutes
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
 
-// Access token duration: 3 hours ("3h") in development/local mode, 15 minutes ("15m") in production
-const JWT_ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES
-  || (process.env.NODE_ENV === "production" ? "15m" : "3h");
-const ACCESS_EXPIRES_SECONDS = JWT_ACCESS_EXPIRES === "3h" ? 10800 : (JWT_ACCESS_EXPIRES === "15m" ? 900 : 10800);
+// Access token duration: 24 hours ("24h") default (configurable via JWT_ACCESS_EXPIRES)
+const JWT_ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || "24h";
+const ACCESS_EXPIRES_SECONDS = JWT_ACCESS_EXPIRES === "24h" ? 86400 : (JWT_ACCESS_EXPIRES === "15m" ? 900 : 86400);
+
 
 // ── JWT Secret Helper ────────────────────────────────────────────────────────
 function getJwtSecret() {
@@ -253,22 +253,22 @@ export async function loginUser(phone, password, ipAddress) {
   );
 
   const refreshToken = jwt.sign(
-    { id: auth._id, type: 'refresh' },
+    { id: auth._id, type: 'refresh', jti: randomUUID() },
     getJwtSecret(),
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
 
-  // Store refresh token
-  const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  // Store refresh token (30 days)
+  const refreshTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   auth.refreshTokens = auth.refreshTokens || [];
   auth.refreshTokens.push({
     token: refreshToken,
     expiresAt: refreshTokenExpiry,
   });
 
-  // Keep only 5 most recent tokens
-  if (auth.refreshTokens.length > 5) {
-    auth.refreshTokens = auth.refreshTokens.slice(-5);
+  // Keep up to 15 most recent tokens
+  if (auth.refreshTokens.length > 15) {
+    auth.refreshTokens = auth.refreshTokens.slice(-15);
   }
 
   await auth.save();
@@ -338,27 +338,55 @@ export async function refreshAccessToken(refreshToken, ipAddress) {
     throw error;
   }
 
-  // Check if refresh token exists
+  // 1. Check if token is an active (unrotated) valid token
   const tokenRecord = auth.refreshTokens?.find(
-    rt => rt.token === refreshToken && rt.expiresAt > Date.now()
+    rt => rt.token === refreshToken && rt.expiresAt > Date.now() && !rt.rotatedAt
   );
 
   if (!tokenRecord) {
-    // Token reuse detected - revoke all tokens
-    auth.refreshTokens = [];
-    await auth.save();
-    logSecurityEvent('REFRESH_TOKEN_REUSE', { 
-      userId: auth._id, 
-      phone: auth.phone, 
-      ip: ipAddress 
-    });
-    const error = new Error("Invalid refresh token. Please login again.");
+    // 2. Check if this token was recently rotated within a 60-second grace window
+    // (Protects against concurrent requests, network retries, and server restarts)
+    const recentlyRotated = auth.refreshTokens?.find(
+      rt => rt.token === refreshToken && rt.rotatedAt && (Date.now() - new Date(rt.rotatedAt).getTime() < 60_000)
+    );
+
+    if (recentlyRotated) {
+      const activeRt = auth.refreshTokens?.find(rt => rt.token === recentlyRotated.replacedBy && !rt.rotatedAt)
+        || auth.refreshTokens?.find(rt => !rt.rotatedAt && rt.expiresAt > Date.now());
+
+      const fallbackRt = activeRt ? activeRt.token : refreshToken;
+      const newAccessToken = jwt.sign(
+        { id: auth._id, role: auth.role, type: 'access' },
+        getJwtSecret(),
+        { expiresIn: JWT_ACCESS_EXPIRES }
+      );
+
+      return {
+        accessToken: newAccessToken,
+        refreshToken: fallbackRt,
+        expiresIn: ACCESS_EXPIRES_SECONDS,
+      };
+    }
+
+    // Truly invalid or reused beyond the 60s grace window
+    const oldRotated = auth.refreshTokens?.find(rt => rt.token === refreshToken && rt.rotatedAt);
+    if (oldRotated) {
+      auth.refreshTokens = [];
+      await auth.save();
+      logSecurityEvent('REFRESH_TOKEN_REUSE', { 
+        userId: auth._id, 
+        phone: auth.phone, 
+        ip: ipAddress 
+      });
+      const error = new Error("Invalid refresh token. Please login again.");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const error = new Error("Invalid refresh token");
     error.statusCode = 401;
     throw error;
   }
-
-  // Remove old refresh token (rotation)
-  auth.refreshTokens = auth.refreshTokens.filter(rt => rt.token !== refreshToken);
 
   // Issue new tokens
   const newAccessToken = jwt.sign(
@@ -368,20 +396,34 @@ export async function refreshAccessToken(refreshToken, ipAddress) {
   );
 
   const newRefreshToken = jwt.sign(
-    { id: auth._id, type: 'refresh' },
+    { id: auth._id, type: 'refresh', jti: randomUUID() },
     getJwtSecret(),
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
 
-  // Store new refresh token
-  const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  // Mark old token as rotated with timestamp and pointer to replacement
+  tokenRecord.rotatedAt = new Date();
+  tokenRecord.replacedBy = newRefreshToken;
+
+  // Store new refresh token (30 days)
+  const refreshTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   auth.refreshTokens.push({
     token: newRefreshToken,
     expiresAt: refreshTokenExpiry,
   });
 
-  // Clean up expired tokens
-  auth.refreshTokens = auth.refreshTokens.filter(rt => rt.expiresAt > Date.now());
+  // Clean up tokens that are expired or rotated more than 5 minutes ago
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+  auth.refreshTokens = auth.refreshTokens.filter(rt => {
+    if (rt.expiresAt <= Date.now()) return false;
+    if (rt.rotatedAt && new Date(rt.rotatedAt).getTime() < fiveMinAgo) return false;
+    return true;
+  });
+
+  // Keep up to 15 recent tokens
+  if (auth.refreshTokens.length > 15) {
+    auth.refreshTokens = auth.refreshTokens.slice(-15);
+  }
 
   await auth.save();
 

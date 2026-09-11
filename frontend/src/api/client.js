@@ -36,10 +36,13 @@ async function refreshAccessToken() {
     try { reconnectSocketWithNewToken(); } catch {}
     return true;
   } catch (error) {
-    // Refresh failed — clear any stale localStorage leftovers
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
+    // Only clear session data if server explicitly rejected with 401 or 403
+    // Never clear on temporary network disconnects, timeouts, or 502/503 server restarts
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
+    }
     throw error;
   }
 }
@@ -154,12 +157,24 @@ export async function ensureFreshToken() {
   }
 
   // Try silent refresh using the httpOnly refresh_token cookie
-  try {
-    await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
-    return true;
-  } catch {
-    return null; // no valid session
+  // Retry up to 3 times on temporary network/5xx server updates before declaring session lost
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+      return true;
+    } catch (err) {
+      const status = err.response?.status;
+      // If server explicitly said 401 or 403, the session is truly invalid
+      if (status === 401 || status === 403) {
+        return null;
+      }
+      // If server is restarting/updating (502, 503, 504, Network Error), wait 1s and retry
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
   }
+  return null;
 }
 
 // Call this after any mutation to bust stale cache entries

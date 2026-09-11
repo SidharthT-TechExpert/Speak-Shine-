@@ -7,33 +7,33 @@ import * as authService from "../services/auth/authService.js";
 
 // ── Cookie helpers ───────────────────────────────────────────────────────────
 const isProd = process.env.NODE_ENV === "production";
-// 3 hours (10,800,000 ms) in development/local mode, 15 minutes in production (or process.env.ACCESS_TOKEN_MAX_AGE)
+// 24 hours (86,400,000 ms) default (or process.env.ACCESS_TOKEN_MAX_AGE)
 const ACCESS_TOKEN_MAX_AGE = process.env.ACCESS_TOKEN_MAX_AGE
   ? Number(process.env.ACCESS_TOKEN_MAX_AGE)
-  : (isProd ? 15 * 60 * 1000 : 3 * 60 * 60 * 1000);
+  : 24 * 60 * 60 * 1000;
 
 function setAuthCookies(res, accessToken, refreshToken) {
-  // Access token cookie — 3 hours locally / in dev, 15 min in prod
+  // Access token cookie — 24 hours
   res.cookie("access_token", accessToken, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: "lax",
     maxAge: ACCESS_TOKEN_MAX_AGE,
     path: "/",
   });
-  // Refresh token cookie — long-lived (7 days), httpOnly, restricted to /api/auth
+  // Refresh token cookie — 30 days, httpOnly
   res.cookie("refresh_token", refreshToken, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: "/api/auth",
+    sameSite: "lax",
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    path: "/",
   });
 }
 
 function clearAuthCookies(res) {
   res.clearCookie("access_token", { path: "/" });
-  res.clearCookie("refresh_token", { path: "/api/auth" });
+  res.clearCookie("refresh_token", { path: "/" });
 }
 
 /**
