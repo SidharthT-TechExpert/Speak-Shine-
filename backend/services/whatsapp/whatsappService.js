@@ -367,6 +367,68 @@ export async function initWhatsAppBot() {
       }
     });
 
+    // ── Incoming Messages Handler (Interactive WhatsApp Commands) ────────────
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
+      try {
+        if (!messages || messages.length === 0) return;
+
+        for (const msg of messages) {
+          if (!msg.message) continue;
+
+          const jid = msg.key?.remoteJid;
+          if (!jid) continue;
+
+          // Extract message text safely from standard conversation, extended text, or media captions
+          const rawText =
+            msg.message?.conversation ||
+            msg.message?.extendedTextMessage?.text ||
+            msg.message?.imageMessage?.caption ||
+            msg.message?.videoMessage?.caption ||
+            "";
+
+          const text = rawText.trim();
+          if (!text) continue;
+
+          const lowerText = text.toLowerCase();
+
+          // Command: /GroupJID, /groupjid, !groupjid, /jid
+          if (lowerText === "/groupjid" || lowerText === "!groupjid" || lowerText === "/jid") {
+            if (jid.endsWith("@g.us")) {
+              console.log(`[WhatsApp] 📨 Group JID request received in ${jid}`);
+
+              let groupName = "WhatsApp Group";
+              try {
+                const groupMeta = await sock.groupMetadata(jid);
+                if (groupMeta?.subject) {
+                  groupName = groupMeta.subject;
+                }
+              } catch (metaErr) {
+                // Ignore metadata error and fallback to default
+              }
+
+              const responseText =
+                `🏷️ *Group Details*\n\n` +
+                `📌 *Group Name:* ${groupName}\n` +
+                `🆔 *Group JID:*\n\`${jid}\`\n\n` +
+                `_💡 You can copy this Group JID and set it as TARGET_GROUP in your Speak & Shine settings._`;
+
+              await sock.sendMessage(jid, { text: responseText }, { quoted: msg });
+            } else if (jid.endsWith("@s.whatsapp.net")) {
+              // Helpful guidance if command was typed in a direct 1-on-1 private chat
+              const privateReply =
+                `ℹ️ *Group JID Command*\n\n` +
+                `Please send */GroupJID* inside the WhatsApp group whose JID you want to obtain.\n\n` +
+                `Your personal user JID is:\n\`${jid}\``;
+
+              await sock.sendMessage(jid, { text: privateReply }, { quoted: msg });
+            }
+          }
+        }
+      } catch (msgErr) {
+        console.warn("[WhatsApp] Error processing incoming message:", msgErr.message);
+      }
+    });
+
     return sock;
   } catch (err) {
     isConnecting = false;
