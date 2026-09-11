@@ -446,6 +446,9 @@ export async function adjustUserStreak(phone, { amount, mode = "add" } = {}, io 
   }
 
   user.streak = newStreak;
+  if (newStreak === 0) {
+    user.freezeStreakProgress = 0;
+  }
   await user.save();
 
   if (io) {

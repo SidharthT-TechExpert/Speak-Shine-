@@ -27,9 +27,20 @@ function simulateAtomicStreakUpdate(user, todayIST) {
     newBadges: [],
   };
 
-  if (newStreak > 0 && newStreak % 7 === 0) {
+  // Continuous 7-day Streak Freeze Progress
+  const FREEZE_AWARD_DAYS = 7;
+  let currentProgress = user.freezeStreakProgress;
+  if (typeof currentProgress !== "number") {
+    currentProgress = (user.streak || 0) % FREEZE_AWARD_DAYS;
+  }
+  const nextProgress = currentProgress + 1;
+
+  if (nextProgress >= FREEZE_AWARD_DAYS) {
     updatedUser.streakFreeze = (updatedUser.streakFreeze || 0) + 1;
+    updatedUser.freezeStreakProgress = 0;
     awards.streakFreezeAwarded = true;
+  } else {
+    updatedUser.freezeStreakProgress = nextProgress;
   }
 
   const newBadgeIds = getNewStreakBadgeIds(newStreak, user.earnedBadges || []);
@@ -128,11 +139,12 @@ describe("Atomic Streak Counting System (Option B)", () => {
     expect(resTomorrow.user.lastStreakDate).toBe(TOMORROW);
   });
 
-  it("awards +1 streakFreeze shield at 7-day milestone", () => {
+  it("awards +1 streakFreeze shield at 7 continuous days and resets progress to 0", () => {
     const userAt6 = {
       _id: "user_1",
       name: "Sidharth",
       streak: 6,
+      freezeStreakProgress: 6,
       lastStreakDate: "2026-09-09",
       completed: false,
       streakFreeze: 0,
@@ -143,6 +155,57 @@ describe("Atomic Streak Counting System (Option B)", () => {
     expect(res.user.streak).toBe(7);
     expect(res.awards.streakFreezeAwarded).toBe(true);
     expect(res.user.streakFreeze).toBe(1);
+    expect(res.user.freezeStreakProgress).toBe(0); // Cycle reset to 0/7
+  });
+
+  it("handles user at streak 12 needing exactly 2 days to earn freeze shield", () => {
+    // Existing user with streak 12 has freezeStreakProgress = 12 % 7 = 5
+    let user = {
+      _id: "user_12",
+      name: "Student12",
+      streak: 12,
+      freezeStreakProgress: 5,
+      lastStreakDate: "2026-09-08",
+      completed: false,
+      streakFreeze: 1,
+      earnedBadges: [],
+    };
+
+    // Day 1: Submits -> streak becomes 13, progress becomes 6 (not awarded yet)
+    const day1Res = simulateAtomicStreakUpdate(user, "2026-09-09");
+    expect(day1Res.user.streak).toBe(13);
+    expect(day1Res.user.freezeStreakProgress).toBe(6);
+    expect(day1Res.awards.streakFreezeAwarded).toBe(false);
+    expect(day1Res.user.streakFreeze).toBe(1);
+
+    // Day 2: Submits -> streak becomes 14, progress reaches 7 -> awarded! Progress resets to 0
+    const day2Res = simulateAtomicStreakUpdate(day1Res.user, "2026-09-10");
+    expect(day2Res.user.streak).toBe(14);
+    expect(day2Res.awards.streakFreezeAwarded).toBe(true);
+    expect(day2Res.user.streakFreeze).toBe(2);
+    expect(day2Res.user.freezeStreakProgress).toBe(0); // Reset for next 7-day cycle
+  });
+
+  it("does not award freeze shield if continuous streak was broken by a freeze day", () => {
+    // User had streak 6, missed a day so freeze shield was used, preserving streak at 6
+    // BUT continuous streak progress was reset to 0
+    const userAfterFreezeUsed = {
+      _id: "user_broken",
+      name: "ProtectedUser",
+      streak: 6,
+      freezeStreakProgress: 0, // Reset to 0 on missed day!
+      lastStreakDate: "2026-09-08",
+      completed: false,
+      streakFreeze: 0,
+      earnedBadges: [],
+    };
+
+    // Next day user submits -> streak 7 (7 % 7 === 0), but continuous progress is only 1!
+    const res = simulateAtomicStreakUpdate(userAfterFreezeUsed, TODAY);
+    expect(res.user.streak).toBe(7);
+    expect(res.user.freezeStreakProgress).toBe(1);
+    expect(res.awards.streakFreezeAwarded).toBe(false); // NOT awarded because not 7 continuous days!
+    expect(res.user.streakFreeze).toBe(0);
   });
 
   it("awards milestone badge when milestone reached", () => {

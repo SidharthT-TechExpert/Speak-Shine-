@@ -546,6 +546,29 @@ async function checkMissedReset() {
   }
 }
 
+async function backfillFreezeStreakProgress() {
+  try {
+    const User = (await import("../models/userSchema.js")).default;
+    const usersToBackfill = await User.find({
+      $or: [
+        { freezeStreakProgress: { $exists: false } },
+        { freezeStreakProgress: null },
+      ],
+    }).select("_id streak name").lean();
+
+    if (usersToBackfill.length > 0) {
+      console.log(`[Startup] 🧊 Backfilling freezeStreakProgress for ${usersToBackfill.length} users...`);
+      for (const u of usersToBackfill) {
+        const progress = (u.streak || 0) % 7;
+        await User.updateOne({ _id: u._id }, { $set: { freezeStreakProgress: progress } });
+      }
+      console.log(`[Startup] ✅ Backfill complete: freezeStreakProgress initialized based on current streak % 7.`);
+    }
+  } catch (err) {
+    console.error("[Startup] ⚠️ Backfill freezeStreakProgress warning:", err.message);
+  }
+}
+
 // ── Start ───────────────────────────────────────────────────────────────────
 connectDB()
   .then(() => {
@@ -561,6 +584,8 @@ connectDB()
     startSelfPing();
     // Catch up on any reset that was missed while server was sleeping
     checkMissedReset();
+    // Backfill freezeStreakProgress for any existing users
+    backfillFreezeStreakProgress();
     // Initialize WhatsApp multi-device client (triggers automated deployment notification once socket is open)
     setWhatsAppSocketIo(io);
     initWhatsAppBot();

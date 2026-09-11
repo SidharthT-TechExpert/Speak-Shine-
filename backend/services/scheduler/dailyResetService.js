@@ -67,10 +67,23 @@ export async function applyStreakUpdates() {
           await User.updateOne({ _id: u._id }, { $addToSet: { earnedBadges: { $each: newBadgeIds } } });
           console.log(`[DailyReset] 🏅 Badges awarded to ${u.name}: ${newBadgeIds.join(", ")}`);
         }
-        if (newStreak > 0 && newStreak % FREEZE_AWARD_DAYS === 0) {
-          await User.updateOne({ _id: u._id }, { $inc: { streakFreeze: 1 } });
+        let currentProgress = u.freezeStreakProgress;
+        if (typeof currentProgress !== "number") {
+          currentProgress = (u.streak || 0) % FREEZE_AWARD_DAYS;
+        }
+        const nextProgress = currentProgress + 1;
+        if (nextProgress >= FREEZE_AWARD_DAYS) {
+          await User.updateOne(
+            { _id: u._id },
+            { $inc: { streakFreeze: 1 }, $set: { freezeStreakProgress: 0 } }
+          );
           freezesAwarded++;
-          console.log(`[DailyReset] 🧊 StreakFreeze awarded to ${u.name} (streak=${newStreak})`);
+          console.log(`[DailyReset] 🧊 Continuous 7-day milestone reached! +1 StreakFreeze awarded to ${u.name} (streak=${newStreak}, cycle reset to 0/7)`);
+        } else {
+          await User.updateOne(
+            { _id: u._id },
+            { $set: { freezeStreakProgress: nextProgress } }
+          );
         }
       }
     }
@@ -82,18 +95,18 @@ export async function applyStreakUpdates() {
 
     for (const u of missedUsers) {
       if ((u.streakFreeze || 0) > 0) {
-        // Consume one freeze — streak survives
+        // Consume one freeze — streak survives, but continuous run is broken: reset progress to 0
         await User.updateOne(
           { _id: u._id },
-          { $inc: { streakFreeze: -1 }, $set: { fineChargedToday: false } }
+          { $inc: { streakFreeze: -1 }, $set: { fineChargedToday: false, freezeStreakProgress: 0 } }
         );
         freezesUsed++;
-        console.log(`[DailyReset] 🧊 StreakFreeze used for ${u.name} (streak=${u.streak} preserved)`);
+        console.log(`[DailyReset] 🧊 StreakFreeze used for ${u.name} (streak=${u.streak} preserved, freeze progress reset to 0)`);
       } else {
-        // No freeze — reset streak
+        // No freeze — reset streak and freeze progress
         await User.updateOne(
           { _id: u._id },
-          { $set: { streak: 0, fineChargedToday: false } }
+          { $set: { streak: 0, fineChargedToday: false, freezeStreakProgress: 0 } }
         );
         streaksReset++;
       }

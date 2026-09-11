@@ -187,6 +187,7 @@ function buildGuestPreviewData() {
       completed: false,
       fine: 0,
       streakFreeze: 1,
+      freezeStreakProgress: 0,
       monthlyScore: 142,
       feedbackScores,
     },

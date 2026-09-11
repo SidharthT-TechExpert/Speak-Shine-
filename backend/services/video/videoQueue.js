@@ -546,11 +546,27 @@ async function processJob(job) {
         const currentStreak = updatedUser?.streak || (userDoc?.streak || 0) + 1;
         console.log(`[Queue] 🔥 Streak atomically incremented to ${currentStreak} for ${phone} (${todayIST})`);
 
-        // Check 7-day milestone for Streak Freeze award (+1 shield)
+        // Check continuous 7-day milestone for Streak Freeze award (+1 shield)
         const FREEZE_AWARD_DAYS = 7;
-        if (currentStreak > 0 && currentStreak % FREEZE_AWARD_DAYS === 0) {
-          await User.updateOne({ _id: updatedUser._id }, { $inc: { streakFreeze: 1 } });
-          console.log(`[Queue] 🧊 Milestone reached! +1 StreakFreeze awarded to ${phone} (streak=${currentStreak})`);
+        let currentProgress = updatedUser?.freezeStreakProgress;
+        if (typeof currentProgress !== "number") {
+          // If uninitialized, backfill based on streak prior to this increment
+          currentProgress = Math.max(0, (currentStreak - 1) % FREEZE_AWARD_DAYS);
+        }
+        const nextProgress = currentProgress + 1;
+
+        if (nextProgress >= FREEZE_AWARD_DAYS) {
+          await User.updateOne(
+            { _id: updatedUser._id },
+            { $inc: { streakFreeze: 1 }, $set: { freezeStreakProgress: 0 } }
+          );
+          console.log(`[Queue] 🧊 Continuous 7-day milestone reached! +1 StreakFreeze awarded to ${phone} (streak=${currentStreak}, cycle reset to 0/7)`);
+        } else {
+          await User.updateOne(
+            { _id: updatedUser._id },
+            { $set: { freezeStreakProgress: nextProgress } }
+          );
+          console.log(`[Queue] 🧊 Freeze progress updated for ${phone}: ${nextProgress}/${FREEZE_AWARD_DAYS} days`);
         }
 
         // Check new streak badges earned

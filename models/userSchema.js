@@ -18,9 +18,12 @@ const userSchema = new mongoose.Schema({
   fineChargedToday: { type: Boolean, default: false },
 
   // ── Streak Freeze ────────────────────────────────────────────────────────
-  // Earned at every 7-day streak milestone (+1 per 7 days).
+  // Earned by completing 7 continuous days of submissions (+1 shield per continuous 7 days).
   // Consumed automatically on a missed day to protect the streak.
   streakFreeze: { type: Number, default: 0 },
+  // Tracks continuous daily submissions towards the next Streak Freeze shield (0 to 6).
+  // Resets to 0 immediately if a day is missed (even if streak is preserved by freeze shield).
+  freezeStreakProgress: { type: Number, default: 0 },
 
   // ── Monthly cumulative score ─────────────────────────────────────────────
   // Each day's best composite score (0–100) is added once per day.

@@ -193,7 +193,7 @@ export async function getUserProfile(phone) {
   const [user, status, allUsers, existingStreakRecord] = await Promise.all([
     phone ? User.findOne({ phone: { $in: phoneCandidates } }).lean() : Promise.resolve(null),
     Status.findOne().lean(),
-    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze").lean(),
+    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze freezeStreakProgress").lean(),
     StreakRecord.findOne().lean(),
   ]);
 
@@ -208,6 +208,7 @@ export async function getUserProfile(phone) {
     monthlySubmissions: 0,
     monthlyScore: 0,
     streakFreeze: 0,
+    freezeStreakProgress: 0,
   };
 
   const recentCompletedReport = profileUser._id
@@ -376,6 +377,7 @@ export async function getUserProfile(phone) {
       totalRecordedSeconds: allTimeRecordedSeconds,
       streak: profileUser.streak || 0,
       streakFreeze: profileUser.streakFreeze || 0,
+      freezeStreakProgress: profileUser.freezeStreakProgress ?? ((profileUser.streak || 0) % 7),
       monthlyScore: profileUser.monthlyScore || 0,
       completed: profileUser.completed || false,
       completedToday: profileUser.completed || false,
@@ -515,6 +517,7 @@ export async function getUserScores(phone) {
     feedbackScores: user.feedbackScores || [],
     streak: user.streak || 0,
     streakFreeze: user.streakFreeze || 0,
+    freezeStreakProgress: user.freezeStreakProgress ?? ((user.streak || 0) % 7),
     monthlyScore: user.monthlyScore || 0,
   };
 }
