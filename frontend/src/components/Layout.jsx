@@ -218,6 +218,16 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
   const streak = profile?.streak ?? (user?.streak || 0);
   const totalPoints = Math.round(profile?.monthlyScore ?? (user?.monthlyScore || 0));
   const freezeTokens = profile?.streakFreeze ?? (user?.streakFreeze || 0);
+  const freezeStreakProgress = Math.min(
+    7,
+    Math.max(
+      0,
+      profile?.freezeStreakProgress ??
+        user?.freezeStreakProgress ??
+        ((streak || 0) % 7)
+    )
+  );
+  const freezeDaysNeeded = Math.max(0, 7 - freezeStreakProgress);
   const displayName = user?.name ? user.name.split(" ")[0] : (profile?.name ? profile.name.split(" ")[0] : "Speaker");
   const avatarInitials = (displayName || "S").charAt(0).toUpperCase();
   const isLoggedIn = Boolean(user && profile?.name !== "Preview User");
@@ -403,8 +413,39 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             <div className="freeze-val">
               {freezeTokens} <span style={{ fontSize: "0.95rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
             </div>
+
+            {/* Continuous 7-Day Streak Freeze Progress Bar */}
+            <div className="freeze-progress-wrap">
+              <div className="freeze-progress-header">
+                <span className="freeze-progress-label">Next Shield</span>
+                <span className="freeze-progress-count">
+                  <strong>{freezeStreakProgress}</strong>/7 days
+                </span>
+              </div>
+              <div className="freeze-progress-track">
+                <div
+                  className="freeze-progress-fill"
+                  style={{ width: `${Math.round((freezeStreakProgress / 7) * 100)}%` }}
+                />
+              </div>
+              <div className="freeze-progress-pills">
+                {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                  <span
+                    key={day}
+                    className={`freeze-pill ${day <= freezeStreakProgress ? "active" : ""}`}
+                    title={`Day ${day} of 7`}
+                  />
+                ))}
+              </div>
+              <div className="freeze-progress-sub">
+                {freezeDaysNeeded === 0
+                  ? "🎉 Milestone reached! +1 Shield awarded"
+                  : `${freezeDaysNeeded} continuous ${freezeDaysNeeded === 1 ? "day" : "days"} needed`}
+              </div>
+            </div>
+
             <div className="freeze-desc">
-              Earn tokens by completing 7-day streak milestones.
+              Earn tokens by completing 7 continuous days of practice.
             </div>
             {isLoggedIn && (
               <button

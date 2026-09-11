@@ -862,6 +862,11 @@ export default function ModernDashboardView({
     profile.totalPoints ?? profile.monthlyScore ?? (stats?.totalPoints || scores.reduce((sum, s) => sum + (s.points || s.total || 0), 0) || (streak * 10) || 160)
   );
   const freezeTokens = profile.streakFreeze ?? 0;
+  const freezeStreakProgress = Math.min(
+    7,
+    Math.max(0, profile.freezeStreakProgress ?? ((streak || 0) % 7))
+  );
+  const freezeDaysNeeded = Math.max(0, 7 - freezeStreakProgress);
 
   // Determine if today's challenge/task has been submitted (matching exact calendar date in IST)
   const todayISTDateKey = getISTDateKey(new Date());
@@ -1615,8 +1620,39 @@ export default function ModernDashboardView({
               <div className="freeze-val">
                 {freezeTokens} <span style={{ fontSize: "1rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
               </div>
+
+              {/* Continuous 7-Day Streak Freeze Progress Bar */}
+              <div className="freeze-progress-wrap">
+                <div className="freeze-progress-header">
+                  <span className="freeze-progress-label">Next Shield</span>
+                  <span className="freeze-progress-count">
+                    <strong>{freezeStreakProgress}</strong>/7 days
+                  </span>
+                </div>
+                <div className="freeze-progress-track">
+                  <div
+                    className="freeze-progress-fill"
+                    style={{ width: `${Math.round((freezeStreakProgress / 7) * 100)}%` }}
+                  />
+                </div>
+                <div className="freeze-progress-pills">
+                  {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                    <span
+                      key={day}
+                      className={`freeze-pill ${day <= freezeStreakProgress ? "active" : ""}`}
+                      title={`Day ${day} of 7`}
+                    />
+                  ))}
+                </div>
+                <div className="freeze-progress-sub">
+                  {freezeDaysNeeded === 0
+                    ? "🎉 Milestone reached! +1 Shield awarded"
+                    : `${freezeDaysNeeded} continuous ${freezeDaysNeeded === 1 ? "day" : "days"} needed`}
+                </div>
+              </div>
+
               <div className="freeze-desc">
-                Earn tokens by completing 7-day streak milestones.
+                Earn tokens by completing 7 continuous days of practice.
               </div>
               {isLoggedIn && (
                 <button
@@ -1721,8 +1757,39 @@ export default function ModernDashboardView({
               <div className="freeze-val">
                 {freezeTokens} <span style={{ fontSize: "1rem", color: "#7c7793", fontWeight: 500 }}>Available</span>
               </div>
+
+              {/* Continuous 7-Day Streak Freeze Progress Bar */}
+              <div className="freeze-progress-wrap">
+                <div className="freeze-progress-header">
+                  <span className="freeze-progress-label">Next Shield</span>
+                  <span className="freeze-progress-count">
+                    <strong>{freezeStreakProgress}</strong>/7 days
+                  </span>
+                </div>
+                <div className="freeze-progress-track">
+                  <div
+                    className="freeze-progress-fill"
+                    style={{ width: `${Math.round((freezeStreakProgress / 7) * 100)}%` }}
+                  />
+                </div>
+                <div className="freeze-progress-pills">
+                  {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                    <span
+                      key={day}
+                      className={`freeze-pill ${day <= freezeStreakProgress ? "active" : ""}`}
+                      title={`Day ${day} of 7`}
+                    />
+                  ))}
+                </div>
+                <div className="freeze-progress-sub">
+                  {freezeDaysNeeded === 0
+                    ? "🎉 Milestone reached! +1 Shield awarded"
+                    : `${freezeDaysNeeded} continuous ${freezeDaysNeeded === 1 ? "day" : "days"} needed`}
+                </div>
+              </div>
+
               <div className="freeze-desc">
-                Earn tokens by completing 7-day streak milestones.
+                Earn tokens by completing 7 continuous days of practice.
               </div>
               {isLoggedIn && (
                 <button

@@ -5026,6 +5026,76 @@ audio { border-radius: 12px; }
   line-height: 1;
   margin-bottom: 0.35rem;
 }
+
+/* Freeze tokens progress bar */
+.speakshine-freeze-box .freeze-progress-wrap {
+  margin: 0.65rem 0 0.55rem 0;
+  padding: 0.55rem 0.65rem;
+  background: rgba(56, 189, 248, 0.05);
+  border: 1px solid rgba(56, 189, 248, 0.16);
+  border-radius: 10px;
+}
+.speakshine-freeze-box .freeze-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+.speakshine-freeze-box .freeze-progress-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.speakshine-freeze-box .freeze-progress-count {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+.speakshine-freeze-box .freeze-progress-count strong {
+  color: #38bdf8;
+  font-weight: 700;
+}
+.speakshine-freeze-box .freeze-progress-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+.speakshine-freeze-box .freeze-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+}
+.speakshine-freeze-box .freeze-progress-pills {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  margin-bottom: 0.35rem;
+}
+.speakshine-freeze-box .freeze-pill {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+.speakshine-freeze-box .freeze-pill.active {
+  background: #38bdf8;
+  box-shadow: 0 0 4px rgba(56, 189, 248, 0.4);
+}
+.speakshine-freeze-box .freeze-progress-sub {
+  font-size: 0.68rem;
+  color: #7c7793;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
 .speakshine-freeze-box .freeze-desc {
   font-size: 0.73rem;
   color: #7c7793;
@@ -6131,6 +6201,42 @@ audio { border-radius: 12px; }
 [data-theme="light"] .speakshine-freeze-box .freeze-val,
 .light .speakshine-freeze-box .freeze-val {
   color: #0284c7;
+}
+
+
+[data-theme="light"] .speakshine-freeze-box .freeze-progress-wrap,
+.light .speakshine-freeze-box .freeze-progress-wrap {
+  background: rgba(2, 132, 199, 0.06);
+  border-color: rgba(2, 132, 199, 0.2);
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-progress-label,
+.light .speakshine-freeze-box .freeze-progress-label {
+  color: #0284c7;
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-progress-count,
+.light .speakshine-freeze-box .freeze-progress-count {
+  color: #64748b;
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-progress-count strong,
+.light .speakshine-freeze-box .freeze-progress-count strong {
+  color: #0284c7;
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-progress-track,
+.light .speakshine-freeze-box .freeze-progress-track {
+  background: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-pill,
+.light .speakshine-freeze-box .freeze-pill {
+  background: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-pill.active,
+.light .speakshine-freeze-box .freeze-pill.active {
+  background: #0284c7;
+  box-shadow: 0 0 4px rgba(2, 132, 199, 0.35);
+}
+[data-theme="light"] .speakshine-freeze-box .freeze-progress-sub,
+.light .speakshine-freeze-box .freeze-progress-sub {
+  color: #64748b;
 }
 
 [data-theme="light"] .speakshine-freeze-box .freeze-desc,

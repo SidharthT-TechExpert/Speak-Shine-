@@ -147,7 +147,7 @@ export async function getUserProfile(userId) {
 
   const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "") : "";
   const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
-  const user = await User.findOne({ phone: { $in: phoneCandidates } }).select("name phone paid streak earnedBadges monthlyScore weeklySubmissions theme isDark").lean();
+  const user = await User.findOne({ phone: { $in: phoneCandidates } }).select("name phone paid streak earnedBadges monthlyScore weeklySubmissions theme isDark streakFreeze freezeStreakProgress").lean();
   return { auth, user: user || null };
 }
 
