@@ -1584,9 +1584,11 @@ export default function VideoAnalysis() {
               </div>
 
               {/* Right Column: Action & Countdown Card */}
-              <div className="speakshine-hero-right-col flex flex-col gap-4" onWheel={handleHeroWheel}>
+              <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible" }}>
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
               <div className="speakshine-hero-right-card" style={{
+                overflow: "visible",
+                scrollbarWidth: "none",
                 background: isDark
                   ? "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.1) 0%, rgba(13, 10, 24, 0.98) 70%)"
                   : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.06) 0%, #ffffff 70%)",
