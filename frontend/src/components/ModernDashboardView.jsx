@@ -287,6 +287,8 @@ export default function ModernDashboardView({
   const [urgencyCycle, setUrgencyCycle] = useState("green");
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [isSpeakingPrompt, setIsSpeakingPrompt] = useState(false);
+  const [selectedVocabIndex, setSelectedVocabIndex] = useState(null);
+  const [showAllVocabDetails, setShowAllVocabDetails] = useState(false);
   const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
 
   const parsedQuestions = useMemo(() => {
@@ -2366,8 +2368,8 @@ export default function ModernDashboardView({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                       <span style={{ fontSize: "0.9rem" }}>✨</span>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
-                        BONUS VOCABULARY
+                      <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
+                        TODAY'S VOCABULARY
                       </span>
                     </div>
                     <span style={{
@@ -2425,27 +2427,38 @@ export default function ModernDashboardView({
                     {vocabList.slice(0, 5).map((v, i) => {
                       const isPlanned = !!plannedWords[i];
                       const isSpeaking = speakingVocabIndex === i;
+                      const isSelected = selectedVocabIndex === i;
                       return (
                         <button
                           key={i}
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            togglePlanned(i);
+                            setSelectedVocabIndex(prev => prev === i ? null : i);
                             handleSpeakVocab(v.word, v.meaning, v.example, i);
                           }}
-                          title={`${v.word}: ${v.meaning || "Click to hear pronunciation & plan"}`}
+                          title={`${v.word}: ${v.meaning || "Click to view details & hear pronunciation"}`}
                           style={{
                             flex: 1,
                             minWidth: "105px",
-                            background: isPlanned
+                            background: isSelected
+                              ? (isDark ? "rgba(168, 85, 247, 0.22)" : "rgba(124, 58, 237, 0.12)")
+                              : isPlanned
                               ? "linear-gradient(135deg, rgba(34, 197, 94, 0.22) 0%, rgba(16, 185, 129, 0.14) 100%)"
                               : (isDark ? "rgba(255, 255, 255, 0.05)" : "#ffffff"),
-                            border: isPlanned
+                            border: isSelected
+                              ? (isDark ? "2px solid #c084fc" : "2px solid #7c3aed")
+                              : isPlanned
                               ? "1px solid rgba(74, 222, 128, 0.55)"
                               : (isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)"),
-                            color: isPlanned ? (isDark ? "#86efac" : "#15803d") : (isDark ? "#e2e8f0" : "#1e293b"),
-                            boxShadow: isPlanned
+                            color: isSelected
+                              ? (isDark ? "#ffffff" : "#6d28d9")
+                              : isPlanned
+                              ? (isDark ? "#86efac" : "#15803d")
+                              : (isDark ? "#e2e8f0" : "#1e293b"),
+                            boxShadow: isSelected
+                              ? (isDark ? "0 0 12px rgba(192, 132, 252, 0.35)" : "0 0 10px rgba(124, 58, 237, 0.2)")
+                              : isPlanned
                               ? "0 2px 8px rgba(34, 197, 94, 0.15)"
                               : (isDark ? "0 2px 6px rgba(0, 0, 0, 0.2)" : "0 1px 3px rgba(0, 0, 0, 0.05)"),
                             borderRadius: 8,
@@ -2458,6 +2471,7 @@ export default function ModernDashboardView({
                             justifyContent: "center",
                             gap: "6px",
                             transition: "all 0.18s ease",
+                            transform: isSelected ? "translateY(-1px)" : "none",
                           }}
                         >
                           <span style={{ fontSize: "0.72rem", color: isPlanned ? "#22c55e" : (isDark ? "#a78bfa" : "#7c3aed") }}>
@@ -2473,6 +2487,229 @@ export default function ModernDashboardView({
                       );
                     })}
                   </div>
+
+                  {/* Helper row when details are closed */}
+                  {selectedVocabIndex === null && !showAllVocabDetails && (
+                    <div style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "0.5rem",
+                      fontSize: "0.68rem",
+                      color: isDark ? "#94a3b8" : "#64748b",
+                    }}>
+                      <span>💡 Click any word to hear pronunciation &amp; see details</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllVocabDetails(true)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: isDark ? "#c084fc" : "#7c3aed",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          padding: "2px 4px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "2px",
+                        }}
+                      >
+                        View all details ▾
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Expanded Full Vocabulary Cards (Old View Details) */}
+                  {(selectedVocabIndex !== null || showAllVocabDetails) && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginTop: "0.75rem" }}>
+                      {(showAllVocabDetails ? vocabList.slice(0, 5) : (selectedVocabIndex !== null && vocabList[selectedVocabIndex] ? [vocabList[selectedVocabIndex]] : [])).map((v, idx) => {
+                        if (!v) return null;
+                        const originalIndex = showAllVocabDetails ? idx : selectedVocabIndex;
+                        const isPlanned = !!plannedWords[originalIndex];
+                        const isSpeaking = speakingVocabIndex === originalIndex;
+
+                        return (
+                          <div
+                            key={originalIndex}
+                            className={`vocab-card-pro ${isPlanned ? "planned" : ""}`}
+                            style={{
+                              borderRadius: 12,
+                              padding: "0.85rem 1rem",
+                              transition: "all 0.18s ease",
+                              background: isDark
+                                ? (isPlanned ? "rgba(34, 197, 94, 0.12)" : "rgba(255, 255, 255, 0.035)")
+                                : (isPlanned ? "#f0fdf4" : "#ffffff"),
+                              border: isPlanned
+                                ? (isDark ? "1.5px solid rgba(74, 222, 128, 0.6)" : "1.5px solid #16a34a")
+                                : (isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid #e2e8f0"),
+                              boxShadow: isPlanned
+                                ? "0 4px 14px rgba(34, 197, 94, 0.15)"
+                                : (isDark ? "0 4px 12px rgba(0, 0, 0, 0.2)" : "0 2px 8px rgba(0, 0, 0, 0.04)"),
+                            }}
+                          >
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                              {/* Header row: badge + word + buttons */}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+                                  <div className="vocab-num-badge" style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 6,
+                                    background: isPlanned ? "linear-gradient(135deg, #22c55e, #16a34a)" : "linear-gradient(135deg, #7c6fff, #4f46e5)",
+                                    color: "#fff",
+                                    fontSize: "0.68rem",
+                                    fontWeight: 800,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                  }}>
+                                    0{originalIndex + 1}
+                                  </div>
+                                  <span className="vocab-word-title" style={{
+                                    fontWeight: 800,
+                                    fontSize: "1rem",
+                                    color: isDark ? "#c4b5fd" : "#6d28d9",
+                                    letterSpacing: "-0.01em",
+                                  }}>
+                                    {v.word}
+                                  </span>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSpeakVocab(v.word, v.meaning, v.example, originalIndex);
+                                    }}
+                                    className="vocab-listen-btn"
+                                    title="Listen to pronunciation & example sentence"
+                                    style={{
+                                      background: isSpeaking ? "var(--primary, #7c6fff)" : (isDark ? "rgba(167, 139, 250, 0.15)" : "#f3e8ff"),
+                                      border: isSpeaking ? "1px solid #7c6fff" : (isDark ? "1px solid rgba(167, 139, 250, 0.35)" : "1px solid rgba(168, 85, 247, 0.4)"),
+                                      color: isSpeaking ? "#ffffff" : (isDark ? "#c4b5fd" : "#7c3aed"),
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: "50%",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "0.78rem",
+                                      cursor: "pointer",
+                                      transition: "all 0.15s ease",
+                                      transform: isSpeaking ? "scale(1.12)" : "none",
+                                    }}
+                                  >
+                                    {isSpeaking ? "🔊" : "🔈"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePlanned(originalIndex);
+                                    }}
+                                    className={`vocab-plan-btn ${isPlanned ? "planned" : ""}`}
+                                    style={{
+                                      borderRadius: 8,
+                                      padding: "4px 10px",
+                                      fontSize: "0.74rem",
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                      transition: "all 0.15s ease",
+                                      background: isPlanned
+                                        ? (isDark ? "rgba(34, 197, 94, 0.22)" : "#dcfce7")
+                                        : (isDark ? "rgba(255, 255, 255, 0.08)" : "#f8fafc"),
+                                      border: isPlanned
+                                        ? (isDark ? "1.5px solid rgba(74, 222, 128, 0.6)" : "1.5px solid #16a34a")
+                                        : (isDark ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid #cbd5e1"),
+                                      color: isPlanned
+                                        ? (isDark ? "#4ade80" : "#15803d")
+                                        : (isDark ? "#cbd5e1" : "#475569"),
+                                    }}
+                                  >
+                                    {isPlanned ? "✓ Planned" : "+ Plan to use"}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Meaning */}
+                              {v.meaning && (
+                                <div className="vocab-meaning-text" style={{
+                                  fontSize: "0.82rem",
+                                  lineHeight: 1.45,
+                                  color: isDark ? "#e2e8f0" : "#1e293b",
+                                  paddingLeft: "2px",
+                                }}>
+                                  <span style={{ color: isDark ? "#a78bfa" : "#7c3aed", fontWeight: 700 }}>Meaning:</span> {v.meaning}
+                                </div>
+                              )}
+
+                              {/* Example sentence */}
+                              {v.example && (
+                                <div className="vocab-example-bubble" style={{
+                                  fontSize: "0.8rem",
+                                  marginTop: "3px",
+                                  background: isDark ? "rgba(0, 0, 0, 0.3)" : "#f1f5f9",
+                                  borderLeft: isDark ? "3px solid rgba(167, 139, 250, 0.6)" : "3px solid #7c3aed",
+                                  padding: "0.45rem 0.75rem",
+                                  borderRadius: "0 8px 8px 0",
+                                  color: isDark ? "rgba(226, 232, 240, 0.9)" : "#334155",
+                                  lineHeight: 1.4,
+                                }}>
+                                  💬 <span style={{ fontStyle: "italic" }}>"{v.example}"</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Collapse & View All button row */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2px" }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedVocabIndex(null);
+                            setShowAllVocabDetails(false);
+                          }}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: isDark ? "#94a3b8" : "#64748b",
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            padding: "2px 6px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <span>▴ Hide details</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowAllVocabDetails(prev => !prev)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: isDark ? "#c084fc" : "#7c3aed",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            padding: "2px 6px",
+                          }}
+                        >
+                          {showAllVocabDetails ? "Show single word view" : "View all 5 words details ▾"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2724,61 +2961,7 @@ export default function ModernDashboardView({
                   />
                 </div>
 
-                {/* Daily Submission Rewards & Benefits Strip (Fills empty space with high-value perks) */}
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "0.55rem",
-                  marginTop: "0.2rem",
-                }}>
-                  <div style={{
-                    background: isDark ? "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.05) 100%)" : "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
-                    border: isDark ? "1px solid rgba(249, 115, 22, 0.25)" : "1px solid rgba(249, 115, 22, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.6rem 0.5rem",
-                    textAlign: "center",
-                  }}>
-                    <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>🔥</div>
-                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
-                      {streak > 0 ? `${streak} Days` : (isTodaySubmitted ? "1 Day" : "Day 0")}
-                    </div>
-                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isTodaySubmitted ? (isDark ? "#4ade80" : "#15803d") : (isDark ? "#fb923c" : "#ea580c"), textTransform: "uppercase", marginTop: "2px" }}>
-                      {isTodaySubmitted ? "Streak Secured" : (streak > 0 ? "Current Streak" : "Start Streak")}
-                    </div>
-                  </div>
 
-                  <div style={{
-                    background: isDark ? "linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%)" : "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
-                    border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.6rem 0.5rem",
-                    textAlign: "center",
-                  }}>
-                    <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>⚡</div>
-                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
-                      Instant AI
-                    </div>
-                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isDark ? "#c084fc" : "#9333ea", textTransform: "uppercase", marginTop: "2px" }}>
-                      Scorecard
-                    </div>
-                  </div>
-
-                  <div style={{
-                    background: isDark ? "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(16, 185, 129, 0.05) 100%)" : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
-                    border: isDark ? "1px solid rgba(34, 197, 94, 0.25)" : "1px solid rgba(34, 197, 94, 0.35)",
-                    borderRadius: 10,
-                    padding: "0.6rem 0.5rem",
-                    textAlign: "center",
-                  }}>
-                    <div style={{ fontSize: "1.05rem", marginBottom: "2px" }}>💎</div>
-                    <div style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", lineHeight: 1.1 }}>
-                      +85-100 pts
-                    </div>
-                    <div style={{ fontSize: "0.58rem", fontWeight: 700, color: isDark ? "#4ade80" : "#16a34a", textTransform: "uppercase", marginTop: "2px" }}>
-                      XP Reward
-                    </div>
-                  </div>
-                </div>
 
                 {/* Privacy & Instant Grading Security Seal */}
                 <div style={{
