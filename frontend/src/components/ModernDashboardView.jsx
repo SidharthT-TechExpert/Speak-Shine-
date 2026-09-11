@@ -1036,6 +1036,7 @@ export default function ModernDashboardView({
   }, [scores, profile?.monthlySubmissions, profile?.totalSessions, profile?.totalRecordedSeconds, isTodaySubmitted]);
 
   const displayName = user?.name || profile?.name || "Jane Doe";
+  const avatarInitials = displayName.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "JD";
   const isLoggedIn = Boolean(
     (user && user.name !== "Preview User") ||
     (profile && profile.name && profile.name !== "Preview User")

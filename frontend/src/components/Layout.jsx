@@ -229,6 +229,7 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
   );
   const freezeDaysNeeded = Math.max(0, 7 - freezeStreakProgress);
   const displayName = user?.name ? user.name.split(" ")[0] : (profile?.name ? profile.name.split(" ")[0] : "Speaker");
+  const avatarInitials = (displayName || "S").charAt(0).toUpperCase();
   const isLoggedIn = Boolean(
     (user && user.name !== "Preview User") ||
     (profile && profile.name && profile.name !== "Preview User")
