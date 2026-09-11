@@ -1369,116 +1369,119 @@ export default function ModernDashboardView({
               </Link>
             </nav>
 
-            {/* Appearance / Theme Mode Selector */}
-            <div className="speakshine-sidebar-theme" style={{ padding: "0 0.2rem", marginBottom: "0.75rem" }}>
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#8b85a3", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.4rem", paddingLeft: "2px" }}>
-                Appearance
-              </div>
-              <ThemeToggle />
-            </div>
-
-            {/* Freeze Tokens Bottom Box (Screenshot 1) */}
-            <div className="speakshine-freeze-box">
-              <div className="freeze-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: 800, letterSpacing: "0.06em", fontSize: "0.68rem" }}>
-                  🛡️ FREEZE TOKENS
-                </span>
-                <span style={{
-                  fontSize: "0.62rem",
-                  fontWeight: 700,
-                  color: "#38bdf8",
-                  background: "rgba(56, 189, 248, 0.12)",
-                  border: "1px solid rgba(56, 189, 248, 0.3)",
-                  padding: "1px 6px",
-                  borderRadius: 99,
-                }}>
-                  Streak Shield
-                </span>
+            {/* Sidebar Footer: Theme Mode Selector + Freeze Tokens Box */}
+            <div className="speakshine-sidebar-footer">
+              {/* Appearance / Theme Mode Selector */}
+              <div className="speakshine-sidebar-theme" style={{ padding: "0 0.2rem" }}>
+                <div style={{ fontSize: "0.68rem", fontWeight: 800, color: "#8b85a3", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.35rem", paddingLeft: "2px" }}>
+                  Appearance
+                </div>
+                <ThemeToggle />
               </div>
 
-              <div className="freeze-val" style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "0.35rem" }}>
-                <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "#38bdf8", lineHeight: 1 }}>{freezeTokens}</span>
-                <span style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 600 }}>Available</span>
-              </div>
-
-              {/* Continuous 7-Day Streak Freeze Progress Bar */}
-              <div className="freeze-progress-wrap">
-                <div className="freeze-progress-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                  <span className="freeze-progress-label" style={{ fontSize: "0.65rem", fontWeight: 700, color: "#38bdf8", textTransform: "uppercase" }}>Next Shield</span>
-                  <span className="freeze-progress-count" style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                    <strong style={{ color: "#38bdf8", fontWeight: 800 }}>{freezeStreakProgress}</strong>/7 days
+              {/* Freeze Tokens Bottom Box (Screenshot 1) */}
+              <div className="speakshine-freeze-box">
+                <div className="freeze-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: 800, letterSpacing: "0.06em", fontSize: "0.68rem" }}>
+                    🛡️ FREEZE TOKENS
+                  </span>
+                  <span style={{
+                    fontSize: "0.62rem",
+                    fontWeight: 700,
+                    color: "#38bdf8",
+                    background: "rgba(56, 189, 248, 0.12)",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
+                    padding: "1px 6px",
+                    borderRadius: 99,
+                  }}>
+                    Streak Shield
                   </span>
                 </div>
-                <div className="freeze-progress-track" style={{ height: 6, borderRadius: 99, background: "rgba(255, 255, 255, 0.08)", overflow: "hidden", marginBottom: "0.35rem" }}>
-                  <div
-                    className="freeze-progress-fill"
-                    style={{
-                      width: `${Math.round((freezeStreakProgress / 7) * 100)}%`,
-                      height: "100%",
-                      borderRadius: 99,
-                      background: "linear-gradient(90deg, #0284c7 0%, #38bdf8 100%)",
-                      boxShadow: "0 0 8px rgba(56, 189, 248, 0.4)",
-                      transition: "width 0.3s ease",
-                    }}
-                  />
-                </div>
-                <div className="freeze-progress-pills" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: "0.35rem" }}>
-                  {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                    <span
-                      key={day}
-                      className={`freeze-pill ${day <= freezeStreakProgress ? "active" : ""}`}
-                      style={{
-                        height: 3,
-                        borderRadius: 2,
-                        background: day <= freezeStreakProgress ? "#38bdf8" : "rgba(255, 255, 255, 0.12)",
-                        boxShadow: day <= freezeStreakProgress ? "0 0 4px rgba(56, 189, 248, 0.5)" : "none",
-                        transition: "all 0.2s ease",
-                      }}
-                      title={`Day ${day} of 7`}
-                    />
-                  ))}
-                </div>
-                <div className="freeze-progress-sub" style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600, lineHeight: 1.25 }}>
-                  {freezeDaysNeeded === 0
-                    ? "🎉 Milestone reached! +1 Shield awarded"
-                    : `${freezeDaysNeeded} continuous ${freezeDaysNeeded === 1 ? "day" : "days"} needed`}
-                </div>
-              </div>
 
-              <div className="freeze-desc" style={{ fontSize: "0.72rem", color: "#7c7793", lineHeight: 1.35, marginBottom: "0.55rem" }}>
-                Earn shields by completing 7 continuous days of speaking practice.
+                <div className="freeze-val" style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "0.35rem" }}>
+                  <span style={{ fontSize: "1.8rem", fontWeight: 800, color: "#38bdf8", lineHeight: 1 }}>{freezeTokens}</span>
+                  <span style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 600 }}>Available</span>
+                </div>
+
+                {/* Continuous 7-Day Streak Freeze Progress Bar */}
+                <div className="freeze-progress-wrap">
+                  <div className="freeze-progress-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                    <span className="freeze-progress-label" style={{ fontSize: "0.65rem", fontWeight: 700, color: "#38bdf8", textTransform: "uppercase" }}>Next Shield</span>
+                    <span className="freeze-progress-count" style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                      <strong style={{ color: "#38bdf8", fontWeight: 800 }}>{freezeStreakProgress}</strong>/7 days
+                    </span>
+                  </div>
+                  <div className="freeze-progress-track" style={{ height: 6, borderRadius: 99, background: "rgba(255, 255, 255, 0.08)", overflow: "hidden", marginBottom: "0.35rem" }}>
+                    <div
+                      className="freeze-progress-fill"
+                      style={{
+                        width: `${Math.round((freezeStreakProgress / 7) * 100)}%`,
+                        height: "100%",
+                        borderRadius: 99,
+                        background: "linear-gradient(90deg, #0284c7 0%, #38bdf8 100%)",
+                        boxShadow: "0 0 8px rgba(56, 189, 248, 0.4)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                  <div className="freeze-progress-pills" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: "0.35rem" }}>
+                    {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                      <span
+                        key={day}
+                        className={`freeze-pill ${day <= freezeStreakProgress ? "active" : ""}`}
+                        style={{
+                          height: 3,
+                          borderRadius: 2,
+                          background: day <= freezeStreakProgress ? "#38bdf8" : "rgba(255, 255, 255, 0.12)",
+                          boxShadow: day <= freezeStreakProgress ? "0 0 4px rgba(56, 189, 248, 0.5)" : "none",
+                          transition: "all 0.2s ease",
+                        }}
+                        title={`Day ${day} of 7`}
+                      />
+                    ))}
+                  </div>
+                  <div className="freeze-progress-sub" style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600, lineHeight: 1.25 }}>
+                    {freezeDaysNeeded === 0
+                      ? "🎉 Milestone reached! +1 Shield awarded"
+                      : `${freezeDaysNeeded} continuous ${freezeDaysNeeded === 1 ? "day" : "days"} needed`}
+                  </div>
+                </div>
+
+                <div className="freeze-desc" style={{ fontSize: "0.72rem", color: "#7c7793", lineHeight: 1.35, marginBottom: "0.55rem" }}>
+                  Earn shields by completing 7 continuous days of speaking practice.
+                </div>
+                {isLoggedIn && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="freeze-link speakshine-sidebar-logout"
+                    title="Log Out"
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.45rem",
+                      padding: "0.45rem 0.75rem",
+                      borderRadius: 10,
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                      color: "#f87171",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" x2="9" y1="12" y2="12" />
+                    </svg>
+                    <span>Log out</span>
+                  </button>
+                )}
               </div>
-              {isLoggedIn && (
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="freeze-link speakshine-sidebar-logout"
-                  title="Log Out"
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.45rem",
-                    padding: "0.45rem 0.75rem",
-                    borderRadius: 10,
-                    fontSize: "0.78rem",
-                    fontWeight: 700,
-                    color: "#f87171",
-                    background: "rgba(239, 68, 68, 0.08)",
-                    border: "1px solid rgba(239, 68, 68, 0.2)",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" x2="9" y1="12" y2="12" />
-                  </svg>
-                  <span>Log out</span>
-                </button>
-              )}
             </div>
           </aside>
 
@@ -1952,6 +1955,9 @@ export default function ModernDashboardView({
 
               {/* Right: Streak Security & Daily Mission Status Card */}
               <div className="speakshine-hero-right-card" onWheel={handleHeroWheel} style={{
+                width: "100%",
+                maxWidth: 440,
+                margin: "0 auto",
                 background: isDark
                   ? "linear-gradient(145deg, #120e24 0%, #0d0918 100%)"
                   : "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
@@ -2782,9 +2788,12 @@ export default function ModernDashboardView({
             </div>
 
             {/* Right Column: Action Card + Target Vocabulary Card in Empty Space */}
-            <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible" }}>
+            <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible", alignItems: "center", justifyContent: "center", width: "100%" }}>
               {/* Right Action & Countdown Card */}
               <div className="speakshine-hero-right-card" style={{
+                width: "100%",
+                maxWidth: 440,
+                margin: "0 auto",
                 overflow: "visible",
                 scrollbarWidth: "none",
                 background: isDark
@@ -3201,7 +3210,10 @@ export default function ModernDashboardView({
               </div>
 
               {/* Right: Daily Protocol & Warm-Up Card */}
-              <div className="speakshine-hero-right-card" onWheel={handleHeroWheel} style={{
+              <div className="speakshine-hero-right-card" style={{
+                width: "100%",
+                maxWidth: 440,
+                margin: "0 auto",
                 background: "#0d0a18",
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 borderRadius: 18,

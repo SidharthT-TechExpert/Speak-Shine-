@@ -1584,9 +1584,12 @@ export default function VideoAnalysis() {
               </div>
 
               {/* Right Column: Action & Countdown Card */}
-              <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible" }}>
+              <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible", alignItems: "center", justifyContent: "center", width: "100%" }}>
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
               <div className="speakshine-hero-right-card" style={{
+                width: "100%",
+                maxWidth: 440,
+                margin: "0 auto",
                 overflow: "visible",
                 scrollbarWidth: "none",
                 background: isDark

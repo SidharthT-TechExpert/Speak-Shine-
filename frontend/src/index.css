@@ -4940,7 +4940,7 @@ audio { border-radius: 12px; }
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  padding: 1.15rem 1rem;
+  padding: 0.95rem 0.85rem;
   height: 100vh;
   max-height: 100vh;
   overflow-y: auto;
@@ -4951,6 +4951,7 @@ audio { border-radius: 12px; }
   z-index: 50;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+  gap: 0.5rem;
 }
 .speakshine-sidebar::-webkit-scrollbar {
   display: none !important;
@@ -4962,9 +4963,10 @@ audio { border-radius: 12px; }
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.25rem 0.45rem 1.25rem;
+  padding: 0.2rem 0.45rem 0.65rem;
   text-decoration: none;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 .speakshine-sidebar-brand:hover {
   transform: translateY(-1px);
@@ -4982,24 +4984,25 @@ audio { border-radius: 12px; }
 .speakshine-sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  flex: 1;
-  min-height: 0;
+  gap: 0.22rem;
+  flex-shrink: 0;
+  width: 100%;
 }
 
 .speakshine-nav-item {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  padding: 0.68rem 0.95rem;
+  gap: 0.75rem;
+  padding: 0.52rem 0.85rem;
   border-radius: 12px;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #94a3b8;
   text-decoration: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   border: 1px solid transparent;
+  flex-shrink: 0;
 }
 .speakshine-nav-item:hover {
   color: #ffffff;
@@ -5018,12 +5021,12 @@ audio { border-radius: 12px; }
   content: "";
   position: absolute;
   left: 0;
-  top: 22%;
-  bottom: 22%;
+  top: 20%;
+  bottom: 20%;
   width: 3.5px;
   border-radius: 0 4px 4px 0;
-  background: #a855f7;
-  box-shadow: 0 0 10px #a855f7;
+  background: linear-gradient(180deg, #c084fc, #7c3aed);
+  box-shadow: 0 0 8px #a855f7;
 }
 .speakshine-nav-item .nav-icon {
   font-size: 1.15rem;
@@ -5034,14 +5037,24 @@ audio { border-radius: 12px; }
   flex-shrink: 0;
 }
 
+/* Sidebar Footer: Theme Toggle & Freeze Box */
+.speakshine-sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex-shrink: 0;
+  width: 100%;
+}
+
 /* Freeze tokens card */
 .speakshine-freeze-box {
   background: linear-gradient(145deg, rgba(20, 15, 38, 0.85) 0%, rgba(10, 8, 20, 0.95) 100%);
   border: 1px solid rgba(168, 85, 247, 0.22);
-  border-radius: 16px;
-  padding: 0.9rem 0.95rem;
-  margin-top: auto;
+  border-radius: 14px;
+  padding: 0.75rem 0.8rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
 }
 .speakshine-freeze-box .freeze-title {
   font-size: 0.68rem;
@@ -5908,6 +5921,7 @@ audio { border-radius: 12px; }
   gap: 1.25rem;
   margin-bottom: 1.25rem;
   width: 100%;
+  align-items: center;
 }
 
 @media (min-width: 1025px) {
@@ -5915,7 +5929,7 @@ audio { border-radius: 12px; }
     height: auto;
     max-height: none;
     min-height: 0;
-    align-items: start;
+    align-items: center;
     margin-bottom: 1.25rem;
   }
 
@@ -5926,9 +5940,23 @@ audio { border-radius: 12px; }
     overflow-x: visible;
   }
 
-  .speakshine-hero-right-col,
+  .speakshine-hero-right-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    scrollbar-width: none !important;
+  }
+
   .speakshine-hero-right-card,
   .speakshine-hero-grid > .speakshine-hero-right-card {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
@@ -5983,6 +6011,7 @@ audio { border-radius: 12px; }
     grid-template-columns: 1fr !important;
     gap: 1.25rem;
     height: auto !important;
+    align-items: center;
   }
   .speakshine-hero-left-card,
   .speakshine-hero-right-col {
@@ -5990,11 +6019,25 @@ audio { border-radius: 12px; }
     max-height: none !important;
     overflow-y: visible !important;
   }
+  .speakshine-hero-right-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  .speakshine-hero-right-card {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+  }
 }
 
 .speakshine-hero-right-col {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
   gap: 1.25rem;
   min-width: 0;
   width: 100%;
