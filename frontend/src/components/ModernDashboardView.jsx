@@ -290,6 +290,7 @@ export default function ModernDashboardView({
   const [selectedVocabIndex, setSelectedVocabIndex] = useState(null);
   const [showAllVocabDetails, setShowAllVocabDetails] = useState(false);
   const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
+  const [showBeginnerGuide, setShowBeginnerGuide] = useState(false);
 
   const parsedQuestions = useMemo(() => {
     if (questionType === "monthly_reflection") {
@@ -2129,7 +2130,7 @@ export default function ModernDashboardView({
               </div>
 
               {/* Title with Premium Editorial Serif — Playfair Display */}
-              <div style={{ marginBottom: "1rem" }}>
+              <div style={{ marginBottom: "0.85rem" }}>
                 <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.04em", color: "#94a3b8", marginBottom: "0.35rem" }}>
                   {questionType === "picture_description" ? "Challenge Theme" : questionType === "story_audio" ? "Story Title" : "Daily Topic"}
                 </div>
@@ -2150,6 +2151,102 @@ export default function ModernDashboardView({
                   )}
                 </h1>
               </div>
+
+              {/* 3-Step Guided Mission Flow for Beginners */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.07)" : "1px solid #e2e8f0",
+                borderRadius: 12,
+                padding: "0.55rem 0.85rem",
+                marginBottom: "1.1rem",
+                gap: "0.5rem",
+                overflowX: "auto",
+                scrollbarWidth: "none",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: "50%",
+                    background: "rgba(124, 111, 255, 0.2)",
+                    color: "#a78bfa", fontSize: "0.72rem", fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>1</span>
+                  <span style={{ fontSize: "0.74rem", fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                    {questionType === "picture_description" ? "Observe Picture" : questionType === "story_audio" ? "Listen to Story" : "Read Prompt"}
+                  </span>
+                </div>
+                <span style={{ color: isDark ? "#475569" : "#cbd5e1", fontSize: "0.8rem" }}>→</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: "50%",
+                    background: "rgba(245, 158, 11, 0.2)",
+                    color: "#fbbf24", fontSize: "0.72rem", fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>2</span>
+                  <span style={{ fontSize: "0.74rem", fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                    Pick 1–2 Target Words
+                  </span>
+                </div>
+                <span style={{ color: isDark ? "#475569" : "#cbd5e1", fontSize: "0.8rem" }}>→</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                  <span style={{
+                    width: 20, height: 20, borderRadius: "50%",
+                    background: "rgba(34, 197, 94, 0.2)",
+                    color: "#4ade80", fontSize: "0.72rem", fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}>3</span>
+                  <span style={{ fontSize: "0.74rem", fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                    Record &amp; Speak (60s+)
+                  </span>
+                </div>
+
+                {/* Quick Beginner Tips Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowBeginnerGuide(prev => !prev)}
+                  style={{
+                    marginLeft: "auto",
+                    background: "transparent",
+                    border: "none",
+                    color: isDark ? "#c084fc" : "#7c3aed",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    padding: "2px 6px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span>💡</span>
+                  <span>{showBeginnerGuide ? "Hide tips" : "New here? Tips ▾"}</span>
+                </button>
+              </div>
+
+              {/* Beginner Quick Guide Drawer */}
+              {showBeginnerGuide && (
+                <div style={{
+                  background: isDark ? "rgba(124, 111, 255, 0.08)" : "#f5f3ff",
+                  border: isDark ? "1px solid rgba(124, 111, 255, 0.2)" : "1px solid #ddd6fe",
+                  borderRadius: 12,
+                  padding: "0.75rem 1rem",
+                  marginBottom: "1.1rem",
+                  fontSize: "0.78rem",
+                  color: isDark ? "#e2e8f0" : "#334155",
+                  lineHeight: 1.5,
+                }}>
+                  <div style={{ fontWeight: 700, color: isDark ? "#c4b5fd" : "#6b21a8", marginBottom: "0.3rem" }}>
+                    🌱 3 Simple Rules for First-Time Speakers:
+                  </div>
+                  <ol style={{ margin: 0, paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <li><strong>No memorization:</strong> Speak spontaneously in your own voice — pauses to think are totally natural!</li>
+                    <li><strong>Aim for 60s minimum:</strong> Speak for at least 1 minute (up to 3–5 min) to earn full practice points.</li>
+                    <li><strong>Preview anytime:</strong> You can watch your recording before submitting, or re-record as many times as you like.</li>
+                  </ol>
+                </div>
+              )}
 
               {/* ── 1. PICTURE DESCRIPTION MODE: High-res Preview ── */}
               {questionType === "picture_description" && today.imageUrl && (
@@ -2507,15 +2604,11 @@ export default function ModernDashboardView({
                       <span>Use at least <strong>{Math.min(targetRequiredCount, vocabList.length)} of {vocabList.length}</strong> words</span>
                     </span>
                     <span style={{
-                      fontSize: "0.66rem",
-                      fontWeight: 800,
-                      color: isDark ? "#4ade80" : "#16a34a",
-                      background: isDark ? "rgba(34, 197, 94, 0.12)" : "rgba(34, 197, 94, 0.1)",
-                      border: isDark ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(34, 197, 94, 0.25)",
-                      padding: "1px 7px",
-                      borderRadius: 6,
+                      fontSize: "0.68rem",
+                      fontWeight: 600,
+                      color: isDark ? "#94a3b8" : "#64748b",
                     }}>
-                      +10 pts each
+                      (+10 pts each)
                     </span>
                   </div>
 
@@ -2600,7 +2693,7 @@ export default function ModernDashboardView({
                       fontSize: "0.68rem",
                       color: isDark ? "#94a3b8" : "#64748b",
                     }}>
-                      <span>💡 Click any word to hear pronunciation &amp; see details</span>
+                      <span>💡 Tap any word to hear pronunciation · Pick 1–2 to weave into your speech</span>
                       <button
                         type="button"
                         onClick={() => setShowAllVocabDetails(true)}
@@ -2733,7 +2826,7 @@ export default function ModernDashboardView({
                                         : (isDark ? "#cbd5e1" : "#475569"),
                                     }}
                                   >
-                                    {isPlanned ? "✓ Planned" : "+ Plan to use"}
+                                    {isPlanned ? "✓ Selected for my speech" : "+ Plan to use"}
                                   </button>
                                 </div>
                               </div>
@@ -2844,41 +2937,25 @@ export default function ModernDashboardView({
                 overflow: "visible",
                 scrollbarWidth: "none",
                 background: isDark
-                  ? urgencyCycle === "green"
-                    ? "radial-gradient(ellipse at 85% 15%, rgba(34, 197, 94, 0.12) 0%, rgba(13, 10, 24, 0.98) 70%)"
-                    : urgencyCycle === "red"
-                    ? "radial-gradient(ellipse at 85% 15%, rgba(239, 68, 68, 0.18) 0%, rgba(15, 10, 22, 0.98) 70%)"
-                    : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.12) 0%, rgba(13, 10, 24, 0.98) 70%)"
-                  : urgencyCycle === "green"
-                  ? "radial-gradient(ellipse at 85% 15%, rgba(34, 197, 94, 0.08) 0%, #ffffff 70%)"
-                  : urgencyCycle === "red"
-                  ? "radial-gradient(ellipse at 85% 15%, rgba(239, 68, 68, 0.09) 0%, #ffffff 70%)"
-                  : "radial-gradient(ellipse at 85% 15%, rgba(249, 115, 22, 0.08) 0%, #ffffff 70%)",
+                  ? "linear-gradient(145deg, #0d0a1b 0%, #080612 100%)"
+                  : "#ffffff",
                 border: isDark
-                  ? urgencyCycle === "green"
-                    ? "1px solid rgba(34, 197, 94, 0.22)"
-                    : urgencyCycle === "red"
-                    ? "1px solid rgba(239, 68, 68, 0.32)"
-                    : "1px solid rgba(249, 115, 22, 0.22)"
-                  : urgencyCycle === "green"
-                  ? "1px solid rgba(34, 197, 94, 0.25)"
+                  ? urgencyCycle === "red"
+                    ? "1px solid rgba(239, 68, 68, 0.28)"
+                    : "1px solid rgba(255, 255, 255, 0.08)"
                   : urgencyCycle === "red"
-                  ? "1px solid rgba(239, 68, 68, 0.3)"
-                  : "1px solid rgba(249, 115, 22, 0.25)",
+                  ? "1px solid rgba(239, 68, 68, 0.25)"
+                  : "1px solid #e2e8f0",
                 borderRadius: 18,
                 padding: "1.25rem 1.25rem 1.35rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.85rem",
                 boxShadow: isDark
-                  ? urgencyCycle === "green"
-                    ? "0 10px 30px rgba(0, 0, 0, 0.35), 0 0 25px rgba(34, 197, 94, 0.08)"
-                    : urgencyCycle === "red"
-                    ? "0 10px 30px rgba(0, 0, 0, 0.35), 0 0 25px rgba(239, 68, 68, 0.14)"
-                    : "0 10px 30px rgba(0, 0, 0, 0.35), 0 0 25px rgba(249, 115, 22, 0.08)"
+                  ? "0 10px 30px rgba(0, 0, 0, 0.35)"
                   : "0 10px 30px rgba(0, 0, 0, 0.05)",
                 position: "relative",
-                transition: "all 0.5s ease",
+                transition: "border-color 0.3s ease",
               }}>
                 {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
                 <MidnightCountdownTimer onCycleChange={setUrgencyCycle} />
@@ -2890,8 +2967,8 @@ export default function ModernDashboardView({
                       alignItems: "center",
                       gap: "0.55rem",
                       fontSize: "0.82rem",
-                      background: isDark ? "rgba(34, 197, 94, 0.1)" : "rgba(34, 197, 94, 0.12)",
-                      border: isDark ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(34, 197, 94, 0.35)",
+                      background: isDark ? "rgba(34, 197, 94, 0.08)" : "rgba(34, 197, 94, 0.1)",
+                      border: isDark ? "1px solid rgba(34, 197, 94, 0.25)" : "1px solid rgba(34, 197, 94, 0.25)",
                       borderRadius: 10,
                       padding: "0.55rem 0.85rem",
                       marginBottom: "0.85rem",
@@ -2907,8 +2984,8 @@ export default function ModernDashboardView({
                       alignItems: "center",
                       gap: "0.55rem",
                       fontSize: "0.82rem",
-                      background: isDark ? "rgba(245, 158, 11, 0.08)" : "rgba(245, 158, 11, 0.1)",
-                      border: isDark ? "1px solid rgba(245, 158, 11, 0.25)" : "1px solid rgba(245, 158, 11, 0.3)",
+                      background: isDark ? "rgba(245, 158, 11, 0.07)" : "rgba(245, 158, 11, 0.08)",
+                      border: isDark ? "1px solid rgba(245, 158, 11, 0.2)" : "1px solid rgba(245, 158, 11, 0.2)",
                       borderRadius: 10,
                       padding: "0.55rem 0.85rem",
                       marginBottom: "0.85rem",
@@ -2929,8 +3006,8 @@ export default function ModernDashboardView({
                         letterSpacing: "-0.01em",
                       }}>
                         {streak > 0
-                          ? `${streak}-day streak going strong! Complete today's mission before midnight to advance.`
-                          : "Complete today's mission before midnight to start your streak!"}
+                          ? `${streak}-day streak · Practice today before midnight to continue your journey.`
+                          : "Practice today before midnight to build your speaking consistency."}
                       </span>
                     </div>
                   )}
@@ -2946,28 +3023,32 @@ export default function ModernDashboardView({
                         color: "#ffffff",
                         border: "none",
                         borderRadius: 12,
-                        padding: "0.85rem",
-                        fontWeight: 700,
-                        fontSize: "0.92rem",
+                        padding: "0.85rem 1rem",
                         cursor: "pointer",
                         display: "flex",
+                        flexDirection: "column",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "0.5rem",
-                        boxShadow: "0 4px 22px rgba(249, 115, 22, 0.45)",
+                        gap: "2px",
+                        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.4)",
                         transition: "all 0.15s ease",
                       }}
                       onMouseEnter={e => {
                         e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 8px 28px rgba(249, 115, 22, 0.55)";
+                        e.currentTarget.style.boxShadow = "0 8px 24px rgba(249, 115, 22, 0.5)";
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 4px 22px rgba(249, 115, 22, 0.45)";
+                        e.currentTarget.style.boxShadow = "0 4px 20px rgba(249, 115, 22, 0.4)";
                       }}
                     >
-                      <span style={{ fontSize: "1.15rem" }}>🎥</span>
-                      <span>{questionConfig.recordButtonLabel}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 700, fontSize: "0.95rem" }}>
+                        <span style={{ fontSize: "1.1rem" }}>🎥</span>
+                        <span>{questionConfig.recordButtonLabel}</span>
+                      </div>
+                      <span style={{ fontSize: "0.72rem", color: "rgba(255, 255, 255, 0.9)", fontWeight: 500 }}>
+                        Opens video studio · Preview anytime before submitting
+                      </span>
                     </button>
 
                     <button
@@ -2980,21 +3061,25 @@ export default function ModernDashboardView({
                         color: isDark ? "#cbd5e1" : "#1e293b",
                         border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
                         borderRadius: 12,
-                        padding: "0.75rem",
-                        fontWeight: 600,
-                        fontSize: "0.88rem",
+                        padding: "0.65rem 1rem",
                         cursor: "pointer",
                         display: "flex",
+                        flexDirection: "column",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "0.5rem",
+                        gap: "2px",
                         transition: "background 0.15s ease",
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
                       onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
                     >
-                      <span>📁</span>
-                      <span>{questionConfig.uploadButtonLabel}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 600, fontSize: "0.86rem" }}>
+                        <span>📁</span>
+                        <span>{questionConfig.uploadButtonLabel}</span>
+                      </div>
+                      <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                        Upload video or audio file (MP4, MOV, MP3, WAV)
+                      </span>
                     </button>
 
                     <input
@@ -3702,11 +3787,11 @@ export default function ModernDashboardView({
                       borderRadius: 6,
                       padding: "3px 9px",
                     }}>
-                      Streak Roadmap
+                      Speaking Milestones
                     </span>
 
                     <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a" }}>
-                      Journey to {nextBadge ? `${nextBadge.icon} ${nextBadge.name}` : "🏆 Speech Legend"}
+                      Consistency Pathway · Next Goal: {nextBadge ? `${nextBadge.icon} ${nextBadge.name}` : "Speech Mastery"}
                     </span>
                   </div>
 
@@ -3741,7 +3826,7 @@ export default function ModernDashboardView({
                             transition: "all 0.15s ease",
                           }}
                         >
-                          ⚡ Active Sprint ({targetDays <= 14 ? `1–${targetDays}d` : (startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`)})
+                          Active Goal ({targetDays <= 14 ? `1–${targetDays}d` : (startDays > 0 ? `${startDays}–${targetDays}d` : `1–${targetDays}d`)})
                         </button>
                         <button
                           type="button"
@@ -3763,7 +3848,7 @@ export default function ModernDashboardView({
                             transition: "all 0.15s ease",
                           }}
                         >
-                          🏆 Full Roadmap (1–{targetDays}d)
+                          Milestone Track (1–{targetDays}d)
                         </button>
                       </div>
                     )}
@@ -3794,7 +3879,7 @@ export default function ModernDashboardView({
                         e.currentTarget.style.color = isDark ? "#c084fc" : "#7c3aed";
                       }}
                     >
-                      <span>View all 20 badges</span>
+                      <span>View speaking badges</span>
                       <span>→</span>
                     </button>
                   </div>
@@ -4678,16 +4763,15 @@ export default function ModernDashboardView({
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                     <div style={{
                       width: 28, height: 28, borderRadius: 8,
-                      background: "linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.1))",
-                      border: "1px solid rgba(251, 191, 36, 0.4)",
+                      background: "rgba(251, 191, 36, 0.12)",
+                      border: "1px solid rgba(251, 191, 36, 0.25)",
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.95rem",
-                      boxShadow: "0 2px 10px rgba(245, 158, 11, 0.2)",
                     }}>
-                      🏆
+                      🌟
                     </div>
                     <div>
                       <div className="leaderboard-header-title" style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.03em" }}>
-                        Today's Leaderboard
+                        Cohort Daily Practice
                       </div>
                     </div>
                   </div>
@@ -4741,11 +4825,11 @@ export default function ModernDashboardView({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "0.95rem 1.15rem",
+                    padding: "0.85rem 1.1rem",
                     borderRadius: 14,
                     background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
-                    border: "1px solid rgba(251, 191, 36, 0.28)",
-                    boxShadow: "0 6px 20px rgba(245, 158, 11, 0.08)",
+                    border: "1px solid rgba(251, 191, 36, 0.2)",
+                    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.2)",
                     marginBottom: "1rem",
                     position: "relative",
                     overflow: "hidden",
@@ -4753,29 +4837,29 @@ export default function ModernDashboardView({
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.5)";
+                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.4)";
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.28)";
+                    e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.2)";
                   }}
                 >
                   <div style={{
                     position: "absolute", top: 0, right: 0, bottom: 0, width: "35%",
-                    background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.12) 0%, transparent 70%)",
+                    background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.08) 0%, transparent 70%)",
                     pointerEvents: "none",
                   }} />
 
                   <div style={{ position: "relative", zIndex: 1 }}>
                     <div style={{
                       display: "flex", alignItems: "center", gap: "0.4rem",
-                      fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em",
+                      fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em",
                       color: "#fbbf24", textTransform: "uppercase", marginBottom: "3px",
                     }}>
                       <span>⭐</span>
-                      <span>ALL-TIME GROUP RECORD</span>
+                      <span>COHORT MILESTONE RECORD</span>
                     </div>
-                    <div style={{ fontSize: "0.85rem", color: "#f1f0f5", fontWeight: 600 }}>
+                    <div style={{ fontSize: "0.82rem", color: "#f1f0f5", fontWeight: 600 }}>
                       {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
                     </div>
                   </div>
@@ -4786,17 +4870,14 @@ export default function ModernDashboardView({
                   }}>
                     <span style={{
                       fontFamily: "Georgia, 'Times New Roman', serif",
-                      fontSize: "2.35rem",
-                      fontWeight: 800,
-                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
+                      fontSize: "1.75rem",
+                      fontWeight: 700,
+                      color: "#fbbf24",
                       lineHeight: 1,
-                      filter: "drop-shadow(0 2px 8px rgba(245, 158, 11, 0.35))",
                     }}>
                       {recordScore}
                     </span>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
+                    <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
                   </div>
                 </div>
 

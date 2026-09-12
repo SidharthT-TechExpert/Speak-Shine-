@@ -43,48 +43,48 @@ export default function MidnightCountdownTimer({ onCycleChange }) {
   const cycleConfig = {
     green: {
       color: "#22c55e",
-      label: "Cycle Open · Ample Time",
+      label: "Active Window · Ample Time",
       badgeBg: isDark ? "rgba(34, 197, 94, 0.14)" : "rgba(34, 197, 94, 0.1)",
       badgeBorder: isDark ? "rgba(34, 197, 94, 0.4)" : "rgba(34, 197, 94, 0.35)",
       boxBg: isDark
-        ? "linear-gradient(145deg, rgba(34, 197, 94, 0.16) 0%, rgba(16, 185, 129, 0.06) 50%, rgba(13, 10, 24, 0.95) 100%)"
-        : "linear-gradient(145deg, rgba(34, 197, 94, 0.1) 0%, #ffffff 100%)",
-      boxBorder: isDark ? "1px solid rgba(34, 197, 94, 0.45)" : "1px solid rgba(34, 197, 94, 0.4)",
-      glow: isDark ? "0 4px 20px rgba(34, 197, 94, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 12px rgba(34, 197, 94, 0.12)",
+        ? "linear-gradient(145deg, rgba(34, 197, 94, 0.12) 0%, rgba(16, 185, 129, 0.04) 50%, rgba(13, 10, 24, 0.95) 100%)"
+        : "linear-gradient(145deg, rgba(34, 197, 94, 0.08) 0%, #ffffff 100%)",
+      boxBorder: isDark ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(34, 197, 94, 0.3)",
+      glow: isDark ? "0 2px 10px rgba(34, 197, 94, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 8px rgba(34, 197, 94, 0.08)",
       colonColor: isDark ? "#22c55e" : "#16a34a",
       labelColor: isDark ? "#86efac" : "#15803d",
-      containerBg: isDark ? "rgba(34, 197, 94, 0.05)" : "rgba(34, 197, 94, 0.03)",
-      containerBorder: isDark ? "rgba(34, 197, 94, 0.22)" : "rgba(34, 197, 94, 0.18)",
+      containerBg: isDark ? "rgba(34, 197, 94, 0.04)" : "rgba(34, 197, 94, 0.03)",
+      containerBorder: isDark ? "rgba(34, 197, 94, 0.18)" : "rgba(34, 197, 94, 0.15)",
     },
     orange: {
       color: "#f97316",
-      label: "Evening Rush",
-      badgeBg: isDark ? "rgba(249, 115, 22, 0.16)" : "rgba(249, 115, 22, 0.1)",
-      badgeBorder: isDark ? "rgba(249, 115, 22, 0.45)" : "rgba(249, 115, 22, 0.35)",
+      label: "Evening Practice",
+      badgeBg: isDark ? "rgba(249, 115, 22, 0.14)" : "rgba(249, 115, 22, 0.1)",
+      badgeBorder: isDark ? "rgba(249, 115, 22, 0.35)" : "rgba(249, 115, 22, 0.3)",
       boxBg: isDark
-        ? "linear-gradient(145deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.08) 50%, rgba(13, 10, 24, 0.95) 100%)"
-        : "linear-gradient(145deg, rgba(249, 115, 22, 0.1) 0%, #ffffff 100%)",
-      boxBorder: isDark ? "1px solid rgba(249, 115, 22, 0.5)" : "1px solid rgba(249, 115, 22, 0.4)",
-      glow: isDark ? "0 4px 20px rgba(249, 115, 22, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 12px rgba(249, 115, 22, 0.15)",
+        ? "linear-gradient(145deg, rgba(249, 115, 22, 0.14) 0%, rgba(234, 88, 12, 0.05) 50%, rgba(13, 10, 24, 0.95) 100%)"
+        : "linear-gradient(145deg, rgba(249, 115, 22, 0.08) 0%, #ffffff 100%)",
+      boxBorder: isDark ? "1px solid rgba(249, 115, 22, 0.35)" : "1px solid rgba(249, 115, 22, 0.3)",
+      glow: isDark ? "0 2px 10px rgba(249, 115, 22, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 8px rgba(249, 115, 22, 0.08)",
       colonColor: isDark ? "#f97316" : "#ea580c",
       labelColor: isDark ? "#fdba74" : "#c2410c",
-      containerBg: isDark ? "rgba(249, 115, 22, 0.05)" : "rgba(249, 115, 22, 0.03)",
-      containerBorder: isDark ? "rgba(249, 115, 22, 0.22)" : "rgba(249, 115, 22, 0.18)",
+      containerBg: isDark ? "rgba(249, 115, 22, 0.04)" : "rgba(249, 115, 22, 0.03)",
+      containerBorder: isDark ? "rgba(249, 115, 22, 0.18)" : "rgba(249, 115, 22, 0.15)",
     },
     red: {
       color: "#ef4444",
-      label: "Final Hours · Closing Soon",
-      badgeBg: isDark ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.12)",
-      badgeBorder: isDark ? "rgba(239, 68, 68, 0.55)" : "rgba(239, 68, 68, 0.45)",
+      label: "Closing at Midnight",
+      badgeBg: isDark ? "rgba(239, 68, 68, 0.16)" : "rgba(239, 68, 68, 0.1)",
+      badgeBorder: isDark ? "rgba(239, 68, 68, 0.4)" : "rgba(239, 68, 68, 0.35)",
       boxBg: isDark
-        ? "linear-gradient(145deg, rgba(239, 68, 68, 0.26) 0%, rgba(220, 38, 38, 0.1) 50%, rgba(15, 10, 20, 0.98) 100%)"
-        : "linear-gradient(145deg, rgba(239, 68, 68, 0.14) 0%, #ffffff 100%)",
-      boxBorder: isDark ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid rgba(239, 68, 68, 0.5)",
-      glow: isDark ? "0 4px 24px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1)" : "0 2px 14px rgba(239, 68, 68, 0.2)",
+        ? "linear-gradient(145deg, rgba(239, 68, 68, 0.18) 0%, rgba(220, 38, 38, 0.06) 50%, rgba(15, 10, 20, 0.98) 100%)"
+        : "linear-gradient(145deg, rgba(239, 68, 68, 0.1) 0%, #ffffff 100%)",
+      boxBorder: isDark ? "1px solid rgba(239, 68, 68, 0.45)" : "1px solid rgba(239, 68, 68, 0.4)",
+      glow: isDark ? "0 2px 12px rgba(239, 68, 68, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08)" : "0 2px 8px rgba(239, 68, 68, 0.12)",
       colonColor: isDark ? "#ef4444" : "#dc2626",
       labelColor: isDark ? "#fca5a5" : "#b91c1c",
-      containerBg: isDark ? "rgba(239, 68, 68, 0.07)" : "rgba(239, 68, 68, 0.05)",
-      containerBorder: isDark ? "rgba(239, 68, 68, 0.28)" : "rgba(239, 68, 68, 0.22)",
+      containerBg: isDark ? "rgba(239, 68, 68, 0.05)" : "rgba(239, 68, 68, 0.04)",
+      containerBorder: isDark ? "rgba(239, 68, 68, 0.22)" : "rgba(239, 68, 68, 0.18)",
     },
   }[t.cycle];
 
@@ -100,7 +100,7 @@ export default function MidnightCountdownTimer({ onCycleChange }) {
       {/* Dynamic Urgency Cycle Header Pill */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.65rem", flexWrap: "wrap", gap: "0.4rem" }}>
         <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase" }}>
-          WINDOW CLOSES AT MIDNIGHT
+          DAILY PRACTICE WINDOW
         </div>
         <div style={{
           fontSize: "0.64rem",
