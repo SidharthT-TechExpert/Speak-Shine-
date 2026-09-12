@@ -2131,7 +2131,7 @@ export default function ModernDashboardView({
 
               {/* Title with Premium Editorial Serif — Playfair Display */}
               <div style={{ marginBottom: "0.85rem" }}>
-                <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.04em", color: "#94a3b8", marginBottom: "0.35rem" }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: isDark ? "#94a3b8" : "#64748b", marginBottom: "0.35rem" }}>
                   {questionType === "picture_description" ? "Challenge Theme" : questionType === "story_audio" ? "Story Title" : "Daily Topic"}
                 </div>
                 <h1 className="story-title-heading" style={{
@@ -2386,36 +2386,6 @@ export default function ModernDashboardView({
                 </div>
               )}
 
-              {/* Beginner-Friendly 3-Step Guided Action Flow */}
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.6rem",
-                background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
-                border: isDark ? "1px solid rgba(255, 255, 255, 0.07)" : "1px solid #e2e8f0",
-                borderRadius: 12,
-                padding: "0.55rem 0.85rem",
-                marginBottom: "1.1rem",
-                fontSize: "0.78rem",
-                color: isDark ? "#94a3b8" : "#64748b",
-                flexWrap: "wrap",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, color: isDark ? "#c4b5fd" : "#7c3aed" }}>
-                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: isDark ? "rgba(167, 139, 250, 0.2)" : "#ede9fe", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.68rem", fontWeight: 800 }}>1</span>
-                  <span>{questionType === "story_audio" ? "Listen to Audio" : questionType === "picture_description" ? "Observe Image" : "Read Prompt"}</span>
-                </div>
-                <span style={{ opacity: 0.35 }}>→</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, color: isDark ? "#cbd5e1" : "#475569" }}>
-                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.68rem", fontWeight: 800 }}>2</span>
-                  <span>Pick Target Words</span>
-                </div>
-                <span style={{ opacity: 0.35 }}>→</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 700, color: "#f97316" }}>
-                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: "rgba(249, 115, 22, 0.18)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.68rem", fontWeight: 800, color: "#f97316" }}>3</span>
-                  <span>Record 1-3 Mins</span>
-                </div>
-              </div>
-
               {/* ── 3. SPEAKING TASK / QUESTION PROMPT CARD (HERO FOR ALL TYPES) ── */}
               <div className="speakshine-prompt-box" style={{
                 background: isDark
@@ -2443,11 +2413,10 @@ export default function ModernDashboardView({
                     borderRadius: 8,
                   }}>
                     <span style={{
-                      fontSize: "0.72rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
+                      fontSize: "0.85rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.02em",
                       color: questionConfig.theme.primary,
-                      textTransform: "uppercase",
                     }}>
                       {questionConfig.promptLabel}
                     </span>
@@ -2564,17 +2533,17 @@ export default function ModernDashboardView({
                   boxShadow: isDark ? "0 4px 18px rgba(0, 0, 0, 0.2)" : "0 2px 8px rgba(124, 58, 237, 0.04)",
                 }}>
                   {/* Row 1: Title and CEFR Difficulty Badge */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span style={{ fontSize: "0.9rem" }}>✨</span>
-                      <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em", color: isDark ? "#c084fc" : "#7c3aed" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                      <span style={{ fontSize: "0.95rem" }}>✨</span>
+                      <span style={{ fontSize: "0.95rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
                         Today's Vocabulary
                       </span>
                     </div>
                     <span style={{
-                      fontSize: "0.64rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.04em",
+                      fontSize: "0.6875rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
                       padding: "2px 8px",
                       borderRadius: 999,
                       background: cefrInfo?.bg || (isDark ? "rgba(192, 132, 252, 0.16)" : "rgba(124, 58, 237, 0.1)"),
@@ -3102,13 +3071,13 @@ export default function ModernDashboardView({
                     gap: "0.75rem",
                   }}>
                     <div style={{
-                      fontSize: "0.74rem",
+                      fontSize: "0.95rem",
                       fontWeight: 700,
-                      letterSpacing: "0.03em",
-                      color: isDark ? "#c4b5fd" : "#6b21a8",
+                      letterSpacing: "-0.01em",
+                      color: isDark ? "#ffffff" : "#0f172a",
                       display: "flex",
                       alignItems: "center",
-                      gap: "0.4rem",
+                      gap: "0.45rem",
                     }}>
                       <span>💡</span>
                       <span>Speaking Guidelines</span>
@@ -3536,13 +3505,13 @@ export default function ModernDashboardView({
           }}>
             {/* KPI 1 */}
             <div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8b85a3", marginBottom: "0.35rem" }}>
                 Current Streak
               </div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
                 {streak} Days
               </div>
-              <div style={{ fontSize: "0.74rem", color: "#f97316", fontWeight: 600, marginTop: "2px", display: "flex", alignItems: "center", gap: "3px" }}>
+              <div style={{ fontSize: "0.75rem", color: "#f97316", fontWeight: 600, marginTop: "4px", display: "flex", alignItems: "center", gap: "3px" }}>
                 <span>🔥</span>
                 <span>{isTodaySubmitted ? "+1 day added · Great consistency!" : (streak > 0 ? "Practice today to keep your streak thriving" : "Start your speaking journey today")}</span>
               </div>
@@ -3550,61 +3519,62 @@ export default function ModernDashboardView({
 
             {/* KPI 2 */}
             <div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8b85a3", marginBottom: "0.35rem" }}>
                 This Month
               </div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
                 {kpiMetrics.thisMonthCompleted} Completed
               </div>
-              <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: "2px" }}>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 500, marginTop: "4px" }}>
                 {kpiMetrics.allTimeCompleted} total all-time
               </div>
             </div>
 
             {/* KPI 3 */}
             <div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8b85a3", marginBottom: "0.35rem" }}>
                 Speak Time
               </div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
                 {kpiMetrics.totalSpeakFormatted}
               </div>
-              <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: "2px" }}>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 500, marginTop: "4px" }}>
                 Avg {kpiMetrics.avgSpeakFormatted} / session
               </div>
             </div>
 
             {/* KPI 4 */}
             <div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8b85a3", marginBottom: "0.35rem" }}>
                 This Week
               </div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
                 {kpiMetrics.weeklyCount}/7 Days
               </div>
-              <div style={{ fontSize: "0.74rem", color: "#94a3b8", marginTop: "2px" }}>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 500, marginTop: "4px" }}>
                 {kpiMetrics.weeklyDaysSubtitle}
               </div>
             </div>
 
             {/* KPI 5: Dynamic Today's Points if submitted, else Total Points */}
             <div>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+              <div style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#8b85a3", marginBottom: "0.35rem" }}>
                 {isTodaySubmitted ? "Today's Points" : "Total Points"}
               </div>
               <div style={{
-                fontSize: "1.35rem",
+                fontSize: "1.5rem",
                 fontWeight: 700,
                 color: isTodaySubmitted ? "#4ade80" : "#fbbf24",
-                letterSpacing: "-0.01em"
+                letterSpacing: "-0.02em",
+                lineHeight: 1.2,
               }}>
                 {isTodaySubmitted ? `${todayPoints} pts` : `${totalPoints} pts`}
               </div>
               <div style={{
-                fontSize: "0.74rem",
+                fontSize: "0.75rem",
                 color: isTodaySubmitted ? "#4ade80" : "#94a3b8",
-                marginTop: "2px",
-                fontWeight: isTodaySubmitted ? 600 : 400
+                marginTop: "4px",
+                fontWeight: isTodaySubmitted ? 600 : 500
               }}>
                 {isTodaySubmitted ? "✓ Challenge completed today" : "Ready to earn today's speaking points"}
               </div>
@@ -3776,22 +3746,19 @@ export default function ModernDashboardView({
                   flexWrap: "wrap",
                   gap: "0.75rem",
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-                    <span style={{
-                      fontSize: "0.72rem",
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                    <h2 style={{
+                      fontSize: "1.05rem",
                       fontWeight: 700,
-                      letterSpacing: "0.03em",
-                      color: isDark ? "#fbbf24" : "#b45309",
-                      background: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.1)",
-                      border: isDark ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid rgba(245, 158, 11, 0.25)",
-                      borderRadius: 6,
-                      padding: "3px 9px",
+                      letterSpacing: "-0.01em",
+                      color: isDark ? "#ffffff" : "#0f172a",
+                      margin: 0,
                     }}>
                       Speaking Milestones
-                    </span>
+                    </h2>
 
-                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a" }}>
-                      Consistency Pathway · Next Goal: {nextBadge ? `${nextBadge.icon} ${nextBadge.name}` : "Speech Mastery"}
+                    <span style={{ fontSize: "0.82rem", fontWeight: 500, color: isDark ? "#94a3b8" : "#64748b" }}>
+                      Consistency Pathway · Next: <span style={{ fontWeight: 700, color: isDark ? "#fbbf24" : "#b45309" }}>{nextBadge ? `${nextBadge.icon} ${nextBadge.name}` : "Speech Mastery"}</span>
                     </span>
                   </div>
 
@@ -4275,7 +4242,7 @@ export default function ModernDashboardView({
             }}>
               {/* Header with Title & Tabs */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
-                <div className="perf-center-title" style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em" }}>
+                <div className="perf-center-title" style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
                   Performance Center
                 </div>
 
@@ -4343,38 +4310,38 @@ export default function ModernDashboardView({
               {/* Metric Averages Row */}
               <div className="perf-metric-grid">
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                  <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Fluency
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    {rubricAverages.fluency} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.fluency} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
 
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                  <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Grammar
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    {rubricAverages.grammar} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.grammar} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
 
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                  <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Confidence
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    {rubricAverages.confidence} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.confidence} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
 
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                  <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Vocabulary
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
-                    {rubricAverages.vocabulary} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.vocabulary} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
               </div>
@@ -4649,11 +4616,10 @@ export default function ModernDashboardView({
                   gap: "0.5rem",
                 }}>
                   <div style={{
-                    fontSize: "0.68rem",
-                    fontWeight: 800,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: isDark ? "#94a3b8" : "#64748b",
+                    fontSize: "0.88rem",
+                    fontWeight: 700,
+                    letterSpacing: "-0.01em",
+                    color: isDark ? "#ffffff" : "#0f172a",
                     display: "flex",
                     alignItems: "center",
                     gap: "0.4rem",
@@ -4662,7 +4628,7 @@ export default function ModernDashboardView({
                     <span>COACH'S PERFORMANCE INSIGHTS</span>
                   </div>
                   <div style={{
-                    fontSize: "0.7rem",
+                    fontSize: "0.6875rem",
                     fontWeight: 700,
                     color: "#a78bfa",
                     background: "rgba(167, 139, 250, 0.12)",
@@ -4688,13 +4654,13 @@ export default function ModernDashboardView({
                     borderRadius: 12,
                     padding: "0.75rem 0.85rem",
                   }}>
-                    <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#22c55e", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
+                    <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#22c55e", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "3px" }}>
                       🌟 TOP STRENGTH
                     </div>
-                    <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                    <div className="perf-insight-val" style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
                       {sessionInsights.topSkill.name} <span style={{ color: "#22c55e", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.topSkill.score}/10)</span>
                     </div>
-                    <div className="perf-insight-sub" style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
                       {sessionInsights.topSkill.sub}
                     </div>
                   </div>
@@ -4708,13 +4674,13 @@ export default function ModernDashboardView({
                     borderRadius: 12,
                     padding: "0.75rem 0.85rem",
                   }}>
-                    <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#f59e0b", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
+                    <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#f59e0b", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "3px" }}>
                       🌱 AREA TO NURTURE
                     </div>
-                    <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                    <div className="perf-insight-val" style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
                       {sessionInsights.focusSkill.name} <span style={{ color: "#f59e0b", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.focusSkill.score}/10)</span>
                     </div>
-                    <div className="perf-insight-sub" style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
                       {sessionInsights.focusSkill.sub}
                     </div>
                   </div>
@@ -4728,13 +4694,13 @@ export default function ModernDashboardView({
                     borderRadius: 12,
                     padding: "0.75rem 0.85rem",
                   }}>
-                    <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#a855f7", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
+                    <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#a855f7", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "3px" }}>
                       🚀 RECENT MOMENTUM
                     </div>
-                    <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                    <div className="perf-insight-val" style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
                       {sessionInsights.momentum.label} <span style={{ color: sessionInsights.momentum.positive ? "#22c55e" : "#a855f7", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.momentum.diff})</span>
                     </div>
-                    <div className="perf-insight-sub" style={{ fontSize: "0.7rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
                       {sessionInsights.momentum.subtitle}
                     </div>
                   </div>
@@ -4770,7 +4736,7 @@ export default function ModernDashboardView({
                       🌟
                     </div>
                     <div>
-                      <div className="leaderboard-header-title" style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.03em" }}>
+                      <div className="leaderboard-header-title" style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
                         Cohort Daily Practice
                       </div>
                     </div>
@@ -4806,8 +4772,8 @@ export default function ModernDashboardView({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "0.45rem",
-                  fontSize: "0.7rem",
-                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                  fontWeight: 500,
                   padding: "4px 10px",
                   borderRadius: 99,
                   marginBottom: "0.85rem",
