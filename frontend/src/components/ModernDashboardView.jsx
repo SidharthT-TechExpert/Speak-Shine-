@@ -1970,8 +1970,9 @@ export default function ModernDashboardView({
                 boxShadow: isDark ? "0 12px 40px rgba(0, 0, 0, 0.4)" : "0 10px 30px rgba(0, 0, 0, 0.04)",
               }}>
                 <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#86efac" : "#15803d", textTransform: "uppercase", marginBottom: "0.85rem" }}>
-                    DAILY MISSION STATUS
+                  <div style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em", color: isDark ? "#86efac" : "#15803d", marginBottom: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span>🎯</span>
+                    <span>Daily Mission Status</span>
                   </div>
 
                   {/* Luminous Streak Shield Box */}
@@ -2018,8 +2019,8 @@ export default function ModernDashboardView({
                     padding: "0.85rem 1rem",
                     marginBottom: "1.25rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.45rem" }}>
-                      NEXT CHALLENGE CYCLE
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", marginBottom: "0.45rem" }}>
+                      Next Challenge Cycle
                     </div>
                     <div style={{ fontSize: "0.82rem", color: isDark ? "#cbd5e1" : "#334155" }}>
                       Next speaking mission drops tomorrow at <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>{formatDropTime(targetPosterSendTime)} IST</strong>. Take today to rest your vocal cords!
@@ -2034,8 +2035,8 @@ export default function ModernDashboardView({
                     padding: "1rem",
                     marginBottom: "1.25rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-                      TODAY'S VERIFIED CHECKLIST
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", marginBottom: "0.75rem" }}>
+                      Today's Verified Checklist
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: isDark ? "#e2e8f0" : "#1e293b" }}>
@@ -2107,8 +2108,8 @@ export default function ModernDashboardView({
                     width: 8, height: 8, borderRadius: "50%",
                     background: "#22c55e", boxShadow: "0 0 10px #22c55e",
                   }} />
-                  <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#22c55e", textTransform: "uppercase" }}>
-                    LIVE NOW
+                  <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.04em", color: "#22c55e" }}>
+                    Live Now
                   </span>
                 </div>
                 <span style={{
@@ -2117,10 +2118,9 @@ export default function ModernDashboardView({
                   borderRadius: 999,
                   padding: "4px 12px",
                   fontSize: "0.72rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.06em",
+                  fontWeight: 700,
+                  letterSpacing: "0.03em",
                   color: questionConfig.theme.primary,
-                  textTransform: "uppercase",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "0.35rem",
@@ -2131,8 +2131,8 @@ export default function ModernDashboardView({
 
               {/* Title with Premium Editorial Serif — Playfair Display */}
               <div style={{ marginBottom: "1rem" }}>
-                <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#94a3b8", textTransform: "uppercase", marginBottom: "0.35rem" }}>
-                  {questionType === "picture_description" ? "CHALLENGE THEME" : questionType === "story_audio" ? "STORY TITLE" : "TOPIC"}
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.04em", color: "#94a3b8", marginBottom: "0.35rem" }}>
+                  {questionType === "picture_description" ? "Challenge Theme" : questionType === "story_audio" ? "Story Title" : "Daily Topic"}
                 </div>
                 <h1 className="story-title-heading" style={{
                   fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
@@ -2211,8 +2211,8 @@ export default function ModernDashboardView({
               {questionType === "story_audio" && questionConfig.hasAudio && audioSrc && (
                 <div style={{ marginBottom: "1.35rem" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                    <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: questionConfig.theme.primary, textTransform: "uppercase" }}>
-                      🎧 LISTEN TO THE STORY
+                    <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em", color: questionConfig.theme.primary }}>
+                      🎧 Listen to the Story
                     </span>
                     <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
                       Listen once before recording summary
@@ -2289,6 +2289,36 @@ export default function ModernDashboardView({
                   </div>
                 </div>
               )}
+
+              {/* Beginner-Friendly 3-Step Guided Action Flow */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.07)" : "1px solid #e2e8f0",
+                borderRadius: 12,
+                padding: "0.55rem 0.85rem",
+                marginBottom: "1.1rem",
+                fontSize: "0.78rem",
+                color: isDark ? "#94a3b8" : "#64748b",
+                flexWrap: "wrap",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, color: isDark ? "#c4b5fd" : "#7c3aed" }}>
+                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: isDark ? "rgba(167, 139, 250, 0.2)" : "#ede9fe", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.68rem", fontWeight: 800 }}>1</span>
+                  <span>{questionType === "story_audio" ? "Listen to Audio" : questionType === "picture_description" ? "Observe Image" : "Read Prompt"}</span>
+                </div>
+                <span style={{ opacity: 0.35 }}>→</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600, color: isDark ? "#cbd5e1" : "#475569" }}>
+                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.68rem", fontWeight: 800 }}>2</span>
+                  <span>Pick Target Words</span>
+                </div>
+                <span style={{ opacity: 0.35 }}>→</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 700, color: "#f97316" }}>
+                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: "rgba(249, 115, 22, 0.18)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.68rem", fontWeight: 800, color: "#f97316" }}>3</span>
+                  <span>Record 1-3 Mins</span>
+                </div>
+              </div>
 
               {/* ── 3. SPEAKING TASK / QUESTION PROMPT CARD (HERO FOR ALL TYPES) ── */}
               <div className="speakshine-prompt-box" style={{
@@ -2441,8 +2471,8 @@ export default function ModernDashboardView({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                       <span style={{ fontSize: "0.9rem" }}>✨</span>
-                      <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
-                        TODAY'S VOCABULARY
+                      <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em", color: isDark ? "#c084fc" : "#7c3aed" }}>
+                        Today's Vocabulary
                       </span>
                     </div>
                     <span style={{
@@ -2861,8 +2891,8 @@ export default function ModernDashboardView({
                       alignItems: "center",
                       gap: "0.55rem",
                       fontSize: "0.82rem",
-                      background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.12)",
-                      border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(245, 158, 11, 0.35)",
+                      background: isDark ? "rgba(245, 158, 11, 0.08)" : "rgba(245, 158, 11, 0.1)",
+                      border: isDark ? "1px solid rgba(245, 158, 11, 0.25)" : "1px solid rgba(245, 158, 11, 0.3)",
                       borderRadius: 10,
                       padding: "0.55rem 0.85rem",
                       marginBottom: "0.85rem",
@@ -2872,11 +2902,9 @@ export default function ModernDashboardView({
                         alignItems: "center",
                         justifyContent: "center",
                         fontSize: "1.05rem",
-                        filter: "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))",
-                        color: "#ef4444",
                         flexShrink: 0,
                       }}>
-                        ⚠️
+                        {streak > 0 ? "🔥" : "✨"}
                       </span>
                       <span style={{
                         color: isDark ? "#fbbf24" : "#b45309",
@@ -2884,12 +2912,14 @@ export default function ModernDashboardView({
                         lineHeight: 1.35,
                         letterSpacing: "-0.01em",
                       }}>
-                        {streak > 0 ? `${streak}-day streak at risk! Submit before midnight to keep it alive.` : "Submit before midnight to start streak"}
+                        {streak > 0
+                          ? `${streak}-day streak going strong! Complete today's mission before midnight to advance.`
+                          : "Complete today's mission before midnight to start your streak!"}
                       </span>
                     </div>
                   )}
 
-                  {/* Rules to Remember */}
+                  {/* Coach's Checklist */}
                   <div className="speakshine-rules-box" style={{
                     background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
                     border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
@@ -2897,13 +2927,23 @@ export default function ModernDashboardView({
                     padding: "0.85rem",
                     marginBottom: "0.55rem",
                   }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#8b85a3" : "#64748b", textTransform: "uppercase", marginBottom: "0.55rem" }}>
-                      RULES TO REMEMBER
+                    <div style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.03em",
+                      color: isDark ? "#c4b5fd" : "#6b21a8",
+                      marginBottom: "0.55rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}>
+                      <span>💡</span>
+                      <span>Coach's Checklist</span>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {questionConfig.rules.map((rule, idx) => (
-                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155" }}>
-                          <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155", lineHeight: 1.45 }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
                           <span style={rule.highlight ? { fontWeight: 600, color: isDark ? "#ffffff" : "#0f172a" } : {}}>{rule.text}</span>
                         </div>
                       ))}
@@ -2933,11 +2973,11 @@ export default function ModernDashboardView({
                         marginBottom: "0.25rem",
                       }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                          <span style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                            TIMING SWEET SPOT
+                          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#cbd5e1" : "#475569" }}>
+                            ⏱️ Timing Sweet Spot
                           </span>
-                          <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
-                            ⏱️ 60s min · {fullLabel} full pts
+                          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#fb923c" : "#ea580c" }}>
+                            60s min · {fullLabel} full pts
                           </span>
                         </div>
                         {/* Visual Sweet Spot Progress Bar */}
@@ -3080,8 +3120,8 @@ export default function ModernDashboardView({
                         width: 8, height: 8, borderRadius: "50%",
                         background: "#a78bfa", boxShadow: "0 0 10px #a78bfa",
                       }} />
-                      <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.08em", color: "#a78bfa", textTransform: "uppercase" }}>
-                        DAILY RESET COMPLETE
+                      <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.04em", color: "#a78bfa" }}>
+                        Daily reset complete
                       </span>
                     </div>
                     <span style={{
@@ -3090,12 +3130,11 @@ export default function ModernDashboardView({
                       borderRadius: 6,
                       padding: "3px 8px",
                       fontSize: "0.7rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.08em",
+                      fontWeight: 700,
+                      letterSpacing: "0.03em",
                       color: "#fb923c",
-                      textTransform: "uppercase",
                     }}>
-                      WINDOW OPENS AT {formatDropTime(targetPosterSendTime)}
+                      Window opens at {formatDropTime(targetPosterSendTime)}
                     </span>
                   </div>
 
@@ -3209,7 +3248,7 @@ export default function ModernDashboardView({
                 </div>
               </div>
 
-              {/* Right: Daily Protocol & Warm-Up Card */}
+              {/* Right: Coach's Practice & Daily Rhythm Card */}
               <div className="speakshine-hero-right-card" style={{
                 width: "100%",
                 maxWidth: 440,
@@ -3225,17 +3264,35 @@ export default function ModernDashboardView({
                 boxShadow: isDark ? "0 10px 30px rgba(0, 0, 0, 0.35)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
               }}>
                 <div style={{
-                  fontSize: "0.68rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.08em",
-                  color: isDark ? "#8b85a3" : "#64748b",
-                  textTransform: "uppercase",
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.45rem",
+                  justifyContent: "space-between",
+                  marginBottom: "0.15rem",
                 }}>
-                  <span>📋</span>
-                  <span>DAILY SPEAKING PROTOCOL</span>
+                  <div style={{
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    color: isDark ? "#c4b5fd" : "#6b21a8",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.45rem",
+                  }}>
+                    <span>🌿</span>
+                    <span>Daily Speaking Rhythm</span>
+                  </div>
+                  <span style={{
+                    fontSize: "0.64rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    background: isDark ? "rgba(124, 111, 255, 0.12)" : "#f3e8ff",
+                    color: isDark ? "#a78bfa" : "#7c3aed",
+                    border: isDark ? "1px solid rgba(124, 111, 255, 0.25)" : "1px solid #ddd6fe",
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    textTransform: "uppercase",
+                  }}>
+                    IST Schedule
+                  </span>
                 </div>
 
                 {/* Daily Rhythm Timeline */}
@@ -3259,11 +3316,11 @@ export default function ModernDashboardView({
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 500 }}>⏰ 11:59 PM Midnight</span>
-                    <span style={{ fontWeight: 600, fontSize: "0.7rem", background: isDark ? "rgba(255, 255, 255, 0.05)" : "#f1f5f9", color: isDark ? "#94a3b8" : "#64748b", border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0", padding: "2px 7px", borderRadius: 5 }}>Deadline</span>
+                    <span style={{ fontWeight: 600, fontSize: "0.7rem", background: isDark ? "rgba(255, 255, 255, 0.05)" : "#f1f5f9", color: isDark ? "#94a3b8" : "#64748b", border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0", padding: "2px 7px", borderRadius: 5 }}>Final Window</span>
                   </div>
                 </div>
 
-                {/* Rules to Remember */}
+                {/* Coach's Checklist */}
                 <div className="speakshine-rules-box" style={{
                   background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
                   border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
@@ -3271,40 +3328,38 @@ export default function ModernDashboardView({
                   padding: "0.85rem 1rem",
                 }}>
                   <div style={{
-                    fontSize: "0.68rem",
-                    fontWeight: 800,
-                    letterSpacing: "0.08em",
-                    color: isDark ? "#8b85a3" : "#64748b",
-                    textTransform: "uppercase",
+                    fontSize: "0.74rem",
+                    fontWeight: 700,
+                    color: isDark ? "#e2e8f0" : "#1e293b",
                     marginBottom: "0.65rem",
                     display: "flex",
                     alignItems: "center",
                     gap: "0.45rem"
                   }}>
-                    <span>📌</span>
-                    <span>RULES TO REMEMBER</span>
+                    <span>💡</span>
+                    <span>Coach's Checklist</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
                     {questionConfig?.rules && questionConfig.rules.length > 0 ? (
                       questionConfig.rules.map((rule, idx) => (
-                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.5 }}>
                           <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
                           <span>{rule.text}</span>
                         </div>
                       ))
                     ) : (
                       <>
-                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.5 }}>
                           <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
                           <span>Minimum 60 seconds continuous speaking (3 min for full points, max 5 min)</span>
                         </div>
-                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.5 }}>
                           <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
                           <span>Use at least {targetRequiredCount} of today's target words ({vocabLevel} level)</span>
                         </div>
-                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.5 }}>
                           <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
-                          <span>No script reading — speak naturally</span>
+                          <span>No script reading — speak naturally from the heart</span>
                         </div>
                       </>
                     )}
@@ -3320,15 +3375,15 @@ export default function ModernDashboardView({
                   borderLeftWidth: "3px",
                   borderLeftColor: "#8B5CF6",
                   borderRadius: 10,
-                  fontSize: "0.79rem",
+                  fontSize: "0.8rem",
                   color: isDark ? "#cbd5e1" : "#334155",
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
                 }}>
-                  <div style={{ fontWeight: 700, color: isDark ? "#a78bfa" : "#7c3aed", marginBottom: "3px", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <span>💡</span>
-                    <span>Pre-Recording Warm-up</span>
+                  <div style={{ fontWeight: 700, color: isDark ? "#a78bfa" : "#7c3aed", marginBottom: "4px", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>🎙️</span>
+                    <span>Quick vocal warm-up</span>
                   </div>
-                  Take a deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles lead to higher confidence scores!
+                  Take a slow, deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles build natural confidence!
                 </div>
 
                 {/* Studio Lock Notice */}
@@ -3346,8 +3401,8 @@ export default function ModernDashboardView({
                   color: isDark ? "#94a3b8" : "#64748b",
                   fontWeight: 500,
                 }}>
-                  <span>🔒</span>
-                  <span>Recording Studio &amp; Uploads unlock when today's mission goes live</span>
+                  <span>✨</span>
+                  <span>Studio unlocks at {formatDropTime(targetPosterSendTime)} · Review past feedback in the meantime</span>
                 </div>
               </div>
             </div>
@@ -3382,8 +3437,8 @@ export default function ModernDashboardView({
           }}>
             {/* KPI 1 */}
             <div>
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                CURRENT STREAK
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+                Current Streak
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
                 {streak} Days
@@ -3396,8 +3451,8 @@ export default function ModernDashboardView({
 
             {/* KPI 2 */}
             <div>
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                THIS MONTH
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+                This Month
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
                 {kpiMetrics.thisMonthCompleted} Completed
@@ -3409,8 +3464,8 @@ export default function ModernDashboardView({
 
             {/* KPI 3 */}
             <div>
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                SPEAK TIME
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+                Speak Time
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
                 {kpiMetrics.totalSpeakFormatted}
@@ -3422,8 +3477,8 @@ export default function ModernDashboardView({
 
             {/* KPI 4 */}
             <div>
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                THIS WEEK
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+                This Week
               </div>
               <div style={{ fontSize: "1.35rem", fontWeight: 700, color: "#ffffff", letterSpacing: "-0.01em" }}>
                 {kpiMetrics.weeklyCount}/7 Days
@@ -3435,8 +3490,8 @@ export default function ModernDashboardView({
 
             {/* KPI 5: Dynamic Today's Points if submitted, else Total Points */}
             <div>
-              <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#6b6680", textTransform: "uppercase", marginBottom: "0.3rem" }}>
-                {isTodaySubmitted ? "TODAY'S POINTS" : "TOTAL POINTS"}
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", color: "#8b85a3", marginBottom: "0.3rem" }}>
+                {isTodaySubmitted ? "Today's Points" : "Total Points"}
               </div>
               <div style={{
                 fontSize: "1.35rem",
@@ -3624,17 +3679,16 @@ export default function ModernDashboardView({
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
                     <span style={{
-                      fontSize: "0.68rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.09em",
-                      color: isDark ? "#f59e0b" : "#d97706",
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.03em",
+                      color: isDark ? "#fbbf24" : "#b45309",
                       background: isDark ? "rgba(245, 158, 11, 0.12)" : "rgba(245, 158, 11, 0.1)",
                       border: isDark ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid rgba(245, 158, 11, 0.25)",
                       borderRadius: 6,
                       padding: "3px 9px",
-                      textTransform: "uppercase"
                     }}>
-                      STREAK ROADMAP
+                      Streak Roadmap
                     </span>
 
                     <span style={{ fontSize: "0.85rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a" }}>
@@ -4122,8 +4176,8 @@ export default function ModernDashboardView({
             }}>
               {/* Header with Title & Tabs */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
-                <div className="perf-center-title" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                  PERFORMANCE CENTER
+                <div className="perf-center-title" style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em" }}>
+                  Performance Center
                 </div>
 
                 <div className="perf-tab-wrapper" style={{ display: "flex", gap: "0.35rem", padding: 4, borderRadius: 10 }}>
@@ -4190,8 +4244,8 @@ export default function ModernDashboardView({
               {/* Metric Averages Row */}
               <div className="perf-metric-grid">
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
-                    FLUENCY
+                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                    Fluency
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
                     {rubricAverages.fluency} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
@@ -4199,8 +4253,8 @@ export default function ModernDashboardView({
                 </div>
 
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
-                    GRAMMAR
+                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                    Grammar
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
                     {rubricAverages.grammar} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
@@ -4208,8 +4262,8 @@ export default function ModernDashboardView({
                 </div>
 
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
-                    CONFIDENCE
+                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                    Confidence
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
                     {rubricAverages.confidence} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
@@ -4217,8 +4271,8 @@ export default function ModernDashboardView({
                 </div>
 
                 <div className="perf-metric-card">
-                  <div className="perf-metric-label" style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
-                    VOCABULARY
+                  <div className="perf-metric-label" style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.03em", marginBottom: "0.25rem" }}>
+                    Vocabulary
                   </div>
                   <div className="perf-metric-val" style={{ fontSize: "1.4rem", fontWeight: 700 }}>
                     {rubricAverages.vocabulary} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 400 }}>avg</span>
@@ -4618,8 +4672,8 @@ export default function ModernDashboardView({
                       🏆
                     </div>
                     <div>
-                      <div className="leaderboard-header-title" style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                        TODAY'S LEADERBOARD
+                      <div className="leaderboard-header-title" style={{ fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.03em" }}>
+                        Today's Leaderboard
                       </div>
                     </div>
                   </div>
@@ -4663,7 +4717,7 @@ export default function ModernDashboardView({
                   flexWrap: "wrap",
                 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                  <span>{groupName.toUpperCase()} · {memberCount} MEMBERS · {submittedCount} SUBMITTED · {pendingCount} PENDING</span>
+                  <span>{groupName} · {memberCount} members · {submittedCount} submitted · {pendingCount} pending</span>
                 </div>
 
                 {/* All-Time Record Callout */}
