@@ -387,35 +387,71 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
         {/* Navigation Items */}
         <nav className="speakshine-sidebar-nav">
           <Link to="/dashboard" className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}>
-            <span className="nav-icon">⏱</span>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </span>
             <span>Dashboard</span>
           </Link>
           <Link to="/record" className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}>
-            <span className="nav-icon">📹</span>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.9L15 14"/>
+                <rect x="3" y="8" width="12" height="8" rx="2"/>
+              </svg>
+            </span>
             <span>Video analysis</span>
           </Link>
           <Link to="/community" className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}>
-            <span className="nav-icon">👥</span>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+              </svg>
+            </span>
             <span>Community</span>
           </Link>
           <Link to="/live/rooms" className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}>
-            <span className="nav-icon">📡</span>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h.01M2 8.82a15 15 0 0120 0"/>
+                <path d="M5 12.86A10 10 0 0119 12.86"/>
+                <path d="M8.53 16.11a6 6 0 016.95 0"/>
+              </svg>
+            </span>
             <span>Live rooms</span>
           </Link>
           <Link to="/payment-history" className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}>
-            <span className="nav-icon">💳</span>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+            </span>
             <span>Payments</span>
           </Link>
 
           {(user?.role === "admin" || user?.role === "admins") && (
             <Link to="/admin" className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}>
-              <span className="nav-icon">🛡️</span>
+              <span className="nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </span>
               <span>Admin</span>
             </Link>
           )}
           {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
             <Link to="/trainer" className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}>
-              <span className="nav-icon">🎓</span>
+              <span className="nav-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                  <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                </svg>
+              </span>
               <span>Trainer</span>
             </Link>
           )}
@@ -695,42 +731,79 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
 
             <nav className="speakshine-sidebar-nav" style={{ flex: 1 }}>
               <Link to="/dashboard" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}>
-                <span className="nav-icon">⏱</span>
+                <span className="nav-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                  </svg>
+                </span>
                 <span>Dashboard</span>
               </Link>
               <Link to="/record" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}>
-                <span className="nav-icon">📹</span>
+                <span className="nav-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.9L15 14"/>
+                    <rect x="3" y="8" width="12" height="8" rx="2"/>
+                  </svg>
+                </span>
                 <span>Video analysis</span>
               </Link>
               <Link to="/community" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}>
-                <span className="nav-icon">👥</span>
+                <span className="nav-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                  </svg>
+                </span>
                 <span>Community</span>
               </Link>
               <Link to="/live/rooms" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}>
-                <span className="nav-icon">📡</span>
+                <span className="nav-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h.01M2 8.82a15 15 0 0120 0"/>
+                    <path d="M5 12.86A10 10 0 0119 12.86"/>
+                    <path d="M8.53 16.11a6 6 0 016.95 0"/>
+                  </svg>
+                </span>
                 <span>Live rooms</span>
               </Link>
               <Link to="/payment-history" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}>
-                <span className="nav-icon">💳</span>
+                <span className="nav-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2"/>
+                    <line x1="2" y1="10" x2="22" y2="10"/>
+                  </svg>
+                </span>
                 <span>Payments</span>
               </Link>
 
               {(user?.role === "admin" || user?.role === "admins") && (
                 <Link to="/admin" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}>
-                  <span className="nav-icon">🛡️</span>
+                  <span className="nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                  </span>
                   <span>Admin</span>
                 </Link>
               )}
               {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
                 <Link to="/trainer" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}>
-                  <span className="nav-icon">🎓</span>
+                  <span className="nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                      <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                    </svg>
+                  </span>
                   <span>Trainer</span>
                 </Link>
               )}
             </nav>
 
             <div style={{ marginTop: "auto", marginBottom: "1rem" }}>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#8e8a9f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
+              {/* Appearance label: sentence case, softer weight */}
+              <div style={{ fontSize: "0.72rem", fontWeight: 500, color: "var(--muted)", letterSpacing: "0.02em", marginBottom: "0.5rem" }}>
                 Appearance
               </div>
               <ThemeToggle />

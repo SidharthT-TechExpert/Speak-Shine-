@@ -19,12 +19,17 @@ const CACHEABLE = ["/dashboard", "/dashboard/me", "/users", "/questions", "/live
 let isRefreshing = false;
 let refreshSubscribers = [];
 
-function subscribeTokenRefresh(cb) {
-  refreshSubscribers.push(cb);
+function subscribeTokenRefresh(resolve, reject) {
+  refreshSubscribers.push({ resolve, reject });
 }
 
 function onTokenRefreshed() {
-  refreshSubscribers.forEach(cb => cb());
+  refreshSubscribers.forEach(({ resolve }) => resolve());
+  refreshSubscribers = [];
+}
+
+function onTokenRefreshFailed(err) {
+  refreshSubscribers.forEach(({ reject }) => reject(err));
   refreshSubscribers = [];
 }
 
@@ -98,10 +103,16 @@ api.interceptors.response.use(
         !originalRequest.url?.includes("/auth/refresh")) {
 
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh(() => {
-            resolve(api(originalRequest));
-          });
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh(
+            () => {
+              delete originalRequest.headers.Authorization;
+              resolve(api(originalRequest));
+            },
+            (refreshErr) => {
+              reject(refreshErr);
+            }
+          );
         });
       }
 
@@ -117,6 +128,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
+        onTokenRefreshFailed(refreshError);
         return Promise.reject(refreshError);
       }
     }

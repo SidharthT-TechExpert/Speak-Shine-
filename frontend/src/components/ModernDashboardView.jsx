@@ -3214,110 +3214,140 @@ export default function ModernDashboardView({
                 width: "100%",
                 maxWidth: 440,
                 margin: "0 auto",
-                background: "#0d0a18",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
+                background: isDark ? "#0d0a18" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
                 borderRadius: 18,
-                padding: "1.75rem",
+                padding: "1.4rem",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "space-between",
+                gap: "0.85rem",
+                boxSizing: "border-box",
+                boxShadow: isDark ? "0 10px 30px rgba(0, 0, 0, 0.35)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
               }}>
-                <div>
-                  <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#716c85", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-                    DAILY SPEAKING PROTOCOL
-                  </div>
+                <div style={{
+                  fontSize: "0.68rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  color: isDark ? "#8b85a3" : "#64748b",
+                  textTransform: "uppercase",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                }}>
+                  <span>📋</span>
+                  <span>DAILY SPEAKING PROTOCOL</span>
+                </div>
 
-                  {/* Daily Rhythm Timeline */}
+                {/* Daily Rhythm Timeline */}
+                <div style={{
+                  background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
+                  border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: "0.85rem 1rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.65rem",
+                  fontSize: "0.8rem",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 600 }}>🌙 12:00 AM Midnight</span>
+                    <span style={{ fontWeight: 700, fontSize: "0.7rem", background: isDark ? "rgba(74, 222, 128, 0.12)" : "#dcfce7", color: isDark ? "#4ade80" : "#15803d", border: isDark ? "1px solid rgba(74, 222, 128, 0.25)" : "1px solid #86efac", padding: "2px 7px", borderRadius: 5 }}>Reset Done ✓</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: isDark ? "#fb923c" : "#ea580c", fontWeight: 600 }}>🌅 {formatDropTime(targetPosterSendTime)}</span>
+                    <span style={{ fontWeight: 700, fontSize: "0.7rem", background: isDark ? "rgba(249, 115, 22, 0.12)" : "#ffedd5", color: isDark ? "#fb923c" : "#c2410c", border: isDark ? "1px solid rgba(249, 115, 22, 0.25)" : "1px solid #fdba74", padding: "2px 7px", borderRadius: 5 }}>Upcoming ⏳</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 500 }}>⏰ 11:59 PM Midnight</span>
+                    <span style={{ fontWeight: 600, fontSize: "0.7rem", background: isDark ? "rgba(255, 255, 255, 0.05)" : "#f1f5f9", color: isDark ? "#94a3b8" : "#64748b", border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0", padding: "2px 7px", borderRadius: 5 }}>Deadline</span>
+                  </div>
+                </div>
+
+                {/* Rules to Remember */}
+                <div className="speakshine-rules-box" style={{
+                  background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
+                  border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: "0.85rem 1rem",
+                }}>
                   <div style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    border: "1px solid rgba(255, 255, 255, 0.05)",
-                    borderRadius: 12,
-                    padding: "0.85rem 1rem",
-                    marginBottom: "1.25rem",
+                    fontSize: "0.68rem",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    color: isDark ? "#8b85a3" : "#64748b",
+                    textTransform: "uppercase",
+                    marginBottom: "0.65rem",
                     display: "flex",
-                    flexDirection: "column",
-                    gap: "0.55rem",
-                    fontSize: "0.78rem",
+                    alignItems: "center",
+                    gap: "0.45rem"
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#4ade80" }}>
-                      <span>🌙 12:00 AM Midnight</span>
-                      <span style={{ fontWeight: 700, fontSize: "0.72rem", background: "rgba(74, 222, 128, 0.12)", padding: "2px 6px", borderRadius: 4 }}>Reset Done ✓</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fb923c" }}>
-                      <span>🌅 {formatDropTime(targetPosterSendTime)}</span>
-                      <span style={{ fontWeight: 700, fontSize: "0.72rem", background: "rgba(249, 115, 22, 0.12)", padding: "2px 6px", borderRadius: 4 }}>Upcoming ⏳</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#94a3b8" }}>
-                      <span>⏰ 11:59 PM Midnight</span>
-                      <span style={{ fontSize: "0.72rem" }}>Deadline</span>
-                    </div>
+                    <span>📌</span>
+                    <span>RULES TO REMEMBER</span>
                   </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                    {questionConfig?.rules && questionConfig.rules.length > 0 ? (
+                      questionConfig.rules.map((rule, idx) => (
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
+                          <span>{rule.text}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
+                          <span>Minimum 60 seconds continuous speaking (3 min for full points, max 5 min)</span>
+                        </div>
+                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
+                          <span>Use at least {targetRequiredCount} of today's target words ({vocabLevel} level)</span>
+                        </div>
+                        <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.45 }}>
+                          <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
+                          <span>No script reading — speak naturally</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
 
-                  {/* Rules to Remember */}
-                  <div className="speakshine-rules-box" style={{
-                    background: "rgba(255, 255, 255, 0.03)",
-                    border: "1px solid rgba(255, 255, 255, 0.06)",
-                    borderRadius: 12,
-                    padding: "1rem",
-                    marginBottom: "1.25rem",
-                  }}>
-                    <div style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.08em", color: "#8b85a3", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-                      RULES TO REMEMBER
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                      {questionConfig?.rules && questionConfig.rules.length > 0 ? (
-                        questionConfig.rules.map((rule, idx) => (
-                          <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                            <span>{rule.text}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <>
-                          <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                            <span>Minimum 60 seconds speaking</span>
-                          </div>
-                          <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                            <span>Use at least {targetRequiredCount} target words ({vocabLevel} level)</span>
-                          </div>
-                          <div className="speakshine-rules-item" style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.82rem", color: "#e2e8f0" }}>
-                            <span style={{ color: "#22c55e", fontWeight: 800 }}>✓</span>
-                            <span>No script reading - speak naturally</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                {/* Warm-Up Advice */}
+                <div style={{
+                  borderLeft: "3px solid #8B5CF6",
+                  padding: "0.75rem 0.95rem",
+                  background: isDark ? "rgba(139, 92, 246, 0.07)" : "#f5f3ff",
+                  border: isDark ? "1px solid rgba(139, 92, 246, 0.2)" : "1px solid #ddd6fe",
+                  borderLeftWidth: "3px",
+                  borderLeftColor: "#8B5CF6",
+                  borderRadius: 10,
+                  fontSize: "0.79rem",
+                  color: isDark ? "#cbd5e1" : "#334155",
+                  lineHeight: 1.45,
+                }}>
+                  <div style={{ fontWeight: 700, color: isDark ? "#a78bfa" : "#7c3aed", marginBottom: "3px", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>💡</span>
+                    <span>Pre-Recording Warm-up</span>
                   </div>
-
-                  {/* Warm-Up Advice */}
-                  <div style={{
-                    borderLeft: "3px solid #7c6fff",
-                    padding: "0.65rem 0.85rem",
-                    background: "rgba(124, 111, 255, 0.05)",
-                    borderRadius: "0 8px 8px 0",
-                    fontSize: "0.78rem",
-                    color: "#cbd5e1",
-                    lineHeight: 1.45,
-                  }}>
-                    <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "3px" }}>💡 Pre-Recording Warm-up</div>
-                    Take a deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles lead to higher confidence scores!
-                  </div>
+                  Take a deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles lead to higher confidence scores!
                 </div>
 
                 {/* Studio Lock Notice */}
                 <div style={{
-                  marginTop: "1.5rem",
-                  padding: "0.9rem",
-                  borderRadius: 12,
-                  background: "rgba(255, 255, 255, 0.02)",
-                  border: "1px dashed rgba(255, 255, 255, 0.1)",
+                  padding: "0.75rem 0.9rem",
+                  borderRadius: 10,
+                  background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                  border: isDark ? "1px dashed rgba(255, 255, 255, 0.1)" : "1px dashed #cbd5e1",
                   textAlign: "center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.45rem",
+                  fontSize: "0.78rem",
+                  color: isDark ? "#94a3b8" : "#64748b",
+                  fontWeight: 500,
                 }}>
-                  <div style={{ fontSize: "0.8rem", color: "#716c85", fontWeight: 600 }}>
-                    🔒 Recording Studio &amp; Uploads unlock when today's mission goes live
-                  </div>
+                  <span>🔒</span>
+                  <span>Recording Studio &amp; Uploads unlock when today's mission goes live</span>
                 </div>
               </div>
             </div>
