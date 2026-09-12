@@ -1638,10 +1638,10 @@ export default function ModernDashboardView({
               </span>
               <span className="speakshine-topbar-subtitle hidden md:block" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {isTodaySubmitted
-                  ? "🎉 Today's speaking mission accomplished! Your streak is secured."
+                  ? "🌟 Inspiring work today! You showed up for your voice and kept your momentum strong."
                   : isQuestionActive
-                  ? "Here's your speaking mission for today."
-                  : `Daily reset complete · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)}`}
+                  ? "Here's your speaking mission for today — take a deep breath and speak with confidence."
+                  : `Your voice is resting · Next speaking challenge drops at ${formatDropTime(targetPosterSendTime)} IST`}
               </span>
             </div>
 
@@ -1730,8 +1730,8 @@ export default function ModernDashboardView({
                         background: isDark ? "#4ade80" : "#16a34a",
                         boxShadow: isDark ? "0 0 12px #4ade80" : "0 0 8px rgba(22, 163, 74, 0.4)",
                       }} />
-                      <span style={{ fontSize: "0.76rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#4ade80" : "#15803d", textTransform: "uppercase" }}>
-                        MISSION COMPLETE · SUBMISSION VERIFIED
+                      <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.04em", color: isDark ? "#4ade80" : "#15803d" }}>
+                        Mission Complete · Submission Verified
                       </span>
                     </div>
                     <span style={{
@@ -1740,15 +1740,14 @@ export default function ModernDashboardView({
                       borderRadius: 9999,
                       padding: "4px 12px",
                       fontSize: "0.72rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.06em",
+                      fontWeight: 700,
+                      letterSpacing: "0.03em",
                       color: isDark ? "#86efac" : "#166534",
-                      textTransform: "uppercase",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "0.35rem",
                     }}>
-                      <span>✓</span> TODAY'S TASK DONE
+                      <span>✓</span> Today's Task Done
                     </span>
                   </div>
 
@@ -1773,7 +1772,7 @@ export default function ModernDashboardView({
                     marginBottom: "1.5rem",
                     maxWidth: "680px",
                   }}>
-                    You've successfully completed and submitted today's daily speaking challenge! Your recording was analyzed, attendance is marked, and your streak is locked in and protected until tomorrow.
+                    You've shown wonderful dedication by completing today's daily speaking challenge! Your recording has been analyzed, your attendance is recorded, and your personalized feedback is ready to explore below.
                   </p>
 
                   {/* 4 Accomplishment Highlights Grid */}
@@ -2003,10 +2002,10 @@ export default function ModernDashboardView({
                     </div>
                     <div>
                       <div style={{ fontSize: "1rem", fontWeight: 800, color: isDark ? "#ffffff" : "#065f46", marginBottom: "2px" }}>
-                        Streak Locked &amp; Protected!
+                        Wonderful job speaking today!
                       </div>
                       <div style={{ fontSize: "0.78rem", color: isDark ? "#86efac" : "#047857", lineHeight: 1.4 }}>
-                        Your {streak}-day streak is 100% safe. No fine or streak loss will occur tonight.
+                        Your voice is growing clearer and more expressive each day. Your {streak}-day streak is secured and thriving!
                       </div>
                     </div>
                   </div>
@@ -2813,6 +2812,24 @@ export default function ModernDashboardView({
                       </div>
                     </div>
                   )}
+
+                  {/* Coach's Warm Tip */}
+                  <div style={{
+                    fontSize: "0.75rem",
+                    color: isDark ? "#c4b5fd" : "#6b21a8",
+                    marginTop: "0.65rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.45rem",
+                    lineHeight: 1.45,
+                    background: isDark ? "rgba(124, 111, 255, 0.08)" : "#f5f3ff",
+                    border: isDark ? "1px solid rgba(124, 111, 255, 0.16)" : "1px solid #ddd6fe",
+                    padding: "0.45rem 0.75rem",
+                    borderRadius: 10,
+                  }}>
+                    <span>💡</span>
+                    <span><strong>Coach's Tip:</strong> Don't worry about perfection — focus on sharing your genuine thoughts. Pauses to think are a normal part of confident speech!</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -2863,9 +2880,8 @@ export default function ModernDashboardView({
                 position: "relative",
                 transition: "all 0.5s ease",
               }}>
-                <div>
-                  {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
-                  <MidnightCountdownTimer onCycleChange={setUrgencyCycle} />
+                {/* 3 Digital Countdown Timer Boxes with Green/Orange/Red Urgency Cycle */}
+                <MidnightCountdownTimer onCycleChange={setUrgencyCycle} />
 
                   {/* Streak Status Banner */}
                   {isTodaySubmitted ? (
@@ -2919,165 +2935,166 @@ export default function ModernDashboardView({
                     </div>
                   )}
 
-                  {/* Coach's Checklist */}
+                  {/* Primary Action Area: Record & Upload (Elevated for Immediate Focus) */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "0.85rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/record#video-studio-container")}
+                      style={{
+                        width: "100%",
+                        background: "linear-gradient(135deg, #f97316 0%, #ea580c 50%, #d97706 100%)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: 12,
+                        padding: "0.85rem",
+                        fontWeight: 700,
+                        fontSize: "0.92rem",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.5rem",
+                        boxShadow: "0 4px 22px rgba(249, 115, 22, 0.45)",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = "0 8px 28px rgba(249, 115, 22, 0.55)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "0 4px 22px rgba(249, 115, 22, 0.45)";
+                      }}
+                    >
+                      <span style={{ fontSize: "1.15rem" }}>🎥</span>
+                      <span>{questionConfig.recordButtonLabel}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleFileUploadClick}
+                      className="speakshine-btn-secondary"
+                      style={{
+                        width: "100%",
+                        background: isDark ? "#181427" : "#f1f5f9",
+                        color: isDark ? "#cbd5e1" : "#1e293b",
+                        border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
+                        borderRadius: 12,
+                        padding: "0.75rem",
+                        fontWeight: 600,
+                        fontSize: "0.88rem",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.5rem",
+                        transition: "background 0.15s ease",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
+                      onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
+                    >
+                      <span>📁</span>
+                      <span>{questionConfig.uploadButtonLabel}</span>
+                    </button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/*,audio/*"
+                      style={{ display: "none" }}
+                      onChange={handleFileChange}
+                    />
+                  </div>
+
+                  {/* Unified Mission Guide: Checklist & Timing Sweet Spot merged */}
                   <div className="speakshine-rules-box" style={{
-                    background: isDark ? "rgba(255, 255, 255, 0.03)" : "#f8fafc",
+                    background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
                     border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
-                    borderRadius: 12,
-                    padding: "0.85rem",
-                    marginBottom: "0.55rem",
+                    borderRadius: 14,
+                    padding: "0.95rem 1rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
                   }}>
                     <div style={{
-                      fontSize: "0.72rem",
+                      fontSize: "0.74rem",
                       fontWeight: 700,
                       letterSpacing: "0.03em",
                       color: isDark ? "#c4b5fd" : "#6b21a8",
-                      marginBottom: "0.55rem",
                       display: "flex",
                       alignItems: "center",
                       gap: "0.4rem",
                     }}>
                       <span>💡</span>
-                      <span>Coach's Checklist</span>
+                      <span>Speaking Guidelines</span>
                     </div>
+
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
                       {questionConfig.rules.map((rule, idx) => (
-                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155", lineHeight: 1.45 }}>
+                        <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.55rem", fontSize: "0.8rem", color: isDark ? "#e2e8f0" : "#334155", lineHeight: 1.45 }}>
                           <span style={{ color: "#22c55e", fontWeight: 800, flexShrink: 0, marginTop: "1px" }}>✓</span>
                           <span style={rule.highlight ? { fontWeight: 600, color: isDark ? "#ffffff" : "#0f172a" } : {}}>{rule.text}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
 
+                    {/* Subtle divider */}
+                    <div style={{
+                      height: 1,
+                      background: isDark ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
+                      margin: "0.1rem 0",
+                    }} />
 
-                  {/* Timing Sweet Spot Visual Gauge */}
-                  {(() => {
-                    const minSec = effectiveDurationLimits?.minSeconds || 60;
-                    const fullSec = effectiveDurationLimits?.fullScoreSeconds || 300;
-                    const maxSec = effectiveDurationLimits?.maxSeconds || 300;
-                    const fullLabel = effectiveDurationLimits?.fullScoreLabel || "5 min";
-                    const maxLabel = effectiveDurationLimits?.maxLabel || "5 min";
+                    {/* Timing Sweet Spot Visual Gauge */}
+                    {(() => {
+                      const minSec = effectiveDurationLimits?.minSeconds || 60;
+                      const fullSec = effectiveDurationLimits?.fullScoreSeconds || 300;
+                      const maxSec = effectiveDurationLimits?.maxSeconds || 300;
+                      const fullLabel = effectiveDurationLimits?.fullScoreLabel || "5 min";
+                      const maxLabel = effectiveDurationLimits?.maxLabel || "5 min";
 
-                    // Gauge calculation: scale up to maxSec (or fullSec if maxSec <= 0)
-                    const totalSec = Math.max(maxSec, fullSec, 60);
-                    const leftPercent = Math.max(0, Math.min(90, Math.round((minSec / totalSec) * 100)));
-                    const widthPercent = Math.max(8, Math.min(100 - leftPercent, Math.round(((fullSec - minSec) / totalSec) * 100) || Math.round((fullSec / totalSec) * 100)));
+                      // Gauge calculation: scale up to maxSec (or fullSec if maxSec <= 0)
+                      const totalSec = Math.max(maxSec, fullSec, 60);
+                      const leftPercent = Math.max(0, Math.min(90, Math.round((minSec / totalSec) * 100)));
+                      const widthPercent = Math.max(8, Math.min(100 - leftPercent, Math.round(((fullSec - minSec) / totalSec) * 100) || Math.round((fullSec / totalSec) * 100)));
 
-                    return (
-                      <div style={{
-                        background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
-                        border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid rgba(0, 0, 0, 0.06)",
-                        borderRadius: 12,
-                        padding: "0.6rem 0.85rem",
-                        marginBottom: "0.25rem",
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#cbd5e1" : "#475569" }}>
-                            ⏱️ Timing Sweet Spot
-                          </span>
-                          <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#fb923c" : "#ea580c" }}>
-                            60s min · {fullLabel} full pts
-                          </span>
-                        </div>
-                        {/* Visual Sweet Spot Progress Bar */}
-                        <div style={{
-                          height: 6,
-                          borderRadius: 99,
-                          background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
-                          position: "relative",
-                          overflow: "hidden",
-                        }}>
+                      return (
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                            <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#cbd5e1" : "#475569" }}>
+                              ⏱️ Timing Sweet Spot
+                            </span>
+                            <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#fb923c" : "#ea580c" }}>
+                              60s min · {fullLabel} full pts
+                            </span>
+                          </div>
+                          {/* Visual Sweet Spot Progress Bar */}
                           <div style={{
-                            position: "absolute",
-                            left: `${leftPercent}%`,
-                            width: `${widthPercent}%`,
-                            height: "100%",
+                            height: 6,
                             borderRadius: 99,
-                            background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
-                            boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
-                          }} />
+                            background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)",
+                            position: "relative",
+                            overflow: "hidden",
+                          }}>
+                            <div style={{
+                              position: "absolute",
+                              left: `${leftPercent}%`,
+                              width: `${widthPercent}%`,
+                              height: "100%",
+                              borderRadius: 99,
+                              background: "linear-gradient(90deg, #22c55e 0%, #10b981 100%)",
+                              boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
+                            }} />
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
+                            <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>60s min target</span>
+                            <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>{fullLabel} (Full Points)</span>
+                            <span>Max: {maxLabel}</span>
+                          </div>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
-                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>60s min target</span>
-                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>{fullLabel} (Full Points)</span>
-                          <span>Max: {maxLabel}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Action Buttons: Record & Upload */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/record#video-studio-container")}
-                    style={{
-                      width: "100%",
-                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 50%, #d97706 100%)",
-                      color: "#ffffff",
-                      border: "none",
-                      borderRadius: 12,
-                      padding: "0.85rem",
-                      fontWeight: 700,
-                      fontSize: "0.92rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                      boxShadow: "0 4px 22px rgba(249, 115, 22, 0.45)",
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 8px 28px rgba(249, 115, 22, 0.55)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 4px 22px rgba(249, 115, 22, 0.45)";
-                    }}
-                  >
-                    <span style={{ fontSize: "1.15rem" }}>🎥</span>
-                    <span>{questionConfig.recordButtonLabel}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleFileUploadClick}
-                    className="speakshine-btn-secondary"
-                    style={{
-                      width: "100%",
-                      background: isDark ? "#181427" : "#f1f5f9",
-                      color: isDark ? "#cbd5e1" : "#1e293b",
-                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
-                      borderRadius: 12,
-                      padding: "0.75rem",
-                      fontWeight: 600,
-                      fontSize: "0.88rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                      transition: "background 0.15s ease",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
-                    onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
-                  >
-                    <span>📁</span>
-                    <span>{questionConfig.uploadButtonLabel}</span>
-                  </button>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/*,audio/*"
-                    style={{ display: "none" }}
-                    onChange={handleFileChange}
-                  />
-                </div>
+                      );
+                    })()}
+                  </div>
 
 
 
@@ -3320,26 +3337,29 @@ export default function ModernDashboardView({
                   </div>
                 </div>
 
-                {/* Coach's Checklist */}
+                {/* Coach's Preparation Guide & Warm-Up */}
                 <div className="speakshine-rules-box" style={{
                   background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
                   border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
-                  borderRadius: 12,
-                  padding: "0.85rem 1rem",
+                  borderRadius: 14,
+                  padding: "1rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.75rem",
                 }}>
                   <div style={{
                     fontSize: "0.74rem",
                     fontWeight: 700,
-                    color: isDark ? "#e2e8f0" : "#1e293b",
-                    marginBottom: "0.65rem",
+                    color: isDark ? "#c4b5fd" : "#6b21a8",
                     display: "flex",
                     alignItems: "center",
                     gap: "0.45rem"
                   }}>
                     <span>💡</span>
-                    <span>Coach's Checklist</span>
+                    <span>Coach's Preparation Checklist</span>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                     {questionConfig?.rules && questionConfig.rules.length > 0 ? (
                       questionConfig.rules.map((rule, idx) => (
                         <div key={idx} className="speakshine-rules-item" style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.81rem", color: isDark ? "#e2e8f0" : "#1e293b", lineHeight: 1.5 }}>
@@ -3364,45 +3384,39 @@ export default function ModernDashboardView({
                       </>
                     )}
                   </div>
-                </div>
 
-                {/* Warm-Up Advice */}
-                <div style={{
-                  borderLeft: "3px solid #8B5CF6",
-                  padding: "0.75rem 0.95rem",
-                  background: isDark ? "rgba(139, 92, 246, 0.07)" : "#f5f3ff",
-                  border: isDark ? "1px solid rgba(139, 92, 246, 0.2)" : "1px solid #ddd6fe",
-                  borderLeftWidth: "3px",
-                  borderLeftColor: "#8B5CF6",
-                  borderRadius: 10,
-                  fontSize: "0.8rem",
-                  color: isDark ? "#cbd5e1" : "#334155",
-                  lineHeight: 1.5,
-                }}>
-                  <div style={{ fontWeight: 700, color: isDark ? "#a78bfa" : "#7c3aed", marginBottom: "4px", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <span>🎙️</span>
-                    <span>Quick vocal warm-up</span>
+                  {/* Subtle divider */}
+                  <div style={{
+                    height: 1,
+                    background: isDark ? "rgba(255, 255, 255, 0.06)" : "#e2e8f0",
+                    margin: "0.1rem 0",
+                  }} />
+
+                  {/* Vocal Warm-up tip */}
+                  <div style={{
+                    fontSize: "0.8rem",
+                    color: isDark ? "#cbd5e1" : "#334155",
+                    lineHeight: 1.5,
+                  }}>
+                    <div style={{ fontWeight: 700, color: isDark ? "#a78bfa" : "#7c3aed", marginBottom: "3px", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <span>🎙️</span>
+                      <span>Quick vocal warm-up</span>
+                    </div>
+                    Take a slow, deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles build natural confidence!
                   </div>
-                  Take a slow, deep breath and articulate the 5 vowel sounds (A-E-I-O-U) clearly. Relaxed facial muscles build natural confidence!
-                </div>
 
-                {/* Studio Lock Notice */}
-                <div style={{
-                  padding: "0.75rem 0.9rem",
-                  borderRadius: 10,
-                  background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
-                  border: isDark ? "1px dashed rgba(255, 255, 255, 0.1)" : "1px dashed #cbd5e1",
-                  textAlign: "center",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.45rem",
-                  fontSize: "0.78rem",
-                  color: isDark ? "#94a3b8" : "#64748b",
-                  fontWeight: 500,
-                }}>
-                  <span>✨</span>
-                  <span>Studio unlocks at {formatDropTime(targetPosterSendTime)} · Review past feedback in the meantime</span>
+                  {/* Studio Unlock Footer */}
+                  <div style={{
+                    fontSize: "0.76rem",
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                    paddingTop: "0.2rem",
+                  }}>
+                    <span>✨</span>
+                    <span>Studio unlocks at {formatDropTime(targetPosterSendTime)} · Review past feedback in the meantime</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3428,12 +3442,12 @@ export default function ModernDashboardView({
           <div className="speakshine-kpi-bar" style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: "1rem",
-            padding: "1.25rem 1.5rem",
+            gap: "1.25rem",
+            padding: "1.35rem 1.6rem",
             background: "#090712",
             border: "1px solid rgba(255, 255, 255, 0.05)",
-            borderRadius: 14,
-            marginBottom: "1.25rem",
+            borderRadius: 16,
+            marginBottom: "2rem",
           }}>
             {/* KPI 1 */}
             <div>
@@ -3445,7 +3459,7 @@ export default function ModernDashboardView({
               </div>
               <div style={{ fontSize: "0.74rem", color: "#f97316", fontWeight: 600, marginTop: "2px", display: "flex", alignItems: "center", gap: "3px" }}>
                 <span>🔥</span>
-                <span>{isTodaySubmitted ? "+1 from yesterday" : (streak > 0 ? "Submit today to maintain" : "Start your streak today")}</span>
+                <span>{isTodaySubmitted ? "+1 day added · Great consistency!" : (streak > 0 ? "Practice today to keep your streak thriving" : "Start your speaking journey today")}</span>
               </div>
             </div>
 
@@ -3507,7 +3521,7 @@ export default function ModernDashboardView({
                 marginTop: "2px",
                 fontWeight: isTodaySubmitted ? 600 : 400
               }}>
-                {isTodaySubmitted ? "✓ Challenge completed today" : "Pending today's submission"}
+                {isTodaySubmitted ? "✓ Challenge completed today" : "Ready to earn today's speaking points"}
               </div>
             </div>
           </div>
@@ -3649,7 +3663,7 @@ export default function ModernDashboardView({
                 border: isDark ? "1px solid rgba(167, 139, 250, 0.14)" : "1px solid #e2e8f0",
                 borderRadius: 18,
                 padding: "1.35rem 1.6rem",
-                marginBottom: "1.25rem",
+                marginBottom: "2rem",
                 boxShadow: isDark ? "0 10px 32px rgba(0, 0, 0, 0.45)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
                 position: "relative",
                 overflow: "hidden",
@@ -4236,9 +4250,9 @@ export default function ModernDashboardView({
 
               {/* Dynamic Subtitle per Tab */}
               <div className="perf-center-subtitle" style={{ fontSize: "0.82rem", marginBottom: "1.25rem" }}>
-                {activeTab === "points" && "Points Progression - Track your daily score and cumulative growth over time."}
-                {activeTab === "history" && "Skill Breakdown - Fluency, Grammar, Confidence, and Vocabulary trends across all submissions."}
-                {activeTab === "sessions" && "Submission Log - All completed speaking challenges with detailed rubric breakdown."}
+                {activeTab === "points" && "Your Consistency Journey — Watch your daily dedication translate into lasting speaking milestones."}
+                {activeTab === "history" && "Voice Skill Analytics — Observe how your fluency, grammar, confidence, and vocabulary grow over time."}
+                {activeTab === "sessions" && "Speech Archive — Revisit your recordings and feedback anytime to celebrate your progress."}
               </div>
 
               {/* Metric Averages Row */}
@@ -4560,7 +4574,7 @@ export default function ModernDashboardView({
                     gap: "0.4rem",
                   }}>
                     <span>💡</span>
-                    <span>SESSION PERFORMANCE INSIGHTS</span>
+                    <span>COACH'S PERFORMANCE INSIGHTS</span>
                   </div>
                   <div style={{
                     fontSize: "0.7rem",
@@ -4590,7 +4604,7 @@ export default function ModernDashboardView({
                     padding: "0.75rem 0.85rem",
                   }}>
                     <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#22c55e", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
-                      🏆 TOP STRENGTH
+                      🌟 TOP STRENGTH
                     </div>
                     <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
                       {sessionInsights.topSkill.name} <span style={{ color: "#22c55e", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.topSkill.score}/10)</span>
@@ -4610,7 +4624,7 @@ export default function ModernDashboardView({
                     padding: "0.75rem 0.85rem",
                   }}>
                     <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#f59e0b", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
-                      🎯 GROWTH FOCUS
+                      🌱 AREA TO NURTURE
                     </div>
                     <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
                       {sessionInsights.focusSkill.name} <span style={{ color: "#f59e0b", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.focusSkill.score}/10)</span>
@@ -4630,7 +4644,7 @@ export default function ModernDashboardView({
                     padding: "0.75rem 0.85rem",
                   }}>
                     <div style={{ fontSize: "0.64rem", fontWeight: 800, color: "#a855f7", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "3px" }}>
-                      ⚡ RECENT MOMENTUM
+                      🚀 RECENT MOMENTUM
                     </div>
                     <div className="perf-insight-val" style={{ fontSize: "0.92rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
                       {sessionInsights.momentum.label} <span style={{ color: sessionInsights.momentum.positive ? "#22c55e" : "#a855f7", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.momentum.diff})</span>

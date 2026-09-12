@@ -5959,7 +5959,7 @@ audio { border-radius: 12px; }
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr);
   gap: 1.25rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 2rem;
   width: 100%;
   align-items: center;
 }
@@ -5970,7 +5970,7 @@ audio { border-radius: 12px; }
     max-height: none;
     min-height: 0;
     align-items: center;
-    margin-bottom: 1.25rem;
+    margin-bottom: 2rem;
   }
 
   .speakshine-hero-left-card {
