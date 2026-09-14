@@ -422,13 +422,15 @@ async function processJob(job) {
 
     const { fluency, grammar, confidence, vocabulary } = result.analysis;
 
-    // ── Compute effective score (with Sunday bonus) early so it can be stored ──
-    let effectiveScore = compositeScore;
-    let isSundayScore = false;
-    if (compositeScore != null) {
-      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      isSundayScore = nowIST.getDay() === 0;
-      if (isSundayScore) effectiveScore = compositeScore * 2;
+    // ── Compute effective score (with Sunday bonus) ONCE — reused by both
+    //    feedbackScores and monthlyScore/todayScore to guarantee they match ──
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const isSundayScore = compositeScore != null && nowIST.getDay() === 0;
+    const effectiveScore = (compositeScore != null && isSundayScore)
+      ? compositeScore * 2
+      : compositeScore;
+    if (isSundayScore && compositeScore != null) {
+      console.log(`[Queue] 🎉 Sunday bonus! Score doubled: ${compositeScore.toFixed(1)} → ${effectiveScore.toFixed(1)} for ${phone}`);
     }
 
     if (fluency != null || grammar != null) {
@@ -467,18 +469,12 @@ async function processJob(job) {
     let previousScore = null;
 
     if (compositeScore != null) {
-      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
       const y  = nowIST.getFullYear();
       const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
       const d  = String(nowIST.getDate()).padStart(2, "0");
       const todayIST = `${y}-${mo}-${d}`;
 
-      // ── Sunday bonus: double points 🎉 ───────────────────────────────────
-      const isSunday = nowIST.getDay() === 0;
-      const effectiveScore = isSunday ? compositeScore * 2 : compositeScore;
-      if (isSunday) {
-        console.log(`[Queue] 🎉 Sunday bonus! Score doubled: ${compositeScore.toFixed(1)} → ${effectiveScore.toFixed(1)} for ${phone}`);
-      }
+      // effectiveScore and isSundayScore already computed above — reuse them
 
       // Fetch current user state
       const userDoc = await User.findOne({
