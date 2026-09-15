@@ -597,7 +597,7 @@ async function processJob(job) {
 
       // Save sundayBonus flag so the UI can show a celebration message
       await VideoReport.findByIdAndUpdate(reportId, {
-        "analysis.sundayBonus": isSunday,
+        "analysis.sundayBonus": isSundayScore,
         "analysis.baseScore": compositeScore,
       });
     }
