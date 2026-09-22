@@ -10,6 +10,7 @@ import { randomInt, randomUUID } from "crypto";
 import Auth from "../../../models/authSchema.js";
 import User from "../../../models/userSchema.js";
 import PendingRegistration from "../../../models/pendingRegistrationSchema.js";
+import { generateUniqueReferralCode, validateReferralCode } from "../referral/referralService.js";
 import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { validatePassword } from "../../utils/validationUtils.js";
 
@@ -606,16 +607,34 @@ export async function sendRegistrationOTP(phone) {
     throw new Error("An account with this number already exists. Please log in.");
   }
 
-  // Enforce daily registration limit (30 slots/day)
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const midnightIST = new Date(nowIST);
-  midnightIST.setHours(0, 0, 0, 0);
-  const todayCount = await PendingRegistration.countDocuments({ createdAt: { $gte: midnightIST } });
-  if (todayCount >= DAILY_REGISTRATION_LIMIT) {
-    const error = new Error(`Registration is full for today (${DAILY_REGISTRATION_LIMIT} slots). New slots open at midnight. Try again tomorrow!`);
-    error.statusCode = 429;
-    error.code = "DAILY_LIMIT_REACHED";
-    throw error;
+  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+
+  // Enforce daily registration limit (30 slots/day) in production only
+  if (!isLocal) {
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const midnightIST = new Date(nowIST);
+    midnightIST.setHours(0, 0, 0, 0);
+    const todayCount = await PendingRegistration.countDocuments({ createdAt: { $gte: midnightIST } });
+    if (todayCount >= DAILY_REGISTRATION_LIMIT) {
+      const error = new Error(`Registration is full for today (${DAILY_REGISTRATION_LIMIT} slots). New slots open at midnight. Try again tomorrow!`);
+      error.statusCode = 429;
+      error.code = "DAILY_LIMIT_REACHED";
+      throw error;
+    }
+  }
+
+  // In local mode, skip SMS sending and store master OTP 112233
+  if (isLocal) {
+    await storeOTP(stripped, "112233", "register");
+    console.log(`\n=======================================================`);
+    console.log(`📱 [Local Dev Registration] SMS sending skipped for ${stripped}`);
+    console.log(`🔑 Master OTP allowed: 112233`);
+    console.log(`=======================================================\n`);
+    return {
+      success: true,
+      message: "Local mode: Use OTP 112233",
+      devOtp: "112233",
+    };
   }
 
   const otp = generateOTP();
@@ -634,12 +653,26 @@ export async function sendRegistrationOTP(phone) {
  */
 export async function verifyRegistrationOTP(phone, otp) {
   const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+  const trimmedOtp = String(otp).trim();
+  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+
+  // In local mode, allow 112233 unconditionally
+  if (isLocal && trimmedOtp === "112233") {
+    await deleteOTP(stripped, "register").catch(() => {});
+    const verifyToken = jwt.sign(
+      { phone: stripped, purpose: "register" },
+      getJwtSecret(),
+      { expiresIn: "10m" }
+    );
+    return { success: true, verifyToken };
+  }
+
   const stored = await getStoredOTP(stripped, "register");
 
   if (!stored) {
     throw new Error("OTP expired or not found. Request a new one.");
   }
-  if (stored !== String(otp).trim()) {
+  if (stored !== trimmedOtp) {
     throw new Error("Incorrect OTP. Please try again.");
   }
 
@@ -658,7 +691,7 @@ export async function verifyRegistrationOTP(phone, otp) {
  * Step 3 — Submit registration details → stored as PendingRegistration
  * Admin must approve before the user can log in.
  */
-export async function submitRegistration(verifyToken, name, password) {
+export async function submitRegistration(verifyToken, name, password, referralCode = null) {
   // Validate token
   let decoded;
   try {
@@ -685,6 +718,16 @@ export async function submitRegistration(verifyToken, name, password) {
     throw new Error(pwCheck.errors.join(". "));
   }
 
+  // Validate referral code if provided
+  let validReferralCode = null;
+  if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
+    const check = await validateReferralCode(referralCode.trim());
+    if (!check?.valid) {
+      throw new Error("Invalid referral code. Please check the code or leave it blank.");
+    }
+    validReferralCode = check.code;
+  }
+
   // Block duplicates
   const existing = await Auth.findOne({ phone: { $in: [phone, `91${phone}`] } });
   if (existing) {
@@ -695,7 +738,13 @@ export async function submitRegistration(verifyToken, name, password) {
   const hashed = await argon2.hash(password);
   await PendingRegistration.findOneAndUpdate(
     { phone },
-    { phone, name: name.trim(), password: hashed, createdAt: new Date() },
+    {
+      phone,
+      name: name.trim(),
+      password: hashed,
+      referralCode: validReferralCode,
+      createdAt: new Date(),
+    },
     { upsert: true, new: true }
   );
 
@@ -714,6 +763,7 @@ export async function listPendingRegistrations() {
     id: p._id,
     phone: p.phone,
     name: p.name,
+    referralCode: p.referralCode || null,
     createdAt: p.createdAt,
     expiresAt: new Date(new Date(p.createdAt).getTime() + 24 * 60 * 60 * 1000),
   }));
@@ -744,6 +794,23 @@ export async function approvePendingRegistration(pendingId) {
     isActive: true,
   });
 
+  // Resolve referrer if pending had a valid referralCode
+  let referredBy = null;
+  let referredByCode = null;
+  if (pending.referralCode) {
+    const referrer = await User.findOne({ referralCode: pending.referralCode.trim().toUpperCase() });
+    if (referrer) {
+      referredBy = referrer._id;
+      referredByCode = referrer.referralCode;
+      referrer.referralCount = (Number(referrer.referralCount) || 0) + 1;
+      await referrer.save();
+      console.log(`[Referral] User ${pending.phone} linked to referrer ${referrer.phone} (${referrer.referralCode})`);
+    }
+  }
+
+  // Generate unique referral code for the new user
+  const newUserReferralCode = await generateUniqueReferralCode(pending.name);
+
   // Create the User tracking record (same as admin-create flow for role "user")
   // Try to link to an existing WhatsApp user first
   const stripped = pending.phone;
@@ -766,12 +833,20 @@ export async function approvePendingRegistration(pendingId) {
       weeklyFine: 0,
       monthlySubmissions: 0,
       feedbackScores: [],
+      referralCode: newUserReferralCode,
+      referredBy,
+      referredByCode,
     });
   } else {
     // Sync name/phone to existing WhatsApp user if missing
     const updates = {};
     if (!waUser.name) updates.name = pending.name;
     if (!waUser.phone) updates.phone = stripped;
+    if (!waUser.referralCode) updates.referralCode = newUserReferralCode;
+    if (!waUser.referredBy && referredBy) {
+      updates.referredBy = referredBy;
+      updates.referredByCode = referredByCode;
+    }
     if (Object.keys(updates).length > 0) {
       await User.updateOne({ _id: waUser._id }, { $set: updates });
     }

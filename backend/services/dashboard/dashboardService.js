@@ -667,6 +667,7 @@ export async function getSettings() {
           : (status.pictureDescriptionDay === -1 ? [] : [4])),
     pictureDescriptionDay: status.pictureDescriptionDay ?? (Array.isArray(status.pictureDescriptionDays) && status.pictureDescriptionDays.length > 0 ? status.pictureDescriptionDays[0] : -1),
     paymentAmount: status.paymentAmount ?? 5,
+    referralRewardAmount: status.referralRewardAmount ?? 5,
     durationDefaultMax: status.durationDefaultMax ?? 300,
     durationDefaultFull: status.durationDefaultFull ?? 300,
     durationStoryMax: status.durationStoryMax ?? 180,
@@ -703,6 +704,7 @@ export async function updateSettings(input, ...rest) {
     const [
       posterSendTime, questionGenerateTime, vocabWordCount, vocabRequiredCount, vocabLevel, storyWordCount, storyLevel, storyDay,
       paymentAmount,
+      referralRewardAmount,
       durationDefaultMax, durationDefaultFull,
       durationStoryMax, durationStoryFull,
       durationWeeklyMax, durationWeeklyFull,
@@ -730,6 +732,7 @@ export async function updateSettings(input, ...rest) {
     params = {
       posterSendTime, questionGenerateTime, vocabWordCount, vocabRequiredCount, vocabLevel, storyWordCount, storyLevel, storyDay, storyDays,
       paymentAmount,
+      referralRewardAmount,
       durationDefaultMax, durationDefaultFull,
       durationStoryMax, durationStoryFull,
       durationWeeklyMax, durationWeeklyFull,
@@ -757,6 +760,7 @@ export async function updateSettings(input, ...rest) {
   const {
     posterSendTime, questionGenerateTime, vocabWordCount, vocabRequiredCount, vocabLevel, storyWordCount, storyLevel, storyDay, storyDays,
     paymentAmount,
+    referralRewardAmount,
     durationDefaultMax, durationDefaultFull,
     durationStoryMax, durationStoryFull,
     durationWeeklyMax, durationWeeklyFull,
@@ -1055,6 +1059,16 @@ export async function updateSettings(input, ...rest) {
       throw error;
     }
     updates.paymentAmount = Math.round(amount * 100) / 100;
+  }
+
+  if (referralRewardAmount !== undefined) {
+    const refAmount = Number(referralRewardAmount);
+    if (!Number.isFinite(refAmount) || refAmount < 0 || refAmount > 10000) {
+      const error = new Error("referralRewardAmount must be between ₹0 and ₹10000");
+      error.statusCode = 400;
+      throw error;
+    }
+    updates.referralRewardAmount = Math.round(refAmount * 100) / 100;
   }
 
   // Duration fields validation

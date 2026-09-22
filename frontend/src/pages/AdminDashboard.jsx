@@ -430,6 +430,7 @@ export default function AdminDashboard() {
     pictureDescriptionDays: [4],
     pictureDescriptionDay: 4,
     paymentAmount: 5,
+    referralRewardAmount: 5,
     durationDefaultMax: 300,
     durationDefaultFull: 300,
     durationStoryMax: 180,
@@ -931,6 +932,7 @@ export default function AdminDashboard() {
           : (s.data.pictureDescriptionDay !== undefined && s.data.pictureDescriptionDay !== -1 ? [s.data.pictureDescriptionDay] : [4]),
         pictureDescriptionDay: s.data.pictureDescriptionDay ?? (Array.isArray(s.data.pictureDescriptionDays) && s.data.pictureDescriptionDays.length > 0 ? s.data.pictureDescriptionDays[0] : -1),
         paymentAmount: s.data.paymentAmount ?? 5,
+        referralRewardAmount: s.data.referralRewardAmount ?? 5,
         durationDefaultMax: s.data.durationDefaultMax ?? 300,
         durationDefaultFull: s.data.durationDefaultFull ?? 300,
         durationStoryMax: s.data.durationStoryMax ?? 180,
@@ -1447,6 +1449,7 @@ export default function AdminDashboard() {
           : (fresh.data.pictureDescriptionDay !== undefined && fresh.data.pictureDescriptionDay !== -1 ? [fresh.data.pictureDescriptionDay] : [4]),
         pictureDescriptionDay: fresh.data.pictureDescriptionDay ?? -1,
         paymentAmount: fresh.data.paymentAmount ?? 5,
+        referralRewardAmount: fresh.data.referralRewardAmount ?? 5,
         durationDefaultMax: fresh.data.durationDefaultMax ?? 300,
         durationDefaultFull: fresh.data.durationDefaultFull ?? 300,
         durationStoryMax: fresh.data.durationStoryMax ?? 180,
@@ -7358,6 +7361,29 @@ export default function AdminDashboard() {
                         min={1} max={100000} step="0.01"
                         value={settings.paymentAmount}
                         onChange={e => setSettings(s => ({ ...s, paymentAmount: e.target.value }))}
+                        required
+                        style={{ width: 140, fontSize: "1.1rem", fontWeight: 700 }}
+                      />
+                      <span style={{ fontSize: "0.82rem", color: "var(--muted)" }}>INR</span>
+                    </div>
+                  </div>
+
+                  {/* Referral Reward Amount */}
+                  <div style={{ padding: "1.25rem", borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.3rem" }}>
+                      🎁 Referral Reward Amount (INR)
+                    </label>
+                    <p style={{ color: "var(--muted)", fontSize: "0.78rem", margin: "0 0 0.75rem" }}>
+                      Wallet credit rewarded to referrer when friend completes payment (0 to disable).
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "#fbbf24" }}>₹</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min={0} max={10000} step="0.5"
+                        value={settings.referralRewardAmount ?? 5}
+                        onChange={e => setSettings(s => ({ ...s, referralRewardAmount: e.target.value }))}
                         required
                         style={{ width: 140, fontSize: "1.1rem", fontWeight: 700 }}
                       />

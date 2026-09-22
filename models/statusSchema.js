@@ -59,8 +59,9 @@ const statusSchema = new mongoose.Schema({
   // Which days of the week picture description runs (array of 0=Sun ... 6=Sat). Default: [4] (Thursday).
   pictureDescriptionDays: { type: [Number], default: [4] },
   pictureDescriptionDay: { type: Number, default: 4, min: -1, max: 6 },
-  // Payment settings (admin-configurable)
+  // Payment & Referral settings (admin-configurable)
   paymentAmount: { type: Number, default: 5, min: 1, max: 100000 },
+  referralRewardAmount: { type: Number, default: 5, min: 0, max: 10000 },
   // Duration scoring settings (admin-configurable)
   durationDefaultMax: { type: Number, default: 300, min: 60, max: 1200 },
   durationDefaultFull: { type: Number, default: 300, min: 60, max: 1200 },

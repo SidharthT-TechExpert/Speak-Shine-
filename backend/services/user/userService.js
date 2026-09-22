@@ -9,6 +9,7 @@ import { randomInt } from "crypto";
 import User from "../../../models/userSchema.js";
 import Auth from "../../../models/authSchema.js";
 import Status from "../../../models/statusSchema.js";
+import { ensureUserReferralCode, getReferralRewardAmount } from "../referral/referralService.js";
 import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { escapeRegex } from "../../utils/phoneUtils.js";
 import { validatePassword } from "../../utils/validationUtils.js";
@@ -147,8 +148,41 @@ export async function getUserProfile(userId) {
 
   const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "") : "";
   const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
-  const user = await User.findOne({ phone: { $in: phoneCandidates } }).select("name phone paid streak earnedBadges monthlyScore weeklySubmissions theme isDark streakFreeze freezeStreakProgress").lean();
-  return { auth, user: user || null };
+  let user = await User.findOne({ phone: { $in: phoneCandidates } });
+
+  // Auto-backfill referralCode for existing users if missing
+  if (user && !user.referralCode) {
+    await ensureUserReferralCode(user);
+  }
+
+  const referralRewardAmount = await getReferralRewardAmount();
+
+  const userProfile = user
+    ? {
+        _id: user._id,
+        name: user.name || auth.name,
+        phone: user.phone || auth.phone,
+        paid: user.paid,
+        paidAt: user.paidAt,
+        streak: user.streak,
+        earnedBadges: user.earnedBadges,
+        monthlyScore: user.monthlyScore,
+        weeklySubmissions: user.weeklySubmissions,
+        theme: user.theme,
+        isDark: user.isDark,
+        streakFreeze: user.streakFreeze,
+        freezeStreakProgress: user.freezeStreakProgress,
+        walletBalance: user.walletBalance || 0,
+        walletHistory: user.walletHistory || [],
+        referralCode: user.referralCode || null,
+        referredByCode: user.referredByCode || null,
+        referralCount: user.referralCount || 0,
+        referralEarnings: user.referralEarnings || 0,
+        referralRewardAmount,
+      }
+    : null;
+
+  return { auth, user: userProfile, referralRewardAmount };
 }
 
 /**

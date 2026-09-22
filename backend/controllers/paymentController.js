@@ -11,6 +11,7 @@ import Transaction from "../../models/transactionSchema.js";
 import Auth from "../../models/authSchema.js";
 import Status from "../../models/statusSchema.js";
 import { escapeRegex, getPhoneLookupVariants } from "../utils/phoneUtils.js";
+import { creditReferralRewardIfEligible, ensureUserReferralCode, getReferralRewardAmount } from "../services/referral/referralService.js";
 
 function getRazorpay() {
   const key_id = process.env.RAZORPAY_KEY_ID;
@@ -102,9 +103,11 @@ async function getPaymentAmount() {
 export async function getPaymentConfig(req, res) {
   try {
     const amount = await getPaymentAmount();
+    const referralRewardAmount = await getReferralRewardAmount();
     const gracePeriod = getMonthlyGracePeriodInfo();
     res.json({
       amount,
+      referralRewardAmount,
       currency: "INR",
       gracePeriod,
       isGracePeriod: gracePeriod.isGracePeriod,
@@ -127,14 +130,32 @@ export async function getUserWallet(req, res) {
       if (auth?.phone) user = await findUserByPhone(auth.phone);
     }
 
+    const referralRewardAmount = await getReferralRewardAmount();
+
     if (!user) {
-      return res.json({ success: true, walletBalance: 0, walletHistory: [] });
+      return res.json({
+        success: true,
+        walletBalance: 0,
+        walletHistory: [],
+        referralCode: null,
+        referralCount: 0,
+        referralEarnings: 0,
+        referralRewardAmount,
+      });
+    }
+
+    if (!user.referralCode) {
+      await ensureUserReferralCode(user);
     }
 
     return res.json({
       success: true,
       walletBalance: user.walletBalance || 0,
       walletHistory: user.walletHistory || [],
+      referralCode: user.referralCode || null,
+      referralCount: user.referralCount || 0,
+      referralEarnings: user.referralEarnings || 0,
+      referralRewardAmount,
     });
   } catch (err) {
     console.error("[Payment] getUserWallet error:", err.message);
@@ -198,6 +219,9 @@ export async function createOrder(req, res) {
         io.emit("user:paid_status", { phone: user.phone || phone, paid: true, paidAt: user.paidAt, name: user.name });
         io.emit("payment:recorded", { phone: user.phone || phone, name: user.name, amount: totalFee, razorpayPaymentId: "wallet_pay", createdAt: new Date() });
       }
+
+      // Credit referral reward (₹5) to referrer if eligible
+      await creditReferralRewardIfEligible(user, io);
 
       console.log(`[Payment] ⚡ 100% Wallet Cover Activated for ${user.phone}. Fee: ₹${totalFee}, New balance: ₹${newBalance}`);
       return res.json({
@@ -415,6 +439,9 @@ export async function verifyPayment(req, res) {
       });
     }
 
+    // Credit referral reward (₹5) to referrer if eligible
+    await creditReferralRewardIfEligible(user, io);
+
     console.log(`[Payment] ✅ Payment verified & logged: ${phone} ₹${amountINR}`);
     res.json({ success: true, message: "Payment successful! Access granted." });
   } catch (err) {
@@ -583,6 +610,11 @@ export async function adminTogglePaid(req, res) {
           createdAt: new Date(),
         });
       }
+    }
+
+    // Credit referral reward (₹5) to referrer if user became paid
+    if (user.paid) {
+      await creditReferralRewardIfEligible(user, io);
     }
 
     console.log(`[Payment] Admin toggled paid=${user.paid} for ${phone}`);
@@ -837,6 +869,9 @@ export async function handleWebhook(req, res) {
       source: "webhook",
     });
   }
+
+  // Credit referral reward (₹5) to referrer if eligible
+  await creditReferralRewardIfEligible(user, io);
 
   console.log(`[Webhook] ✅ Payment captured: ${user.phone} ₹${amountINR} (order: ${orderId})`);
   return res.status(200).json({ received: true });

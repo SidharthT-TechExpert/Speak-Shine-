@@ -4,6 +4,7 @@
  */
 
 import * as authService from "../services/auth/authService.js";
+import { validateReferralCode } from "../services/referral/referralService.js";
 
 // ── Cookie helpers ───────────────────────────────────────────────────────────
 const isProd = process.env.NODE_ENV === "production";
@@ -197,18 +198,34 @@ export async function verifyRegistrationOTP(req, res) {
 }
 
 /**
- * POST /api/auth/register  — Step 3: submit name + password → pending approval
+ * POST /api/auth/register  — Step 3: submit name + password (+ referralCode) → pending approval
  */
 export async function register(req, res) {
   try {
-    const { verifyToken, name, password } = req.body;
+    const { verifyToken, name, password, referralCode } = req.body;
     if (!verifyToken || !name || !password) {
       return res.status(400).json({ error: "verifyToken, name, and password are required" });
     }
-    const result = await authService.submitRegistration(verifyToken, name, password);
+    const result = await authService.submitRegistration(verifyToken, name, password, referralCode);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+}
+
+/**
+ * GET /api/auth/validate-referral/:code — check if a referral code is valid
+ */
+export async function validateReferral(req, res) {
+  try {
+    const { code } = req.params;
+    const result = await validateReferralCode(code);
+    if (!result?.valid) {
+      return res.status(400).json({ valid: false, error: "Invalid referral code" });
+    }
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ valid: false, error: error.message });
   }
 }
 

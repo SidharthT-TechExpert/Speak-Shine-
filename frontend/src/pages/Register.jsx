@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import api from "../api/client.js";
 
 function validatePhone(raw) {
@@ -27,19 +27,47 @@ const STRENGTH_COLOR = ["", "#f87171", "#fb923c", "#fbbf24", "#4ade80", "#22c55e
 // Step 1: Enter phone → Step 2: Enter OTP → Step 3: Enter name + password
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialRef = (searchParams.get("ref") || "").trim().toUpperCase();
+
   const [step, setStep] = useState(1); // 1 | 2 | 3 | 4
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [verifyToken, setVerifyToken] = useState("");
-  const [form, setForm] = useState({ name: "", password: "" });
-  const [formTouched, setFormTouched] = useState({ name: false, password: false });
+  const [form, setForm] = useState({ name: "", password: "", referralCode: initialRef });
+  const [formTouched, setFormTouched] = useState({ name: false, password: false, referralCode: false });
   const [formErrors, setFormErrors] = useState({ name: "", password: "" });
+  const [referralStatus, setReferralStatus] = useState(null); // { valid: boolean, inviterName: string }
+  const [referralValidating, setReferralValidating] = useState(false);
+  const [devOtp, setDevOtp] = useState(import.meta.env.DEV ? "112233" : null);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [stepError, setStepError] = useState("");
   const otpRefs = useRef([]);
+
+  // Auto-validate referral code if present
+  useEffect(() => {
+    const code = form.referralCode?.trim()?.toUpperCase();
+    if (!code) {
+      setReferralStatus(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setReferralValidating(true);
+      try {
+        const { data } = await api.get(`/auth/validate-referral/${encodeURIComponent(code)}`);
+        setReferralStatus({ valid: true, inviterName: data.inviterName, code: data.code });
+      } catch {
+        setReferralStatus({ valid: false });
+      } finally {
+        setReferralValidating(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [form.referralCode]);
 
   // Countdown timer for resend
   useEffect(() => {
@@ -67,10 +95,11 @@ export default function Register() {
     setLoading(true);
     setStepError(""); // clear any previous error
     try {
-      await api.post("/auth/send-otp", { phone });
+      const { data } = await api.post("/auth/send-otp", { phone });
       setStep(2);
       setStepError("");
       setResendTimer(60);
+      if (data?.devOtp) setDevOtp(data.devOtp);
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (err) {
       const msg = err.response?.data?.error || "Failed to send OTP";
@@ -144,7 +173,13 @@ export default function Register() {
     setLoading(true);
     setStepError(""); // clear any previous error
     try {
-      await api.post("/auth/register", { phone, ...form, verifyToken });
+      await api.post("/auth/register", {
+        phone,
+        name: form.name.trim(),
+        password: form.password,
+        referralCode: form.referralCode?.trim()?.toUpperCase() || undefined,
+        verifyToken,
+      });
       setStep(4); // success / pending approval screen
     } catch (err) {
       setStepError(err.response?.data?.error || "Registration failed");
@@ -249,6 +284,31 @@ export default function Register() {
                   onKeyDown={(e) => handleOtpKeyDown(i, e)} />
               ))}
             </div>
+
+            {devOtp && (
+              <div style={{ textAlign: "center", marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setOtp(devOtp.split("").slice(0, 6))}
+                  style={{
+                    background: "rgba(124, 111, 255, 0.12)",
+                    border: "1px dashed rgba(124, 111, 255, 0.4)",
+                    borderRadius: 8,
+                    padding: "0.35rem 0.75rem",
+                    color: "#c4b5fd",
+                    fontSize: "0.78rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                  }}
+                >
+                  <span>⚡ Local Mode: Use OTP {devOtp}</span>
+                </button>
+              </div>
+            )}
+
             <button type="submit" className="btn-primary" style={{ width: "100%", marginTop: 16 }}
               disabled={loading || otp.join("").length !== 6}>
               {loading ? "Verifying…" : "Verify OTP"}
@@ -337,6 +397,50 @@ export default function Register() {
               {!formErrors.password && !form.password && (
                 <div style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: "0.3rem" }}>
                   Must be 8+ characters with uppercase, lowercase, number & special character
+                </div>
+              )}
+            </div>
+
+            {/* Referral Code (Optional) */}
+            <div className="form-group" style={{ marginBottom: "1.25rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+                <label className="form-label" style={{ margin: 0 }}>
+                  Referral Code <span style={{ color: "var(--muted)", fontWeight: "normal", fontSize: "0.78rem" }}>(Optional)</span>
+                </label>
+                {referralValidating && <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Checking...</span>}
+              </div>
+              <div style={{ position: "relative" }}>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="e.g. SPEAK..."
+                  value={form.referralCode}
+                  onChange={e => handleFormChange("referralCode", e.target.value.toUpperCase().replace(/\s/g, ""))}
+                  style={{
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    borderColor: form.referralCode
+                      ? referralStatus?.valid
+                        ? "#22c55e"
+                        : referralStatus?.valid === false
+                        ? "var(--danger)"
+                        : undefined
+                      : undefined,
+                  }}
+                />
+                {form.referralCode && referralStatus?.valid && (
+                  <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "#22c55e" }}>✓</span>
+                )}
+              </div>
+              {form.referralCode && referralStatus?.valid && (
+                <div style={{ color: "#22c55e", fontSize: "0.78rem", marginTop: "0.35rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <span>🎁</span>
+                  <span>Invited by <strong>{referralStatus.inviterName}</strong></span>
+                </div>
+              )}
+              {form.referralCode && referralStatus?.valid === false && (
+                <div style={{ color: "var(--danger)", fontSize: "0.78rem", marginTop: "0.35rem" }}>
+                  ⚠ Referral code not found. Check the code or leave blank.
                 </div>
               )}
             </div>

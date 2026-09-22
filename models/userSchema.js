@@ -58,7 +58,8 @@ const userSchema = new mongoose.Schema({
   paidAt:            { type: Date,   default: null },
 
   // ── Wallet & Rewards ──────────────────────────────────────────────────────
-  // Credited automatically when student wins Month-End Prize rewards (Top 3–6).
+  // Credited automatically when student wins Month-End Prize rewards (Top 3–6)
+  // or via Referral Program (₹5 credited when referred friend pays).
   // Automatically applied as a discount on checkout (or 100% coverage if balance >= fee).
   walletBalance: { type: Number, default: 0, min: 0 },
   walletHistory: {
@@ -71,6 +72,16 @@ const userSchema = new mongoose.Schema({
     }],
     default: [],
   },
+
+  // ── Referral System ───────────────────────────────────────────────────────
+  // Unique code formatted like SPEAK + name letters + crypto random alphanumeric
+  referralCode: { type: String, unique: true, sparse: true, index: true },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  referredByCode: { type: String, default: null },
+  // Ensures ₹5 reward is paid to referrer only on the referred user's first successful payment
+  referralRewardClaimed: { type: Boolean, default: false },
+  referralCount: { type: Number, default: 0 },
+  referralEarnings: { type: Number, default: 0 },
 
   // Legacy fields — kept for DB compatibility, no longer used in business logic
   fine: { type: Number, default: 0 },
