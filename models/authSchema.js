@@ -6,6 +6,7 @@ const authSchema = new mongoose.Schema({
   role: { type: String, enum: ["user", "trainer", "admin", "admins", "viewer"], default: "user" },
   userId: { type: String, default: null },               // linked WhatsApp JID
   name: { type: String, default: null },
+  avatarUrl: { type: String, default: null },
   email: { type: String, default: null },                // admin email for OTP verification
   isActive: { type: Boolean, default: true },
   theme: { type: String, enum: ["dark", "light"], default: "dark" },

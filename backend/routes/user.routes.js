@@ -4,14 +4,43 @@
  */
 
 import express from "express";
+import multer from "multer";
 import * as userController from "../controllers/userController.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// Configure memory storage for avatar uploads (max 5MB, images only)
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, WebP, or GIF images are allowed"));
+    }
+  },
+});
+
+function handleAvatarUpload(req, res, next) {
+  avatarUpload.single("photo")(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ error: "Profile photo is too large. Maximum size is 5MB." });
+      }
+      return res.status(400).json({ error: err.message || "Failed to process photo upload" });
+    }
+    next();
+  });
+}
+
 // ── User List & Profile ──────────────────────────────────────────────────────
 router.get("/", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getAllUsers);
 router.get("/me", authMiddleware, userController.getMyProfile);
+router.patch("/me/profile", authMiddleware, handleAvatarUpload, userController.updateMyProfile);
+router.patch("/me/password", authMiddleware, userController.changeMyPassword);
+router.patch("/me/phone", authMiddleware, userController.changeMyPhone);
 router.patch("/me/theme", authMiddleware, userController.updateMyTheme);
 router.get("/:phone", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getUserByPhone);
 

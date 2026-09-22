@@ -4,6 +4,7 @@
  */
 
 import * as userService from "../services/user/userService.js";
+import { uploadAvatar } from "../services/storage/cloudinaryService.js";
 
 /**
  * GET /api/users
@@ -333,5 +334,77 @@ export async function updateMyTheme(req, res) {
     }
     console.error("[UpdateMyTheme] Error:", error.message);
     res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * PATCH /api/users/me/profile
+ * Update current user's name and/or avatar photo
+ */
+export async function updateMyProfile(req, res) {
+  try {
+    const { name, removePhoto } = req.body;
+    let avatarUrl = undefined;
+
+    if (req.file && req.file.buffer) {
+      const uploadResult = await uploadAvatar(req.file.buffer, req.user.id, req.file.mimetype);
+      avatarUrl = uploadResult.url;
+    }
+
+    const result = await userService.updateUserProfile(req.user.id, {
+      name,
+      avatarUrl,
+      removeAvatar: removePhoto === "true" || removePhoto === true,
+    });
+
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[UpdateMyProfile] Error:", error.message);
+    res.status(500).json({ error: error.message || "Failed to update profile" });
+  }
+}
+
+/**
+ * PATCH /api/users/me/password
+ * Change current user's password
+ */
+export async function changeMyPassword(req, res) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const result = await userService.changeUserPassword(req.user.id, {
+      currentPassword,
+      newPassword,
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[ChangeMyPassword] Error:", error.message);
+    res.status(500).json({ error: error.message || "Failed to change password" });
+  }
+}
+
+/**
+ * PATCH /api/users/me/phone
+ * Change current user's phone number
+ */
+export async function changeMyPhone(req, res) {
+  try {
+    const { newPhone, password } = req.body;
+    const result = await userService.changeUserPhone(req.user.id, {
+      newPhone,
+      password,
+    });
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[ChangeMyPhone] Error:", error.message);
+    res.status(500).json({ error: error.message || "Failed to change phone number" });
   }
 }

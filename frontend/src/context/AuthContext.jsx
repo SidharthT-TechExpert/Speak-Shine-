@@ -179,10 +179,22 @@ export function AuthProvider({ children }) {
     return () => socket.off("force:logout", onForceLogout);
   }, [user, booting, clearSession]);
 
+  const updateUser = useCallback((updatedFields) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updatedFields };
+      try {
+        localStorage.setItem("speakshine_user", JSON.stringify(updated));
+        localStorage.setItem("user", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+
   useEffect(() => () => stopRefresh(), [stopRefresh]);
 
   return (
-    <AuthContext.Provider value={{ user, token, booting, login, logout }}>
+    <AuthContext.Provider value={{ user, token, booting, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -23,6 +23,7 @@ const LiveRooms       = lazy(() => import("./pages/LiveRooms.jsx"));
 const NotFound        = lazy(() => import("./pages/NotFound.jsx"));
 const PaymentWall     = lazy(() => import("./pages/PaymentWall.jsx"));
 const PaymentHistory  = lazy(() => import("./pages/PaymentHistory.jsx"));
+const Profile         = lazy(() => import("./pages/Profile.jsx"));
 import { AppShell } from "./components/Layout.jsx";
 
 function PageLoader() {
@@ -193,6 +194,11 @@ function AppRoutes() {
               <Route path="/payment-history" element={
                 <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
                   <PaymentHistory />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute roles={["user","admin","admins","trainer","viewer"]} loginPath="/login">
+                  <Profile />
                 </ProtectedRoute>
               } />
               <Route path="/admin" element={

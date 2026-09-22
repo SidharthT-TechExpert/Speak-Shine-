@@ -1,14 +1,29 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
 import { getSharedSocket } from "../hooks/useSocket.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
-export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle }) {
-  const { updateUser } = useAuth() || {};
+export default function Profile() {
+  const { user, updateUser } = useAuth() || {};
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "edit" | "security"
+
+  // Read initial tab from URL query param ?tab= (defaults to "overview")
+  const initialTab = searchParams.get("tab") || "overview";
+  const [activeTab, setActiveTab] = useState(
+    ["overview", "edit", "security"].includes(initialTab) ? initialTab : "overview"
+  );
+
+  const handleTabChange = (tabKey) => {
+    setActiveTab(tabKey);
+    setSearchParams({ tab: tabKey }, { replace: true });
+    setFeedback(null);
+  };
 
   // Referral states
   const [copiedCode, setCopiedCode] = useState(false);
@@ -37,20 +52,11 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
 
   const showMsg = (message, type = "success") => {
     setFeedback({ message, type });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => {
       setFeedback((prev) => (prev?.message === message ? null : prev));
-    }, 4500);
+    }, 5000);
   };
-
-  // Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   // Fetch full profile and wallet details
   const loadProfile = () => {
@@ -64,28 +70,17 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
         }
       })
       .catch((err) => {
-        console.warn("[ProfileModal] Failed to load profile:", err);
+        console.warn("[ProfilePage] Failed to load profile:", err);
       })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    if (isOpen) {
-      loadProfile();
-      setActiveTab("overview");
-      setCopiedCode(false);
-      setCopiedLink(false);
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      setFeedback(null);
-      setPwdForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setPhoneForm({ newPhone: "", password: "" });
-    }
-  }, [isOpen]);
+    loadProfile();
+  }, []);
 
-  // Real-time wallet update listener
+  // Real-time wallet update listener via Socket.IO
   useEffect(() => {
-    if (!isOpen) return;
     const socket = getSharedSocket();
     if (!socket) return;
 
@@ -107,9 +102,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
     return () => {
       socket.off("wallet:updated", handleWalletUpdated);
     };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+  }, []);
 
   const authUser = profileData?.auth || user;
   const userDetails = profileData?.user || {};
@@ -138,9 +131,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
       await navigator.clipboard.writeText(referralCode);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
-    } catch {
-      // Fallback
-    }
+    } catch {}
   };
 
   const handleCopyLink = async () => {
@@ -149,9 +140,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
       await navigator.clipboard.writeText(referralLink);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
-    } catch {
-      // Fallback
-    }
+    } catch {}
   };
 
   const handleWhatsAppShare = () => {
@@ -174,7 +163,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      showMsg("Please select an image file (JPG, PNG, WebP)", "error");
+      showMsg("Please select an image file (JPG, PNG, WebP, GIF)", "error");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -185,13 +174,17 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
     setPhotoFile(file);
     const objectUrl = URL.createObjectURL(file);
     setPhotoPreview(objectUrl);
+    // Switch to edit tab if on overview so user sees the preview and can save
+    if (activeTab !== "edit") {
+      handleTabChange("edit");
+    }
   };
 
   // Submit Profile update (Name and/or Photo via Cloudinary)
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
     if (!editName.trim()) {
-      showMsg("Please enter a valid display name", "error");
+      showMsg("Please enter a valid full name", "error");
       return;
     }
 
@@ -209,18 +202,16 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
       });
 
       if (res.data?.success) {
-        showMsg("Profile updated successfully!");
+        showMsg("Profile details saved successfully!");
         setPhotoFile(null);
         if (res.data.avatarUrl) {
           setPhotoPreview(res.data.avatarUrl);
         }
-        // Update local profile state
         setProfileData((prev) => ({
           ...prev,
           auth: { ...prev?.auth, name: res.data.name, avatarUrl: res.data.avatarUrl },
           user: { ...prev?.user, name: res.data.name, avatarUrl: res.data.avatarUrl },
         }));
-        // Update global auth context
         if (updateUser) {
           updateUser({ name: res.data.name, avatarUrl: res.data.avatarUrl });
         }
@@ -289,7 +280,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
         newPassword: pwdForm.newPassword,
       });
       if (res.data?.success) {
-        showMsg("Password changed successfully! Keep it safe.");
+        showMsg("Password updated successfully! Keep your credentials safe.");
         setPwdForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       }
     } catch (err) {
@@ -308,7 +299,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
       return;
     }
     if (!phoneForm.password) {
-      showMsg("Please enter your current password to authorize phone change", "error");
+      showMsg("Please enter your current password to authorize this change", "error");
       return;
     }
 
@@ -339,359 +330,361 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
   };
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.72)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-        zIndex: 99999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-        animation: "fadeIn 0.2s ease-out",
-      }}
-    >
-      <div
-        className="modal-box"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          maxHeight: "92vh",
-          overflowY: "auto",
-          background: "var(--card, #13111c)",
-          border: "1px solid var(--border, rgba(255, 255, 255, 0.12))",
-          borderRadius: 20,
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.5), 0 0 20px rgba(124, 111, 255, 0.15)",
-          color: "var(--foreground, #f8fafc)",
-          padding: "1.5rem",
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.15rem",
-          position: "relative",
-        }}
-      >
-        {/* Hidden File Input for Cloudinary avatar upload */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          onChange={handlePhotoSelect}
-          style={{ display: "none" }}
-        />
+    <Layout title="My Profile" subtitle="Account Settings, Security & Referral Rewards">
+      {/* Hidden File Input for Cloudinary photo upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        onChange={handlePhotoSelect}
+        style={{ display: "none" }}
+      />
 
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          style={{
-            position: "absolute",
-            top: "1.2rem",
-            right: "1.2rem",
-            background: "rgba(255, 255, 255, 0.08)",
-            border: "none",
-            borderRadius: "50%",
-            width: 32,
-            height: 32,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--muted, #94a3b8)",
-            cursor: "pointer",
-            fontSize: "1rem",
-            transition: "all 0.2s ease",
-            zIndex: 10,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
-            e.currentTarget.style.color = "#fff";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-            e.currentTarget.style.color = "var(--muted, #94a3b8)";
-          }}
-        >
-          ✕
-        </button>
-
-        {/* ── Profile Header with Avatar & Quick Photo Upload ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0 }}>
-          {/* Avatar with Camera badge */}
-          <div style={{ position: "relative" }}>
-            <div
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 800,
-                fontSize: "1.4rem",
-                boxShadow: "0 0 16px rgba(124, 111, 255, 0.4)",
-                flexShrink: 0,
-                overflow: "hidden",
-                border: "2px solid rgba(124, 111, 255, 0.45)",
-              }}
-            >
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                initials
-              )}
-            </div>
-            {/* Quick Camera button to trigger Cloudinary file picker */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="Change profile photo (Cloudinary)"
-              style={{
-                position: "absolute",
-                bottom: -2,
-                right: -2,
-                width: 26,
-                height: 26,
-                borderRadius: "50%",
-                background: "#7c6fff",
-                border: "2px solid #13111c",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontSize: "0.75rem",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-                transition: "transform 0.15s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              📷
-            </button>
-          </div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, letterSpacing: "-0.01em" }}>
-                {displayName}
-              </h2>
-              <span
-                style={{
-                  background: displayRole === "admin" || displayRole === "admins"
-                    ? "rgba(239, 68, 68, 0.18)"
-                    : displayRole === "trainer"
-                    ? "rgba(168, 85, 247, 0.18)"
-                    : "rgba(124, 111, 255, 0.18)",
-                  color: displayRole === "admin" || displayRole === "admins"
-                    ? "#fca5a5"
-                    : displayRole === "trainer"
-                    ? "#d8b4fe"
-                    : "#a5b4fc",
-                  border: `1px solid ${
-                    displayRole === "admin" || displayRole === "admins"
-                      ? "rgba(239, 68, 68, 0.35)"
-                      : displayRole === "trainer"
-                      ? "rgba(168, 85, 247, 0.35)"
-                      : "rgba(124, 111, 255, 0.35)"
-                  }`,
-                  fontSize: "0.7rem",
-                  fontWeight: 700,
-                  padding: "0.15rem 0.5rem",
-                  borderRadius: 6,
-                  textTransform: "capitalize",
-                }}
-              >
-                {displayRole}
-              </span>
-            </div>
-            <div style={{ color: "var(--muted, #94a3b8)", fontSize: "0.85rem", marginTop: "0.2rem" }}>
-              📱 {displayPhone || "No phone linked"}
-            </div>
-            <div style={{ marginTop: "0.35rem" }}>
-              {isPaid ? (
-                <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#4ade80", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                  <span>✅</span> Subscription Active
-                </span>
-              ) : (
-                <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fbbf24", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                  <span>⚠️</span> Payment Required &bull;{" "}
-                  <Link to="/payment-history" onClick={onClose} style={{ color: "#38bdf8", textDecoration: "underline" }}>
-                    Pay Now
-                  </Link>
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Tab Navigation ── */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: "0.35rem",
-            background: "rgba(255, 255, 255, 0.04)",
-            padding: "0.25rem",
-            borderRadius: 12,
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            flexShrink: 0,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => { setActiveTab("overview"); setFeedback(null); }}
-            style={{
-              padding: "0.5rem 0.35rem",
-              borderRadius: 8,
-              border: "none",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              background: activeTab === "overview" ? "rgba(124, 111, 255, 0.25)" : "transparent",
-              color: activeTab === "overview" ? "#fff" : "var(--muted, #94a3b8)",
-              borderBottom: activeTab === "overview" ? "2px solid #7c6fff" : "2px solid transparent",
-              transition: "all 0.2s ease",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.3rem",
-            }}
-          >
-            <span>🎁</span> Overview
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setActiveTab("edit"); setFeedback(null); }}
-            style={{
-              padding: "0.5rem 0.35rem",
-              borderRadius: 8,
-              border: "none",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              background: activeTab === "edit" ? "rgba(124, 111, 255, 0.25)" : "transparent",
-              color: activeTab === "edit" ? "#fff" : "var(--muted, #94a3b8)",
-              borderBottom: activeTab === "edit" ? "2px solid #7c6fff" : "2px solid transparent",
-              transition: "all 0.2s ease",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.3rem",
-            }}
-          >
-            <span>✏️</span> Edit Profile
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setActiveTab("security"); setFeedback(null); }}
-            style={{
-              padding: "0.5rem 0.35rem",
-              borderRadius: 8,
-              border: "none",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              cursor: "pointer",
-              background: activeTab === "security" ? "rgba(124, 111, 255, 0.25)" : "transparent",
-              color: activeTab === "security" ? "#fff" : "var(--muted, #94a3b8)",
-              borderBottom: activeTab === "security" ? "2px solid #7c6fff" : "2px solid transparent",
-              transition: "all 0.2s ease",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.3rem",
-            }}
-          >
-            <span>🔒</span> Security
-          </button>
-        </div>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "1.25rem 1rem 3rem" }}>
 
         {/* ── Status Feedback Banner ── */}
         {feedback && (
           <div
             style={{
-              padding: "0.65rem 0.9rem",
-              borderRadius: 10,
-              fontSize: "0.82rem",
+              padding: "0.85rem 1.25rem",
+              borderRadius: 14,
+              fontSize: "0.9rem",
               fontWeight: 600,
               display: "flex",
               alignItems: "center",
-              gap: "0.5rem",
+              gap: "0.6rem",
+              marginBottom: "1.5rem",
               background: feedback.type === "success" ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
               border: `1px solid ${feedback.type === "success" ? "rgba(34, 197, 94, 0.35)" : "rgba(239, 68, 68, 0.35)"}`,
               color: feedback.type === "success" ? "#4ade80" : "#fca5a5",
-              animation: "fadeIn 0.2s ease",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+              animation: "slideDownIn 0.25s ease",
             }}
           >
-            <span>{feedback.type === "success" ? "✓" : "⚠️"}</span>
-            <span>{feedback.message}</span>
+            <span style={{ fontSize: "1.2rem" }}>{feedback.type === "success" ? "✓" : "⚠️"}</span>
+            <span style={{ flex: 1 }}>{feedback.message}</span>
+            <button
+              type="button"
+              onClick={() => setFeedback(null)}
+              style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", fontSize: "1rem" }}
+            >
+              ✕
+            </button>
           </div>
         )}
+
+        {/* ── Section 1: Hero Banner & Identity Card ── */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, rgba(124, 111, 255, 0.14) 0%, rgba(79, 70, 229, 0.06) 100%)",
+            border: "1px solid rgba(124, 111, 255, 0.25)",
+            borderRadius: 20,
+            padding: "1.75rem",
+            marginBottom: "1.5rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "1.5rem",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.25)",
+          }}
+        >
+          {/* Avatar and Info */}
+          <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", minWidth: 260 }}>
+            {/* Avatar Circle with Cloudinary quick upload camera badge */}
+            <div style={{ position: "relative" }}>
+              <div
+                style={{
+                  width: 84,
+                  height: 84,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 800,
+                  fontSize: "1.9rem",
+                  boxShadow: "0 0 24px rgba(124, 111, 255, 0.45)",
+                  overflow: "hidden",
+                  border: "3px solid rgba(124, 111, 255, 0.55)",
+                  flexShrink: 0,
+                }}
+              >
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Change photo via Cloudinary"
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  right: -2,
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  background: "#7c6fff",
+                  border: "2px solid #0f0d19",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.5)",
+                  transition: "transform 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              >
+                📷
+              </button>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+                <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.01em", color: "#fff" }}>
+                  {displayName}
+                </h1>
+                <span
+                  style={{
+                    background: displayRole === "admin" || displayRole === "admins"
+                      ? "rgba(239, 68, 68, 0.2)"
+                      : displayRole === "trainer"
+                      ? "rgba(168, 85, 247, 0.2)"
+                      : "rgba(124, 111, 255, 0.2)",
+                    color: displayRole === "admin" || displayRole === "admins"
+                      ? "#fca5a5"
+                      : displayRole === "trainer"
+                      ? "#d8b4fe"
+                      : "#c7d2fe",
+                    border: `1px solid ${
+                      displayRole === "admin" || displayRole === "admins"
+                        ? "rgba(239, 68, 68, 0.4)"
+                        : displayRole === "trainer"
+                        ? "rgba(168, 85, 247, 0.4)"
+                        : "rgba(124, 111, 255, 0.4)"
+                    }`,
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    padding: "0.2rem 0.6rem",
+                    borderRadius: 99,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {displayRole}
+                </span>
+              </div>
+
+              <div style={{ color: "var(--muted, #94a3b8)", fontSize: "0.88rem", marginTop: "0.3rem" }}>
+                📱 +91 {displayPhone || "Not configured"}
+              </div>
+
+              <div style={{ marginTop: "0.45rem" }}>
+                {isPaid ? (
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#4ade80", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>✅</span> Subscription Active
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fbbf24", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>⚠️</span> Payment Required &bull;{" "}
+                    <Link to="/payment-history" style={{ color: "#38bdf8", textDecoration: "underline" }}>
+                      Activate Membership
+                    </Link>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats or Actions */}
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => handleTabChange("edit")}
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                color: "#fff",
+                padding: "0.6rem 1.1rem",
+                borderRadius: 12,
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <span>✏️</span> Edit Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange("security")}
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                color: "#fff",
+                padding: "0.6rem 1.1rem",
+                borderRadius: 12,
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <span>🔒</span> Security
+            </button>
+          </div>
+        </div>
+
+        {/* ── Navigation Tabs ── */}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+            marginBottom: "1.75rem",
+            paddingBottom: "0.25rem",
+            overflowX: "auto",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => handleTabChange("overview")}
+            style={{
+              background: activeTab === "overview" ? "rgba(124, 111, 255, 0.18)" : "transparent",
+              color: activeTab === "overview" ? "#fff" : "var(--muted, #94a3b8)",
+              border: "none",
+              borderBottom: activeTab === "overview" ? "3px solid #7c6fff" : "3px solid transparent",
+              padding: "0.75rem 1.25rem",
+              borderRadius: "8px 8px 0 0",
+              fontWeight: 700,
+              fontSize: "0.92rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              transition: "all 0.2s ease",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span>🎁</span> Overview &amp; Referrals
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("edit")}
+            style={{
+              background: activeTab === "edit" ? "rgba(124, 111, 255, 0.18)" : "transparent",
+              color: activeTab === "edit" ? "#fff" : "var(--muted, #94a3b8)",
+              border: "none",
+              borderBottom: activeTab === "edit" ? "3px solid #7c6fff" : "3px solid transparent",
+              padding: "0.75rem 1.25rem",
+              borderRadius: "8px 8px 0 0",
+              fontWeight: 700,
+              fontSize: "0.92rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              transition: "all 0.2s ease",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span>✏️</span> Edit Profile Details
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("security")}
+            style={{
+              background: activeTab === "security" ? "rgba(124, 111, 255, 0.18)" : "transparent",
+              color: activeTab === "security" ? "#fff" : "var(--muted, #94a3b8)",
+              border: "none",
+              borderBottom: activeTab === "security" ? "3px solid #7c6fff" : "3px solid transparent",
+              padding: "0.75rem 1.25rem",
+              borderRadius: "8px 8px 0 0",
+              fontWeight: 700,
+              fontSize: "0.92rem",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              transition: "all 0.2s ease",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span>🔒</span> Password &amp; Phone Security
+          </button>
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* TAB 1: OVERVIEW & REFERRAL                                         */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "overview" && (
-          <>
-            {/* ── Wallet Card ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+
+            {/* Wallet Card */}
             <div
               style={{
-                background: "linear-gradient(135deg, rgba(124, 111, 255, 0.12) 0%, rgba(99, 102, 241, 0.05) 100%)",
+                background: "linear-gradient(135deg, rgba(124, 111, 255, 0.12) 0%, rgba(99, 102, 241, 0.04) 100%)",
                 border: "1px solid rgba(124, 111, 255, 0.3)",
-                borderRadius: 16,
-                padding: "1rem 1.25rem",
+                borderRadius: 18,
+                padding: "1.5rem 1.75rem",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.2)",
-                flexShrink: 0,
+                flexWrap: "wrap",
+                gap: "1.25rem",
+                boxShadow: "0 6px 24px rgba(0, 0, 0, 0.25)",
               }}
             >
               <div>
-                <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "#a5b4fc", fontWeight: 700 }}>
-                  👛 Wallet Balance
+                <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#a5b4fc", fontWeight: 800 }}>
+                  👛 Live Wallet Balance
                 </div>
-                <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#fff", lineHeight: 1.2, marginTop: "0.2rem" }}>
+                <div style={{ fontSize: "2.5rem", fontWeight: 800, color: "#fff", lineHeight: 1.1, marginTop: "0.35rem" }}>
                   ₹{walletBalance}
                 </div>
-                <div style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", marginTop: "0.2rem" }}>
-                  Auto-applied on renewals &amp; checkouts
+                <div style={{ fontSize: "0.82rem", color: "var(--muted, #94a3b8)", marginTop: "0.35rem" }}>
+                  Wallet cash is automatically applied on checkouts and membership renewals.
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "flex-end" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", alignItems: "flex-end" }}>
                 <Link
                   to="/payment-history"
-                  onClick={onClose}
                   style={{
-                    background: "rgba(124, 111, 255, 0.2)",
-                    border: "1px solid rgba(124, 111, 255, 0.4)",
+                    background: "rgba(124, 111, 255, 0.22)",
+                    border: "1px solid rgba(124, 111, 255, 0.45)",
                     color: "#c7d2fe",
-                    padding: "0.4rem 0.8rem",
-                    borderRadius: 8,
-                    fontSize: "0.78rem",
+                    padding: "0.6rem 1.1rem",
+                    borderRadius: 10,
+                    fontSize: "0.85rem",
                     fontWeight: 700,
                     textDecoration: "none",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "0.3rem",
+                    gap: "0.45rem",
                   }}
                 >
-                  <span>💳 Payments</span>
+                  <span>💳 Payments &amp; Invoices</span>
                 </Link>
+
                 {walletHistory.length > 0 && (
                   <button
                     type="button"
@@ -700,45 +693,44 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                       background: "transparent",
                       border: "none",
                       color: "#94a3b8",
-                      fontSize: "0.72rem",
+                      fontSize: "0.8rem",
                       textDecoration: "underline",
                       cursor: "pointer",
                       padding: 0,
                     }}
                   >
-                    {showHistory ? "Hide Activity" : "View Activity"}
+                    {showHistory ? "Hide Wallet Activity" : `View Activity (${walletHistory.length})`}
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Optional Wallet History Dropdown */}
+            {/* Wallet History Table / Drawer */}
             {showHistory && walletHistory.length > 0 && (
               <div
                 style={{
-                  background: "rgba(0, 0, 0, 0.4)",
+                  background: "rgba(0, 0, 0, 0.35)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: 14,
-                  padding: "0.85rem 1rem",
-                  flexShrink: 0,
+                  borderRadius: 16,
+                  padding: "1.25rem 1.5rem",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.75rem",
+                  gap: "0.85rem",
                 }}
               >
-                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Recent Wallet Activity
+                <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Recent Transactions
                 </div>
-                {walletHistory.slice(-5).reverse().map((entry, idx) => (
+                {walletHistory.slice(-8).reverse().map((entry, idx) => (
                   <div
                     key={idx}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "flex-start",
-                      gap: "0.85rem",
-                      paddingBottom: idx < Math.min(walletHistory.length, 5) - 1 ? "0.6rem" : 0,
-                      borderBottom: idx < Math.min(walletHistory.length, 5) - 1 ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
+                      gap: "1rem",
+                      paddingBottom: idx < Math.min(walletHistory.length, 8) - 1 ? "0.75rem" : 0,
+                      borderBottom: idx < Math.min(walletHistory.length, 8) - 1 ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
                     }}
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -746,18 +738,19 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                         style={{
                           color: entry.type === "credit" ? "#4ade80" : "#f87171",
                           fontWeight: 700,
-                          fontSize: "0.82rem",
+                          fontSize: "0.9rem",
                           lineHeight: 1.45,
-                          wordBreak: "break-word",
                         }}
                       >
                         {entry.type === "credit" ? "+" : "-"}₹{entry.amount} &bull; {entry.reason}
                       </div>
-                      <div style={{ color: "#64748b", fontSize: "0.7rem", marginTop: "0.2rem" }}>
-                        {new Date(entry.date).toLocaleDateString("en-IN", {
+                      <div style={{ color: "#64748b", fontSize: "0.75rem", marginTop: "0.2rem" }}>
+                        {new Date(entry.date).toLocaleString("en-IN", {
                           day: "2-digit",
                           month: "short",
                           year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
                         })}
                       </div>
                     </div>
@@ -765,13 +758,12 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                       style={{
                         color: "#cbd5e1",
                         fontWeight: 700,
-                        fontSize: "0.75rem",
+                        fontSize: "0.8rem",
                         flexShrink: 0,
                         background: "rgba(255, 255, 255, 0.08)",
                         border: "1px solid rgba(255, 255, 255, 0.12)",
-                        padding: "0.25rem 0.55rem",
-                        borderRadius: 6,
-                        whiteSpace: "nowrap",
+                        padding: "0.3rem 0.65rem",
+                        borderRadius: 8,
                       }}
                     >
                       Bal: ₹{entry.balanceAfter}
@@ -781,34 +773,37 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
               </div>
             )}
 
-            {/* ── Refer & Earn Section ── */}
+            {/* Refer & Earn Section */}
             <div
               style={{
-                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(245, 158, 11, 0.03) 100%)",
+                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%)",
                 border: "1px solid rgba(251, 191, 36, 0.28)",
-                borderRadius: 16,
-                padding: "1.25rem",
+                borderRadius: 20,
+                padding: "1.75rem",
                 display: "flex",
                 flexDirection: "column",
-                gap: "1rem",
-                position: "relative",
-                flexShrink: 0,
+                gap: "1.25rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                  <span style={{ fontSize: "1.2rem" }}>🎁</span>
-                  <span style={{ fontWeight: 800, fontSize: "0.98rem", color: "#fbbf24" }}>
-                    Refer a Friend &amp; Earn ₹{referralRewardAmount}
-                  </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                  <span style={{ fontSize: "1.5rem" }}>🎁</span>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, color: "#fbbf24" }}>
+                      Refer a Friend &amp; Earn ₹{referralRewardAmount}
+                    </h2>
+                    <div style={{ fontSize: "0.82rem", color: "var(--muted, #cbd5e1)", marginTop: "0.2rem" }}>
+                      Share your unique code. When your friend signs up and completes membership payment, ₹{referralRewardAmount} is instantly credited to your wallet!
+                    </div>
+                  </div>
                 </div>
                 <span
                   style={{
                     background: "rgba(251, 191, 36, 0.2)",
                     color: "#fbbf24",
-                    padding: "0.2rem 0.55rem",
-                    borderRadius: 20,
-                    fontSize: "0.68rem",
+                    padding: "0.3rem 0.75rem",
+                    borderRadius: 99,
+                    fontSize: "0.75rem",
                     fontWeight: 800,
                     letterSpacing: "0.04em",
                   }}
@@ -817,33 +812,29 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 </span>
               </div>
 
-              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted, #cbd5e1)", lineHeight: 1.45 }}>
-                Invite friends to Speak &amp; Shine. When your friend completes their membership payment, <strong>₹{referralRewardAmount}</strong> is instantly credited to your wallet balance!
-              </p>
-
-              {/* Referral Code Box */}
+              {/* Code Box */}
               <div>
-                <label style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: "0.3rem" }}>
+                <label style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", display: "block", marginBottom: "0.4rem" }}>
                   Your Unique Referral Code
                 </label>
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.5rem",
+                    gap: "0.75rem",
                     background: "rgba(0, 0, 0, 0.35)",
-                    border: "1px dashed rgba(251, 191, 36, 0.4)",
-                    padding: "0.5rem 0.85rem",
-                    borderRadius: 10,
+                    border: "1px dashed rgba(251, 191, 36, 0.45)",
+                    padding: "0.75rem 1.25rem",
+                    borderRadius: 12,
                   }}
                 >
                   <span
                     style={{
                       flex: 1,
                       fontFamily: "monospace",
-                      fontSize: "1.1rem",
+                      fontSize: "1.3rem",
                       fontWeight: 800,
-                      letterSpacing: "0.1em",
+                      letterSpacing: "0.12em",
                       color: "#fbbf24",
                     }}
                   >
@@ -857,9 +848,9 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                       background: copiedCode ? "#22c55e" : "rgba(251, 191, 36, 0.18)",
                       color: copiedCode ? "#fff" : "#fbbf24",
                       border: "1px solid rgba(251, 191, 36, 0.4)",
-                      borderRadius: 8,
-                      padding: "0.4rem 0.75rem",
-                      fontSize: "0.75rem",
+                      borderRadius: 10,
+                      padding: "0.55rem 1rem",
+                      fontSize: "0.85rem",
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.2s ease",
@@ -871,7 +862,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
               </div>
 
               {/* Action Buttons: Copy Link & WhatsApp Share */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.85rem" }}>
                 <button
                   type="button"
                   onClick={handleCopyLink}
@@ -880,20 +871,20 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                     background: copiedLink ? "rgba(34, 197, 94, 0.2)" : "rgba(255, 255, 255, 0.08)",
                     color: copiedLink ? "#4ade80" : "#f1f5f9",
                     border: copiedLink ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(255, 255, 255, 0.15)",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.75rem",
-                    fontSize: "0.8rem",
+                    borderRadius: 12,
+                    padding: "0.85rem 1rem",
+                    fontSize: "0.88rem",
                     fontWeight: 700,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: "0.4rem",
+                    gap: "0.5rem",
                     transition: "all 0.2s ease",
                   }}
                 >
                   <span>🔗</span>
-                  <span>{copiedLink ? "Link Copied! ✓" : "Copy Link"}</span>
+                  <span>{copiedLink ? "Link Copied! ✓" : "Copy Direct Invitation Link"}</span>
                 </button>
 
                 <button
@@ -904,45 +895,38 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                     background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)",
                     color: "#fff",
                     border: "none",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.75rem",
-                    fontSize: "0.8rem",
+                    borderRadius: 12,
+                    padding: "0.85rem 1rem",
+                    fontSize: "0.88rem",
                     fontWeight: 700,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: "0.45rem",
-                    boxShadow: "0 4px 12px rgba(37, 211, 102, 0.25)",
+                    gap: "0.5rem",
+                    boxShadow: "0 4px 16px rgba(37, 211, 102, 0.3)",
                     transition: "all 0.2s ease",
                   }}
                 >
                   <span>📲</span>
-                  <span>Share WhatsApp</span>
+                  <span>Share on WhatsApp</span>
                 </button>
               </div>
 
-              {/* Referral Stats */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "0.6rem",
-                  marginTop: "0.2rem",
-                }}
-              >
+              {/* Referral Stats Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "0.5rem" }}>
                 <div
                   style={{
                     background: "rgba(0, 0, 0, 0.25)",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.85rem",
+                    borderRadius: 14,
+                    padding: "1rem 1.25rem",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
                   }}
                 >
-                  <div style={{ fontSize: "0.68rem", color: "var(--muted, #94a3b8)", textTransform: "uppercase", fontWeight: 700 }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted, #94a3b8)", textTransform: "uppercase", fontWeight: 700 }}>
                     Friends Joined
                   </div>
-                  <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#fff", marginTop: "0.15rem" }}>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#fff", marginTop: "0.25rem" }}>
                     {referralCount}
                   </div>
                 </div>
@@ -950,50 +934,56 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 <div
                   style={{
                     background: "rgba(0, 0, 0, 0.25)",
-                    borderRadius: 10,
-                    padding: "0.65rem 0.85rem",
+                    borderRadius: 14,
+                    padding: "1rem 1.25rem",
                     border: "1px solid rgba(255, 255, 255, 0.06)",
                   }}
                 >
-                  <div style={{ fontSize: "0.68rem", color: "var(--muted, #94a3b8)", textTransform: "uppercase", fontWeight: 700 }}>
-                    Referral Earnings
+                  <div style={{ fontSize: "0.75rem", color: "var(--muted, #94a3b8)", textTransform: "uppercase", fontWeight: 700 }}>
+                    Total Referral Rewards Earned
                   </div>
-                  <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "#4ade80", marginTop: "0.15rem" }}>
+                  <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#4ade80", marginTop: "0.25rem" }}>
                     ₹{referralEarnings}
                   </div>
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 2: EDIT PROFILE (Name & Cloudinary Photo)                       */}
+        {/* TAB 2: EDIT PROFILE                                                */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "edit" && (
-          <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            {/* Profile Photo Section */}
+          <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+
+            {/* Profile Photo Card */}
             <div
               style={{
                 background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: 14,
-                padding: "1.1rem",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: 18,
+                padding: "1.75rem",
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.85rem",
+                gap: "1.25rem",
               }}
             >
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                🖼️ Profile Photo
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#a5b4fc" }}>
+                  🖼️ Profile Picture
+                </h3>
+                <div style={{ fontSize: "0.82rem", color: "var(--muted, #94a3b8)", marginTop: "0.25rem" }}>
+                  Upload a photo to represent you on the community leaderboard and speaking sessions.
+                </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "1.2rem" }}>
-                {/* Large Preview Circle */}
+              <div style={{ display: "flex", alignItems: "center", gap: "1.75rem", flexWrap: "wrap" }}>
+                {/* Photo Preview Circle */}
                 <div
                   style={{
-                    width: 76,
-                    height: 76,
+                    width: 96,
+                    height: 96,
                     borderRadius: "50%",
                     background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
                     color: "#fff",
@@ -1001,11 +991,11 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                     alignItems: "center",
                     justifyContent: "center",
                     fontWeight: 800,
-                    fontSize: "1.6rem",
-                    boxShadow: "0 0 16px rgba(124, 111, 255, 0.3)",
+                    fontSize: "2rem",
+                    boxShadow: "0 0 20px rgba(124, 111, 255, 0.35)",
                     overflow: "hidden",
+                    border: "3px solid rgba(124, 111, 255, 0.5)",
                     flexShrink: 0,
-                    border: "2px solid rgba(124, 111, 255, 0.5)",
                   }}
                 >
                   {avatarUrl ? (
@@ -1019,28 +1009,28 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                   )}
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", flex: 1 }}>
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", flex: 1, minWidth: 240 }}>
+                  <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={savingProfile}
                       style={{
-                        background: "rgba(124, 111, 255, 0.2)",
-                        border: "1px solid rgba(124, 111, 255, 0.45)",
+                        background: "rgba(124, 111, 255, 0.22)",
+                        border: "1px solid rgba(124, 111, 255, 0.5)",
                         color: "#c7d2fe",
-                        padding: "0.45rem 0.85rem",
-                        borderRadius: 8,
-                        fontSize: "0.8rem",
+                        padding: "0.6rem 1.1rem",
+                        borderRadius: 10,
+                        fontSize: "0.88rem",
                         fontWeight: 700,
                         cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: "0.35rem",
+                        gap: "0.45rem",
                       }}
                     >
                       <span>📁</span>
-                      <span>{photoFile ? "Choose Different" : "Upload Photo"}</span>
+                      <span>{photoFile ? "Choose Different Image" : "Upload Photo"}</span>
                     </button>
 
                     {avatarUrl && (
@@ -1052,115 +1042,127 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                           background: "rgba(239, 68, 68, 0.12)",
                           border: "1px solid rgba(239, 68, 68, 0.3)",
                           color: "#fca5a5",
-                          padding: "0.45rem 0.75rem",
-                          borderRadius: 8,
-                          fontSize: "0.8rem",
+                          padding: "0.6rem 1rem",
+                          borderRadius: 10,
+                          fontSize: "0.88rem",
                           fontWeight: 700,
                           cursor: "pointer",
                         }}
                       >
-                        Remove
+                        Remove Photo
                       </button>
                     )}
                   </div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", lineHeight: 1.35 }}>
-                    Supports JPG, PNG, WebP up to 5MB. Auto-cropped to square using Cloudinary AI face-detection.
+
+                  <div style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)", lineHeight: 1.45 }}>
+                    Cloudinary storage setup: Supports JPG, PNG, WebP up to 5MB. Face detection automatically centers and crops your avatar cleanly.
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Display Name Section */}
+            {/* Display Name Card */}
             <div
               style={{
                 background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: 14,
-                padding: "1.1rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.6rem",
-              }}
-            >
-              <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                👤 Full Name
-              </label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                placeholder="Enter your full name"
-                required
-                maxLength={60}
-                style={{
-                  background: "rgba(0, 0, 0, 0.3)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  borderRadius: 10,
-                  padding: "0.65rem 0.85rem",
-                  color: "#fff",
-                  fontSize: "0.95rem",
-                  outline: "none",
-                }}
-              />
-              <div style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)" }}>
-                This name appears on the leaderboard, reports, and community sessions.
-              </div>
-            </div>
-
-            {/* Save Profile Button */}
-            <button
-              type="submit"
-              disabled={savingProfile}
-              style={{
-                background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
-                border: "none",
-                color: "#fff",
-                padding: "0.75rem 1rem",
-                borderRadius: 12,
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(124, 111, 255, 0.35)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.4rem",
-                transition: "opacity 0.2s ease",
-                opacity: savingProfile ? 0.7 : 1,
-              }}
-            >
-              <span>{savingProfile ? "Saving..." : "💾 Save Changes"}</span>
-            </button>
-          </form>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* TAB 3: SECURITY (Password & Phone change)                          */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {activeTab === "security" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            {/* Change Password Card */}
-            <form
-              onSubmit={handleChangePassword}
-              style={{
-                background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: 14,
-                padding: "1.1rem",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: 18,
+                padding: "1.75rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.85rem",
               }}
             >
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                🔑 Change Password
+              <div>
+                <label style={{ fontSize: "0.85rem", fontWeight: 800, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.06em", display: "block" }}>
+                  👤 Full Display Name
+                </label>
+                <div style={{ fontSize: "0.8rem", color: "var(--muted, #94a3b8)", marginTop: "0.25rem" }}>
+                  Your name visible to peers, trainers, and leaderboard participants.
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter full name"
+                required
+                maxLength={60}
+                style={{
+                  maxWidth: 420,
+                  background: "rgba(0, 0, 0, 0.35)",
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  borderRadius: 12,
+                  padding: "0.75rem 1rem",
+                  color: "#fff",
+                  fontSize: "1rem",
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            {/* Save Button */}
+            <div>
+              <button
+                type="submit"
+                disabled={savingProfile}
+                style={{
+                  background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
+                  border: "none",
+                  color: "#fff",
+                  padding: "0.85rem 1.75rem",
+                  borderRadius: 12,
+                  fontSize: "0.95rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 18px rgba(124, 111, 255, 0.4)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  opacity: savingProfile ? 0.7 : 1,
+                  transition: "opacity 0.2s ease",
+                }}
+              >
+                <span>{savingProfile ? "Saving Details..." : "💾 Save Profile Changes"}</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* TAB 3: ACCOUNT & SECURITY                                          */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === "security" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+
+            {/* Change Password Card */}
+            <form
+              onSubmit={handleChangePassword}
+              style={{
+                background: "rgba(255, 255, 255, 0.03)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: 18,
+                padding: "1.75rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.1rem",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#a5b4fc" }}>
+                  🔑 Change Password
+                </h3>
+                <div style={{ fontSize: "0.82rem", color: "var(--muted, #94a3b8)", marginTop: "0.25rem" }}>
+                  Update your password to keep your account safe. Minimum 6 characters required.
+                </div>
               </div>
 
               <div>
-                <label style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+                <label style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)", fontWeight: 700, display: "block", marginBottom: "0.3rem" }}>
                   Current Password
                 </label>
-                <div style={{ position: "relative" }}>
+                <div style={{ position: "relative", maxWidth: 420 }}>
                   <input
                     type={showCurrentPwd ? "text" : "password"}
                     value={pwdForm.currentPassword}
@@ -1169,12 +1171,12 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                     required
                     style={{
                       width: "100%",
-                      background: "rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      borderRadius: 10,
-                      padding: "0.6rem 2.4rem 0.6rem 0.8rem",
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(255, 255, 255, 0.18)",
+                      borderRadius: 12,
+                      padding: "0.75rem 2.6rem 0.75rem 1rem",
                       color: "#fff",
-                      fontSize: "0.88rem",
+                      fontSize: "0.95rem",
                       outline: "none",
                       boxSizing: "border-box",
                     }}
@@ -1184,14 +1186,14 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                     onClick={() => setShowCurrentPwd((s) => !s)}
                     style={{
                       position: "absolute",
-                      right: "0.7rem",
+                      right: "0.85rem",
                       top: "50%",
                       transform: "translateY(-50%)",
                       background: "transparent",
                       border: "none",
                       color: "#94a3b8",
                       cursor: "pointer",
-                      fontSize: "0.85rem",
+                      fontSize: "1rem",
                       padding: 0,
                     }}
                   >
@@ -1200,9 +1202,9 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", maxWidth: 640 }}>
                 <div>
-                  <label style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+                  <label style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)", fontWeight: 700, display: "block", marginBottom: "0.3rem" }}>
                     New Password
                   </label>
                   <div style={{ position: "relative" }}>
@@ -1215,12 +1217,12 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                       minLength={6}
                       style={{
                         width: "100%",
-                        background: "rgba(0, 0, 0, 0.3)",
-                        border: "1px solid rgba(255, 255, 255, 0.15)",
-                        borderRadius: 10,
-                        padding: "0.6rem 2.4rem 0.6rem 0.8rem",
+                        background: "rgba(0, 0, 0, 0.35)",
+                        border: "1px solid rgba(255, 255, 255, 0.18)",
+                        borderRadius: 12,
+                        padding: "0.75rem 2.6rem 0.75rem 1rem",
                         color: "#fff",
-                        fontSize: "0.88rem",
+                        fontSize: "0.95rem",
                         outline: "none",
                         boxSizing: "border-box",
                       }}
@@ -1230,14 +1232,14 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                       onClick={() => setShowNewPwd((s) => !s)}
                       style={{
                         position: "absolute",
-                        right: "0.7rem",
+                        right: "0.85rem",
                         top: "50%",
                         transform: "translateY(-50%)",
                         background: "transparent",
                         border: "none",
                         color: "#94a3b8",
                         cursor: "pointer",
-                        fontSize: "0.85rem",
+                        fontSize: "1rem",
                         padding: 0,
                       }}
                     >
@@ -1247,23 +1249,23 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+                  <label style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)", fontWeight: 700, display: "block", marginBottom: "0.3rem" }}>
                     Confirm New Password
                   </label>
                   <input
                     type="password"
                     value={pwdForm.confirmPassword}
                     onChange={(e) => setPwdForm((p) => ({ ...p, confirmPassword: e.target.value }))}
-                    placeholder="Repeat password"
+                    placeholder="Repeat new password"
                     required
                     style={{
                       width: "100%",
-                      background: "rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      borderRadius: 10,
-                      padding: "0.6rem 0.8rem",
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(255, 255, 255, 0.18)",
+                      borderRadius: 12,
+                      padding: "0.75rem 1rem",
                       color: "#fff",
-                      fontSize: "0.88rem",
+                      fontSize: "0.95rem",
                       outline: "none",
                       boxSizing: "border-box",
                     }}
@@ -1271,23 +1273,24 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={savingPwd}
-                style={{
-                  background: "rgba(124, 111, 255, 0.2)",
-                  border: "1px solid rgba(124, 111, 255, 0.4)",
-                  color: "#c7d2fe",
-                  padding: "0.65rem 1rem",
-                  borderRadius: 10,
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  marginTop: "0.2rem",
-                }}
-              >
-                {savingPwd ? "Updating..." : "Update Password"}
-              </button>
+              <div>
+                <button
+                  type="submit"
+                  disabled={savingPwd}
+                  style={{
+                    background: "rgba(124, 111, 255, 0.22)",
+                    border: "1px solid rgba(124, 111, 255, 0.45)",
+                    color: "#c7d2fe",
+                    padding: "0.75rem 1.5rem",
+                    borderRadius: 12,
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {savingPwd ? "Updating Password..." : "Update Password"}
+                </button>
+              </div>
             </form>
 
             {/* Change Mobile Number Card */}
@@ -1295,28 +1298,29 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
               onSubmit={handleChangePhone}
               style={{
                 background: "rgba(255, 255, 255, 0.03)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                borderRadius: 14,
-                padding: "1.1rem",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: 18,
+                padding: "1.75rem",
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.85rem",
+                gap: "1.1rem",
               }}
             >
-              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                📱 Update Mobile Number
-              </div>
-
-              <div style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)" }}>
-                Current linked phone: <strong style={{ color: "#fff" }}>{displayPhone || "None"}</strong>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#a5b4fc" }}>
+                  📱 Update Mobile Number
+                </h3>
+                <div style={{ fontSize: "0.82rem", color: "var(--muted, #94a3b8)", marginTop: "0.25rem" }}>
+                  Current linked login &amp; WhatsApp number: <strong style={{ color: "#fff" }}>+91 {displayPhone || "None"}</strong>
+                </div>
               </div>
 
               <div>
-                <label style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+                <label style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)", fontWeight: 700, display: "block", marginBottom: "0.3rem" }}>
                   New 10-Digit Mobile Number
                 </label>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.85rem", color: "var(--muted, #94a3b8)", fontWeight: 700 }}>+91</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", maxWidth: 420 }}>
+                  <span style={{ fontSize: "0.95rem", color: "var(--muted, #94a3b8)", fontWeight: 800 }}>+91</span>
                   <input
                     type="tel"
                     value={phoneForm.newPhone}
@@ -1326,12 +1330,12 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                     required
                     style={{
                       flex: 1,
-                      background: "rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.15)",
-                      borderRadius: 10,
-                      padding: "0.6rem 0.8rem",
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(255, 255, 255, 0.18)",
+                      borderRadius: 12,
+                      padding: "0.75rem 1rem",
                       color: "#fff",
-                      fontSize: "0.95rem",
+                      fontSize: "1rem",
                       outline: "none",
                     }}
                   />
@@ -1339,8 +1343,8 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
               </div>
 
               <div>
-                <label style={{ fontSize: "0.72rem", color: "var(--muted, #94a3b8)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
-                  Account Password Confirmation
+                <label style={{ fontSize: "0.78rem", color: "var(--muted, #94a3b8)", fontWeight: 700, display: "block", marginBottom: "0.3rem" }}>
+                  Current Account Password (for Authorization)
                 </label>
                 <input
                   type="password"
@@ -1349,45 +1353,43 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                   placeholder="Enter current password to authorize"
                   required
                   style={{
+                    maxWidth: 420,
                     width: "100%",
-                    background: "rgba(0, 0, 0, 0.3)",
-                    border: "1px solid rgba(255, 255, 255, 0.15)",
-                    borderRadius: 10,
-                    padding: "0.6rem 0.8rem",
+                    background: "rgba(0, 0, 0, 0.35)",
+                    border: "1px solid rgba(255, 255, 255, 0.18)",
+                    borderRadius: 12,
+                    padding: "0.75rem 1rem",
                     color: "#fff",
-                    fontSize: "0.88rem",
+                    fontSize: "0.95rem",
                     outline: "none",
                     boxSizing: "border-box",
                   }}
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={savingPhone}
-                style={{
-                  background: "rgba(124, 111, 255, 0.2)",
-                  border: "1px solid rgba(124, 111, 255, 0.4)",
-                  color: "#c7d2fe",
-                  padding: "0.65rem 1rem",
-                  borderRadius: 10,
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  marginTop: "0.2rem",
-                }}
-              >
-                {savingPhone ? "Updating Phone..." : "Confirm & Update Phone"}
-              </button>
+              <div>
+                <button
+                  type="submit"
+                  disabled={savingPhone}
+                  style={{
+                    background: "rgba(124, 111, 255, 0.22)",
+                    border: "1px solid rgba(124, 111, 255, 0.45)",
+                    color: "#c7d2fe",
+                    padding: "0.75rem 1.5rem",
+                    borderRadius: 12,
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {savingPhone ? "Updating Phone..." : "Authorize & Update Mobile Number"}
+                </button>
+              </div>
             </form>
           </div>
         )}
 
-        {/* Footer info */}
-        <div style={{ textAlign: "center", fontSize: "0.72rem", color: "var(--muted, #64748b)" }}>
-          Speak &amp; Shine AI Fluency Lab &bull; Keep speaking every day to shine!
-        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

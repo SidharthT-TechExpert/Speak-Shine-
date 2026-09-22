@@ -179,10 +179,175 @@ export async function getUserProfile(userId) {
         referralCount: user.referralCount || 0,
         referralEarnings: user.referralEarnings || 0,
         referralRewardAmount,
+        avatarUrl: user.avatarUrl || auth.avatarUrl || null,
       }
     : null;
 
-  return { auth, user: userProfile, referralRewardAmount };
+  return {
+    auth: { ...auth, avatarUrl: auth.avatarUrl || user?.avatarUrl || null },
+    user: userProfile,
+    referralRewardAmount,
+  };
+}
+
+/**
+ * Update user's name and/or profile photo (avatar)
+ */
+export async function updateUserProfile(userId, { name, avatarUrl, removeAvatar }) {
+  const auth = await Auth.findById(userId);
+  if (!auth) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const updates = {};
+  if (name !== undefined) {
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    if (!trimmedName || trimmedName.length < 2 || trimmedName.length > 60) {
+      const error = new Error("Name must be between 2 and 60 characters");
+      error.statusCode = 400;
+      throw error;
+    }
+    updates.name = trimmedName;
+    auth.name = trimmedName;
+  }
+
+  if (removeAvatar === true || removeAvatar === "true") {
+    updates.avatarUrl = null;
+    auth.avatarUrl = null;
+  } else if (avatarUrl) {
+    updates.avatarUrl = avatarUrl;
+    auth.avatarUrl = avatarUrl;
+  }
+
+  await auth.save();
+
+  // Find linked User document by phone candidates
+  const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "") : "";
+  const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
+  const user = await User.findOne({ phone: { $in: phoneCandidates } });
+
+  if (user) {
+    if (updates.name) user.name = updates.name;
+    if (updates.avatarUrl !== undefined) user.avatarUrl = updates.avatarUrl;
+    await user.save();
+  }
+
+  return {
+    success: true,
+    name: auth.name,
+    avatarUrl: auth.avatarUrl || null,
+    user: user ? { ...user.toObject(), name: auth.name, avatarUrl: auth.avatarUrl || null } : null,
+  };
+}
+
+/**
+ * Change user's password with current password verification
+ */
+export async function changeUserPassword(userId, { currentPassword, newPassword }) {
+  if (!currentPassword || !newPassword) {
+    const error = new Error("Current password and new password are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const auth = await Auth.findById(userId);
+  if (!auth) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const isValid = await argon2.verify(auth.password, currentPassword);
+  if (!isValid) {
+    const error = new Error("Current password is incorrect");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (typeof newPassword !== "string" || newPassword.length < 6 || newPassword.length > 100) {
+    const error = new Error("New password must be at least 6 characters long");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  auth.password = await argon2.hash(newPassword);
+  await auth.save();
+
+  return { success: true, message: "Password updated successfully" };
+}
+
+/**
+ * Change user's phone number with password verification
+ */
+export async function changeUserPhone(userId, { newPhone, password }) {
+  if (!newPhone || !password) {
+    const error = new Error("New phone number and current password are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const auth = await Auth.findById(userId);
+  if (!auth) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const isValid = await argon2.verify(auth.password, password);
+  if (!isValid) {
+    const error = new Error("Incorrect password. Please verify your password to update your mobile number.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanPhone = newPhone.replace(/[^\d]/g, "");
+  const stripped = cleanPhone.replace(/^(\+91|91)/, "");
+  if (stripped.length !== 10) {
+    const error = new Error("Please enter a valid 10-digit mobile number");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalizedNewPhone = stripped;
+
+  const candidatePhones = [
+    normalizedNewPhone,
+    `91${normalizedNewPhone}`,
+    `+91${normalizedNewPhone}`,
+  ];
+  const existingAuth = await Auth.findOne({
+    phone: { $in: candidatePhones },
+    _id: { $ne: auth._id },
+  });
+  if (existingAuth) {
+    const error = new Error("This phone number is already registered to another account");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const oldPhone = auth.phone;
+  auth.phone = normalizedNewPhone;
+  await auth.save();
+
+  const oldCandidates = [
+    oldPhone,
+    oldPhone ? oldPhone.replace(/^(\+91|91)/, "") : "",
+    oldPhone ? `91${oldPhone.replace(/^(\+91|91)/, "")}` : "",
+  ].filter(Boolean);
+
+  const user = await User.findOne({ phone: { $in: oldCandidates } });
+  if (user) {
+    user.phone = normalizedNewPhone;
+    await user.save();
+  }
+
+  return {
+    success: true,
+    message: "Phone number updated successfully",
+    phone: normalizedNewPhone,
+  };
 }
 
 /**

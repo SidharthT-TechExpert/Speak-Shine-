@@ -7,7 +7,6 @@ import { useShell, ShellProvider } from "../context/ShellContext.jsx";
 
 const Modal = lazy(() => import("./Modal.jsx"));
 import ThemeToggle from "./ThemeToggle.jsx";
-import UserProfileModal from "./UserProfileModal.jsx";
 
 // ── Live session banner (shown on all pages when a session goes live) ────────
 function LiveSessionBanner() {
@@ -156,7 +155,6 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showIOSHint, setShowIOSHint] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const { prompt, isInstalled, install } = useInstall();
 
   // Load user profile statistics for Topbar and Freeze box
@@ -232,6 +230,7 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
   const freezeDaysNeeded = Math.max(0, 7 - freezeStreakProgress);
   const displayName = user?.name ? user.name.split(" ")[0] : (profile?.name ? profile.name.split(" ")[0] : "Speaker");
   const avatarInitials = (displayName || "S").charAt(0).toUpperCase();
+  const avatarUrl = user?.avatarUrl || profile?.avatarUrl || null;
   const isLoggedIn = Boolean(
     (user && user.name !== "Preview User") ||
     (profile && profile.name && profile.name !== "Preview User")
@@ -437,22 +436,9 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
           </Link>
 
           {isLoggedIn && (
-            <button
-              type="button"
-              onClick={() => setShowProfileModal(true)}
-              className="speakshine-nav-item"
-              style={{
-                background: "transparent",
-                border: "none",
-                width: "100%",
-                textAlign: "left",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                color: "inherit",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-              }}
+            <Link
+              to="/profile"
+              className={`speakshine-nav-item${location.pathname === "/profile" ? " active" : ""}`}
             >
               <span className="nav-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -462,9 +448,9 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
               </span>
               <span>My Profile</span>
               <span style={{ marginLeft: "auto", background: "rgba(251, 191, 36, 0.16)", color: "#fbbf24", border: "1px solid rgba(251, 191, 36, 0.35)", fontSize: "0.62rem", padding: "0.12rem 0.45rem", borderRadius: 10, fontWeight: 800 }}>
-                🎁 ₹5
+                🎁 ₹{profile?.referralRewardAmount ?? 5}
               </span>
-            </button>
+            </Link>
           )}
 
           {(user?.role === "admin" || user?.role === "admins") && (
@@ -655,12 +641,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
               </>
             )}
             {isLoggedIn && (
-              <button
-                type="button"
+              <Link
+                to="/profile"
                 className="speakshine-avatar hidden sm:flex"
-                onClick={() => setShowProfileModal(true)}
-                title={`Open Profile & Referral: ${displayName}`}
+                title={`My Profile & Settings: ${displayName}`}
                 style={{
+                  textDecoration: "none",
                   cursor: "pointer",
                   border: "2px solid rgba(124, 111, 255, 0.45)",
                   background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
@@ -669,6 +655,7 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                   transition: "transform 0.15s ease, box-shadow 0.15s ease",
                   padding: 0,
                   outline: "none",
+                  overflow: "hidden",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "scale(1.08)";
@@ -679,8 +666,16 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                   e.currentTarget.style.boxShadow = "0 0 10px rgba(124, 111, 255, 0.25)";
                 }}
               >
-                {avatarInitials}
-              </button>
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }}
+                  />
+                ) : (
+                  avatarInitials
+                )}
+              </Link>
             )}
 
             {/* Mobile Hamburger Toggle - hidden on laptop and desktop */}
@@ -832,25 +827,10 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
               </Link>
 
               {isLoggedIn && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setShowProfileModal(true);
-                  }}
-                  className="speakshine-nav-item"
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    width: "100%",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    color: "inherit",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                  }}
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className={`speakshine-nav-item${location.pathname === "/profile" ? " active" : ""}`}
                 >
                   <span className="nav-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -860,9 +840,9 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                   </span>
                   <span>My Profile</span>
                   <span style={{ marginLeft: "auto", background: "rgba(251, 191, 36, 0.16)", color: "#fbbf24", border: "1px solid rgba(251, 191, 36, 0.35)", fontSize: "0.62rem", padding: "0.12rem 0.45rem", borderRadius: 10, fontWeight: 800 }}>
-                    🎁 ₹5
+                    🎁 ₹{profile?.referralRewardAmount ?? 5}
                   </span>
-                </button>
+                </Link>
               )}
 
               {(user?.role === "admin" || user?.role === "admins") && (
@@ -920,12 +900,6 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
       )}
 
       <LiveSessionBanner />
-
-      <UserProfileModal
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-        user={user}
-      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema({
   userId: { type: String, unique: true },
   name: { type: String, default: null },
+  avatarUrl: { type: String, default: null },
   phone: { type: String, default: null },
   completed: { type: Boolean, default: false },
   streak: { type: Number, default: 0 },
