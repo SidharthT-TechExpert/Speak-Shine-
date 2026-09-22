@@ -234,7 +234,40 @@ export default function VideoAnalysis() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(75);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const audioRef = useRef(null);
+  const speedMenuRef = useRef(null);
+  const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
+
+  const handleSelectSpeed = (speed) => {
+    setPlaybackSpeed(speed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
+    }
+    setShowSpeedMenu(false);
+  };
+
+  const handleCycleSpeed = () => {
+    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
+    const nextIndex = (currentIndex + 1) % PLAYBACK_SPEEDS.length;
+    handleSelectSpeed(PLAYBACK_SPEEDS[nextIndex]);
+  };
+
+  useEffect(() => {
+    if (!showSpeedMenu) return;
+    const handleClickOutside = (e) => {
+      if (speedMenuRef.current && !speedMenuRef.current.contains(e.target)) {
+        setShowSpeedMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showSpeedMenu]);
 
   const audioSrc = todayQuestion?.audioUrl || "";
 
@@ -244,7 +277,7 @@ export default function VideoAnalysis() {
     window.speechSynthesis.cancel();
     const promptText = todayQuestion?.question || todayQuestion?.topic || "Listen to the story carefully and summarize it in your own words.";
     const utt = new SpeechSynthesisUtterance(promptText);
-    utt.rate = 0.96;
+    utt.rate = 0.96 * playbackSpeed;
     utt.pitch = 1.0;
     const voices = window.speechSynthesis.getVoices();
     const prefVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha")));
@@ -276,6 +309,7 @@ export default function VideoAnalysis() {
       setIsPlaying(false);
     } else {
       if (audioRef.current && audioRef.current.src && audioRef.current.src !== window.location.href) {
+        audioRef.current.playbackRate = playbackSpeed;
         audioRef.current.play().then(() => {
           setIsPlaying(true);
         }).catch(err => {
@@ -297,12 +331,12 @@ export default function VideoAnalysis() {
             setIsPlaying(false);
             return 0;
           }
-          return prev + 0.5;
+          return prev + 0.5 * playbackSpeed;
         });
       }, 500);
     }
     return () => clearInterval(interval);
-  }, [isPlaying, duration]);
+  }, [isPlaying, duration, playbackSpeed]);
 
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
@@ -769,6 +803,9 @@ export default function VideoAnalysis() {
             src={audioSrc}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
+            onPlay={() => {
+              if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
+            }}
             onEnded={handleAudioEnded}
             preload="metadata"
           />
@@ -1056,6 +1093,89 @@ export default function VideoAnalysis() {
                       <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "#e2e8f0" }}>
                         {fmtTime(currentTime)} / {fmtTime(duration)}
                       </span>
+
+                      {/* Speed Selector Pill & Menu */}
+                      <div ref={speedMenuRef} style={{ position: "relative", flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowSpeedMenu(prev => !prev)}
+                          title={`Playback speed: ${playbackSpeed}x (Click to change)`}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "3px",
+                            padding: "3px 8px",
+                            borderRadius: 8,
+                            fontSize: "0.74rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            background: playbackSpeed !== 1 ? qConfig.theme.primary : "rgba(255, 255, 255, 0.08)",
+                            color: playbackSpeed !== 1 ? "#0d0a18" : "#e2e8f0",
+                            border: playbackSpeed !== 1 ? "none" : "1px solid rgba(255, 255, 255, 0.15)",
+                            transition: "all 0.15s ease",
+                            boxShadow: playbackSpeed !== 1 ? `0 2px 8px ${qConfig.theme.primary}55` : "none",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.68rem", opacity: 0.85 }}>⚡</span>
+                          <span>{playbackSpeed}x</span>
+                          <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor" style={{ opacity: 0.7, transform: showSpeedMenu ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>
+                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+
+                        {showSpeedMenu && (
+                          <div style={{
+                            position: "absolute",
+                            bottom: "calc(100% + 8px)",
+                            right: 0,
+                            background: "#18142a",
+                            border: "1px solid rgba(255, 255, 255, 0.18)",
+                            borderRadius: 10,
+                            padding: "4px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "2px",
+                            minWidth: 92,
+                            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.55)",
+                            zIndex: 50,
+                            backdropFilter: "blur(12px)",
+                          }}>
+                            <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", padding: "4px 8px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "2px" }}>
+                              Speed
+                            </div>
+                            {PLAYBACK_SPEEDS.map(speed => {
+                              const isSelected = playbackSpeed === speed;
+                              return (
+                                <button
+                                  key={speed}
+                                  type="button"
+                                  onClick={() => handleSelectSpeed(speed)}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "5px 8px",
+                                    borderRadius: 6,
+                                    fontSize: "0.75rem",
+                                    fontWeight: isSelected ? 800 : 500,
+                                    background: isSelected ? qConfig.theme.primary : "transparent",
+                                    color: isSelected ? "#0d0a18" : "#f1f5f9",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    textAlign: "left",
+                                    transition: "background 0.12s ease",
+                                  }}
+                                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"; }}
+                                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
+                                >
+                                  <span>{speed}x</span>
+                                  {isSelected && <span style={{ fontSize: "0.7rem", fontWeight: 900 }}>✓</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
