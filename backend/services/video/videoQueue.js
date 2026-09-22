@@ -298,8 +298,10 @@ async function processJob(job) {
       const status = await Status.findOne().lean();
       const todayVocab = status?.todayVocabulary || [];
       const taskType = reportMeta?.challengeType || (
-        (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
-        : status?.isStorySummaryDay ? "story_summary"
+        status?.isMonthlyReflectionDay ? "monthly_reflection"
+        : (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
+        : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
+        : status?.isMonthlyGoalsDay ? "monthly_goals"
         : "topic"
       );
       const configuredRequiredCount = taskType === "picture_description"

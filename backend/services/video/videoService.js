@@ -1037,8 +1037,8 @@ async function prepareReportAnalysis(report) {
   const status = analysis ? await Status.findOne().lean() : null;
   const user = (analysis && report.phone) ? await User.findOne({ phone: report.phone }).lean() : null;
   const userHistory = user?.feedbackScores || [];
-  const isPicTask = challengeType === "picture_description" || status?.isPictureDescriptionDay;
-  const isStoryTask = challengeType === "story_summary" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
+  const isPicTask = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+  const isStoryTask = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
 
   if (!challengeType && analysis) {
     if (isPicTask) {
@@ -1050,12 +1050,17 @@ async function prepareReportAnalysis(report) {
 
   if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+    const configuredPicWords = status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5;
+    const configuredPicReq = status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 1;
+    const effectivePicTotal = status?.todayVocabulary?.length || configuredPicWords;
+    const effectivePicReq = Math.min(configuredPicReq, effectivePicTotal);
+
     const { breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
       maxDurationSeconds: status?.durationPictureFull ?? 180,
       vocabularyUsed: source.vocabularyUsed || [],
-      totalVocabWords: status?.todayVocabulary?.length || status?.vocabWordCount || 5,
-      requiredVocabWords: Math.min(status?.vocabRequiredCount ?? 3, status?.todayVocabulary?.length || status?.vocabWordCount || 5),
+      totalVocabWords: effectivePicTotal,
+      requiredVocabWords: effectivePicReq,
       topicRelevance: source.topicRelevance ?? null,
       analysis: source,
       isPictureDescription: true,
@@ -1192,8 +1197,8 @@ async function prepareReportAnalysis(report) {
       const source = analysis.toObject ? analysis.toObject() : { ...analysis };
       source.vocabularyUsed = rechecked;
       
-      const isPic = challengeType === "picture_description" || status?.isPictureDescriptionDay;
-      const isStory = challengeType === "story_summary" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
+      const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+      const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
       const configuredWordCount = isPic
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : isStory
@@ -1712,14 +1717,14 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   // 2. Re-calculate composite score and score breakdown
   const challengeType = report.challengeType || report.analysis?.challengeType || (
     status?.isMonthlyReflectionDay ? "monthly_reflection"
-    : status?.isPictureDescriptionDay ? "picture_description"
-    : status?.isStorySummaryDay ? "story_summary"
+    : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio")) ? "picture_description"
+    : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
     : status?.isMonthlyGoalsDay ? "monthly_goals"
     : "topic"
   );
 
-  const isPic = challengeType === "picture_description" || status?.isPictureDescriptionDay;
-  const isStory = challengeType === "story_summary" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
+  const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+  const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
   const configuredWordCount = isPic
     ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
     : isStory

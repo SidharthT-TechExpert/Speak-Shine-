@@ -367,6 +367,7 @@ export function ensureScoreDefaults(scores, fallback) {
     suggestions: Array.isArray(scores.suggestions) && scores.suggestions.length > 0 ? scores.suggestions : fallback.suggestions,
     topicRelevance: scores.topicRelevance !== undefined ? scores.topicRelevance : fallback.topicRelevance,
     topicFeedback: scores.topicFeedback !== undefined ? scores.topicFeedback : fallback.topicFeedback,
+    isOffTopic: typeof scores.isOffTopic === "boolean" ? scores.isOffTopic : (typeof scores.topicRelevance === "number" && scores.topicRelevance < 3.5),
     pronunciationNote: scores.pronunciationNote !== undefined ? scores.pronunciationNote : fallback.pronunciationNote,
     rhythmNote: scores.rhythmNote !== undefined ? scores.rhythmNote : fallback.rhythmNote,
     cefrLevel: scores.cefrLevel || fallback.cefrLevel,
@@ -417,6 +418,8 @@ function mergeScores(a, b) {
     .join(" ")
     .trim() || null;
 
+  const isOffTopic = Boolean(a.isOffTopic || b.isOffTopic || (topicRelevance !== null && topicRelevance < 3.5));
+
   // CEFR: pick the higher level (more conservative = better for the student)
   const cefrOrder = ["A1", "A2", "B1", "B2", "C1", "C2"];
   const cefrA = cefrOrder.indexOf(a.cefrLevel ?? "");
@@ -445,6 +448,7 @@ function mergeScores(a, b) {
     suggestions:  dedup(a.suggestions,  b.suggestions).slice(0, 4),
     topicRelevance,
     topicFeedback,
+    isOffTopic,
     pronunciationNote: a.pronunciationNote || b.pronunciationNote || null,
     rhythmNote:        a.rhythmNote        || b.rhythmNote        || null,
     cefrLevel,
@@ -530,35 +534,48 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
 
   const topicRelevanceGuide = !hasTopic
     ? `- topicRelevance: null (no topic was provided)
-- topicFeedback: null`
+- topicFeedback: null
+- isOffTopic: false`
     : challengeType === "story_summary"
-    ? `- topicRelevance: how accurately, coherently, and thoroughly the speaker summarized the audio story (characters, sequence of events, conflict, resolution, and main lesson/takeaway)
-    10 = comprehensive, accurate summary capturing all key story elements, main characters, sequence of events, problem and resolution in clear chronological flow
-    8-9 = good summary covering most major plot points and the ending; minor omissions of secondary details
-    6-7 = basic summary; captures the general gist or main idea but misses key events, resolution, or character details
-    4-5 = fragmented attempt; mentions only 1-2 isolated elements from the story, is very vague or confusing
-    2-3 = minimal relevance; barely refers to the story, mostly filler or unrelated commentary
-    1 = does not attempt to summarize the story at all or completely off-topic
-    IMPORTANT: Credit any genuine attempt to retell what happened in the story. Evaluate listening comprehension and narrative retelling.
+    ? `- topicRelevance & isOffTopic: how accurately, coherently, and thoroughly the speaker summarized the audio story (characters, sequence of events, conflict, resolution, and main lesson/takeaway).
+    STRICT SECURITY CHECK: If the speaker is NOT summarizing this specific audio story (e.g. talking about yesterday's topic, random life stories, or an unrelated subject):
+      → You MUST set isOffTopic: true
+      → You MUST set topicRelevance: 1 or 2 (NEVER higher than 2 for an unrelated or wrong-story speech)
+      → topicFeedback: explain specifically that the submission does not retell today's assigned story.
+    If the speaker genuinely attempts to retell today's story:
+      10 = comprehensive, accurate summary capturing all key story elements, main characters, sequence of events, problem and resolution
+      8-9 = good summary covering most major plot points and the ending; minor omissions of secondary details
+      6-7 = basic summary; captures the general gist or main idea but misses key events, resolution, or character details
+      4-5 = fragmented attempt; mentions only 1-2 isolated elements from the story, is very vague or confusing
+      2-3 = minimal relevance; barely refers to the story, mostly filler or unrelated commentary
+      1 = does not attempt to summarize the story at all or completely off-topic
 - topicFeedback: 1-2 sentences explaining specifically which story plot points/characters the student summarized well and which key story events or details they missed or could have explained more clearly.`
     : challengeType === "picture_description"
-    ? `- topicRelevance: how thoroughly the speaker described the image and followed the task instructions
-    10 = rich, vivid description covering people/objects/setting/mood/actions, clear inferences, personal thoughts expressed fluently
-    8-9 = good description with most key elements covered; minor gaps in detail or inference
-    6-7 = adequate description but surface-level; misses important visual details or doesn't go beyond obvious
-    4-5 = partial description; only describes 1-2 elements, very brief or generic
-    2-3 = minimal effort; barely describes the image, mostly off-topic or filler
-    1 = does not attempt to describe the image at all
-    IMPORTANT: Credit any attempt to describe what they see. Reward specific observations (colours, actions, emotions, setting) over vague statements.
+    ? `- topicRelevance & isOffTopic: how thoroughly the speaker described the image and followed the task instructions.
+    STRICT SECURITY CHECK: If the speaker does not describe the assigned picture (e.g. speaks about yesterday's question or an unrelated topic):
+      → You MUST set isOffTopic: true
+      → You MUST set topicRelevance: 1 or 2 (NEVER higher than 2 for an unrelated speech)
+      → topicFeedback: explain specifically that the submission does not describe today's assigned picture.
+    If the speaker genuinely attempts to describe the image:
+      10 = rich, vivid description covering people/objects/setting/mood/actions, clear inferences, personal thoughts expressed fluently
+      8-9 = good description with most key elements covered; minor gaps in detail or inference
+      6-7 = adequate description but surface-level; misses important visual details or doesn't go beyond obvious
+      4-5 = partial description; only describes 1-2 elements, very brief or generic
+      2-3 = minimal effort; barely describes the image, mostly off-topic or filler
+      1 = does not attempt to describe the image at all
 - topicFeedback: 1-2 sentences explaining specifically which visual elements the student described well (people, objects, setting, mood, actions) and which important details they missed or could expand on. Be concrete — mention what was actually in their description.`
-    : `- topicRelevance: how directly and thoroughly the speaker addressed the topic/question
-    10 = entire speech is focused on the topic with specific details and examples
-    8-9 = mostly on-topic with good coverage, minor tangents
-    6-7 = partially on-topic, addresses the question but lacks depth or goes off-track
-    4-5 = loosely related, mentions the topic briefly but mostly talks about something else
-    2-3 = barely related, only 1-2 sentences touch the topic
-    1 = completely off-topic, does not address the question at all
-    IMPORTANT: Read the transcript carefully against the question. Give credit for any relevant content.
+    : `- topicRelevance & isOffTopic: how directly and thoroughly the speaker addressed the specific topic/question.
+    STRICT SECURITY CHECK: If the speaker talks about a DIFFERENT question (e.g. yesterday's topic, an old prompt, or a completely unrelated subject):
+      → You MUST set isOffTopic: true
+      → You MUST set topicRelevance: 1 or 2 (NEVER higher than 2 for an off-topic or wrong-question speech)
+      → topicFeedback: explain specifically that the video discusses a different question/topic instead of today's assigned prompt.
+    If the speaker genuinely addresses today's topic:
+      10 = entire speech is focused on the topic with specific details and examples
+      8-9 = mostly on-topic with good coverage, minor tangents
+      6-7 = partially on-topic, addresses the question but lacks depth or goes off-track
+      4-5 = loosely related, mentions the topic briefly but mostly talks about something else
+      2-3 = barely related, only 1-2 sentences touch the topic
+      1 = completely off-topic, does not address the question at all
 - topicFeedback: 1-2 sentences explaining specifically what the student covered from the topic and what key points were missing. Be specific — mention actual content from their speech.`;
 
   // ---------------------------------------------------------------------------
@@ -626,6 +643,7 @@ TASK: Analyze this spoken English and return ONLY a valid JSON object with this 
   "suggestions": ["<specific, actionable improvement tip>", "<tip 2>", "<tip 3>"],
   "topicRelevance": ${hasTopic ? "<integer 1-10>" : "null"},
   "topicFeedback": ${hasTopic ? "\"<1-2 sentences explaining what they covered well and what was missing from the topic>\"" : "null"},
+  "isOffTopic": ${hasTopic ? "<boolean: true if speaking about yesterday's topic or unrelated question, false if addressing today's prompt>" : "false"},
   "pronunciationNote": "<1 sentence about pronunciation clarity, or null if no issues detected>",
   "rhythmNote": "<1 sentence about speaking rhythm and pace consistency, or null if rhythm data unavailable>",
   "cefrLevel": "<estimated CEFR level: A1/A2/B1/B2/C1/C2>",
@@ -716,6 +734,7 @@ RULES:
       topicFeedback: hasTopic
         ? "You addressed the speaking prompt. Continue practicing to organize your points with clear examples."
         : null,
+      isOffTopic: false,
       pronunciationNote: pronunciationIssues.length > 0
         ? `A few words could be articulated more clearly: ${pronunciationIssues.slice(0, 3).join(", ")}.`
         : "Clear pronunciation overall.",

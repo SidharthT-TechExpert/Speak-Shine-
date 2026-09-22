@@ -995,9 +995,11 @@ export default function AdminDashboard() {
       const res = await api.post("/whatsapp/send-poster");
       if (res.data?.success) {
         msg("✅ Poster and caption sent to WhatsApp group successfully!", "success");
+        await loadWhatsAppStatus();
       }
     } catch (err) {
       msg(err.response?.data?.error || "Failed to send poster to WhatsApp group", "danger");
+      await loadWhatsAppStatus();
     } finally {
       setWaSendingPoster(false);
     }
@@ -2850,6 +2852,52 @@ export default function AdminDashboard() {
       {/* TODAY */}
       {tab==="today" && (
         <>
+          {waStatus?.lastPosterStatus === "failed" && (
+            <div style={{
+              background: "rgba(239, 68, 68, 0.12)",
+              border: "1px solid rgba(239, 68, 68, 0.45)",
+              borderRadius: 14,
+              padding: "0.9rem 1.25rem",
+              marginBottom: "1rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <span style={{ fontSize: "1.4rem" }}>🚨</span>
+                <div>
+                  <div style={{ color: "#ef4444", fontWeight: 800, fontSize: "0.92rem" }}>
+                    Morning Question WhatsApp Dispatch Failed
+                  </div>
+                  <div style={{ color: "#fca5a5", fontSize: "0.8rem", marginTop: "2px" }}>
+                    {waStatus?.lastPosterError || "WhatsApp bot was not connected or encountered an error while sending to the group."}
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn-sm"
+                style={{
+                  background: "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  fontWeight: 700,
+                  padding: "0.5rem 1rem",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+                onClick={waStatus?.isConnected ? handleSendPosterToGroup : () => setTab("whatsapp")}
+                disabled={waSendingPoster}
+              >
+                {waSendingPoster ? "⏳ Retrying..." : waStatus?.isConnected ? "🔄 Retry Sending to Group Now" : "📱 Connect WhatsApp Bot"}
+              </button>
+            </div>
+          )}
+
           {dash?.today?.question
             ? <div className="today-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -4724,6 +4772,53 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
+
+          {waStatus?.lastPosterStatus === "failed" && (
+            <div style={{
+              background: "rgba(239, 68, 68, 0.12)",
+              border: "1px solid rgba(239, 68, 68, 0.45)",
+              borderRadius: 16,
+              padding: "1rem 1.4rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.85rem",
+              boxShadow: "0 8px 24px rgba(239, 68, 68, 0.15)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                <span style={{ fontSize: "1.6rem" }}>🚨</span>
+                <div>
+                  <div style={{ color: "#ef4444", fontWeight: 800, fontSize: "0.95rem" }}>
+                    Morning Challenge WhatsApp Dispatch Failed
+                  </div>
+                  <div style={{ color: "#fca5a5", fontSize: "0.82rem", marginTop: "3px" }}>
+                    {waStatus?.lastPosterError || "WhatsApp bot was not connected or encountered an error while sending to the group."}
+                  </div>
+                </div>
+              </div>
+              <button
+                className="btn-sm"
+                style={{
+                  background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                  color: "#fff",
+                  border: "none",
+                  fontWeight: 800,
+                  padding: "0.6rem 1.2rem",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  boxShadow: "0 4px 14px rgba(239, 68, 68, 0.35)",
+                }}
+                onClick={waStatus?.isConnected ? handleSendPosterToGroup : () => setWaSubSection("gateway")}
+                disabled={waSendingPoster}
+              >
+                {waSendingPoster ? "⏳ Sending..." : waStatus?.isConnected ? "🔄 Retry Sending to Group Now" : "📱 Check Bot Connection"}
+              </button>
+            </div>
+          )}
 
           {/* Sub-Tab Navigation Bar for Zero-Scroll Focused Views */}
           <div style={{

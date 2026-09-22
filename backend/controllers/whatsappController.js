@@ -37,7 +37,7 @@ export async function getWhatsAppStatus(req, res) {
   try {
     const status = getStatus();
     const dbStatus = await Status.findOne()
-      .select("todayTopic todayQuestion todayCategory todayContentType todayImageUrl todayAudioUrl isPictureDescriptionDay isStorySummaryDay todayVocabulary todayImageInstructions")
+      .select("todayTopic todayQuestion todayCategory todayContentType todayImageUrl todayAudioUrl isPictureDescriptionDay isStorySummaryDay todayVocabulary todayImageInstructions lastPosterStatus lastPosterError lastPosterAttemptAt lastPosterSentDate lastPosterSentTime")
       .lean();
 
     const submissionSummary = await getSubmissionReportSummary();
@@ -48,6 +48,11 @@ export async function getWhatsAppStatus(req, res) {
       userPhone: maskPhoneNumber(status.userPhone),
       targetGroup: maskTargetGroup(status.targetGroup),
       submissionSummary,
+      lastPosterStatus: dbStatus?.lastPosterStatus || "pending",
+      lastPosterError: dbStatus?.lastPosterError || null,
+      lastPosterAttemptAt: dbStatus?.lastPosterAttemptAt || null,
+      lastPosterSentDate: dbStatus?.lastPosterSentDate || null,
+      lastPosterSentTime: dbStatus?.lastPosterSentTime || null,
       todayQuestion: dbStatus ? {
         topic: dbStatus.todayTopic,
         question: dbStatus.todayQuestion,

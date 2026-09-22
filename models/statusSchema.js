@@ -24,6 +24,9 @@ const statusSchema = new mongoose.Schema({
   posterExpiresAt: { type: Date, default: null },
   lastPosterSentDate: { type: String, default: null },
   lastPosterSentTime: { type: String, default: null },
+  lastPosterStatus: { type: String, enum: ["pending", "success", "failed"], default: "pending" },
+  lastPosterError: { type: String, default: null },
+  lastPosterAttemptAt: { type: Date, default: null },
   recentCategories: { type: [String], default: [] },
   // Daily vocabulary words (configurable count, related to today's question)
   todayVocabulary: {

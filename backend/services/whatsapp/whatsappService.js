@@ -345,6 +345,25 @@ export async function initWhatsAppBot() {
             }
           }, 3000);
         }
+
+        // 🔄 Check if today's morning challenge needs to be dispatched (failed or unsent while disconnected)
+        setTimeout(async () => {
+          try {
+            const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+            const todayDate = nowIST.toISOString().split("T")[0];
+            const statusDoc = await Status.findOne().lean();
+            if (
+              statusDoc &&
+              statusDoc.questionSentToday &&
+              (statusDoc.lastPosterStatus === "failed" || (statusDoc.lastPosterStatus !== "success" && statusDoc.lastPosterSentDate !== todayDate))
+            ) {
+              console.log("[WhatsApp] 🔄 Bot connected! Found unsent or failed morning challenge for today. Retrying dispatch now...");
+              await sendDailyPosterToGroup();
+            }
+          } catch (autoSendErr) {
+            console.warn("[WhatsApp] ⚠️ Auto-retry morning challenge dispatch error:", autoSendErr.message);
+          }
+        }, 5000);
       }
 
       if (connection === "close") {
@@ -605,219 +624,309 @@ export async function logoutWhatsAppBot() {
  * @param {string} [options.targetGroup] - override target group if needed
  */
 export async function sendDailyPosterToGroup(options = {}) {
-  const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
+  try {
+    const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
 
-  if (!rawTargetGroup) {
-    throw new Error("TARGET_GROUP is not configured. Please set TARGET_GROUP in Infisical or environment.");
-  }
-  const targetGroup = formatGroupJid(rawTargetGroup);
+    if (!rawTargetGroup) {
+      throw new Error("TARGET_GROUP is not configured. Please set TARGET_GROUP in Infisical or environment.");
+    }
+    const targetGroup = formatGroupJid(rawTargetGroup);
 
-  // Ensure WhatsApp socket is connected (auto-connects from MongoDB if needed)
-  await ensureWhatsAppConnected(15000);
+    // Ensure WhatsApp socket is connected (auto-connects from MongoDB if needed)
+    await ensureWhatsAppConnected(15000);
 
-  // Fetch full status from DB to inspect content type and attachments
-  const status = await Status.findOne().lean();
+    // Fetch full status from DB to inspect content type and attachments
+    const status = await Status.findOne().lean();
 
-  const contentType = options.contentType || status?.todayContentType || "question";
-  let topic = options.topic || status?.todayTopic || "Speaking Practice";
-  let question = options.question || status?.todayQuestion || "";
-  let category = options.category || status?.todayCategory || "General";
-  const vocabulary = status?.todayVocabulary || [];
-  const frontendUrl = process.env.FRONTEND_URL || "https://speakandshine.com";
+    const contentType = options.contentType || status?.todayContentType || "question";
+    let topic = options.topic || status?.todayTopic || "Speaking Practice";
+    let question = options.question || status?.todayQuestion || "";
+    let category = options.category || status?.todayCategory || "General";
+    const vocabulary = status?.todayVocabulary || [];
+    const frontendUrl = process.env.FRONTEND_URL || "https://speakandshine.com";
 
-  if (!question && !topic) {
-    throw new Error("No active daily challenge found in database.");
-  }
-
-  const isPicture = contentType === "picture_description" || status?.isPictureDescriptionDay;
-  const isStory = contentType === "story_audio" || status?.isStorySummaryDay;
-  const vocabReq = isPicture
-    ? (status?.vocabPictureRequiredCount ?? 1)
-    : isStory
-    ? (status?.vocabStoryRequiredCount ?? 3)
-    : (status?.vocabNormalRequiredCount ?? 3);
-
-  // Format vocabulary lines if present
-  let vocabSection = "";
-  if (Array.isArray(vocabulary) && vocabulary.length > 0) {
-    const vocabList = vocabulary.map(v => `• *${v.word}*: ${v.meaning}`).join("\n");
-    vocabSection = `\n🎯 *Focus Vocabulary (Use at least ${vocabReq} in your video):*\n${vocabList}\n`;
-  }
-
-  console.log(`[WhatsApp] 📦 Preparing dispatch for "${topic}" (Type: ${contentType})...`);
-
-  // ── CASE 1: PICTURE DESCRIPTION CHALLENGE ──────────────────────────────────
-  if (isPicture) {
-    let imageBuffer = null;
-    const imageUrl = status?.todayImageUrl;
-
-    if (imageUrl) {
-      try {
-        console.log(`[WhatsApp] 🖼️ Fetching challenge picture from: ${imageUrl}`);
-        const res = await fetch(imageUrl);
-        if (res.ok) {
-          const arrayBuf = await res.arrayBuffer();
-          imageBuffer = Buffer.from(arrayBuf);
-        }
-      } catch (fetchErr) {
-        console.warn("[WhatsApp] Could not fetch remote picture, falling back to generated poster:", fetchErr.message);
-      }
+    if (!question && !topic) {
+      throw new Error("No active daily challenge found in database.");
     }
 
-    // If picture download failed or no URL, generate dedicated picture poster
-    if (!imageBuffer) {
-      imageBuffer = await generatePNGPosterBuffer({
+    const isPicture = contentType === "picture_description" || status?.isPictureDescriptionDay || status?.todayContentType === "picture_description";
+    const isStory = contentType === "story_audio" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
+    const vocabReq = isPicture
+      ? (status?.vocabPictureRequiredCount ?? 1)
+      : isStory
+      ? (status?.vocabStoryRequiredCount ?? 1)
+      : (status?.vocabNormalRequiredCount ?? 3);
+
+    // Helper to record successful delivery in Status
+    const recordSuccess = async () => {
+      const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+      const todayDate = nowIST.toISOString().split("T")[0];
+      const todayTime = `${String(nowIST.getUTCHours()).padStart(2, "0")}:${String(nowIST.getUTCMinutes()).padStart(2, "0")}`;
+
+      await Status.updateOne({}, {
+        $set: {
+          lastPosterStatus: "success",
+          lastPosterError: null,
+          lastPosterSentDate: todayDate,
+          lastPosterSentTime: todayTime,
+          lastPosterAttemptAt: new Date(),
+        }
+      }).catch(e => console.warn("[WhatsApp] Could not update Status on poster success:", e.message));
+    };
+
+    // Format vocabulary lines if present
+    let vocabSection = "";
+    if (Array.isArray(vocabulary) && vocabulary.length > 0) {
+      const vocabList = vocabulary.map(v => `• *${v.word}*: ${v.meaning}`).join("\n");
+      vocabSection = `\n🎯 *Focus Vocabulary (Use at least ${vocabReq} in your video):*\n${vocabList}\n`;
+    }
+
+    console.log(`[WhatsApp] 📦 Preparing dispatch for "${topic}" (Type: ${contentType})...`);
+
+    // ── CASE 1: PICTURE DESCRIPTION CHALLENGE ──────────────────────────────────
+    if (isPicture) {
+      let imageBuffer = null;
+      const imageUrl = status?.todayImageUrl;
+
+      if (imageUrl) {
+        try {
+          console.log(`[WhatsApp] 🖼️ Fetching challenge picture from: ${imageUrl}`);
+          const res = await fetch(imageUrl);
+          if (res.ok) {
+            const arrayBuf = await res.arrayBuffer();
+            imageBuffer = Buffer.from(arrayBuf);
+          }
+        } catch (fetchErr) {
+          console.warn("[WhatsApp] Could not fetch remote picture, falling back to generated poster:", fetchErr.message);
+        }
+      }
+
+      // If picture download failed or no URL, generate dedicated picture poster
+      if (!imageBuffer) {
+        imageBuffer = await generatePNGPosterBuffer({
+          topic,
+          question: status?.todayImageInstructions || question,
+          category: "Picture Description",
+          contentType: "picture_description",
+          vocabulary,
+          vocabRequiredCount: vocabReq,
+        });
+      }
+
+      const instructions = status?.todayImageInstructions || question || "Describe what you see in this picture in detail: people, setting, actions, emotions, and your perspective.";
+
+      const caption = [
+        `🖼️ *SPEAK & SHINE — PICTURE DESCRIPTION CHALLENGE* 🖼️`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `📸 *Challenge Theme:* ${topic}`,
+        ``,
+        `📝 *Your Speaking Task:*`,
+        `${instructions}`,
+        vocabSection,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `🎥 *TASK:* Record your 2-3 minute video describing this picture!`,
+        `🚀 *Submit your video here:* ${frontendUrl}`,
+      ].filter(Boolean).join("\n");
+
+      console.log(`[WhatsApp] 📤 Sending picture challenge to group: ${targetGroup}...`);
+      await sock.sendMessage(targetGroup, {
+        image: imageBuffer,
+        mimetype: "image/jpeg",
+        caption,
+      });
+
+      await recordSuccess();
+      console.log(`[WhatsApp] ✅ Picture description challenge sent successfully!`);
+      return { success: true, targetGroup, topic, type: "picture_description", sentAt: new Date() };
+    }
+
+    // ── CASE 2: AUDIO STORY SUMMARY CHALLENGE ──────────────────────────────────
+    if (isStory) {
+      const posterBuffer = await generatePNGPosterBuffer({
         topic,
-        question: status?.todayImageInstructions || question,
-        category: "Picture Description",
-        contentType: "picture_description",
+        question: question || "Listen to the audio story and record a short video summary in your own words.",
+        category: "Story Summary",
+        contentType: "story_audio",
         vocabulary,
         vocabRequiredCount: vocabReq,
       });
+
+      const caption = [
+        `🎧 *SPEAK & SHINE — STORY SUMMARY CHALLENGE* 🎧`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `📖 *Story Title:* ${topic}`,
+        ``,
+        `📝 *Your Assignment:*`,
+        `1. Listen to the audio story on the Speak & Shine webapp.`,
+        `2. Understand the key characters, the plot, and the resolution.`,
+        `3. Record your video summarizing the story in your own words!`,
+        vocabSection,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `🎥 *TASK:* Record your 2-3 minute story summary video!`,
+        `🚀 *Listen & submit here:* ${frontendUrl}`,
+      ].filter(Boolean).join("\n");
+
+      console.log(`[WhatsApp] 📤 Sending story poster to group: ${targetGroup}...`);
+      await sock.sendMessage(targetGroup, {
+        image: posterBuffer,
+        mimetype: "image/png",
+        caption,
+      });
+
+      // If audio URL is available, also send the audio file directly into the WhatsApp group!
+      if (status?.todayAudioUrl) {
+        try {
+          console.log(`[WhatsApp] 🎵 Sending story audio file to group: ${status.todayAudioUrl}...`);
+          await sock.sendMessage(targetGroup, {
+            audio: { url: status.todayAudioUrl },
+            mimetype: "audio/mp4",
+            ptt: false,
+            fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}.mp3`,
+          });
+          console.log(`[WhatsApp] ✅ Story audio file delivered to group!`);
+        } catch (audioErr) {
+          console.warn("[WhatsApp] Could not send audio file attachment (non-fatal):", audioErr.message);
+        }
+      }
+
+      await recordSuccess();
+      console.log(`[WhatsApp] ✅ Story summary challenge sent successfully!`);
+      return { success: true, targetGroup, topic, type: "story_audio", sentAt: new Date() };
     }
 
-    const instructions = status?.todayImageInstructions || question || "Describe what you see in this picture in detail: people, setting, actions, emotions, and your perspective.";
-
-    const caption = [
-      `🖼️ *SPEAK & SHINE — PICTURE DESCRIPTION CHALLENGE* 🖼️`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `📸 *Challenge Theme:* ${topic}`,
-      ``,
-      `📝 *Your Speaking Task:*`,
-      `${instructions}`,
-      vocabSection,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `🎥 *TASK:* Record your 2-3 minute video describing this picture!`,
-      `🚀 *Submit your video here:* ${frontendUrl}`,
-    ].filter(Boolean).join("\n");
-
-    console.log(`[WhatsApp] 📤 Sending picture challenge to group: ${targetGroup}...`);
-    await sock.sendMessage(targetGroup, {
-      image: imageBuffer,
-      mimetype: "image/jpeg",
-      caption,
-    });
-
-    console.log(`[WhatsApp] ✅ Picture description challenge sent successfully!`);
-    return { success: true, targetGroup, topic, type: "picture_description", sentAt: new Date() };
-  }
-
-  // ── CASE 2: AUDIO STORY SUMMARY CHALLENGE ──────────────────────────────────
-  if (isStory) {
-    const posterBuffer = await generatePNGPosterBuffer({
+    // ── CASE 3: REGULAR DAILY QUESTION CHALLENGE ─────────────────────────────────
+    console.log(`[WhatsApp] 🎨 Generating updated HD poster for "${topic}" (${category})...`);
+    const pngBuffer = await generatePNGPosterBuffer({
       topic,
-      question: question || "Listen to the audio story and record a short video summary in your own words.",
-      category: "Story Summary",
-      contentType: "story_audio",
+      question,
+      category,
+      contentType: "question",
       vocabulary,
       vocabRequiredCount: vocabReq,
     });
 
+    const isReflection = category?.toLowerCase().includes("reflection") || topic?.toLowerCase().includes("reflection") || status?.isMonthlyReflectionDay;
+    const isGoals = category?.toLowerCase().includes("goal") || topic?.toLowerCase().includes("goal") || status?.isMonthlyGoalsDay;
+
+    const headerTitle = isReflection
+      ? `🌟 *SPEAK & SHINE — MONTHLY REFLECTION CHALLENGE* 🌟`
+      : isGoals
+      ? `🎯 *SPEAK & SHINE — MONTHLY GOALS CHALLENGE* 🎯`
+      : `🌟 *SPEAK & SHINE — DAILY SPEAKING CHALLENGE* 🌟`;
+
+    const questionHeader = isReflection
+      ? `📋 *REFLECTION QUESTIONS:*`
+      : isGoals
+      ? `🎯 *GOAL SETTING QUESTIONS:*`
+      : `❓ *TODAY'S QUESTION:*`;
+
+    const taskPrompt = isReflection
+      ? `🎥 *TASK:* Record & submit your monthly reflection video!`
+      : isGoals
+      ? `🎥 *TASK:* Record & submit your monthly goals video!`
+      : `🎥 *TASK:* Record & submit your 1-minute speaking video!`;
+
     const caption = [
-      `🎧 *SPEAK & SHINE — STORY SUMMARY CHALLENGE* 🎧`,
+      headerTitle,
       `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `📖 *Story Title:* ${topic}`,
+      `🏷️ *Topic:* ${topic}`,
+      `📂 *Category:* ${category}`,
       ``,
-      `📝 *Your Assignment:*`,
-      `1. Listen to the audio story on the Speak & Shine webapp.`,
-      `2. Understand the key characters, the plot, and the resolution.`,
-      `3. Record your video summarizing the story in your own words!`,
+      questionHeader,
+      `${question}`,
       vocabSection,
       `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `🎥 *TASK:* Record your 2-3 minute story summary video!`,
-      `🚀 *Listen & submit here:* ${frontendUrl}`,
+      taskPrompt,
+      `🚀 *Submit here:* ${frontendUrl}`,
     ].filter(Boolean).join("\n");
 
-    console.log(`[WhatsApp] 📤 Sending story poster to group: ${targetGroup}...`);
+    console.log(`[WhatsApp] 📤 Sending HD poster to group: ${targetGroup}...`);
     await sock.sendMessage(targetGroup, {
-      image: posterBuffer,
+      image: pngBuffer,
       mimetype: "image/png",
       caption,
     });
 
-    // If audio URL is available, also send the audio file directly into the WhatsApp group!
-    if (status?.todayAudioUrl) {
-      try {
-        console.log(`[WhatsApp] 🎵 Sending story audio file to group: ${status.todayAudioUrl}...`);
-        await sock.sendMessage(targetGroup, {
-          audio: { url: status.todayAudioUrl },
-          mimetype: "audio/mp4",
-          ptt: false,
-          fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}.mp3`,
-        });
-        console.log(`[WhatsApp] ✅ Story audio file delivered to group!`);
-      } catch (audioErr) {
-        console.warn("[WhatsApp] Could not send audio file attachment (non-fatal):", audioErr.message);
+    await recordSuccess();
+    console.log(`[WhatsApp] ✅ Poster sent successfully to ${targetGroup}!`);
+
+    return {
+      success: true,
+      targetGroup,
+      topic,
+      category,
+      type: "question",
+      sentAt: new Date(),
+    };
+  } catch (err) {
+    console.error(`[WhatsApp] ❌ sendDailyPosterToGroup failed: ${err.message}`);
+    await Status.updateOne({}, {
+      $set: {
+        lastPosterStatus: "failed",
+        lastPosterError: err.message,
+        lastPosterAttemptAt: new Date(),
       }
+    }).catch(e => console.warn("[WhatsApp] Could not update Status on poster failure:", e.message));
+
+    // If socket is connected, dispatch error alert to the WhatsApp group and admin
+    if (sock && isConnected) {
+      await sendErrorAlertToGroup(err.message, "Daily Morning Challenge Dispatch").catch(() => {});
     }
 
-    console.log(`[WhatsApp] ✅ Story summary challenge sent successfully!`);
-    return { success: true, targetGroup, topic, type: "story_audio", sentAt: new Date() };
+    throw err;
+  }
+}
+
+/**
+ * Sends an error or failure alert to the configured WhatsApp group and/or admin.
+ * @param {string|Error} error - Error message or Error instance
+ * @param {string} [context] - Context description, e.g. "Morning Challenge Dispatch"
+ */
+export async function sendErrorAlertToGroup(error, context = "Daily Challenge Dispatch") {
+  const rawTargetGroup = process.env.TARGET_GROUP;
+  const errorMsg = typeof error === "string" ? error : (error?.message || "Unknown error");
+
+  console.warn(`[WhatsApp] 🚨 System Alert triggered for [${context}]: ${errorMsg}`);
+
+  if (!sock || !isConnected) {
+    console.warn(`[WhatsApp] Cannot send error alert via WhatsApp: bot is not connected.`);
+    return { success: false, error: "WhatsApp bot not connected" };
   }
 
-  // ── CASE 3: REGULAR DAILY QUESTION CHALLENGE ─────────────────────────────────
-  console.log(`[WhatsApp] 🎨 Generating updated HD poster for "${topic}" (${category})...`);
-  const pngBuffer = await generatePNGPosterBuffer({
-    topic,
-    question,
-    category,
-    contentType: "question",
-    vocabulary,
-    vocabRequiredCount: vocabReq,
-  });
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const timeStr = nowIST.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const dateStr = nowIST.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
-  const isReflection = category?.toLowerCase().includes("reflection") || topic?.toLowerCase().includes("reflection") || status?.isMonthlyReflectionDay;
-  const isGoals = category?.toLowerCase().includes("goal") || topic?.toLowerCase().includes("goal") || status?.isMonthlyGoalsDay;
-
-  const headerTitle = isReflection
-    ? `🌟 *SPEAK & SHINE — MONTHLY REFLECTION CHALLENGE* 🌟`
-    : isGoals
-    ? `🎯 *SPEAK & SHINE — MONTHLY GOALS CHALLENGE* 🎯`
-    : `🌟 *SPEAK & SHINE — DAILY SPEAKING CHALLENGE* 🌟`;
-
-  const questionHeader = isReflection
-    ? `📋 *REFLECTION QUESTIONS:*`
-    : isGoals
-    ? `🎯 *GOAL SETTING QUESTIONS:*`
-    : `❓ *TODAY'S QUESTION:*`;
-
-  const taskPrompt = isReflection
-    ? `🎥 *TASK:* Record & submit your monthly reflection video!`
-    : isGoals
-    ? `🎥 *TASK:* Record & submit your monthly goals video!`
-    : `🎥 *TASK:* Record & submit your 1-minute speaking video!`;
-
-  const caption = [
-    headerTitle,
+  const alertMessage = [
+    `⚠️ *SPEAK & SHINE SYSTEM ALERT* ⚠️`,
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `🏷️ *Topic:* ${topic}`,
-    `📂 *Category:* ${category}`,
+    `🚨 *Event:* ${context}`,
+    `📅 *Date:* ${dateStr} | ⏰ *Time:* ${timeStr}`,
     ``,
-    questionHeader,
-    `${question}`,
-    vocabSection,
+    `❌ *Error Details:*`,
+    `${errorMsg}`,
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    taskPrompt,
-    `🚀 *Submit here:* ${frontendUrl}`,
-  ].filter(Boolean).join("\n");
+    `ℹ️ Admin has been alerted. The system will retry automatically or admin can trigger dispatch manually.`,
+  ].join("\n");
 
-  console.log(`[WhatsApp] 📤 Sending HD poster to group: ${targetGroup}...`);
-  await sock.sendMessage(targetGroup, {
-    image: pngBuffer,
-    mimetype: "image/png",
-    caption,
-  });
+  let groupSent = false;
+  if (rawTargetGroup) {
+    try {
+      const targetGroup = formatGroupJid(rawTargetGroup);
+      await sock.sendMessage(targetGroup, { text: alertMessage });
+      console.log(`[WhatsApp] 🚨 Error alert successfully posted to group: ${targetGroup}`);
+      groupSent = true;
+    } catch (gErr) {
+      console.warn(`[WhatsApp] Failed to send error alert to target group:`, gErr.message);
+    }
+  }
 
-  console.log(`[WhatsApp] ✅ Poster sent successfully to ${targetGroup}!`);
+  // Also notify admin directly if possible
+  try {
+    await sendAdminDirectMessage(alertMessage).catch(() => {});
+  } catch {}
 
-  return {
-    success: true,
-    targetGroup,
-    topic,
-    category,
-    type: "question",
-    sentAt: new Date(),
-  };
+  return { success: groupSent };
 }
 
 export const DEFAULT_SUBMISSION_TEMPLATES = {

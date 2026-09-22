@@ -98,12 +98,14 @@ export function startScheduler() {
           console.log(`[Scheduler] ⏰ Time matched: ${nowTime} — publishing question & dispatching poster`);
           const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
           await publishFromService();
-          await Status.updateOne({}, { $set: { lastPosterSentDate: todayDate, lastPosterSentTime: sendTime } });
-        } else if (s.lastPosterSentDate !== todayDate || s.lastPosterSentTime !== sendTime) {
+        } else if (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate)) {
           console.log(`[Scheduler] ⏰ Time matched: ${nowTime} — question already published, dispatching poster to WhatsApp group`);
-          const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
-          await sendDailyPosterToGroup();
-          await Status.updateOne({}, { $set: { lastPosterSentDate: todayDate, lastPosterSentTime: sendTime } });
+          try {
+            const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
+            await sendDailyPosterToGroup();
+          } catch (posterErr) {
+            console.warn("[Scheduler] Poster dispatch failed:", posterErr.message);
+          }
         }
       }
 
@@ -219,6 +221,14 @@ export function startScheduler() {
           console.log(`[Scheduler] Catch-up: ${sendTime} already passed, publishing now...`);
           const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
           await publishFromService();
+        }
+      } else if (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate)) {
+        console.log(`[Scheduler] Catch-up: Question already published for today, but poster dispatch is pending/failed (${s.lastPosterStatus || "pending"}). Retrying dispatch...`);
+        try {
+          const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
+          await sendDailyPosterToGroup();
+        } catch (catchUpPosterErr) {
+          console.warn("[Scheduler] Catch-up poster dispatch failed:", catchUpPosterErr.message);
         }
       }
 

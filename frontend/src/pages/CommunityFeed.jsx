@@ -162,18 +162,26 @@ function DetailedReport({ a }) {
 
   const improvementTips = [];
   if (bd) {
+    if (bd.isOffTopic) {
+      improvementTips.push({
+        icon: "🚨",
+        label: "Answer today's challenge",
+        detail: bd.offTopicReason || "Your video does not address today's topic. Re-record answering today's question to earn a higher score.",
+        gap: 50,
+      });
+    }
     const lenGap = isPictureBd ? (bd.maxDuration || 20) - (bd.duration || 0) : (bd.maxLength || 30) - (bd.length || 0);
     const vocGap = isPictureBd ? (bd.maxVocabulary || 10) - (bd.vocabulary || 0) : (bd.maxVocab || 30) - (bd.vocabUsed || 0);
     const topGap = isPictureBd ? (bd.maxContent || 35) - (bd.content || 0) : (bd.maxTopic || 15) - (bd.topic || 0);
     const comGap = isPictureBd ? (bd.maxCommunication || 20) - (bd.communication || 0) : (bd.maxComm || (bd.isSpecialDay ? 25 : 10)) - (bd.comm || 0);
     const groGap = (bd.maxGrowth || 15) - (bd.growth || 0);
     if (lenGap > 2) improvementTips.push({ icon: "⏱️", label: "Record longer",          detail: `+${lenGap.toFixed(1)} pts possible — speak closer to the full-score time`,                      gap: lenGap });
-    if (vocGap > 2) {
-      const requiredVocabWords = bd.requiredVocabWords || 3;
-      const totalVocabWords = bd.totalVocabWords || 5;
+    if (vocGap > 1.5) {
+      const requiredVocabWords = bd.requiredVocabWords || (isPictureBd || isStoryBd ? 1 : 3);
+      const totalVocabWords = bd.totalVocabWords || (isPictureBd || isStoryBd ? 3 : 5);
       improvementTips.push({ icon: "📚", label: "Use more vocab words",    detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`,                  gap: vocGap });
     }
-    if (!bd.isSpecialDay && topGap > 1) {
+    if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
       improvementTips.push({
         icon: isStoryBd ? "📖" : "🎯",
         label: isStoryBd ? "Cover key story points" : "Stay on topic",
@@ -208,6 +216,28 @@ function DetailedReport({ a }) {
             </div>
             <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>
               Beat baseline ({bd.baselineComm != null ? `${bd.baselineComm.toFixed(1)} avg` : "past attempts"}) by <strong style={{ color: "#34d399" }}>+{bd.growthDelta.toFixed(1)}</strong>!
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Off-Topic Alert Banner ── */}
+      {bd?.isOffTopic && (
+        <div style={{
+          marginBottom: "0.85rem",
+          padding: "0.75rem 0.95rem",
+          borderRadius: 10,
+          background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.08))",
+          border: "1px solid rgba(239, 68, 68, 0.45)",
+          display: "flex", alignItems: "center", gap: "0.65rem",
+        }}>
+          <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>⚠️</span>
+          <div>
+            <div style={{ fontWeight: 800, color: "#f87171", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+              Off-Topic Submission Detected
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
+              {bd.offTopicReason || "This video does not address today's assigned topic or question. Please re-record to earn full score!"}
             </div>
           </div>
         </div>

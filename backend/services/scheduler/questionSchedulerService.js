@@ -16,10 +16,12 @@ async function dispatchPosterToWhatsApp(details = {}) {
   try {
     if (process.env.TARGET_GROUP) {
       const { sendDailyPosterToGroup } = await import("../whatsapp/whatsappService.js");
-      await sendDailyPosterToGroup(details);
+      return await sendDailyPosterToGroup(details);
     }
+    return { success: false, reason: "No TARGET_GROUP configured" };
   } catch (err) {
     console.warn("[QuestionScheduler] WhatsApp poster auto-send skipped/failed:", err.message);
+    return { success: false, error: err.message };
   }
 }
 
@@ -174,7 +176,7 @@ async function publishAutoPictureDescription() {
     await ensureTodayVocabulary().catch(err =>
       console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
     );
-    dispatchPosterToWhatsApp({ topic: challenge.title, question: challenge.instructions, category: "Picture Description" });
+    await dispatchPosterToWhatsApp({ topic: challenge.title, question: challenge.instructions, category: "Picture Description" });
     return { published: true, type: "picture_description", topic: challenge.title, source: "auto" };
   } catch (err) {
     console.error("[QuestionScheduler] Picture Description auto-publish failed:", err.message);
@@ -235,7 +237,7 @@ export async function publishAutoSaturdayStory() {
     await ensureTodayVocabulary().catch(err =>
       console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
     );
-    dispatchPosterToWhatsApp({ topic: story.topic, question: story.question, category: STORY_SUMMARY_CATEGORY });
+    await dispatchPosterToWhatsApp({ topic: story.topic, question: story.question, category: STORY_SUMMARY_CATEGORY });
     return { published: true, type: "story_summary", topic: story.topic, source: "auto" };
   } catch (err) {
     console.error("[QuestionScheduler] Story summary auto-publish failed:", err.message);
@@ -288,7 +290,7 @@ export async function publishManualQuestion(q) {
     console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
   );
 
-  dispatchPosterToWhatsApp({
+  await dispatchPosterToWhatsApp({
     topic: q.topic,
     question: q.question,
     category: q.category,
@@ -392,6 +394,16 @@ export async function publishDailyQuestion() {
           todayCategory: MONTHLY_REFLECTION_CATEGORY,
         }
       }, { upsert: true });
+
+      await ensureTodayVocabulary().catch(err =>
+        console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
+      );
+
+      await dispatchPosterToWhatsApp({
+        topic: MONTHLY_REFLECTION_TOPIC,
+        question: reflectionText,
+        category: MONTHLY_REFLECTION_CATEGORY,
+      });
       
       return { 
         published: true, 
@@ -467,6 +479,16 @@ export async function publishDailyQuestion() {
           todayCategory: MONTHLY_GOALS_CATEGORY,
         }
       }, { upsert: true });
+
+      await ensureTodayVocabulary().catch(err =>
+        console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
+      );
+
+      await dispatchPosterToWhatsApp({
+        topic: MONTHLY_GOALS_TOPIC,
+        question: goalsText,
+        category: MONTHLY_GOALS_CATEGORY,
+      });
       
       return { 
         published: true, 
@@ -573,7 +595,7 @@ export async function publishDailyQuestion() {
       console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
     );
 
-    dispatchPosterToWhatsApp({
+    await dispatchPosterToWhatsApp({
       topic: question.topic,
       question: question.question,
       category: question.category,

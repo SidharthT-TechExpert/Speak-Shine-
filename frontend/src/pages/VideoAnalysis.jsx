@@ -5271,18 +5271,30 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
   // Generate improvement tips based on what's missing from full score
   const improvementTips = [];
   if (bd) {
+    if (bd.isOffTopic) {
+      improvementTips.push({
+        icon: "🚨",
+        label: "Answer today's challenge",
+        detail: bd.offTopicReason || "Your video does not address today's topic. Re-record answering today's question to earn a higher score.",
+        gap: 50,
+      });
+    }
     if (isPictureBd) {
       // Picture Description tips
-      const comGap  = 30 - (bd.communication || 0);
-      const conGap  = 40 - (bd.content       || 0);
-      const vocGap  = 10 - (bd.vocabulary    || 0);
-      const durGap  = 20  - (bd.duration     || 0);
+      const comGap  = (bd.maxCommunication || 20) - (bd.communication || 0);
+      const conGap  = (bd.maxContent       || 35) - (bd.content       || 0);
+      const vocGap  = (bd.maxVocabulary    || 10) - (bd.vocabulary    || 0);
+      const durGap  = (bd.maxDuration      || 20) - (bd.duration      || 0);
       if (bd.speechMultiplier != null && bd.speechMultiplier < 85) {
         improvementTips.push({ icon: "🎙️", label: "Improve communication", detail: `Speech ratio was ${bd.speechRatio ?? "?"}% — keep a steady speaking flow`, gap: comGap });
       }
       if (comGap > 2)  improvementTips.push({ icon: "🗣️", label: "Improve communication", detail: `+${comGap.toFixed(1)} pts possible — improve fluency, confidence, grammar and flow`, gap: comGap });
-      if (conGap > 2)  improvementTips.push({ icon: "🧠", label: "Develop content", detail: `+${conGap.toFixed(1)} pts possible — connect observations and explain the image in more depth`, gap: conGap });
-      if (vocGap > 2)  improvementTips.push({ icon: "📚", label: "Richer vocabulary",  detail: `+${vocGap.toFixed(1)} pts possible — use more varied and precise words`, gap: vocGap });
+      if (conGap > 2 && !bd.isOffTopic)  improvementTips.push({ icon: "🧠", label: "Develop content", detail: `+${conGap.toFixed(1)} pts possible — connect observations and explain the image in more depth`, gap: conGap });
+      if (vocGap > 1.5) {
+        const requiredVocabWords = bd.requiredVocabWords || 1;
+        const totalVocabWords = bd.totalVocabWords || 3;
+        improvementTips.push({ icon: "📚", label: "Use more vocab words",  detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`, gap: vocGap });
+      }
       if (durGap > 0.5) improvementTips.push({ icon: "⏱️", label: "Make a complete attempt", detail: `+${durGap.toFixed(1)} pts possible — speak for a reasonable amount of time`, gap: durGap });
     } else {
       // Normal / Story summary tips
@@ -5295,17 +5307,17 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       } else if (lenGap > 2) {
         improvementTips.push({ icon: "⏱️", label: "Record longer", detail: `+${lenGap.toFixed(1)} pts possible — speak closer to the full-score time`, gap: lenGap });
       }
-      if (vocGap > 2) {
-        const requiredVocabWords = bd.requiredVocabWords || 3;
-        const totalVocabWords = bd.totalVocabWords || 5;
+      if (vocGap > 1.5) {
+        const requiredVocabWords = bd.requiredVocabWords || (isStoryBd ? 1 : 3);
+        const totalVocabWords = bd.totalVocabWords || (isStoryBd ? 3 : 5);
         improvementTips.push({ icon: "📚", label: "Use more vocab words", detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`, gap: vocGap });
       }
-      if (!bd.isSpecialDay && topGap > 1) {
+      if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
         improvementTips.push({
           icon: isStoryBd ? "📖" : "🎯",
           label: isStoryBd ? "Cover key story points" : "Stay on topic",
           detail: isStoryBd
-            ? `+${topGap.toFixed(1)} pts possible — retell the story plot, characters, key events, and resolution`
+            ? `+${topGap.toFixed(1)} pts possible — retell the story plot, characters, key events, and conclusion`
             : `+${topGap.toFixed(1)} pts possible — answer the question more directly`,
           gap: topGap,
         });
@@ -5534,6 +5546,27 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
               color: reEvalMsg.startsWith("✓") ? "#4ade80" : "#f87171",
             }}>
               {reEvalMsg}
+            </div>
+          )}
+
+          {bd?.isOffTopic && (
+            <div style={{
+              margin: "0 1.25rem 0.85rem",
+              padding: "0.65rem 0.95rem",
+              borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.08))",
+              border: "1px solid rgba(239, 68, 68, 0.45)",
+              display: "flex", alignItems: "center", gap: "0.65rem",
+            }}>
+              <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>⚠️</span>
+              <div>
+                <div style={{ fontWeight: 800, color: "#f87171", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+                  Off-Topic Submission Detected
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
+                  {bd.offTopicReason || "This video does not address today's assigned topic or question. Please re-record to earn full score!"}
+                </div>
+              </div>
             </div>
           )}
 

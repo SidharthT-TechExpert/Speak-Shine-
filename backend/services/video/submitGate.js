@@ -373,9 +373,16 @@ export function calculateCompositeScore({
     // Communication: max 20 pts
     const communicationBase = objectiveRhythm * 0.8 + languageScore * 0.2;
     const communicationScore = (communicationBase / 10) * 20 * speechMult;
+
+    // Check if off-topic
+    const isOffTopic = Boolean(analysis?.isOffTopic || (typeof contentRel === "number" && contentRel < 3.5));
+
     // Content & Relevance: max 35 pts
-    const contentBase        = coherence * 0.60 + contentRel * 0.40;
-    const contentScore       = (contentBase / 10) * 35;
+    // If off-topic, heavily penalize contentBase instead of letting coherence inflate it
+    const contentBase = isOffTopic
+      ? (Math.min(contentRel, 2.5) * 0.85 + coherence * 0.15)
+      : (coherence * 0.60 + contentRel * 0.40);
+    const contentScore = (contentBase / 10) * 35;
 
     // Vocabulary: max 10 pts
     const configuredTotalWords = Number(totalVocabWords) || 0;
@@ -396,9 +403,16 @@ export function calculateCompositeScore({
     });
     const growthScore = growthResult.growthScore;
 
-    const total100 = Math.min(100, Math.round(
+    let total100 = Math.round(
       (communicationScore + contentScore + vocabularyScore + durationScore + growthScore) * 100
-    ) / 100);
+    ) / 100;
+
+    // STRICT SECURITY GATE: Off-topic submissions cannot get high scores (>50)
+    if (isOffTopic) {
+      const cap = contentRel <= 2 ? 35 : 48;
+      total100 = Math.min(cap, Math.round(total100 * 0.55 * 100) / 100);
+    }
+    total100 = Math.min(100, Math.max(0, total100));
 
     return {
       score: total100,
@@ -417,6 +431,10 @@ export function calculateCompositeScore({
         maxVocabulary:    10,
         maxDuration:      20,
         speechMultiplier: Math.round(speechMult * 100),
+        requiredVocabWords: requiredTargetWords,
+        totalVocabWords:  configuredTotalWords,
+        isOffTopic,
+        offTopicReason:   isOffTopic ? "Submission is off-topic and does not describe today's assigned image." : null,
         isPictureDescription: true,
         isStorySummary: false,
         isSpecialDay: false,
@@ -520,7 +538,19 @@ export function calculateCompositeScore({
     commScore  = (commAvg / 10) * 10;
   }
 
-  const total100 = Math.min(100, Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100);
+  // Check if submission is off-topic or answering yesterday's / wrong question
+  const isOffTopic = !isSpecialDay && Boolean(
+    analysis?.isOffTopic || (typeof effectiveTopicRelevance === "number" && effectiveTopicRelevance < 3.5)
+  );
+
+  let total100 = Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100;
+
+  // STRICT SECURITY GATE: Off-topic submissions cannot get high scores (>50)
+  if (isOffTopic) {
+    const cap = (typeof effectiveTopicRelevance === "number" && effectiveTopicRelevance <= 2) ? 35 : 48;
+    total100 = Math.min(cap, Math.round(total100 * 0.55 * 100) / 100);
+  }
+  total100 = Math.min(100, Math.max(0, total100));
 
   return {
     score: total100,
@@ -539,6 +569,12 @@ export function calculateCompositeScore({
       fullScoreDurationSeconds: maxDur,
       requiredVocabWords: required,
       totalVocabWords: total,
+      isOffTopic,
+      offTopicReason: isOffTopic
+        ? (isStoryTask
+          ? "Submission is off-topic and does not summarize today's audio story."
+          : "Submission is off-topic and does not answer today's question.")
+        : null,
       isSpecialDay,
       isStorySummary:  isStoryTask,
       isPictureDescription: false,
