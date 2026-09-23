@@ -126,6 +126,8 @@ export async function creditReferralRewardIfEligible(user, io = null) {
   const newBalance = prevBalance + rewardAmount;
   referrer.walletBalance = newBalance;
   referrer.referralEarnings = (Number(referrer.referralEarnings) || 0) + rewardAmount;
+  const actualCount = await User.countDocuments({ referredBy: referrer._id });
+  referrer.referralCount = Math.max(actualCount, (Number(referrer.referralCount) || 0) + 1);
 
   if (!Array.isArray(referrer.walletHistory)) {
     referrer.walletHistory = [];

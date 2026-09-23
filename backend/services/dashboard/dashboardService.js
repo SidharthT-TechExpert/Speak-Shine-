@@ -191,8 +191,18 @@ export async function getUserProfile(phone) {
   const strippedPhone = phone ? phone.replace(/^91/, "") : "";
   const phoneCandidates = phone ? [phone, strippedPhone, `91${phone}`] : [];
 
-  const [user, status, allUsers, existingStreakRecord] = await Promise.all([
-    phone ? User.findOne({ phone: { $in: phoneCandidates } }).lean() : Promise.resolve(null),
+  let user = phone ? await User.findOne({ phone: { $in: phoneCandidates } }).lean() : null;
+  if (!user && strippedPhone) {
+    const { escapeRegex } = await import("../../utils/phoneUtils.js");
+    user = await User.findOne({
+      $or: [
+        { phone: { $regex: escapeRegex(strippedPhone) } },
+        { userId: { $regex: escapeRegex(strippedPhone) } }
+      ]
+    }).lean();
+  }
+
+  const [status, allUsers, existingStreakRecord] = await Promise.all([
     Status.findOne().lean(),
     User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze freezeStreakProgress avatarUrl").lean(),
     StreakRecord.findOne().lean(),
@@ -376,6 +386,11 @@ export async function getUserProfile(phone) {
     profile: {
       name: profileUser.name,
       avatarUrl: profileUser.avatarUrl || null,
+      walletBalance: profileUser.walletBalance || 0,
+      referralCode: profileUser.referralCode || null,
+      referralCount: profileUser.referralCount || 0,
+      referralEarnings: profileUser.referralEarnings || 0,
+      referralRewardAmount: status?.referralRewardAmount ?? 5,
       feedbackScores,
       totalSessions: allTimeSessions,
       totalRecordedSeconds: allTimeRecordedSeconds,

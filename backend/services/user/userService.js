@@ -146,42 +146,77 @@ export async function getUserProfile(userId) {
     throw error;
   }
 
-  const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "") : "";
+  const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "").replace(/\D/g, "") : "";
   const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
   let user = await User.findOne({ phone: { $in: phoneCandidates } });
 
-  // Auto-backfill referralCode for existing users if missing
-  if (user && !user.referralCode) {
-    await ensureUserReferralCode(user);
+  if (!user && stripped) {
+    user = await User.findOne({
+      $or: [
+        { phone: { $regex: escapeRegex(stripped) } },
+        { userId: { $regex: escapeRegex(stripped) } }
+      ]
+    });
+    if (user && !user.phone) {
+      user.phone = stripped;
+      await user.save();
+    }
+  }
+
+  // Auto-create tracking User document if missing for this active Auth user
+  if (!user) {
+    const newCode = await generateUniqueReferralCode(auth.name || "Student");
+    user = await User.create({
+      userId: `web:${stripped || auth.phone}`,
+      name: auth.name,
+      phone: stripped || auth.phone,
+      referralCode: newCode,
+      paid: false,
+      streak: 0,
+      walletBalance: 0,
+      referralCount: 0,
+      referralEarnings: 0,
+    });
+    console.log(`[UserService] Auto-created User tracking document for ${auth.phone}`);
+  }
+
+  // Auto-backfill referralCode and sync actual referral count
+  if (user) {
+    if (!user.referralCode) {
+      await ensureUserReferralCode(user);
+    }
+    const actualReferredCount = await User.countDocuments({ referredBy: user._id });
+    if (actualReferredCount > (user.referralCount || 0)) {
+      user.referralCount = actualReferredCount;
+      await user.save();
+    }
   }
 
   const referralRewardAmount = await getReferralRewardAmount();
 
-  const userProfile = user
-    ? {
-        _id: user._id,
-        name: user.name || auth.name,
-        phone: user.phone || auth.phone,
-        paid: user.paid,
-        paidAt: user.paidAt,
-        streak: user.streak,
-        earnedBadges: user.earnedBadges,
-        monthlyScore: user.monthlyScore,
-        weeklySubmissions: user.weeklySubmissions,
-        theme: user.theme,
-        isDark: user.isDark,
-        streakFreeze: user.streakFreeze,
-        freezeStreakProgress: user.freezeStreakProgress,
-        walletBalance: user.walletBalance || 0,
-        walletHistory: user.walletHistory || [],
-        referralCode: user.referralCode || null,
-        referredByCode: user.referredByCode || null,
-        referralCount: user.referralCount || 0,
-        referralEarnings: user.referralEarnings || 0,
-        referralRewardAmount,
-        avatarUrl: user.avatarUrl || auth.avatarUrl || null,
-      }
-    : null;
+  const userProfile = {
+    _id: user._id,
+    name: user.name || auth.name,
+    phone: user.phone || auth.phone,
+    paid: user.paid,
+    paidAt: user.paidAt,
+    streak: user.streak,
+    earnedBadges: user.earnedBadges,
+    monthlyScore: user.monthlyScore,
+    weeklySubmissions: user.weeklySubmissions,
+    theme: user.theme,
+    isDark: user.isDark,
+    streakFreeze: user.streakFreeze,
+    freezeStreakProgress: user.freezeStreakProgress,
+    walletBalance: user.walletBalance || 0,
+    walletHistory: user.walletHistory || [],
+    referralCode: user.referralCode || null,
+    referredByCode: user.referredByCode || null,
+    referralCount: user.referralCount || 0,
+    referralEarnings: user.referralEarnings || 0,
+    referralRewardAmount,
+    avatarUrl: user.avatarUrl || auth.avatarUrl || null,
+  };
 
   return {
     auth: { ...auth, avatarUrl: auth.avatarUrl || user?.avatarUrl || null },
