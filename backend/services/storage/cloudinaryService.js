@@ -67,8 +67,8 @@ export async function uploadAvatar(buffer, userId, mimetype = "image/jpeg") {
           folder: "speak-shine/avatars",
           public_id: `avatar_${userId}_${Date.now()}`,
           transformation: [
-            // zoom: 0.6 zooms OUT from tight face to include hair, head, shoulders, and upper torso
-            { width: 400, height: 400, crop: "fill", gravity: "face", zoom: 0.6 },
+            // gravity: "auto" uses AI saliency detection to center on the person even in mirror selfies
+            { width: 400, height: 400, crop: "fill", gravity: "auto" },
             { quality: "auto", fetch_format: "auto" },
           ],
           resource_type: "image",
@@ -92,7 +92,7 @@ export async function uploadAvatar(buffer, userId, mimetype = "image/jpeg") {
 
   // Graceful fallback when Cloudinary is not yet configured in .env
   console.warn(
-    "[Cloudinary] Credentials not configured in .env. Using Groq AI Vision + Sharp aesthetic portrait crop for local avatar display."
+    "[Cloudinary] Credentials not configured in .env. Using Groq AI Vision + Sharp smart subject crop for local avatar display."
   );
 
   try {
@@ -101,65 +101,51 @@ export async function uploadAvatar(buffer, userId, mimetype = "image/jpeg") {
     const meta = await baseSharp.metadata();
 
     let cropRegion = null;
-    const faceCoords = await detectFaceWithGroqVision(buffer, mimetype);
+    const subjectCoords = await detectSubjectWithGroqVision(buffer, mimetype);
 
-    if (faceCoords && meta.width && meta.height) {
-      console.log("[Avatar Processing] 🤖 Groq AI Vision portrait framing detected:", faceCoords);
-      const faceTop = (faceCoords.ymin / 100) * meta.height;
-      const faceBottom = (faceCoords.ymax / 100) * meta.height;
-      const faceLeft = (faceCoords.xmin / 100) * meta.width;
-      const faceRight = (faceCoords.xmax / 100) * meta.width;
+    if (subjectCoords && meta.width && meta.height) {
+      console.log("[Avatar Processing] 🤖 Groq AI Vision subject bounds detected:", subjectCoords);
+      const subjTop = (subjectCoords.ymin / 100) * meta.height;
+      const subjBottom = (subjectCoords.ymax / 100) * meta.height;
+      const subjLeft = (subjectCoords.xmin / 100) * meta.width;
+      const subjRight = (subjectCoords.xmax / 100) * meta.width;
 
-      const faceH = Math.max(20, faceBottom - faceTop);
-      const faceW = Math.max(20, faceRight - faceLeft);
-      const cx = (faceLeft + faceRight) / 2;
+      const subjH = Math.max(30, subjBottom - subjTop);
+      const subjW = Math.max(30, subjRight - subjLeft);
+      const cx = (subjLeft + subjRight) / 2;
+      const cy = (subjTop + subjBottom) / 2;
 
-      // Aesthetic Bust-Up Portrait Framing:
-      // Set crop size to 2.8x face height to preserve head, hair, shoulders, and upper torso
-      let cropSize = Math.round(faceH * 2.8);
-
-      // Ensure crop size is wide enough for shoulders and capped within image bounds
-      cropSize = Math.max(cropSize, Math.round(faceW * 1.8));
+      // Calculate square crop size to fit subject cleanly with modest margin
+      let cropSize = Math.round(Math.max(subjH * 1.15, subjW * 1.15));
       cropSize = Math.min(cropSize, meta.width, meta.height);
 
-      // Headroom buffer: place top boundary ~25% of face height above top of head
-      let cropTop = Math.round(faceTop - (faceH * 0.25));
+      // Center crop square around the subject's center position
+      let cropTop = Math.round(cy - (cropSize / 2));
       let cropLeft = Math.round(cx - (cropSize / 2));
 
-      // Clamp coordinates cleanly within original image boundaries
+      // Clamp coordinates cleanly within image boundaries
       cropLeft = Math.max(0, Math.min(meta.width - cropSize, cropLeft));
       cropTop = Math.max(0, Math.min(meta.height - cropSize, cropTop));
 
       const width = Math.min(meta.width - cropLeft, cropSize);
       const height = Math.min(meta.height - cropTop, cropSize);
 
-      if (width > 50 && height > 50) {
+      if (width > 40 && height > 40) {
         cropRegion = { left: cropLeft, top: cropTop, width, height };
       }
     }
 
     let pipeline = sharp(buffer).rotate();
     if (cropRegion) {
-      console.log(`[Avatar Processing] 🎯 Aesthetic head & shoulders portrait crop [left:${cropRegion.left}, top:${cropRegion.top}, size:${cropRegion.width}x${cropRegion.height}]`);
+      console.log(`[Avatar Processing] 🎯 Smart subject-centered crop [left:${cropRegion.left}, top:${cropRegion.top}, size:${cropRegion.width}x${cropRegion.height}]`);
       pipeline = pipeline.extract(cropRegion).resize(400, 400);
     } else {
-      console.log("[Avatar Processing] 🔍 Smart aesthetic portrait crop using sharp cover...");
-      // For vertical photos (portrait mode), top-center crop preserves head + shoulders best without face zoom
-      if (meta.height && meta.width && meta.height > meta.width) {
-        const squareSize = meta.width;
-        const topOffset = Math.round(meta.height * 0.05); // 5% top margin for head & hair
-        pipeline = pipeline.extract({
-          left: 0,
-          top: Math.min(meta.height - squareSize, topOffset),
-          width: squareSize,
-          height: squareSize,
-        }).resize(400, 400);
-      } else {
-        pipeline = pipeline.resize(400, 400, {
-          fit: "cover",
-          position: sharp.position.entropy,
-        });
-      }
+      console.log("[Avatar Processing] 🔍 Saliency attention crop for avatar...");
+      // Attention strategy automatically finds person/saliency center regardless of wall padding
+      pipeline = pipeline.resize(400, 400, {
+        fit: "cover",
+        position: sharp.strategy.attention,
+      });
     }
 
     const processedBuffer = await pipeline.webp({ quality: 82 }).toBuffer();
@@ -181,28 +167,30 @@ export async function uploadAvatar(buffer, userId, mimetype = "image/jpeg") {
 }
 
 /**
- * Detect face bounding box using Groq AI Vision model
+ * Detect main subject / person bounding box using Groq AI Vision model
+ * Detects humans even in mirror selfies, hidden faces, or off-center compositions.
  * Returns normalized coordinates { ymin, xmin, ymax, xmax } (0..100) or null if unavailable/failed
  */
-async function detectFaceWithGroqVision(buffer, mimetype = "image/jpeg") {
+async function detectSubjectWithGroqVision(buffer, mimetype = "image/jpeg") {
   try {
     const { getVisionModel, getVisionKey, markKeyExhausted, parseRetryAfter } = await import("../ai/groqKeyManager.js");
     const { default: fetch } = await import("node-fetch");
 
     const apiKey = getVisionKey();
     if (!apiKey) {
-      console.log("[Avatar Groq Vision] No vision API key available — falling back to sharp portrait crop");
+      console.log("[Avatar Groq Vision] No vision API key available — using sharp attention saliency crop");
       return null;
     }
 
     const base64 = buffer.toString("base64");
-    const prompt = `You are a professional portrait photography assistant framing an aesthetic profile picture avatar.
-Locate the main person in this photo and return a JSON object with integer percentage coordinates (0 to 100) for a natural head-and-shoulders bust-up portrait crop.
+    const prompt = `You are an AI photo composition assistant framing a social media profile avatar.
+Locate the main person or subject in this photo (including mirror selfies, phone-covered faces, or portraits).
+Return a JSON object with integer percentage coordinates (0 to 100) enclosing the main person's head, hair, shoulders, and upper body:
+{"ymin": integer, "xmin": integer, "ymax": integer, "xmax": integer}
 
-Guidelines:
-1. Include the full head, hair, neck, shoulders, and upper chest area for a balanced, attractive profile picture.
-2. DO NOT tightly crop only the face. Keep breathing room above the head and include the shoulders and upper body.
-3. Return ONLY a valid JSON object: {"ymin": integer, "xmin": integer, "ymax": integer, "xmax": integer}`;
+Rules:
+1. Locate top of head/hair (ymin) and bottom of shoulders/torso (ymax).
+2. Return ONLY strict JSON with no explanation or backticks.`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -230,7 +218,7 @@ Guidelines:
       const txt = await res.text();
       const wait = parseRetryAfter(txt) || 5000;
       markKeyExhausted(apiKey, wait);
-      console.warn("[Avatar Groq Vision] 429 rate limit hit — falling back to sharp portrait crop");
+      console.warn("[Avatar Groq Vision] 429 rate limit hit — using sharp attention saliency crop");
       return null;
     }
 
