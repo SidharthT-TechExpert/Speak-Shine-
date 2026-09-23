@@ -105,25 +105,24 @@ export async function uploadAvatar(buffer, userId, mimetype = "image/jpeg") {
 
     if (subjectCoords && meta.width && meta.height) {
       console.log("[Avatar Processing] 🤖 Groq AI Vision subject bounds detected:", subjectCoords);
-      const subjTop = (subjectCoords.ymin / 100) * meta.height;
-      const subjBottom = (subjectCoords.ymax / 100) * meta.height;
-      const subjLeft = (subjectCoords.xmin / 100) * meta.width;
-      const subjRight = (subjectCoords.xmax / 100) * meta.width;
+      const headTopY = (subjectCoords.ymin / 100) * meta.height;
+      const subjBottomY = (subjectCoords.ymax / 100) * meta.height;
+      const subjLeftX = (subjectCoords.xmin / 100) * meta.width;
+      const subjRightX = (subjectCoords.xmax / 100) * meta.width;
 
-      const subjH = Math.max(30, subjBottom - subjTop);
-      const subjW = Math.max(30, subjRight - subjLeft);
-      const cx = (subjLeft + subjRight) / 2;
-      const cy = (subjTop + subjBottom) / 2;
+      const cx = (subjLeftX + subjRightX) / 2;
 
-      // Calculate square crop size to fit subject cleanly with modest margin
-      let cropSize = Math.round(Math.max(subjH * 1.15, subjW * 1.15));
-      cropSize = Math.min(cropSize, meta.width, meta.height);
+      // 5% headroom buffer above top of hair so top of head is NEVER cut off
+      const headroom = Math.round(meta.height * 0.05);
+      let cropTop = Math.max(0, Math.round(headTopY - headroom));
 
-      // Center crop square around the subject's center position
-      let cropTop = Math.round(cy - (cropSize / 2));
+      // cropSize: set to image width or available height to preserve head + shoulders + upper dress
+      let cropSize = Math.min(meta.width, Math.round(meta.height - cropTop));
+
+      // Calculate horizontal left boundary centered on subject
       let cropLeft = Math.round(cx - (cropSize / 2));
 
-      // Clamp coordinates cleanly within image boundaries
+      // Clamp coordinates cleanly within original image boundaries
       cropLeft = Math.max(0, Math.min(meta.width - cropSize, cropLeft));
       cropTop = Math.max(0, Math.min(meta.height - cropSize, cropTop));
 
@@ -137,15 +136,25 @@ export async function uploadAvatar(buffer, userId, mimetype = "image/jpeg") {
 
     let pipeline = sharp(buffer).rotate();
     if (cropRegion) {
-      console.log(`[Avatar Processing] 🎯 Smart subject-centered crop [left:${cropRegion.left}, top:${cropRegion.top}, size:${cropRegion.width}x${cropRegion.height}]`);
+      console.log(`[Avatar Processing] 🎯 Head-first portrait crop [left:${cropRegion.left}, top:${cropRegion.top}, size:${cropRegion.width}x${cropRegion.height}]`);
       pipeline = pipeline.extract(cropRegion).resize(400, 400);
     } else {
-      console.log("[Avatar Processing] 🔍 Saliency attention crop for avatar...");
-      // Attention strategy automatically finds person/saliency center regardless of wall padding
-      pipeline = pipeline.resize(400, 400, {
-        fit: "cover",
-        position: sharp.strategy.attention,
-      });
+      console.log("[Avatar Processing] 🔍 Head-first portrait crop fallback...");
+      if (meta.height && meta.width && meta.height > meta.width) {
+        // Vertical photo: crop top square starting at top (top: 0) to ensure full hair + head visibility
+        const squareSize = meta.width;
+        pipeline = pipeline.extract({
+          left: 0,
+          top: 0,
+          width: squareSize,
+          height: squareSize,
+        }).resize(400, 400);
+      } else {
+        pipeline = pipeline.resize(400, 400, {
+          fit: "cover",
+          position: sharp.position.entropy,
+        });
+      }
     }
 
     const processedBuffer = await pipeline.webp({ quality: 82 }).toBuffer();
@@ -189,7 +198,7 @@ Return a JSON object with integer percentage coordinates (0 to 100) enclosing th
 {"ymin": integer, "xmin": integer, "ymax": integer, "xmax": integer}
 
 Rules:
-1. Locate top of head/hair (ymin) and bottom of shoulders/torso (ymax).
+1. "ymin" MUST be the exact top boundary of the person's hair or head.
 2. Return ONLY strict JSON with no explanation or backticks.`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
