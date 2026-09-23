@@ -1317,12 +1317,14 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
 
   const feedUserIds = feed.map(item => item.userId).filter(Boolean);
   const feedPhones = feed.map(item => item.phone).filter(Boolean);
+  const commentPhones = feed.flatMap(item => (item.comments || []).map(c => c.phone)).filter(Boolean);
   const feedUsers = await User.find({
     $or: [
       ...(feedUserIds.length ? [{ _id: { $in: feedUserIds } }] : []),
       ...(feedPhones.length ? [{ phone: { $in: feedPhones } }] : []),
+      ...(commentPhones.length ? [{ phone: { $in: commentPhones } }] : []),
     ],
-  }).select("name phone streak earnedBadges").lean();
+  }).select("name phone streak earnedBadges avatarUrl").lean();
   const userById = new Map(feedUsers.map(user => [String(user._id), user]));
   const userByPhone = new Map(feedUsers.filter(user => user.phone).map(user => [user.phone, user]));
 
@@ -1352,6 +1354,7 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
       _id: item._id,
       uploaderName: item.uploaderName,
       uploaderPhone: item.phone,
+      uploaderAvatarUrl: feedUser.avatarUrl || null,
       ...serializeStreakBadges(feedUser),
       submittedAt: item.submittedAt,
       videoDuration: item.videoDuration,
@@ -1368,15 +1371,19 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
         : item.dislikes?.includes(myPhone)
         ? "dislike"
         : null,
-      // Strip phone numbers from comments for privacy
-      comments: (item.comments || []).map(c => ({
-        _id:       c._id,
-        name:      c.name,
-        role:      c.role,
-        text:      c.text,
-        createdAt: c.createdAt,
-        isOwn:     c.phone === myPhone,
-      })),
+      // Strip phone numbers from comments for privacy, attach avatarUrl if available
+      comments: (item.comments || []).map(c => {
+        const cUser = c.phone ? userByPhone.get(c.phone) : null;
+        return {
+          _id:       c._id,
+          name:      c.name,
+          role:      c.role,
+          text:      c.text,
+          createdAt: c.createdAt,
+          isOwn:     c.phone === myPhone,
+          avatarUrl: cUser?.avatarUrl || null,
+        };
+      }),
       isPublic,
     };
   }));

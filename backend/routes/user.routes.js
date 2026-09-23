@@ -22,6 +22,7 @@ function isLocalRequest(req) {
 
 const localBypass = (limiter) => (req, res, next) => {
   if (isLocalRequest(req)) return next();
+  if (["admin", "admins"].includes(req.user?.role)) return next();
   return limiter(req, res, next);
 };
 
@@ -33,7 +34,7 @@ const avatarUploadLimiter = rateLimit({
   message: { error: "Hourly limit reached for profile photo updates. You can update your photo up to 5 times per hour." },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => isLocalRequest(req),
+  skip: (req) => isLocalRequest(req) || ["admin", "admins"].includes(req.user?.role),
 });
 
 // Configure memory storage for avatar uploads (max 5MB, images only)

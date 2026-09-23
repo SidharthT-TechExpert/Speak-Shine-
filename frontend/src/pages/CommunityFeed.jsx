@@ -646,8 +646,17 @@ function CommentSection({ item, onAddComment, onDeleteComment }) {
                 background: `linear-gradient(135deg, ${ROLE_COLOR[c.role] || "#8b5cf6"}, #06b6d4)`,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "12px", fontWeight: 700, color: "#fff",
+                position: "relative", overflow: "hidden",
               }}>
-                {c.name?.[0]?.toUpperCase() || "?"}
+                <span>{c.name?.[0]?.toUpperCase() || "?"}</span>
+                {c.avatarUrl && (
+                  <img
+                    src={c.avatarUrl}
+                    alt={c.name}
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.2rem" }}>
@@ -1838,9 +1847,19 @@ export default function CommunityFeed() {
                             boxShadow: "0 2px 10px rgba(124, 111, 255, 0.25)",
                             border: isDark ? "2px solid rgba(255, 255, 255, 0.15)" : "2px solid #ffffff",
                             flexShrink: 0,
+                            position: "relative",
+                            overflow: "hidden",
                           }}
                         >
-                          {initials}
+                          <span>{initials}</span>
+                          {(item.uploaderAvatarUrl || item.avatarUrl) && (
+                            <img
+                              src={item.uploaderAvatarUrl || item.avatarUrl}
+                              alt={item.uploaderName || "User"}
+                              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                          )}
                         </div>
 
                         <div>
@@ -2603,8 +2622,17 @@ export default function CommunityFeed() {
                           color: rank === 1 ? "#000" : "#fff",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: "0.75rem", fontWeight: 700, flexShrink: 0,
+                          position: "relative", overflow: "hidden",
                         }}>
-                          {initial}
+                          <span>{initial}</span>
+                          {u.avatarUrl && (
+                            <img
+                              src={u.avatarUrl}
+                              alt={name}
+                              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                          )}
                         </div>
 
                         <div style={{ minWidth: 0 }}>
