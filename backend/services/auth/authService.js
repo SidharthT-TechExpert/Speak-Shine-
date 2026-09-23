@@ -475,6 +475,26 @@ export async function sendPasswordResetOTP(phone) {
     throw error;
   }
 
+  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+
+  // In local/dev mode: skip SMS and use master OTP 112233
+  if (isLocal) {
+    auth.otp = "112233";
+    auth.otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    auth.otpAttempts = 0;
+    await auth.save();
+    await storeOTP(stripped, "112233", "forgot");
+    console.log(`\n=======================================================`);
+    console.log(`📱 [Local Dev Forgot-Password] SMS sending skipped for ${stripped}`);
+    console.log(`🔑 Master OTP allowed: 112233`);
+    console.log(`=======================================================\n`);
+    return {
+      success: true,
+      message: "Local mode: Use OTP 112233",
+      devOtp: "112233",
+    };
+  }
+
   const otp = generateOTP();
   
   auth.otp = otp;
@@ -483,7 +503,11 @@ export async function sendPasswordResetOTP(phone) {
   await auth.save();
   
   await storeOTP(stripped, otp, "forgot");
-  await sendSmsOTP(stripped, otp);
+  const sent = await sendSmsOTP(stripped, otp);
+
+  if (!sent) {
+    throw new Error("Failed to send OTP. Please try again.");
+  }
 
   return { success: true, message: `OTP sent to ${stripped.slice(0, 5)}XXXXX` };
 }
@@ -493,6 +517,28 @@ export async function sendPasswordResetOTP(phone) {
  */
 export async function verifyPasswordResetOTP(phone, otp) {
   const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+  const trimmedOtp = String(otp).trim();
+  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+
+  // In local/dev mode, always allow master OTP 112233
+  if (isLocal && trimmedOtp === "112233") {
+    // Verify there is a matching auth account
+    const auth = await Auth.findOne({ phone: { $in: [stripped, `91${stripped}`, phone] } });
+    if (!auth) throw new Error("Account not found");
+    // Clear any stored OTP
+    auth.otp = null;
+    auth.otpExpiry = null;
+    auth.otpAttempts = 0;
+    await auth.save();
+    await deleteOTP(stripped, "forgot").catch(() => {});
+    const resetToken = jwt.sign(
+      { phone: stripped, purpose: "reset" },
+      getJwtSecret(),
+      { expiresIn: "10m" }
+    );
+    return { success: true, resetToken };
+  }
+
   const stored = await getStoredOTP(stripped, "forgot");
 
   if (!stored) {
@@ -516,7 +562,7 @@ export async function verifyPasswordResetOTP(phone, otp) {
     throw error;
   }
 
-  if (stored !== String(otp).trim()) {
+  if (stored !== trimmedOtp) {
     auth.otpAttempts = (auth.otpAttempts || 0) + 1;
     await auth.save();
     throw new Error("Incorrect OTP");

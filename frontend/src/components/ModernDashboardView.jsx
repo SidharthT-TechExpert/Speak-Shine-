@@ -1194,6 +1194,7 @@ export default function ModernDashboardView({
         rank: rankNum,
         medal,
         name,
+        avatarUrl: u.avatarUrl || (isUser ? (user?.avatarUrl || profile?.avatarUrl || null) : null),
         initials,
         title,
         badgeName,
@@ -5057,9 +5058,18 @@ export default function ModernDashboardView({
                                 : isUser
                                 ? "0 0 12px rgba(168, 85, 247, 0.4)"
                                 : "none",
+                              overflow: "hidden",
                             }}
                           >
-                            {u.initials || "S"}
+                            {u.avatarUrl ? (
+                              <img
+                                src={u.avatarUrl}
+                                alt={u.name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                              />
+                            ) : (
+                              u.initials || "S"
+                            )}
                           </div>
 
                           {/* Name & Title */}

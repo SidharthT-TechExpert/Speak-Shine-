@@ -215,6 +215,7 @@ export default function Login({ loginFor = "user" }) {
         phone: data.phone,
         role: data.role,
         name: data.name,
+        avatarUrl: data.avatarUrl,
         paid: data.paid ?? false,
         theme: data.theme,
         isDark: data.isDark,

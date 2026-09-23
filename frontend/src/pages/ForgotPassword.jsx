@@ -39,6 +39,7 @@ export default function ForgotPassword() {
   const [stepError, setStepError] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
   const [done, setDone] = useState(false);
+  const [devOtp, setDevOtp] = useState(""); // dev mode hint
   const otpRefs = useRef([]);
 
   useEffect(() => {
@@ -57,12 +58,13 @@ export default function ForgotPassword() {
     setStepError("");
     setLoading(true);
     try {
-      await api.post("/auth/forgot/send-otp", { phone });
+      const { data } = await api.post("/auth/forgot/send-otp", { phone });
+      if (data?.devOtp) setDevOtp(data.devOtp);
       setStep(2);
       setResendTimer(60);
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (err) {
-      setStepError(err.response?.data?.error || "Failed to send OTP");
+      setStepError(err.response?.data?.error || "Failed to send OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -200,9 +202,23 @@ export default function ForgotPassword() {
         {step === 2 && (
           <form onSubmit={verifyOTP}>
             <p className="auth-sub" style={{ marginBottom: 4 }}>OTP sent to</p>
-            <p style={{ color: "#a78bfa", fontWeight: 600, marginBottom: 20, textAlign: "center" }}>
+            <p style={{ color: "#a78bfa", fontWeight: 600, marginBottom: 16, textAlign: "center" }}>
               +91 {phone.replace(/^(\+91|91)/, "")}
             </p>
+
+            {/* Dev mode hint */}
+            {devOtp && (
+              <div style={{
+                background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.35)",
+                borderRadius: 10, padding: "0.6rem 1rem", marginBottom: "1rem",
+                color: "#fbbf24", fontSize: "0.82rem", fontWeight: 600,
+                display: "flex", alignItems: "center", gap: "0.5rem",
+              }}>
+                <span>🛠️</span>
+                <span>Dev mode — Use OTP: <strong style={{ letterSpacing: "0.12em", fontSize: "1rem" }}>{devOtp}</strong></span>
+              </div>
+            )}
+
             <div className="otp-boxes">
               {otp.map((digit, i) => (
                 <input key={i} ref={el => (otpRefs.current[i] = el)}
@@ -223,7 +239,7 @@ export default function ForgotPassword() {
             </div>
             <div style={{ textAlign: "center", marginTop: 8 }}>
               <button type="button" className="auth-link-btn"
-                onClick={() => { setStep(1); setOtp(["", "", "", "", "", ""]); setStepError(""); }}>
+                onClick={() => { setStep(1); setOtp(["", "", "", "", "", ""]); setStepError(""); setDevOtp(""); }}>
                 ← Change number
               </button>
             </div>

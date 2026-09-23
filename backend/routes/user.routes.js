@@ -5,10 +5,36 @@
 
 import express from "express";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import * as userController from "../controllers/userController.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
+
+function isLocalRequest(req) {
+  if (process.env.NODE_ENV !== "production") return true;
+  const ip = req?.ip || req?.connection?.remoteAddress || "";
+  const host = req?.headers?.host || req?.hostname || "";
+  if (ip.includes("127.0.0.1") || ip === "::1" || ip.includes("::ffff:127.0.0.1")) return true;
+  if (host.includes("localhost") || host.includes("127.0.0.1")) return true;
+  return false;
+}
+
+const localBypass = (limiter) => (req, res, next) => {
+  if (isLocalRequest(req)) return next();
+  return limiter(req, res, next);
+};
+
+// Hourly rate limiter for profile photo updates (5 updates per hour per user)
+const avatarUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Max 5 uploads per hour per user
+  keyGenerator: (req) => req.user?.id || req.user?.phone || req.ip,
+  message: { error: "Hourly limit reached for profile photo updates. You can update your photo up to 5 times per hour." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isLocalRequest(req),
+});
 
 // Configure memory storage for avatar uploads (max 5MB, images only)
 const avatarUpload = multer({
@@ -38,7 +64,7 @@ function handleAvatarUpload(req, res, next) {
 // ── User List & Profile ──────────────────────────────────────────────────────
 router.get("/", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getAllUsers);
 router.get("/me", authMiddleware, userController.getMyProfile);
-router.patch("/me/profile", authMiddleware, handleAvatarUpload, userController.updateMyProfile);
+router.patch("/me/profile", authMiddleware, localBypass(avatarUploadLimiter), handleAvatarUpload, userController.updateMyProfile);
 router.patch("/me/password", authMiddleware, userController.changeMyPassword);
 router.patch("/me/phone", authMiddleware, userController.changeMyPhone);
 router.patch("/me/theme", authMiddleware, userController.updateMyTheme);

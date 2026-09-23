@@ -48,7 +48,7 @@ export async function getTodayOverview() {
 
   const [status, users] = await Promise.all([
     Status.findOne().lean(),
-    User.find({ paid: true }).select("name userId streak weeklySubmissions completed earnedBadges paid").lean(),
+    User.find({ paid: true }).select("name userId streak weeklySubmissions completed earnedBadges paid avatarUrl").lean(),
   ]);
 
   const completed = users.filter(u => u.completed);
@@ -59,6 +59,7 @@ export async function getTodayOverview() {
     .map(u => withBadgeData(u, {
       name: u.name,
       userId: u.userId,
+      avatarUrl: u.avatarUrl || null,
       streak: u.streak || 0,
       weeklySubmissions: u.weeklySubmissions || 0,
       completed: u.completed || false,
@@ -193,7 +194,7 @@ export async function getUserProfile(phone) {
   const [user, status, allUsers, existingStreakRecord] = await Promise.all([
     phone ? User.findOne({ phone: { $in: phoneCandidates } }).lean() : Promise.resolve(null),
     Status.findOne().lean(),
-    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze freezeStreakProgress").lean(),
+    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze freezeStreakProgress avatarUrl").lean(),
     StreakRecord.findOne().lean(),
   ]);
 
@@ -293,6 +294,7 @@ export async function getUserProfile(phone) {
         name: u.name,
         userId: u.userId,
         phone: u.phone,
+        avatarUrl: u.avatarUrl || null,
         streak: u.streak || 0,
         weeklySubmissions: u.weeklySubmissions || 0,
         completed: u.completed || false,
@@ -334,6 +336,7 @@ export async function getUserProfile(phone) {
     rank: myActiveRank,
     name: myUserObj.name,
     userId: myUserObj.userId,
+    avatarUrl: myUserObj.avatarUrl || null,
     streak: myUserObj.streak || 0,
     weeklySubmissions: myUserObj.weeklySubmissions || 0,
     completed: myUserObj.completed || false,
@@ -372,6 +375,7 @@ export async function getUserProfile(phone) {
   return {
     profile: {
       name: profileUser.name,
+      avatarUrl: profileUser.avatarUrl || null,
       feedbackScores,
       totalSessions: allTimeSessions,
       totalRecordedSeconds: allTimeRecordedSeconds,
