@@ -4351,48 +4351,230 @@ export default function ModernDashboardView({
             );
           })()}
 
-          {/* ── Section 4: Unified Gamification & Prize Pool Hub (Option 1) ── */}
+          {/* ── Section 4: Unified Gamification & Prize Pool Hub ── */}
           {(() => {
             const month = prizeSummary?.month || new Date().toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
             const hasPrizeData = Boolean(prizeSummary);
-            const winnerCount = prizeSummary?.winnerCount || 3;
+            const winnerCount = prizeSummary?.winnerCount || (prizeSummary?.prizes?.length) || 3;
 
-            const rankIcons  = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅"];
-            const rankColors = ["#fbbf24", "#e2e8f0", "#f97316", "#818cf8", "#34d399", "#60a5fa"];
-            const rankGlows  = [
-              "rgba(251,191,36,0.14)",
-              "rgba(226,232,240,0.12)",
-              "rgba(249,115,22,0.14)",
-              "rgba(129,140,248,0.12)",
-              "rgba(52,211,153,0.12)",
-              "rgba(96,165,250,0.12)",
+            // Comprehensive Rank Configurations for dynamic Top N (1 to 10+)
+            const RANK_CONFIGS = [
+              {
+                rank: 1,
+                label: "1st Place",
+                icon: "🥇",
+                colorDark: "#fbbf24",
+                colorLight: "#b45309",
+                nameColorLight: "#854d0e",
+                glowDark: "rgba(251, 191, 36, 0.12)",
+                glowLight: "linear-gradient(90deg, #fef9c3 0%, #fef3c7 100%)",
+                borderDark: "rgba(251, 191, 36, 0.4)",
+                borderLight: "#facc15",
+                avatarBg: "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)",
+                avatarBorder: "2px solid #fde68a",
+                avatarColor: "#000000",
+              },
+              {
+                rank: 2,
+                label: "2nd Place",
+                icon: "🥈",
+                colorDark: "#cbd5e1",
+                colorLight: "#334155",
+                nameColorLight: "#0f172a",
+                glowDark: "rgba(203, 213, 225, 0.1)",
+                glowLight: "linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%)",
+                borderDark: "rgba(203, 213, 225, 0.35)",
+                borderLight: "#cbd5e1",
+                avatarBg: "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)",
+                avatarBorder: "2px solid #e2e8f0",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 3,
+                label: "3rd Place",
+                icon: "🥉",
+                colorDark: "#f97316",
+                colorLight: "#c2410c",
+                nameColorLight: "#7c2d12",
+                glowDark: "rgba(249, 115, 22, 0.12)",
+                glowLight: "linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)",
+                borderDark: "rgba(249, 115, 22, 0.35)",
+                borderLight: "#fdba74",
+                avatarBg: "linear-gradient(135deg, #f97316 0%, #b45309 100%)",
+                avatarBorder: "2px solid #fed7aa",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 4,
+                label: "4th Place",
+                icon: "🏅",
+                colorDark: "#818cf8",
+                colorLight: "#4338ca",
+                nameColorLight: "#312e81",
+                glowDark: "rgba(129, 140, 248, 0.12)",
+                glowLight: "linear-gradient(90deg, #eef2ff 0%, #e0e7ff 100%)",
+                borderDark: "rgba(129, 140, 248, 0.35)",
+                borderLight: "#a5b4fc",
+                avatarBg: "linear-gradient(135deg, #818cf8 0%, #4f46e5 100%)",
+                avatarBorder: "2px solid #c7d2fe",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 5,
+                label: "5th Place",
+                icon: "🏅",
+                colorDark: "#34d399",
+                colorLight: "#047857",
+                nameColorLight: "#064e3b",
+                glowDark: "rgba(52, 211, 153, 0.12)",
+                glowLight: "linear-gradient(90deg, #ecfdf5 0%, #d1fae5 100%)",
+                borderDark: "rgba(52, 211, 153, 0.35)",
+                borderLight: "#6ee7b7",
+                avatarBg: "linear-gradient(135deg, #34d399 0%, #059669 100%)",
+                avatarBorder: "2px solid #a7f3d0",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 6,
+                label: "6th Place",
+                icon: "🏅",
+                colorDark: "#38bdf8",
+                colorLight: "#0369a1",
+                nameColorLight: "#0c4a6e",
+                glowDark: "rgba(56, 189, 248, 0.12)",
+                glowLight: "linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%)",
+                borderDark: "rgba(56, 189, 248, 0.35)",
+                borderLight: "#7dd3fc",
+                avatarBg: "linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)",
+                avatarBorder: "2px solid #bae6fd",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 7,
+                label: "7th Place",
+                icon: "🏅",
+                colorDark: "#ec4899",
+                colorLight: "#be185d",
+                nameColorLight: "#831843",
+                glowDark: "rgba(236, 72, 153, 0.12)",
+                glowLight: "linear-gradient(90deg, #fdf2f8 0%, #fce7f3 100%)",
+                borderDark: "rgba(236, 72, 153, 0.35)",
+                borderLight: "#f472b6",
+                avatarBg: "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+                avatarBorder: "2px solid #fbcfe8",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 8,
+                label: "8th Place",
+                icon: "🏅",
+                colorDark: "#a855f7",
+                colorLight: "#7e22ce",
+                nameColorLight: "#581c87",
+                glowDark: "rgba(168, 85, 247, 0.12)",
+                glowLight: "linear-gradient(90deg, #faf5ff 0%, #f3e8ff 100%)",
+                borderDark: "rgba(168, 85, 247, 0.35)",
+                borderLight: "#c084fc",
+                avatarBg: "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)",
+                avatarBorder: "2px solid #e9d5ff",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 9,
+                label: "9th Place",
+                icon: "🏅",
+                colorDark: "#14b8a6",
+                colorLight: "#0f766e",
+                nameColorLight: "#134e4a",
+                glowDark: "rgba(20, 184, 166, 0.12)",
+                glowLight: "linear-gradient(90deg, #f0fdfa 0%, #ccfbf1 100%)",
+                borderDark: "rgba(20, 184, 166, 0.35)",
+                borderLight: "#5eead4",
+                avatarBg: "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
+                avatarBorder: "2px solid #99f6e4",
+                avatarColor: "#ffffff",
+              },
+              {
+                rank: 10,
+                label: "10th Place",
+                icon: "🏅",
+                colorDark: "#f43f5e",
+                colorLight: "#be123c",
+                nameColorLight: "#881337",
+                glowDark: "rgba(244, 63, 94, 0.12)",
+                glowLight: "linear-gradient(90deg, #fff1f2 0%, #ffe4e6 100%)",
+                borderDark: "rgba(244, 63, 94, 0.35)",
+                borderLight: "#fb7185",
+                avatarBg: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                avatarBorder: "2px solid #fecdd3",
+                avatarColor: "#ffffff",
+              },
             ];
 
+            const getRankCfg = (rank) => {
+              if (rank >= 1 && rank <= RANK_CONFIGS.length) {
+                return RANK_CONFIGS[rank - 1];
+              }
+              return {
+                rank,
+                label: `Rank ${rank}`,
+                icon: "🏅",
+                colorDark: "#38bdf8",
+                colorLight: "#0284c7",
+                nameColorLight: "#0c4a6e",
+                glowDark: "rgba(56, 189, 248, 0.12)",
+                glowLight: "linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%)",
+                borderDark: "rgba(56, 189, 248, 0.35)",
+                borderLight: "#7dd3fc",
+                avatarBg: "linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)",
+                avatarBorder: "2px solid #bae6fd",
+                avatarColor: "#ffffff",
+              };
+            };
+
             const prizeRows = hasPrizeData
-              ? (prizeSummary.prizes || []).map((p, i) => ({
-                  rank: p.rank || i + 1,
-                  icon: rankIcons[i] ?? "🏅",
-                  color: rankColors[i] ?? "#7c6fff",
-                  glow: rankGlows[i] ?? "rgba(124,111,255,0.08)",
-                  label: p.label || `Rank ${p.rank || i + 1}`,
-                  amount: p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : null,
-                  rawAmount: p.amount,
-                  currentLeader: p.currentLeader || null,
-                  monthlyScore: p.monthlyScore || 0,
-                  streak: p.streak || 0,
-                }))
-              : Array.from({ length: 3 }, (_, i) => ({
-                  rank: i + 1,
-                  icon: rankIcons[i],
-                  color: rankColors[i],
-                  glow: rankGlows[i],
-                  label: ["1st Place", "2nd Place", "3rd Place"][i],
-                  amount: null,
-                  rawAmount: null,
-                  currentLeader: null,
-                  monthlyScore: 0,
-                  streak: 0,
-                }));
+              ? (prizeSummary.prizes || []).map((p, i) => {
+                  const rank = p.rank || i + 1;
+                  const cfg = getRankCfg(rank);
+                  return {
+                    rank,
+                    icon: cfg.icon,
+                    color: isDark ? cfg.colorDark : cfg.colorLight,
+                    glow: isDark ? cfg.glowDark : cfg.glowLight,
+                    border: isDark ? cfg.borderDark : cfg.borderLight,
+                    avatarBg: cfg.avatarBg,
+                    avatarBorder: cfg.avatarBorder,
+                    avatarColor: cfg.avatarColor,
+                    nameColorLight: cfg.nameColorLight,
+                    label: p.label || cfg.label,
+                    amount: p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : null,
+                    rawAmount: p.amount,
+                    currentLeader: p.currentLeader || null,
+                    monthlyScore: p.monthlyScore || 0,
+                    streak: p.streak || 0,
+                  };
+                })
+              : Array.from({ length: winnerCount }, (_, i) => {
+                  const rank = i + 1;
+                  const cfg = getRankCfg(rank);
+                  return {
+                    rank,
+                    icon: cfg.icon,
+                    color: isDark ? cfg.colorDark : cfg.colorLight,
+                    glow: isDark ? cfg.glowDark : cfg.glowLight,
+                    border: isDark ? cfg.borderDark : cfg.borderLight,
+                    avatarBg: cfg.avatarBg,
+                    avatarBorder: cfg.avatarBorder,
+                    avatarColor: cfg.avatarColor,
+                    nameColorLight: cfg.nameColorLight,
+                    label: cfg.label,
+                    amount: null,
+                    rawAmount: null,
+                    currentLeader: null,
+                    monthlyScore: 0,
+                    streak: 0,
+                  };
+                });
 
             // Map for quick prize lookups by rank
             const prizeMap = {};
@@ -4430,7 +4612,7 @@ export default function ModernDashboardView({
                     boxSizing: "border-box",
                   }}
                 >
-                  {/* Glowing background orbs */}
+                  {/* Glowing background orbs (Dark mode only) */}
                   {isDark && (
                     <>
                       <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.16) 0%, transparent 70%)", pointerEvents: "none" }} />
@@ -4527,8 +4709,16 @@ export default function ModernDashboardView({
                         </span>
                       </div>
 
-                      {/* 2x2 Prize Grid */}
-                      <div className="unified-prizes-grid">
+                      {/* Dynamic Prize Grid (Adapts to Top 3, Top 4, Top 5, etc.) */}
+                      <div
+                        className="unified-prizes-grid"
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: winnerCount <= 2 ? "repeat(2, 1fr)" : "repeat(2, 1fr)",
+                          gap: "0.55rem",
+                          marginBottom: "0.75rem",
+                        }}
+                      >
                         {prizeRows.map((p, i) => {
                           const isUserLeadingThis = myUser && myUser.rank === p.rank;
                           return (
@@ -4536,7 +4726,7 @@ export default function ModernDashboardView({
                               key={i}
                               style={{
                                 background: p.glow,
-                                border: `1px solid ${p.color}35`,
+                                border: `1.5px solid ${p.border}`,
                                 borderRadius: 12,
                                 padding: "0.65rem 0.75rem",
                                 display: "flex",
@@ -4561,13 +4751,13 @@ export default function ModernDashboardView({
                                     {p.amount}
                                   </div>
                                 ) : (
-                                  <div style={{ fontSize: "0.62rem", color: "#94a3b8", fontWeight: 700 }}>TBA</div>
+                                  <div style={{ fontSize: "0.62rem", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 700 }}>TBA</div>
                                 )}
                               </div>
 
                               {/* Bottom row: Leader details */}
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0, marginTop: "2px" }}>
-                                <div style={{ fontSize: "0.72rem", color: isDark ? "#f1f5f9" : "#1e293b", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", minWidth: 0, overflow: "hidden" }}>
+                                <div style={{ fontSize: "0.72rem", color: isDark ? "#f1f5f9" : (p.nameColorLight || "#1e293b"), fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", minWidth: 0, overflow: "hidden" }}>
                                   {p.currentLeader ? (
                                     <>
                                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -4583,7 +4773,7 @@ export default function ModernDashboardView({
                                       )}
                                     </>
                                   ) : (
-                                    <span style={{ color: "#64748b", fontStyle: "italic", fontSize: "0.68rem" }}>No one yet</span>
+                                    <span style={{ color: isDark ? "#64748b" : "#94a3b8", fontStyle: "italic", fontSize: "0.68rem" }}>No one yet</span>
                                   )}
                                 </div>
 
@@ -4665,12 +4855,12 @@ export default function ModernDashboardView({
                         <div style={{ fontSize: "0.72rem", color: isDark ? "#c4b5fd" : "#6b21a8", fontWeight: 600, lineHeight: 1.4 }}>
                           {myRank > 0 && myRank <= winnerCount ? (
                             <span>
-                              <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Great job!</strong> You're currently holding <strong style={{ color: rankColors[myRank - 1] || "#fbbf24" }}>{myRank === 1 ? "1st" : myRank === 2 ? "2nd" : myRank === 3 ? "3rd" : `Rank ${myRank}`} Place ({prizeMap[myRank]?.amount || "Prize"})</strong>. Keep practicing daily to lock in your reward! 🔥
+                              <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Great job!</strong> You're currently holding <strong style={{ color: prizeMap[myRank]?.color || (isDark ? "#fbbf24" : "#b45309") }}>{getRankCfg(myRank).label} ({prizeMap[myRank]?.amount || "Prize"})</strong>. Maintain this spot until month-end to secure your reward! 🔥
                             </span>
                           ) : (
                             <span>
                               <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Stay consistent!</strong> {ptsGap > 0 ? (
-                                <>You are only <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>{ptsGap} pts</strong> away from <strong style={{ color: cutoffPrize?.color || "#fbbf24" }}>{cutoffPrize?.label || `Top ${winnerCount}`} ({cutoffPrize?.amount || "Prize"})</strong>! </>
+                                <>You are only <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>{ptsGap} pts</strong> away from <strong style={{ color: cutoffPrize?.color || (isDark ? "#fbbf24" : "#b45309") }}>{cutoffPrize?.label || `Top ${winnerCount}`} ({cutoffPrize?.amount || "Prize"})</strong>! </>
                               ) : (
                                 <>Practice daily to climb into the <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>Top {winnerCount} Prize Zone</strong>! </>
                               )}
@@ -4753,44 +4943,45 @@ export default function ModernDashboardView({
                         }}
                       >
                         {currentLeaderboard.map((u, i) => {
-                          const isRank1 = u.rank === 1;
-                          const isRank2 = u.rank === 2;
-                          const isRank3 = u.rank === 3;
                           const isUser = u.isUser;
+                          const isWinningSpot = u.rank <= winnerCount;
                           const userPrize = prizeMap[u.rank];
-                          const isWinningSpot = u.rank <= winnerCount && userPrize;
                           const showCutoffLineAfter = u.rank === winnerCount && currentLeaderboard.length > winnerCount;
+                          const cfg = getRankCfg(u.rank);
 
+                          const rankColor = isDark ? cfg.colorDark : cfg.colorLight;
+                          const rankGlow = isDark ? cfg.glowDark : cfg.glowLight;
+                          const rankBorder = isDark ? cfg.borderDark : cfg.borderLight;
+                          const rankNameColor = isDark ? "#ffffff" : (isUser ? "#4c1d95" : (isWinningSpot ? cfg.nameColorLight : "#0f172a"));
+
+                          // Dynamic Row Class
                           const rowClass = isUser
                             ? "leaderboard-row user-row"
-                            : isRank1
-                            ? "leaderboard-row rank-1"
-                            : isRank2
-                            ? "leaderboard-row rank-2"
-                            : isRank3
-                            ? "leaderboard-row rank-3"
+                            : isWinningSpot
+                            ? `leaderboard-row rank-${u.rank} winning-spot`
                             : "leaderboard-row standard-row";
 
-                          const avatarBg = isRank1
-                            ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
-                            : isRank2
-                            ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
-                            : isRank3
-                            ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
+                          // Row Inline Background & Border for crisp theme accuracy
+                          const rowBg = isUser
+                            ? (isDark ? "linear-gradient(90deg, rgba(168, 85, 247, 0.18) 0%, rgba(99, 102, 241, 0.1) 100%)" : "linear-gradient(90deg, #f5f3ff 0%, #ede9fe 100%)")
+                            : isWinningSpot
+                            ? rankGlow
+                            : (isDark ? "rgba(255, 255, 255, 0.025)" : "#ffffff");
+
+                          const rowBorder = isUser
+                            ? (isDark ? "1.5px solid rgba(168, 85, 247, 0.55)" : "1.5px solid #a855f7")
+                            : isWinningSpot
+                            ? `1.5px solid ${rankBorder}`
+                            : (isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0");
+
+                          const avatarBg = isWinningSpot
+                            ? cfg.avatarBg
                             : isUser
                             ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
-                            : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
+                            : (isDark ? "linear-gradient(135deg, #334155 0%, #1e293b 100%)" : "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)");
 
-                          const avatarColor = isRank1 ? "#000000" : "#ffffff";
-                          const avatarBorder = isRank1
-                            ? "2px solid #fde68a"
-                            : isRank2
-                            ? "2px solid #e2e8f0"
-                            : isRank3
-                            ? "2px solid #fed7aa"
-                            : isUser
-                            ? "2px solid #c084fc"
-                            : "1px solid rgba(255, 255, 255, 0.12)";
+                          const avatarColor = isWinningSpot ? cfg.avatarColor : (isDark ? "#ffffff" : "#0f172a");
+                          const avatarBorder = isWinningSpot ? cfg.avatarBorder : (isUser ? "2px solid #c084fc" : (isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid #cbd5e1"));
 
                           return (
                             <React.Fragment key={u.id || `${u.name}-${i}`}>
@@ -4802,6 +4993,11 @@ export default function ModernDashboardView({
                                   justifyContent: "space-between",
                                   padding: isUser ? "0.65rem 0.85rem" : "0.55rem 0.75rem",
                                   borderRadius: 11,
+                                  background: rowBg,
+                                  border: rowBorder,
+                                  boxShadow: isUser
+                                    ? (isDark ? "0 4px 16px rgba(168, 85, 247, 0.2)" : "0 2px 8px rgba(168, 85, 247, 0.12)")
+                                    : (isWinningSpot && isDark ? `0 2px 10px ${rankColor}12` : "none"),
                                 }}
                               >
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0 }}>
@@ -4809,14 +5005,15 @@ export default function ModernDashboardView({
                                   <div
                                     className="leaderboard-rank-num"
                                     style={{
-                                      width: 22,
+                                      width: 24,
                                       textAlign: "center",
-                                      fontSize: isRank1 || isRank2 || isRank3 ? "1.05rem" : "0.82rem",
+                                      fontSize: u.rank <= 3 ? "1.05rem" : "0.82rem",
                                       fontWeight: 800,
+                                      color: isWinningSpot ? rankColor : (isDark ? "#94a3b8" : "#475569"),
                                       flexShrink: 0,
                                     }}
                                   >
-                                    {u.medal}
+                                    {u.rank === 1 ? "🥇" : u.rank === 2 ? "🥈" : u.rank === 3 ? "🥉" : `#${u.rank}`}
                                   </div>
 
                                   {/* Avatar Circle */}
@@ -4829,7 +5026,7 @@ export default function ModernDashboardView({
                                       background: avatarBg,
                                       color: avatarColor,
                                       border: avatarBorder,
-                                      boxShadow: isRank1
+                                      boxShadow: u.rank === 1
                                         ? "0 0 10px rgba(251, 191, 36, 0.4)"
                                         : isUser
                                         ? "0 0 10px rgba(168, 85, 247, 0.4)"
@@ -4867,10 +5064,11 @@ export default function ModernDashboardView({
                                         whiteSpace: "nowrap",
                                         overflow: "hidden",
                                         textOverflow: "ellipsis",
+                                        color: rankNameColor,
                                       }}
                                     >
                                       <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
-                                      {isRank1 && <span title="Current #1 Leader">👑</span>}
+                                      {u.rank === 1 && <span title="Current #1 Leader">👑</span>}
                                       {isUser && (
                                         <span
                                           className="leaderboard-you-badge"
@@ -4881,6 +5079,9 @@ export default function ModernDashboardView({
                                             borderRadius: 4,
                                             letterSpacing: "0.05em",
                                             flexShrink: 0,
+                                            background: isDark ? "#a855f7" : "#ddd6fe",
+                                            color: isDark ? "#ffffff" : "#5b21b6",
+                                            border: isDark ? "none" : "1px solid #a855f7",
                                           }}
                                         >
                                           YOU
@@ -4910,15 +5111,15 @@ export default function ModernDashboardView({
                                             borderRadius: 999,
                                             fontSize: "0.65rem",
                                             fontWeight: 700,
-                                            color: "#a78bfa",
-                                            background: "rgba(167, 139, 250, 0.12)",
-                                            border: "1px solid rgba(167, 139, 250, 0.25)",
+                                            color: isDark ? "#a78bfa" : "#6d28d9",
+                                            background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(109, 40, 217, 0.08)",
+                                            border: isDark ? "1px solid rgba(167, 139, 250, 0.25)" : "1px solid rgba(109, 40, 217, 0.2)",
                                           }}
                                         >
                                           {u.badgeIcon} {u.badgeName}
                                         </span>
                                       ) : (
-                                        <span style={{ color: "var(--muted)", fontSize: "0.68rem" }}>No active streak</span>
+                                        <span style={{ color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.68rem" }}>No active streak</span>
                                       )}
 
                                       {u.streakDays > 0 && (
@@ -4929,11 +5130,11 @@ export default function ModernDashboardView({
                                             gap: "0.2rem",
                                             fontSize: "0.68rem",
                                             fontWeight: 700,
-                                            color: "#f97316",
-                                            background: "rgba(249, 115, 22, 0.12)",
+                                            color: isDark ? "#f97316" : "#ea580c",
+                                            background: isDark ? "rgba(249, 115, 22, 0.12)" : "rgba(234, 88, 12, 0.1)",
                                             padding: "0.05rem 0.4rem",
                                             borderRadius: 999,
-                                            border: "1px solid rgba(249, 115, 22, 0.28)",
+                                            border: isDark ? "1px solid rgba(249, 115, 22, 0.28)" : "1px solid rgba(234, 88, 12, 0.25)",
                                             whiteSpace: "nowrap",
                                           }}
                                         >
@@ -4944,28 +5145,26 @@ export default function ModernDashboardView({
                                   </div>
                                 </div>
 
-                                {/* Right — Prize Tag + Points & Status Icon */}
+                                {/* Right — Month-End Prize Tag + Points & Status Icon */}
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
-                                  {/* Prize Badge if winning */}
-                                  {isWinningSpot && userPrize.amount && (
+                                  {/* Highlighted Month-End Prize Chip for all Top N qualifying winners */}
+                                  {isWinningSpot && (
                                     <div
+                                      className="leaderboard-prize-chip"
                                       style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "2px",
-                                        background: userPrize.glow,
-                                        border: `1px solid ${userPrize.color}50`,
-                                        borderRadius: 7,
-                                        padding: "2px 7px",
-                                        fontSize: "0.72rem",
-                                        fontWeight: 800,
-                                        color: userPrize.color,
-                                        letterSpacing: "-0.01em",
+                                        background: isDark ? `${rankColor}18` : `${rankColor}12`,
+                                        border: `1.5px solid ${rankColor}45`,
+                                        boxShadow: `0 2px 8px ${rankColor}15`,
                                       }}
-                                      title={`Holding ${userPrize.label} (${userPrize.amount})`}
+                                      title={`Holding ${cfg.label}: Earns ${userPrize?.amount || "Month-End Prize"} if maintained to month-end`}
                                     >
-                                      <span>🏆</span>
-                                      <span>{userPrize.amount}</span>
+                                      <div className="leaderboard-prize-amount" style={{ color: rankColor }}>
+                                        <span>🏆</span>
+                                        <span>{userPrize?.amount || (userPrize?.rawAmount ? `₹${userPrize.rawAmount}` : "TBA")}</span>
+                                      </div>
+                                      <div className="leaderboard-prize-tag" style={{ color: isDark ? "#94a3b8" : "#64748b" }}>
+                                        Month-End
+                                      </div>
                                     </div>
                                   )}
 
@@ -4977,8 +5176,8 @@ export default function ModernDashboardView({
                                         fontWeight: 800,
                                       }}
                                     >
-                                      <span className="leaderboard-pts-num">{u.pts}</span>
-                                      <span className="leaderboard-pts-label" style={{ fontSize: "0.68rem", fontWeight: 600 }}>pts</span>
+                                      <span className="leaderboard-pts-num" style={{ color: isWinningSpot ? rankColor : (isDark ? "#ffffff" : "#0f172a") }}>{u.pts}</span>
+                                      <span className="leaderboard-pts-label" style={{ fontSize: "0.68rem", fontWeight: 600, color: isDark ? "#94a3b8" : "#64748b" }}>pts</span>
                                     </div>
                                     <div style={{
                                       fontSize: "0.75rem",
@@ -4993,22 +5192,30 @@ export default function ModernDashboardView({
                                 </div>
                               </div>
 
-                              {/* Prize Cutoff Divider Line */}
+                              {/* Prize Cutoff Divider Line right after winnerCount */}
                               {showCutoffLineAfter && (
                                 <div style={{
                                   display: "flex",
                                   alignItems: "center",
                                   gap: "0.5rem",
-                                  margin: "0.25rem 0",
+                                  margin: "0.35rem 0",
                                   fontSize: "0.62rem",
                                   fontWeight: 800,
-                                  color: "#64748b",
+                                  color: isDark ? "#94a3b8" : "#64748b",
                                   letterSpacing: "0.06em",
                                   textTransform: "uppercase",
                                 }}>
-                                  <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
-                                  <span>🏆 Top {winnerCount} Prize Cutoff</span>
-                                  <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
+                                  <span style={{ flex: 1, height: 1, background: isDark ? "rgba(148, 163, 184, 0.25)" : "rgba(100, 116, 139, 0.2)" }} />
+                                  <span style={{
+                                    padding: "2px 8px",
+                                    borderRadius: 99,
+                                    background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.15)",
+                                    border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(251, 191, 36, 0.35)",
+                                    color: isDark ? "#fbbf24" : "#b45309",
+                                  }}>
+                                    🏆 Top {winnerCount} Prize Cutoff
+                                  </span>
+                                  <span style={{ flex: 1, height: 1, background: isDark ? "rgba(148, 163, 184, 0.25)" : "rgba(100, 116, 139, 0.2)" }} />
                                 </div>
                               )}
                             </React.Fragment>
@@ -5027,9 +5234,9 @@ export default function ModernDashboardView({
                             gap: "0.45rem",
                             fontSize: "0.7rem",
                             fontWeight: 700,
-                            color: "#c4b5fd",
-                            background: "rgba(124, 111, 255, 0.08)",
-                            border: "1px dashed rgba(124, 111, 255, 0.3)",
+                            color: isDark ? "#c4b5fd" : "#6d28d9",
+                            background: isDark ? "rgba(124, 111, 255, 0.08)" : "#f5f3ff",
+                            border: isDark ? "1px dashed rgba(124, 111, 255, 0.3)" : "1px dashed #ddd6fe",
                             borderRadius: 9,
                             padding: "5px 10px",
                             marginTop: "0.45rem",
