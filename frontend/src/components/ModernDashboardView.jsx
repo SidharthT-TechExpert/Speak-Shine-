@@ -201,6 +201,7 @@ export default function ModernDashboardView({
   myStreakEntry = null,
   posterSendTime: propPosterSendTime,
   badges = {},
+  prizeSummary = null,
   onOpenBadges,
   onOpenSettings,
   onOpenReport,
@@ -5261,6 +5262,155 @@ export default function ModernDashboardView({
                   </div>
                 </div>
               </div>
+              {/* ── 🏆 Prize Pool Motivation Card ── */}
+              {(() => {
+                // Static fallback prizes if no API data yet
+                const prizes = prizeSummary?.prizes || [
+                  { rank: 1, label: "🥇 1st Place", amount: null },
+                  { rank: 2, label: "🥈 2nd Place", amount: null },
+                  { rank: 3, label: "🥉 3rd Place", amount: null },
+                ];
+                const month = prizeSummary?.month || new Date().toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+                const hasPrizeData = Boolean(prizeSummary);
+
+                const rankIcons = ["🥇", "🥈", "🥉"];
+                const rankColors = ["#fbbf24", "#94a3b8", "#f97316"];
+                const rankGlows = [
+                  "rgba(251,191,36,0.18)",
+                  "rgba(148,163,184,0.1)",
+                  "rgba(249,115,22,0.14)",
+                ];
+
+                // Build prize rows from API or show teaser
+                const prizeRows = hasPrizeData
+                  ? (prizeSummary.prizes || []).slice(0, 3).map((p, i) => ({
+                      icon: rankIcons[i] || "🏅",
+                      color: rankColors[i] || "#7c6fff",
+                      glow: rankGlows[i] || "rgba(124,111,255,0.1)",
+                      label: p.label || `Rank ${p.rank}`,
+                      amount: p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : null,
+                      winner: p.winner || null,
+                    }))
+                  : [
+                      { icon: "🥇", color: "#fbbf24", glow: "rgba(251,191,36,0.18)", label: "1st Place", amount: null, winner: null },
+                      { icon: "🥈", color: "#94a3b8", glow: "rgba(148,163,184,0.1)", label: "2nd Place", amount: null, winner: null },
+                      { icon: "🥉", color: "#f97316", glow: "rgba(249,115,22,0.14)", label: "3rd Place", amount: null, winner: null },
+                    ];
+
+                return (
+                  <div
+                    style={{
+                      background: "linear-gradient(135deg, #0d0a18 0%, #12092a 55%, #0d0a18 100%)",
+                      border: "1px solid rgba(168, 85, 247, 0.28)",
+                      borderRadius: 18,
+                      padding: "1.25rem 1.35rem",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Purple glow orb */}
+                    <div style={{
+                      position: "absolute", top: -50, right: -50,
+                      width: 180, height: 180, borderRadius: "50%",
+                      background: "radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%)",
+                      pointerEvents: "none",
+                    }} />
+                    <div style={{
+                      position: "absolute", bottom: -40, left: -30,
+                      width: 140, height: 140, borderRadius: "50%",
+                      background: "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)",
+                      pointerEvents: "none",
+                    }} />
+
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", gap: "0.5rem" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <span style={{ fontSize: "1.1rem" }}>🏆</span>
+                          <span style={{
+                            fontSize: "0.88rem", fontWeight: 800, color: "#f8fafc",
+                            letterSpacing: "-0.01em",
+                          }}>Month-End Prize Pool</span>
+                        </div>
+                        <div style={{ fontSize: "0.68rem", color: "#a855f7", fontWeight: 700, marginTop: 2, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {month}
+                        </div>
+                      </div>
+                      <div style={{
+                        background: "rgba(168,85,247,0.15)",
+                        border: "1px solid rgba(168,85,247,0.35)",
+                        borderRadius: 8,
+                        padding: "3px 10px",
+                        fontSize: "0.68rem",
+                        fontWeight: 800,
+                        color: "#c084fc",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        whiteSpace: "nowrap",
+                      }}>Monthly</div>
+                    </div>
+
+                    {/* Prize rows */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginBottom: "0.9rem" }}>
+                      {prizeRows.map((row, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.7rem",
+                            background: row.glow,
+                            border: `1px solid ${row.color}30`,
+                            borderRadius: 10,
+                            padding: "0.55rem 0.75rem",
+                          }}
+                        >
+                          <span style={{ fontSize: "1.35rem", lineHeight: 1, flexShrink: 0 }}>{row.icon}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: row.color, lineHeight: 1.2 }}>{row.label}</div>
+                            {row.winner && (
+                              <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                🎯 {row.winner}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            {row.amount != null ? (
+                              <div style={{ fontSize: "1rem", fontWeight: 900, color: row.color, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                                {row.amount}
+                              </div>
+                            ) : (
+                              <div style={{
+                                fontSize: "0.65rem", fontWeight: 700,
+                                color: "#64748b",
+                                background: "rgba(100,116,139,0.12)",
+                                border: "1px dashed rgba(100,116,139,0.35)",
+                                borderRadius: 6, padding: "2px 8px",
+                              }}>TBA</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Motivational CTA */}
+                    <div style={{
+                      background: "rgba(168,85,247,0.08)",
+                      border: "1px solid rgba(168,85,247,0.2)",
+                      borderRadius: 10,
+                      padding: "0.6rem 0.85rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.55rem",
+                    }}>
+                      <span style={{ fontSize: "1rem", flexShrink: 0 }}>🚀</span>
+                      <div style={{ fontSize: "0.72rem", color: "#c4b5fd", fontWeight: 600, lineHeight: 1.45 }}>
+                        <strong style={{ color: "#e9d5ff" }}>Stay consistent, climb the leaderboard</strong> and win your share of this month's prize! Practice daily to stay in the top 3. 🔥
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
 
             </div>

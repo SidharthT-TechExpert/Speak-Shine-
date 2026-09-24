@@ -13,6 +13,7 @@ const router = express.Router();
 router.get("/", authMiddleware, dashboardController.getTodayOverview);
 router.get("/me", authMiddleware, dashboardController.getUserProfile);
 router.get("/scores/:phone", authMiddleware, dashboardController.getUserScores);
+router.get("/prize-info", authMiddleware, dashboardController.getPrizeInfo);
 
 // Admin/Trainer routes — viewer can read these too
 router.get("/report/weekly", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), dashboardController.getWeeklyReport);

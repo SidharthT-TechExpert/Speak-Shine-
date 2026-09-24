@@ -819,6 +819,7 @@ export default function UserDashboard() {
   const badgeStateInitialized = useRef(false);
   const navigate = useNavigate();
   const entranceRef = useGsapEntrance({ selector: ".gsap-stagger-card", y: 22, stagger: 0.08, deps: [loading] });
+  const [prizeSummary, setPrizeSummary] = useState(null);
 
   const handleCopyPrompt = (text) => {
     if (!text) return;
@@ -888,6 +889,14 @@ export default function UserDashboard() {
     }).catch(() => { }), 30_000);
     return () => clearInterval(interval);
   }, [isGuest, hasRealUser, user]);
+
+  // Fetch prize summary once for motivation banner (non-blocking, best-effort)
+  useEffect(() => {
+    if (isGuest) return;
+    api.get("/dashboard/prize-info")
+      .then(res => { if (res.data?.success) setPrizeSummary(res.data); })
+      .catch(() => {});
+  }, [isGuest]);
 
   if (loading) return <Layout title="My Dashboard"><div className="spinner-wrap"><div className="spinner" /><p style={{ color: "var(--muted)" }}>Loading…</p></div></Layout>;
   if (error) return <Layout title="My Dashboard"><div className="error-box"><p>{error}</p><button className="btn-primary" style={{ marginTop: "1rem" }} onClick={() => window.location.reload()}>Retry</button></div></Layout>;
@@ -1146,6 +1155,7 @@ export default function UserDashboard() {
         streakRecord={data?.streakRecord || null}
         myStreakEntry={data?.myStreakEntry || null}
         posterSendTime={data?.posterSendTime || data?.today?.posterSendTime || "08:00"}
+        prizeSummary={prizeSummary}
         badges={{
           available: profile?.availableBadges || [],
           earned: profile?.earnedBadges || [],
