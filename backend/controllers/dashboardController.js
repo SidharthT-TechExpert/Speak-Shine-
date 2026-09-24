@@ -213,13 +213,20 @@ export async function getPrizeInfo(req, res) {
     const { getMonthEndPrizeReportSummary } = await import("../services/whatsapp/whatsappService.js");
     const summary = await getMonthEndPrizeReportSummary({});
 
-    // Strip sensitive winner data, expose only prize distribution amounts
-    const prizes = (summary.winners || []).map((w, i) => ({
-      rank: w.rank || i + 1,
-      label: w.rank === 1 ? "🥇 1st Place" : w.rank === 2 ? "🥈 2nd Place" : w.rank === 3 ? "🥉 3rd Place" : `🏅 ${w.rank}th Place`,
-      amount: w.amount ?? null,
-      percentage: w.percentage ?? null,
-    }));
+    // Expose prize amounts + first name only (no phone/userId for privacy)
+    const prizes = (summary.winners || []).map((w, i) => {
+      const fullName = w.name || "";
+      const firstName = fullName.split(" ")[0] || null; // only first name
+      return {
+        rank: w.rank || i + 1,
+        label: w.rank === 1 ? "🥇 1st Place" : w.rank === 2 ? "🥈 2nd Place" : w.rank === 3 ? "🥉 3rd Place" : `🏅 ${w.rank}th Place`,
+        amount: w.amount ?? null,
+        percentage: w.percentage ?? null,
+        currentLeader: firstName,  // first name only — safe to show
+        streak: w.streak || 0,
+        monthlyScore: w.monthlyScore || 0,
+      };
+    });
 
     const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const month = nowIST.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
@@ -235,16 +242,15 @@ export async function getPrizeInfo(req, res) {
     });
   } catch (err) {
     console.error("[Dashboard] getPrizeInfo error:", err.message);
-    // Return graceful fallback so UI doesn't break
     const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const month = nowIST.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
     return res.json({
       success: true,
       month,
       prizes: [
-        { rank: 1, label: "🥇 1st Place", amount: null, percentage: null },
-        { rank: 2, label: "🥈 2nd Place", amount: null, percentage: null },
-        { rank: 3, label: "🥉 3rd Place", amount: null, percentage: null },
+        { rank: 1, label: "🥇 1st Place", amount: null, percentage: null, currentLeader: null },
+        { rank: 2, label: "🥈 2nd Place", amount: null, percentage: null, currentLeader: null },
+        { rank: 3, label: "🥉 3rd Place", amount: null, percentage: null, currentLeader: null },
       ],
     });
   }
