@@ -6739,31 +6739,26 @@ audio { border-radius: 12px; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Performance Center Base Styles ── */
-.speakshine-perf-analytics-grid {
+/* ── Section 4: Gamification Row (Leaderboard + Month-End Prize Pool) ── */
+.speakshine-gamification-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 1fr) minmax(0, 1.75fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   gap: 1.25rem;
   align-items: stretch;
   width: 100%;
+  margin-bottom: 1.5rem;
 }
 
-.speakshine-leaderboard-col {
-  order: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+@media (max-width: 1024px) {
+  .speakshine-gamification-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
 }
 
-.speakshine-leaderboard-box {
-  height: 100%;
-}
-
-.speakshine-perf-center-col {
-  order: 2;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+/* ── Section 5: Performance Analytics Suite (Full Width) ── */
+.speakshine-perf-analytics-section {
+  width: 100%;
 }
 
 .prize-pool-scroll-container {
@@ -6786,22 +6781,6 @@ audio { border-radius: 12px; }
 
 .prize-pool-scroll-container::-webkit-scrollbar-thumb:hover {
   background: rgba(168, 85, 247, 0.6);
-}
-
-@media (max-width: 1024px) {
-  .speakshine-perf-analytics-grid {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 1.25rem !important;
-  }
-  .speakshine-leaderboard-col {
-    order: 1 !important;
-    width: 100% !important;
-  }
-  .speakshine-perf-center-col {
-    order: 2 !important;
-    width: 100% !important;
-  }
 }
 
 @media (max-width: 900px) {

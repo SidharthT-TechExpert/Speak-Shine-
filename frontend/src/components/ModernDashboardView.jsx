@@ -4351,22 +4351,633 @@ export default function ModernDashboardView({
             );
           })()}
 
-          {/* ── Section 4: Performance Analytics & Leaderboard ── */}
-          <div className="speakshine-perf-analytics-grid">
-            {/* Left Column: Performance Center with 3 Tabs */}
-            <div className="speakshine-card-box speakshine-perf-center-col" style={{
+          {/* ── Section 4: Gamification & Rewards Hub (Row 1) ── */}
+          <div className="speakshine-gamification-grid">
+            {/* Left Card: Cohort Daily Practice Leaderboard */}
+            <div
+              ref={leaderboardRef}
+              className="speakshine-card-box speakshine-leaderboard-box"
+              style={{
+                background: "#0d0a18",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: 20,
+                padding: "1.5rem",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              {/* Header with Trophy Emblem & Cohort Switcher */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: "rgba(251, 191, 36, 0.12)",
+                    border: "1px solid rgba(251, 191, 36, 0.25)",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.95rem",
+                  }}>
+                    🌟
+                  </div>
+                  <div>
+                    <div className="leaderboard-header-title" style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
+                      Cohort Daily Practice
+                    </div>
+                  </div>
+                </div>
+                <Link
+                  to="/community"
+                  className="leaderboard-group-btn"
+                  style={{
+                    fontSize: "0.74rem",
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    padding: "4px 10px",
+                    borderRadius: 99,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateX(2px)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "translateX(0)";
+                  }}
+                >
+                  <span>{groupName}</span>
+                  <span style={{ fontSize: "0.85rem" }}>↗</span>
+                </Link>
+              </div>
+
+              {/* Subheader Status Pill */}
+              <div className="leaderboard-sub-pill" style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                padding: "4px 10px",
+                borderRadius: 99,
+                marginBottom: "0.85rem",
+                maxWidth: "100%",
+                flexWrap: "wrap",
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                <span>{groupName} · {memberCount} members · {submittedCount} submitted · {pendingCount} pending</span>
+              </div>
+
+              {/* All-Time Record Callout */}
+              <div
+                className="all-time-record-box"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.85rem 1.1rem",
+                  borderRadius: 14,
+                  background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
+                  border: "1px solid rgba(251, 191, 36, 0.2)",
+                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.2)",
+                  marginBottom: "1rem",
+                  position: "relative",
+                  overflow: "hidden",
+                  transition: "transform 0.2s ease, border-color 0.2s ease",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.4)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.2)";
+                }}
+              >
+                <div style={{
+                  position: "absolute", top: 0, right: 0, bottom: 0, width: "35%",
+                  background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.08) 0%, transparent 70%)",
+                  pointerEvents: "none",
+                }} />
+
+                <div style={{ position: "relative", zIndex: 1 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "0.4rem",
+                    fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em",
+                    color: "#fbbf24", textTransform: "uppercase", marginBottom: "3px",
+                  }}>
+                    <span>⭐</span>
+                    <span>COHORT MILESTONE RECORD</span>
+                  </div>
+                  <div style={{ fontSize: "0.82rem", color: "#f1f0f5", fontWeight: 600 }}>
+                    {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
+                  </div>
+                </div>
+
+                <div style={{
+                  position: "relative", zIndex: 1,
+                  display: "flex", alignItems: "baseline", gap: "3px",
+                }}>
+                  <span style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "1.75rem",
+                    fontWeight: 700,
+                    color: "#fbbf24",
+                    lineHeight: 1,
+                  }}>
+                    {recordScore}
+                  </span>
+                  <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
+                </div>
+              </div>
+
+              {/* Ranked Peer Rows (Scrollable Container) */}
+              <div
+                className="leaderboard-scroll-container"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.55rem",
+                  marginBottom: currentLeaderboard.length > 5 ? "0.6rem" : "1.25rem",
+                  maxHeight: "330px",
+                  overflowY: "auto",
+                  paddingRight: "4px",
+                  scrollBehavior: "smooth",
+                }}
+              >
+                {currentLeaderboard.map((u, i) => {
+                  const isRank1 = u.rank === 1;
+                  const isRank2 = u.rank === 2;
+                  const isRank3 = u.rank === 3;
+                  const isUser = u.isUser;
+
+                  const rowClass = isUser
+                    ? "leaderboard-row user-row"
+                    : isRank1
+                    ? "leaderboard-row rank-1"
+                    : isRank2
+                    ? "leaderboard-row rank-2"
+                    : isRank3
+                    ? "leaderboard-row rank-3"
+                    : "leaderboard-row standard-row";
+
+                  const avatarBg = isRank1
+                    ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
+                    : isRank2
+                    ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
+                    : isRank3
+                    ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
+                    : isUser
+                    ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
+                    : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
+
+                  const avatarColor = isRank1 ? "#000000" : "#ffffff";
+                  const avatarBorder = isRank1
+                    ? "2px solid #fde68a"
+                    : isRank2
+                    ? "2px solid #e2e8f0"
+                    : isRank3
+                    ? "2px solid #fed7aa"
+                    : isUser
+                    ? "2px solid #c084fc"
+                    : "1px solid rgba(255, 255, 255, 0.12)";
+
+                  return (
+                    <div
+                      key={u.id || `${u.name}-${i}`}
+                      className={rowClass}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: isUser ? "0.8rem 0.95rem" : "0.7rem 0.85rem",
+                        borderRadius: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+                        {/* Rank / Medal Emblem */}
+                        <div
+                          className="leaderboard-rank-num"
+                          style={{
+                            width: 24,
+                            textAlign: "center",
+                            fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.85rem",
+                            fontWeight: 800,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {u.medal}
+                        </div>
+
+                        {/* Avatar Circle */}
+                        <div
+                          className="leaderboard-avatar"
+                          style={{
+                            background: avatarBg,
+                            color: avatarColor,
+                            border: avatarBorder,
+                            boxShadow: isRank1
+                              ? "0 0 10px rgba(251, 191, 36, 0.4)"
+                              : isUser
+                              ? "0 0 12px rgba(168, 85, 247, 0.4)"
+                              : "none",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {u.avatarUrl ? (
+                            <img
+                              src={u.avatarUrl}
+                              alt={u.name}
+                              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                            />
+                          ) : (
+                            u.initials || "S"
+                          )}
+                        </div>
+
+                        {/* Name & Title */}
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            className="leaderboard-name"
+                            style={{
+                              fontSize: "0.88rem",
+                              fontWeight: 700,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.35rem",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            <span>{u.name}</span>
+                            {isRank1 && <span title="Current #1 Leader">👑</span>}
+                            {isUser && (
+                              <span
+                                className="leaderboard-you-badge"
+                                style={{
+                                  fontSize: "0.62rem",
+                                  fontWeight: 800,
+                                  padding: "1px 5px",
+                                  borderRadius: 4,
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                YOU
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className="leaderboard-subtitle"
+                            style={{
+                              fontSize: "0.72rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.35rem",
+                              marginTop: "3px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {u.currentBadge ? (
+                              <StreakBadge badge={u.currentBadge} compact />
+                            ) : (u.streakDays > 0) ? (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.2rem",
+                                  padding: "0.1rem 0.4rem",
+                                  borderRadius: 999,
+                                  fontSize: "0.68rem",
+                                  fontWeight: 700,
+                                  color: "#a78bfa",
+                                  background: "rgba(167, 139, 250, 0.12)",
+                                  border: "1px solid rgba(167, 139, 250, 0.25)",
+                                }}
+                              >
+                                {u.badgeIcon} {u.badgeName}
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>No active streak</span>
+                            )}
+
+                            {u.streakDays > 0 && (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.2rem",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 700,
+                                  color: "#f97316",
+                                  background: "rgba(249, 115, 22, 0.12)",
+                                  padding: "0.1rem 0.45rem",
+                                  borderRadius: 999,
+                                  border: "1px solid rgba(249, 115, 22, 0.28)",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                🔥 {u.streakDays}d
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Points & Time with Status Icon */}
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div
+                          className="leaderboard-pts-badge"
+                          style={{
+                            fontSize: "0.92rem",
+                            fontWeight: 800,
+                          }}
+                        >
+                          <span className="leaderboard-pts-num">{u.pts}</span>
+                          <span className="leaderboard-pts-label" style={{ fontSize: "0.72rem", fontWeight: 600 }}>pts</span>
+                        </div>
+                        <div style={{
+                          fontSize: "0.8rem",
+                          marginTop: "2px",
+                          lineHeight: 1,
+                        }}>
+                          <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
+                            {u.isCompletedToday ? "✅" : "⏳"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Scroll for more members button / indicator */}
+              {currentLeaderboard.length > 5 && (
+                <div
+                  className="leaderboard-scroll-hint"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    color: "#c4b5fd",
+                    background: "rgba(124, 111, 255, 0.08)",
+                    border: "1px dashed rgba(124, 111, 255, 0.3)",
+                    borderRadius: 10,
+                    padding: "6px 12px",
+                    marginBottom: "1.1rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    userSelect: "none",
+                  }}
+                  onClick={() => {
+                    const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
+                    if (el) el.scrollBy({ top: 140, behavior: "smooth" });
+                  }}
+                  title="Click to scroll and see more group members"
+                >
+                  <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
+                  <span style={{ fontSize: "0.85rem" }}>↓</span>
+                </div>
+              )}
+
+              {/* Group Member Stats: 3 Micro-Cards docked at bottom */}
+              <div className="leaderboard-stat-grid" style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "0.6rem",
+                textAlign: "center",
+                marginTop: "auto",
+                paddingTop: "0.9rem",
+              }}>
+                <div className="leaderboard-stat-card members-card" style={{
+                  borderRadius: 10,
+                  padding: "0.55rem 0.4rem",
+                }}>
+                  <div className="leaderboard-stat-label">MEMBERS</div>
+                  <div className="leaderboard-stat-val">{memberCount}</div>
+                </div>
+                <div className="leaderboard-stat-card submitted-card" style={{
+                  borderRadius: 10,
+                  padding: "0.55rem 0.4rem",
+                }}>
+                  <div className="leaderboard-stat-label">SUBMITTED</div>
+                  <div className="leaderboard-stat-val">{submittedCount}</div>
+                </div>
+                <div className="leaderboard-stat-card pending-card" style={{
+                  borderRadius: 10,
+                  padding: "0.55rem 0.4rem",
+                }}>
+                  <div className="leaderboard-stat-label">PENDING</div>
+                  <div className="leaderboard-stat-val">{pendingCount}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Card: Month-End Prize Pool Card */}
+            {(() => {
+              const month = prizeSummary?.month || new Date().toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+              const hasPrizeData = Boolean(prizeSummary);
+              const winnerCount = prizeSummary?.winnerCount || 3;
+
+              const rankIcons  = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅"];
+              const rankColors = ["#fbbf24", "#e2e8f0", "#f97316", "#818cf8", "#34d399", "#60a5fa"];
+              const rankGlows  = [
+                "rgba(251,191,36,0.14)",
+                "rgba(226,232,240,0.12)",
+                "rgba(249,115,22,0.14)",
+                "rgba(129,140,248,0.12)",
+                "rgba(52,211,153,0.12)",
+                "rgba(96,165,250,0.12)",
+              ];
+
+              const prizeRows = hasPrizeData
+                ? (prizeSummary.prizes || []).map((p, i) => ({
+                    icon: rankIcons[i] ?? "🏅",
+                    color: rankColors[i] ?? "#7c6fff",
+                    glow: rankGlows[i] ?? "rgba(124,111,255,0.08)",
+                    label: p.label || `Rank ${p.rank}`,
+                    amount: p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : null,
+                    currentLeader: p.currentLeader || null,
+                    monthlyScore: p.monthlyScore || 0,
+                    streak: p.streak || 0,
+                  }))
+                : Array.from({ length: 3 }, (_, i) => ({
+                    icon: rankIcons[i],
+                    color: rankColors[i],
+                    glow: rankGlows[i],
+                    label: ["1st Place", "2nd Place", "3rd Place"][i],
+                    amount: null, currentLeader: null, monthlyScore: 0, streak: 0,
+                  }));
+
+              return (
+                <div style={{
+                  background: "linear-gradient(135deg, #0d0a18 0%, #12092a 55%, #0d0a18 100%)",
+                  border: "1px solid rgba(168, 85, 247, 0.28)",
+                  borderRadius: 20,
+                  padding: "1.5rem",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  height: "100%",
+                  boxSizing: "border-box",
+                }}>
+                  {/* Glow orbs */}
+                  <div style={{ position: "absolute", top: -50, right: -50, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+                  <div style={{ position: "absolute", bottom: -40, left: -30, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+                  {/* Card Header */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "0.85rem", gap: "0.5rem" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                        <span style={{ fontSize: "1.15rem" }}>🏆</span>
+                        <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#f8fafc", letterSpacing: "-0.01em" }}>
+                          Month-End Prize Pool
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: "#a855f7", fontWeight: 700, marginTop: 2, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        {month} &nbsp;·&nbsp; Top {winnerCount} winners
+                      </div>
+                    </div>
+                    {/* LIVE indicator */}
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: "5px",
+                      background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.35)",
+                      borderRadius: 8, padding: "4px 10px",
+                      fontSize: "0.65rem", fontWeight: 800, color: "#c084fc",
+                      letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a855f7", display: "inline-block", animation: "pulse 1.8s ease-in-out infinite", flexShrink: 0 }} />
+                      Live
+                    </div>
+                  </div>
+
+                  {/* "Current Standing" divider */}
+                  <div style={{
+                    fontSize: "0.65rem", fontWeight: 800, color: "#64748b",
+                    letterSpacing: "0.09em", textTransform: "uppercase",
+                    marginBottom: "0.65rem",
+                    display: "flex", alignItems: "center", gap: "0.4rem",
+                  }}>
+                    <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.2)", display: "inline-block" }} />
+                    📊 Current Standing
+                    <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.2)", display: "inline-block" }} />
+                  </div>
+
+                  {/* Prize rows (dynamic count & scrollable) */}
+                  <div
+                    className="prize-pool-scroll-container"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                      marginBottom: "1rem",
+                      maxHeight: "310px",
+                      overflowY: "auto",
+                      paddingRight: "4px",
+                    }}
+                  >
+                    {prizeRows.map((row, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: "0.7rem",
+                        background: row.glow,
+                        border: `1px solid ${row.color}28`,
+                        borderRadius: 12, padding: "0.65rem 0.85rem",
+                      }}>
+                        {/* Medal icon */}
+                        <span style={{ fontSize: "1.35rem", lineHeight: 1, flexShrink: 0 }}>{row.icon}</span>
+
+                        {/* Centre — rank label + current holder */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: row.color, lineHeight: 1.2 }}>
+                            {row.label}
+                          </div>
+                          {row.currentLeader ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: 3, flexWrap: "wrap" }}>
+                              <span style={{
+                                fontSize: "0.78rem", color: "#f1f5f9", fontWeight: 700,
+                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%",
+                              }}>
+                                👤 {row.currentLeader}
+                              </span>
+                              {row.monthlyScore > 0 && (
+                                <span style={{
+                                  fontSize: "0.62rem", color: "#94a3b8", fontWeight: 600,
+                                  background: "rgba(148,163,184,0.12)", borderRadius: 4,
+                                  padding: "1px 5px", flexShrink: 0,
+                                }}>{row.monthlyScore} pts</span>
+                              )}
+                              {row.streak > 0 && (
+                                <span style={{ fontSize: "0.62rem", color: "#f97316", fontWeight: 700, flexShrink: 0 }}>
+                                  🔥{row.streak}d
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "0.65rem", color: "#475569", marginTop: 2, fontStyle: "italic" }}>
+                              No one yet — be the first! 🚀
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right — prize amount */}
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          {row.amount != null ? (
+                            <div style={{ fontSize: "1.05rem", fontWeight: 900, color: row.color, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                              {row.amount}
+                            </div>
+                          ) : (
+                            <div style={{
+                              fontSize: "0.65rem", fontWeight: 700, color: "#64748b",
+                              background: "rgba(100,116,139,0.12)",
+                              border: "1px dashed rgba(100,116,139,0.3)",
+                              borderRadius: 6, padding: "2px 7px",
+                            }}>TBA</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Motivational CTA */}
+                  <div style={{
+                    background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.2)",
+                    borderRadius: 12, padding: "0.75rem 0.95rem",
+                    display: "flex", alignItems: "center", gap: "0.65rem",
+                    marginTop: "auto",
+                  }}>
+                    <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>🚀</span>
+                    <div style={{ fontSize: "0.74rem", color: "#c4b5fd", fontWeight: 600, lineHeight: 1.45 }}>
+                      <strong style={{ color: "#e9d5ff" }}>Stay consistent, climb the leaderboard</strong> and win your share of this month's prize! Practice daily to hold your spot in the top {winnerCount}. 🔥
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* ── Section 5: Performance Analytics Suite (Row 2 - Full Width) ── */}
+          <div className="speakshine-perf-analytics-section">
+            <div className="speakshine-card-box speakshine-perf-center-box" style={{
               background: "#0d0a18",
               border: "1px solid rgba(255, 255, 255, 0.06)",
-              borderRadius: 18,
-              padding: "1.5rem",
+              borderRadius: 20,
+              padding: "1.75rem",
               display: "flex",
               flexDirection: "column",
-              height: "100%",
               boxSizing: "border-box",
+              boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
             }}>
               {/* Header with Title & Tabs */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
-                <div className="perf-center-title" style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
+                <div className="perf-center-title" style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
                   Performance Center
                 </div>
 
@@ -4378,8 +4989,8 @@ export default function ModernDashboardView({
                     style={{
                       border: "none",
                       borderRadius: 8,
-                      padding: "0.4rem 0.9rem",
-                      fontSize: "0.82rem",
+                      padding: "0.45rem 1rem",
+                      fontSize: "0.84rem",
                       fontWeight: activeTab === "points" ? 700 : 500,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
@@ -4395,8 +5006,8 @@ export default function ModernDashboardView({
                     style={{
                       border: "none",
                       borderRadius: 8,
-                      padding: "0.4rem 0.9rem",
-                      fontSize: "0.82rem",
+                      padding: "0.45rem 1rem",
+                      fontSize: "0.84rem",
                       fontWeight: activeTab === "history" ? 700 : 500,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
@@ -4412,8 +5023,8 @@ export default function ModernDashboardView({
                     style={{
                       border: "none",
                       borderRadius: 8,
-                      padding: "0.4rem 0.9rem",
-                      fontSize: "0.82rem",
+                      padding: "0.45rem 1rem",
+                      fontSize: "0.84rem",
                       fontWeight: activeTab === "sessions" ? 700 : 500,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
@@ -4425,7 +5036,7 @@ export default function ModernDashboardView({
               </div>
 
               {/* Dynamic Subtitle per Tab */}
-              <div className="perf-center-subtitle" style={{ fontSize: "0.82rem", marginBottom: "1.25rem" }}>
+              <div className="perf-center-subtitle" style={{ fontSize: "0.84rem", marginBottom: "1.35rem" }}>
                 {activeTab === "points" && "Your Consistency Journey — Watch your daily dedication translate into lasting speaking milestones."}
                 {activeTab === "history" && "Voice Skill Analytics — Observe how your fluency, grammar, confidence, and vocabulary grow over time."}
                 {activeTab === "sessions" && "Speech Archive — Revisit your recordings and feedback anytime to celebrate your progress."}
@@ -4437,8 +5048,8 @@ export default function ModernDashboardView({
                   <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Fluency
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
-                    {rubricAverages.fluency} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.55rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.fluency} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
 
@@ -4446,8 +5057,8 @@ export default function ModernDashboardView({
                   <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Grammar
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
-                    {rubricAverages.grammar} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.55rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.grammar} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
 
@@ -4455,8 +5066,8 @@ export default function ModernDashboardView({
                   <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Confidence
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
-                    {rubricAverages.confidence} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.55rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.confidence} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
 
@@ -4464,26 +5075,26 @@ export default function ModernDashboardView({
                   <div className="perf-metric-label" style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.25rem" }}>
                     Vocabulary
                   </div>
-                  <div className="perf-metric-val" style={{ fontSize: "1.45rem", fontWeight: 700, lineHeight: 1.2 }}>
-                    {rubricAverages.vocabulary} <span className="perf-metric-sub" style={{ fontSize: "0.75rem", fontWeight: 500 }}>avg</span>
+                  <div className="perf-metric-val" style={{ fontSize: "1.55rem", fontWeight: 700, lineHeight: 1.2 }}>
+                    {rubricAverages.vocabulary} <span className="perf-metric-sub" style={{ fontSize: "0.78rem", fontWeight: 500 }}>avg</span>
                   </div>
                 </div>
               </div>
 
-              {/* Tab 1: Points Area Chart (Screenshot 3) */}
+              {/* Tab 1: Points Area Chart (Full Width) */}
               {activeTab === "points" && (
                 <div>
                   {chartPointsData.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📊</div>
-                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Points Data Yet</div>
-                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>Complete your daily speaking challenge to start graphing your score progress!</div>
+                    <div style={{ textAlign: "center", padding: "3.5rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <div style={{ fontSize: "2.2rem", marginBottom: "0.5rem" }}>📊</div>
+                      <div style={{ fontWeight: 700, fontSize: "1rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Points Data Yet</div>
+                      <div style={{ fontSize: "0.82rem", marginTop: 4 }}>Complete your daily speaking challenge to start graphing your score progress!</div>
                     </div>
                   ) : (
                     <>
-                      <div style={{ width: "100%", height: 250 }}>
+                      <div style={{ width: "100%", height: 280 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartPointsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                          <AreaChart data={chartPointsData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
                             <defs>
                               <linearGradient id="purpleWaveGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.4} />
@@ -4494,13 +5105,13 @@ export default function ModernDashboardView({
                             <XAxis
                               dataKey="session"
                               stroke={isDark ? "#524d68" : "#94a3b8"}
-                              fontSize={11}
+                              fontSize={12}
                               tickLine={false}
-                              interval={chartPointsData.length <= 10 ? 0 : Math.max(1, Math.floor(chartPointsData.length / 8))}
+                              interval={chartPointsData.length <= 15 ? 0 : Math.max(1, Math.floor(chartPointsData.length / 12))}
                             />
                             <YAxis
                               stroke={isDark ? "#524d68" : "#94a3b8"}
-                              fontSize={11}
+                              fontSize={12}
                               domain={[0, pointsMaxDomain]}
                               tickLine={false}
                               axisLine={false}
@@ -4532,7 +5143,7 @@ export default function ModernDashboardView({
                         </ResponsiveContainer>
                       </div>
 
-                      <div className="chart-footer-note" style={{ fontSize: "0.74rem", marginTop: "1rem" }}>
+                      <div className="chart-footer-note" style={{ fontSize: "0.76rem", marginTop: "1rem" }}>
                         <span style={{ color: "#c084fc" }}>●</span> Daily points ({chartPointsData.length} sessions logged) · Average {pointsAvg} pts · Best {pointsBest} pts · Sunday bonus normalized to base score
                       </div>
                     </>
@@ -4540,31 +5151,31 @@ export default function ModernDashboardView({
                 </div>
               )}
 
-              {/* Tab 2: Score History Multi-Line Chart (Screenshot 4) */}
+              {/* Tab 2: Score History Multi-Line Chart (Full Width) */}
               {activeTab === "history" && (
                 <div>
                   {chartHistoryData.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📈</div>
-                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Score History Yet</div>
-                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>Submit speaking sessions to view detailed Fluency, Grammar, Confidence, and Vocabulary rubric trends.</div>
+                    <div style={{ textAlign: "center", padding: "3.5rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <div style={{ fontSize: "2.2rem", marginBottom: "0.5rem" }}>📈</div>
+                      <div style={{ fontWeight: 700, fontSize: "1rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Score History Yet</div>
+                      <div style={{ fontSize: "0.82rem", marginTop: 4 }}>Submit speaking sessions to view detailed Fluency, Grammar, Confidence, and Vocabulary rubric trends.</div>
                     </div>
                   ) : (
                     <>
-                      <div style={{ width: "100%", height: 250 }}>
+                      <div style={{ width: "100%", height: 280 }}>
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={chartHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                          <LineChart data={chartHistoryData} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
                             <XAxis
                               dataKey="session"
                               stroke={isDark ? "#524d68" : "#94a3b8"}
-                              fontSize={11}
+                              fontSize={12}
                               tickLine={false}
-                              interval={chartHistoryData.length <= 10 ? 0 : Math.max(1, Math.floor(chartHistoryData.length / 8))}
+                              interval={chartHistoryData.length <= 15 ? 0 : Math.max(1, Math.floor(chartHistoryData.length / 12))}
                             />
                             <YAxis
                               stroke={isDark ? "#524d68" : "#94a3b8"}
-                              fontSize={11}
+                              fontSize={12}
                               domain={[0, 10]}
                               ticks={[0, 2, 4, 6, 8, 10]}
                               tickLine={false}
@@ -4575,7 +5186,7 @@ export default function ModernDashboardView({
                                 if (active && payload && payload.length) {
                                   const item = payload[0]?.payload;
                                   return (
-                                    <div style={{ background: isDark ? "#141026" : "#ffffff", border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", borderRadius: 8, padding: "8px 12px", fontSize: "0.78rem", minWidth: 150 }}>
+                                    <div style={{ background: isDark ? "#141026" : "#ffffff", border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #e2e8f0", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", minWidth: 160 }}>
                                       <div style={{ fontWeight: 700, color: isDark ? "#fff" : "#0f172a", marginBottom: "4px" }}>
                                         Session {label} {item?.date ? `· ${item.date}` : ""}
                                       </div>
@@ -4589,15 +5200,15 @@ export default function ModernDashboardView({
                                 return null;
                               }}
                             />
-                            <Line type="monotone" dataKey="fluency" stroke="#a78bfa" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="grammar" stroke="#4ade80" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="confidence" stroke="#fbbf24" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="vocabulary" stroke="#ff6b9d" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="fluency" stroke="#a78bfa" strokeWidth={2.5} dot={false} />
+                            <Line type="monotone" dataKey="grammar" stroke="#4ade80" strokeWidth={2.5} dot={false} />
+                            <Line type="monotone" dataKey="confidence" stroke="#fbbf24" strokeWidth={2.5} dot={false} />
+                            <Line type="monotone" dataKey="vocabulary" stroke="#ff6b9d" strokeWidth={2.5} dot={false} />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
 
-                      <div className="chart-legend-row" style={{ display: "flex", gap: "1.25rem", fontSize: "0.75rem", marginTop: "1rem", flexWrap: "wrap" }}>
+                      <div className="chart-legend-row" style={{ display: "flex", gap: "1.5rem", fontSize: "0.8rem", marginTop: "1rem", flexWrap: "wrap" }}>
                         <span><strong style={{ color: "#a78bfa" }}>●</strong> Fluency</span>
                         <span><strong style={{ color: "#4ade80" }}>●</strong> Grammar</span>
                         <span><strong style={{ color: "#fbbf24" }}>●</strong> Confidence</span>
@@ -4608,28 +5219,28 @@ export default function ModernDashboardView({
                 </div>
               )}
 
-              {/* Tab 3: Sessions Paginated Table (Screenshot 5) */}
+              {/* Tab 3: Sessions Paginated Table (Full Width) */}
               {activeTab === "sessions" && (
                 <div>
                   {sessionsList.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "3rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
-                      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📋</div>
-                      <div style={{ fontWeight: 700, fontSize: "0.95rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Sessions Recorded Yet</div>
-                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>Completed video submissions will appear here with detailed dates, recorded duration, and rubric scores.</div>
+                    <div style={{ textAlign: "center", padding: "3.5rem 1rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <div style={{ fontSize: "2.2rem", marginBottom: "0.5rem" }}>📋</div>
+                      <div style={{ fontWeight: 700, fontSize: "1rem", color: isDark ? "#ffffff" : "#0f172a" }}>No Sessions Recorded Yet</div>
+                      <div style={{ fontSize: "0.82rem", marginTop: 4 }}>Completed video submissions will appear here with detailed dates, recorded duration, and rubric scores.</div>
                     </div>
                   ) : (
                     <>
                       <div style={{ overflowX: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
                           <thead>
                             <tr className="perf-session-header-row" style={{ textAlign: "left" }}>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>SESSION</th>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>DATE</th>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>RECORDED</th>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>FLUENCY</th>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>GRAMMAR</th>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>CONFIDENCE</th>
-                              <th style={{ padding: "0.6rem 0.5rem", fontWeight: 700, fontSize: "0.68rem", textTransform: "uppercase" }}>VOCABULARY</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>SESSION</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>DATE</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>RECORDED</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>FLUENCY</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>GRAMMAR</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>CONFIDENCE</th>
+                              <th style={{ padding: "0.75rem 0.75rem", fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase" }}>VOCABULARY</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -4643,13 +5254,13 @@ export default function ModernDashboardView({
                                   transition: "background 0.15s ease",
                                 }}
                               >
-                                <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.session}</td>
-                                <td style={{ padding: "0.75rem 0.5rem" }}>{s.date}</td>
-                                <td className="sub-text" style={{ padding: "0.75rem 0.5rem" }}>{s.duration}</td>
-                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.fluency) }}>{s.fluency}/10</td>
-                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.grammar) }}>{s.grammar}/10</td>
-                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.confidence) }}>{s.confidence}/10</td>
-                                <td style={{ padding: "0.75rem 0.5rem", fontWeight: 700, color: getScoreColor(s.vocabulary) }}>{s.vocabulary}/10</td>
+                                <td className="sub-text" style={{ padding: "0.85rem 0.75rem" }}>{s.session}</td>
+                                <td style={{ padding: "0.85rem 0.75rem" }}>{s.date}</td>
+                                <td className="sub-text" style={{ padding: "0.85rem 0.75rem" }}>{s.duration}</td>
+                                <td style={{ padding: "0.85rem 0.75rem", fontWeight: 700, color: getScoreColor(s.fluency) }}>{s.fluency}/10</td>
+                                <td style={{ padding: "0.85rem 0.75rem", fontWeight: 700, color: getScoreColor(s.grammar) }}>{s.grammar}/10</td>
+                                <td style={{ padding: "0.85rem 0.75rem", fontWeight: 700, color: getScoreColor(s.confidence) }}>{s.confidence}/10</td>
+                                <td style={{ padding: "0.85rem 0.75rem", fontWeight: 700, color: getScoreColor(s.vocabulary) }}>{s.vocabulary}/10</td>
                               </tr>
                             ))}
                           </tbody>
@@ -4658,7 +5269,7 @@ export default function ModernDashboardView({
 
                       {/* Pagination Controls */}
                       {totalPages > 1 && (
-                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.4rem", marginTop: "1.25rem" }}>
+                        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.45rem", marginTop: "1.5rem" }}>
                           <button
                             type="button"
                             disabled={sessionPage <= 1}
@@ -4668,8 +5279,8 @@ export default function ModernDashboardView({
                               border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
                               color: sessionPage <= 1 ? (isDark ? "#524d68" : "#cbd5e1") : (isDark ? "#94a3b8" : "#64748b"),
                               borderRadius: 6,
-                              padding: "4px 10px",
-                              fontSize: "0.75rem",
+                              padding: "5px 12px",
+                              fontSize: "0.78rem",
                               cursor: sessionPage <= 1 ? "default" : "pointer",
                             }}
                           >
@@ -4689,9 +5300,9 @@ export default function ModernDashboardView({
                                   color: isActive ? (isDark ? "#110e20" : "#ffffff") : (isDark ? "#94a3b8" : "#64748b"),
                                   border: isActive ? "none" : (isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0"),
                                   borderRadius: 6,
-                                  width: 28,
-                                  height: 28,
-                                  fontSize: "0.75rem",
+                                  width: 30,
+                                  height: 30,
+                                  fontSize: "0.78rem",
                                   fontWeight: isActive ? 800 : 500,
                                   cursor: "pointer",
                                   transition: "all 0.15s ease",
@@ -4711,8 +5322,8 @@ export default function ModernDashboardView({
                               border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
                               color: sessionPage >= totalPages ? (isDark ? "#524d68" : "#cbd5e1") : (isDark ? "#94a3b8" : "#64748b"),
                               borderRadius: 6,
-                              padding: "4px 10px",
-                              fontSize: "0.75rem",
+                              padding: "5px 12px",
+                              fontSize: "0.78rem",
                               cursor: sessionPage >= totalPages ? "default" : "pointer",
                             }}
                           >
@@ -4725,38 +5336,38 @@ export default function ModernDashboardView({
                 </div>
               )}
 
-              {/* Session Performance Insights */}
+              {/* Session Performance Insights (Full Width) */}
               <div className="perf-session-insights" style={{
-                marginTop: "auto",
-                paddingTop: "1.25rem",
+                marginTop: "1.75rem",
+                paddingTop: "1.5rem",
                 borderTop: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
               }}>
                 <div style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  marginBottom: "0.75rem",
+                  marginBottom: "0.85rem",
                   flexWrap: "wrap",
                   gap: "0.5rem",
                 }}>
                   <div style={{
-                    fontSize: "0.88rem",
+                    fontSize: "0.92rem",
                     fontWeight: 700,
                     letterSpacing: "-0.01em",
                     color: isDark ? "#ffffff" : "#0f172a",
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.4rem",
+                    gap: "0.45rem",
                   }}>
                     <span>💡</span>
                     <span>COACH'S PERFORMANCE INSIGHTS</span>
                   </div>
                   <div style={{
-                    fontSize: "0.6875rem",
+                    fontSize: "0.72rem",
                     fontWeight: 700,
                     color: "#a78bfa",
                     background: "rgba(167, 139, 250, 0.12)",
-                    padding: "3px 9px",
+                    padding: "3px 10px",
                     borderRadius: 99,
                     border: "1px solid rgba(167, 139, 250, 0.25)",
                   }}>
@@ -4767,7 +5378,7 @@ export default function ModernDashboardView({
                 <div className="perf-insight-grid" style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: "0.75rem",
+                  gap: "1rem",
                 }}>
                   {/* Card 1: Top Strength */}
                   <div className="perf-insight-card" style={{
@@ -4775,16 +5386,16 @@ export default function ModernDashboardView({
                       ? "linear-gradient(135deg, rgba(34, 197, 94, 0.09) 0%, rgba(13, 10, 24, 0.95) 100%)"
                       : "#f0fdf4",
                     border: isDark ? "1px solid rgba(34, 197, 94, 0.28)" : "1px solid #bbf7d0",
-                    borderRadius: 12,
-                    padding: "0.75rem 0.85rem",
+                    borderRadius: 14,
+                    padding: "0.9rem 1rem",
                   }}>
-                    <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#22c55e", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "3px" }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>
                       🌟 TOP STRENGTH
                     </div>
-                    <div className="perf-insight-val" style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
-                      {sessionInsights.topSkill.name} <span style={{ color: "#22c55e", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.topSkill.score}/10)</span>
+                    <div className="perf-insight-val" style={{ fontSize: "1.02rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {sessionInsights.topSkill.name} <span style={{ color: "#22c55e", fontSize: "0.85rem", fontWeight: 800 }}>({sessionInsights.topSkill.score}/10)</span>
                     </div>
-                    <div className="perf-insight-sub" style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "3px" }}>
                       {sessionInsights.topSkill.sub}
                     </div>
                   </div>
@@ -4795,16 +5406,16 @@ export default function ModernDashboardView({
                       ? "linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(13, 10, 24, 0.95) 100%)"
                       : "#fffbeb",
                     border: isDark ? "1px solid rgba(245, 158, 11, 0.28)" : "1px solid #fde68a",
-                    borderRadius: 12,
-                    padding: "0.75rem 0.85rem",
+                    borderRadius: 14,
+                    padding: "0.9rem 1rem",
                   }}>
-                    <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#f59e0b", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "3px" }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#f59e0b", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>
                       🌱 AREA TO NURTURE
                     </div>
-                    <div className="perf-insight-val" style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
-                      {sessionInsights.focusSkill.name} <span style={{ color: "#f59e0b", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.focusSkill.score}/10)</span>
+                    <div className="perf-insight-val" style={{ fontSize: "1.02rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {sessionInsights.focusSkill.name} <span style={{ color: "#f59e0b", fontSize: "0.85rem", fontWeight: 800 }}>({sessionInsights.focusSkill.score}/10)</span>
                     </div>
-                    <div className="perf-insight-sub" style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "3px" }}>
                       {sessionInsights.focusSkill.sub}
                     </div>
                   </div>
@@ -4815,590 +5426,21 @@ export default function ModernDashboardView({
                       ? "linear-gradient(135deg, rgba(168, 85, 247, 0.09) 0%, rgba(13, 10, 24, 0.95) 100%)"
                       : "#faf5ff",
                     border: isDark ? "1px solid rgba(168, 85, 247, 0.28)" : "1px solid #e9d5ff",
-                    borderRadius: 12,
-                    padding: "0.75rem 0.85rem",
+                    borderRadius: 14,
+                    padding: "0.9rem 1rem",
                   }}>
-                    <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#a855f7", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "3px" }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#a855f7", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "4px" }}>
                       🚀 RECENT MOMENTUM
                     </div>
-                    <div className="perf-insight-val" style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
-                      {sessionInsights.momentum.label} <span style={{ color: sessionInsights.momentum.positive ? "#22c55e" : "#a855f7", fontSize: "0.8rem", fontWeight: 800 }}>({sessionInsights.momentum.diff})</span>
+                    <div className="perf-insight-val" style={{ fontSize: "1.02rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {sessionInsights.momentum.label} <span style={{ color: sessionInsights.momentum.positive ? "#22c55e" : "#a855f7", fontSize: "0.85rem", fontWeight: 800 }}>({sessionInsights.momentum.diff})</span>
                     </div>
-                    <div className="perf-insight-sub" style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "2px" }}>
+                    <div className="perf-insight-sub" style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "3px" }}>
                       {sessionInsights.momentum.subtitle}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Right Column: Unified Leaderboard & Month-End Prize Pool */}
-            <div className="speakshine-leaderboard-col">
-              {(() => {
-                const month = prizeSummary?.month || new Date().toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
-                const winnerCount = prizeSummary?.winnerCount || 3;
-                const prizesList = prizeSummary?.prizes || [];
-                const hasPrizes = Array.isArray(prizesList) && prizesList.length > 0;
-
-                const rankIcons  = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅"];
-                const rankColors = ["#fbbf24", "#e2e8f0", "#f97316", "#818cf8", "#34d399", "#60a5fa"];
-                const rankGlows  = [
-                  "rgba(251,191,36,0.14)",
-                  "rgba(226,232,240,0.12)",
-                  "rgba(249,115,22,0.14)",
-                  "rgba(129,140,248,0.12)",
-                  "rgba(52,211,153,0.12)",
-                  "rgba(96,165,250,0.12)",
-                ];
-                const rankBorders = [
-                  "rgba(251,191,36,0.4)",
-                  "rgba(226,232,240,0.35)",
-                  "rgba(249,115,22,0.4)",
-                  "rgba(129,140,248,0.35)",
-                  "rgba(52,211,153,0.35)",
-                  "rgba(96,165,250,0.35)",
-                ];
-
-                const prizeMap = {};
-                prizesList.forEach((p, idx) => {
-                  const r = p.rank || idx + 1;
-                  prizeMap[r] = {
-                    amount: p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : null,
-                    label: p.label || `Rank ${r}`,
-                    rawAmount: p.amount,
-                  };
-                });
-
-                const myItem = currentLeaderboard.find(u => u.isUser);
-                const myRank = myItem ? myItem.rank : 0;
-
-                return (
-                  <div
-                    ref={leaderboardRef}
-                    className="speakshine-card-box speakshine-leaderboard-box"
-                    style={{
-                      background: "#0d0a18",
-                      border: "1px solid rgba(255, 255, 255, 0.08)",
-                      borderRadius: 20,
-                      padding: "1.5rem",
-                      position: "relative",
-                      overflow: "hidden",
-                      boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
-                      display: "flex",
-                      flexDirection: "column",
-                      height: "100%",
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    {/* Header with Title & Group Link + Live Prize Badge */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem", flexWrap: "wrap", gap: "0.5rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: 8,
-                          background: "rgba(251, 191, 36, 0.12)",
-                          border: "1px solid rgba(251, 191, 36, 0.25)",
-                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.95rem",
-                        }}>
-                          🌟
-                        </div>
-                        <div>
-                          <div className="leaderboard-header-title" style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
-                            Cohort Daily Practice
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                        <div style={{
-                          display: "inline-flex", alignItems: "center", gap: "5px",
-                          background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.35)",
-                          borderRadius: 8, padding: "3px 8px",
-                          fontSize: "0.65rem", fontWeight: 800, color: "#c084fc",
-                          letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap",
-                        }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a855f7", display: "inline-block", animation: "pulse 1.8s ease-in-out infinite", flexShrink: 0 }} />
-                          Live Prizes
-                        </div>
-                        <Link
-                          to="/community"
-                          className="leaderboard-group-btn"
-                          style={{
-                            fontSize: "0.74rem",
-                            fontWeight: 700,
-                            textDecoration: "none",
-                            padding: "4px 10px",
-                            borderRadius: 99,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.35rem",
-                            transition: "all 0.2s ease",
-                          }}
-                        >
-                          <span>{groupName}</span>
-                          <span style={{ fontSize: "0.85rem" }}>↗</span>
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* Subheader Status Pill */}
-                    <div className="leaderboard-sub-pill" style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.45rem",
-                      fontSize: "0.75rem",
-                      fontWeight: 500,
-                      padding: "4px 10px",
-                      borderRadius: 99,
-                      marginBottom: "0.75rem",
-                      maxWidth: "100%",
-                      flexWrap: "wrap",
-                    }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                      <span>{groupName} · {memberCount} members · {submittedCount} submitted · {pendingCount} pending</span>
-                    </div>
-
-                    {/* 🏆 Month-End Prize Pool Highlight Strip */}
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      background: "linear-gradient(135deg, rgba(168, 85, 247, 0.14) 0%, rgba(251, 191, 36, 0.1) 100%)",
-                      border: "1px solid rgba(168, 85, 247, 0.28)",
-                      borderRadius: 12,
-                      padding: "0.6rem 0.85rem",
-                      marginBottom: "0.85rem",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                        <span style={{ fontSize: "1.1rem" }}>🏆</span>
-                        <div>
-                          <div style={{ fontSize: "0.76rem", fontWeight: 800, color: "#f8fafc", letterSpacing: "0.01em" }}>
-                            {month} Prize Pool
-                          </div>
-                          <div style={{ fontSize: "0.63rem", color: "#c4b5fd", fontWeight: 600, marginTop: 1 }}>
-                            Top {winnerCount} Winners Earn Cash Rewards
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Prize Chips */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexWrap: "wrap" }}>
-                        {(hasPrizes ? prizesList : Array.from({ length: winnerCount }, (_, i) => ({ rank: i + 1, amount: null }))).map((p, idx) => {
-                          const icon = rankIcons[idx] || "🏅";
-                          const color = rankColors[idx] || "#fbbf24";
-                          const bg = rankGlows[idx] || "rgba(251,191,36,0.12)";
-                          const border = rankBorders[idx] || "rgba(251,191,36,0.3)";
-                          return (
-                            <span key={idx} style={{
-                              fontSize: "0.66rem", fontWeight: 800, color: color,
-                              background: bg, border: `1px solid ${border}`,
-                              borderRadius: 6, padding: "2px 6px", whiteSpace: "nowrap",
-                            }}>
-                              {icon} {p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : `Rank ${p.rank || idx + 1}`}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* All-Time Record Callout */}
-                    <div
-                      className="all-time-record-box"
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "0.75rem 1rem",
-                        borderRadius: 12,
-                        background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
-                        border: "1px solid rgba(251, 191, 36, 0.2)",
-                        boxShadow: "0 4px 14px rgba(0, 0, 0, 0.2)",
-                        marginBottom: "0.85rem",
-                        position: "relative",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div style={{ position: "relative", zIndex: 1 }}>
-                        <div style={{
-                          display: "flex", alignItems: "center", gap: "0.4rem",
-                          fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.08em",
-                          color: "#fbbf24", textTransform: "uppercase", marginBottom: "2px",
-                        }}>
-                          <span>⭐</span>
-                          <span>COHORT MILESTONE RECORD</span>
-                        </div>
-                        <div style={{ fontSize: "0.8rem", color: "#f1f0f5", fontWeight: 600 }}>
-                          {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
-                        </div>
-                      </div>
-
-                      <div style={{
-                        position: "relative", zIndex: 1,
-                        display: "flex", alignItems: "baseline", gap: "3px",
-                      }}>
-                        <span style={{
-                          fontFamily: "Georgia, 'Times New Roman', serif",
-                          fontSize: "1.6rem",
-                          fontWeight: 700,
-                          color: "#fbbf24",
-                          lineHeight: 1,
-                        }}>
-                          {recordScore}
-                        </span>
-                        <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
-                      </div>
-                    </div>
-
-                    {/* Ranked Peer Rows (Scrollable Container with Prize Badges) */}
-                    <div
-                      className="leaderboard-scroll-container"
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.5rem",
-                        marginBottom: "0.85rem",
-                        maxHeight: "340px",
-                        overflowY: "auto",
-                        paddingRight: "4px",
-                        scrollBehavior: "smooth",
-                      }}
-                    >
-                      {currentLeaderboard.map((u, i) => {
-                        const isRank1 = u.rank === 1;
-                        const isRank2 = u.rank === 2;
-                        const isRank3 = u.rank === 3;
-                        const isUser = u.isUser;
-                        const inPrizeZone = u.rank <= winnerCount;
-                        const prizeInfo = prizeMap[u.rank];
-
-                        const rowClass = isUser
-                          ? "leaderboard-row user-row"
-                          : isRank1
-                          ? "leaderboard-row rank-1"
-                          : isRank2
-                          ? "leaderboard-row rank-2"
-                          : isRank3
-                          ? "leaderboard-row rank-3"
-                          : "leaderboard-row standard-row";
-
-                        const avatarBg = isRank1
-                          ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
-                          : isRank2
-                          ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
-                          : isRank3
-                          ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
-                          : isUser
-                          ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
-                          : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
-
-                        const avatarColor = isRank1 ? "#000000" : "#ffffff";
-                        const avatarBorder = isRank1
-                          ? "2px solid #fde68a"
-                          : isRank2
-                          ? "2px solid #e2e8f0"
-                          : isRank3
-                          ? "2px solid #fed7aa"
-                          : isUser
-                          ? "2px solid #c084fc"
-                          : "1px solid rgba(255, 255, 255, 0.12)";
-
-                        return (
-                          <React.Fragment key={u.id || `${u.name}-${i}`}>
-                            <div
-                              className={rowClass}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: isUser ? "0.75rem 0.9rem" : "0.65rem 0.8rem",
-                                borderRadius: 12,
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", minWidth: 0 }}>
-                                {/* Rank / Medal Emblem */}
-                                <div
-                                  className="leaderboard-rank-num"
-                                  style={{
-                                    width: 24,
-                                    textAlign: "center",
-                                    fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.82rem",
-                                    fontWeight: 800,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  {u.medal}
-                                </div>
-
-                                {/* Avatar Circle */}
-                                <div
-                                  className="leaderboard-avatar"
-                                  style={{
-                                    background: avatarBg,
-                                    color: avatarColor,
-                                    border: avatarBorder,
-                                    boxShadow: isRank1
-                                      ? "0 0 10px rgba(251, 191, 36, 0.4)"
-                                      : isUser
-                                      ? "0 0 12px rgba(168, 85, 247, 0.4)"
-                                      : "none",
-                                    overflow: "hidden",
-                                  }}
-                                >
-                                  {u.avatarUrl ? (
-                                    <img
-                                      src={u.avatarUrl}
-                                      alt={u.name}
-                                      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                                    />
-                                  ) : (
-                                    u.initials || "S"
-                                  )}
-                                </div>
-
-                                {/* Name & Badges */}
-                                <div style={{ minWidth: 0 }}>
-                                  <div
-                                    className="leaderboard-name"
-                                    style={{
-                                      fontSize: "0.85rem",
-                                      fontWeight: 700,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "0.35rem",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                    }}
-                                  >
-                                    <span>{u.name}</span>
-                                    {isRank1 && <span title="Current #1 Leader">👑</span>}
-                                    {isUser && (
-                                      <span
-                                        className="leaderboard-you-badge"
-                                        style={{
-                                          fontSize: "0.6rem",
-                                          fontWeight: 800,
-                                          padding: "1px 5px",
-                                          borderRadius: 4,
-                                          letterSpacing: "0.05em",
-                                        }}
-                                      >
-                                        YOU
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div
-                                    className="leaderboard-subtitle"
-                                    style={{
-                                      fontSize: "0.7rem",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "0.35rem",
-                                      marginTop: "2px",
-                                      flexWrap: "wrap",
-                                    }}
-                                  >
-                                    {u.currentBadge ? (
-                                      <StreakBadge badge={u.currentBadge} compact />
-                                    ) : (u.streakDays > 0) ? (
-                                      <span
-                                        style={{
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          gap: "0.2rem",
-                                          padding: "0.1rem 0.4rem",
-                                          borderRadius: 999,
-                                          fontSize: "0.66rem",
-                                          fontWeight: 700,
-                                          color: "#a78bfa",
-                                          background: "rgba(167, 139, 250, 0.12)",
-                                          border: "1px solid rgba(167, 139, 250, 0.25)",
-                                        }}
-                                      >
-                                        {u.badgeIcon} {u.badgeName}
-                                      </span>
-                                    ) : (
-                                      <span style={{ color: "var(--muted)", fontSize: "0.68rem" }}>No active streak</span>
-                                    )}
-
-                                    {u.streakDays > 0 && (
-                                      <span
-                                        style={{
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          gap: "0.2rem",
-                                          fontSize: "0.68rem",
-                                          fontWeight: 700,
-                                          color: "#f97316",
-                                          background: "rgba(249, 115, 22, 0.12)",
-                                          padding: "0.1rem 0.45rem",
-                                          borderRadius: 999,
-                                          border: "1px solid rgba(249, 115, 22, 0.28)",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        🔥 {u.streakDays}d
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Right: Points + Status + Cash Prize Badge */}
-                              <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                  <div
-                                    className="leaderboard-pts-badge"
-                                    style={{
-                                      fontSize: "0.92rem",
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    <span className="leaderboard-pts-num">{u.pts}</span>
-                                    <span className="leaderboard-pts-label" style={{ fontSize: "0.7rem", fontWeight: 600 }}>pts</span>
-                                  </div>
-                                  <span style={{ fontSize: "0.78rem", lineHeight: 1 }} title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
-                                    {u.isCompletedToday ? "✅" : "⏳"}
-                                  </span>
-                                </div>
-
-                                {/* Glowing Prize Badge for top ranks */}
-                                {inPrizeZone && (
-                                  <div style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "3px",
-                                    fontSize: "0.66rem",
-                                    fontWeight: 800,
-                                    color: rankColors[u.rank - 1] || "#fbbf24",
-                                    background: rankGlows[u.rank - 1] || "rgba(251,191,36,0.14)",
-                                    border: `1px solid ${rankBorders[u.rank - 1] || "rgba(251,191,36,0.35)"}`,
-                                    padding: "1px 6px",
-                                    borderRadius: 6,
-                                    whiteSpace: "nowrap",
-                                    boxShadow: isRank1 ? "0 0 8px rgba(251, 191, 36, 0.25)" : "none",
-                                  }}>
-                                    <span>{rankIcons[u.rank - 1] || "🏆"}</span>
-                                    <span>{prizeInfo?.amount ? prizeInfo.amount : (isRank1 ? "1st" : isRank2 ? "2nd" : isRank3 ? "3rd" : `${u.rank}th`)}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Prize Zone Cutoff Divider */}
-                            {i === winnerCount - 1 && currentLeaderboard.length > winnerCount && (
-                              <div style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                                margin: "0.3rem 0",
-                                fontSize: "0.6rem",
-                                fontWeight: 800,
-                                color: "#64748b",
-                                letterSpacing: "0.06em",
-                                textTransform: "uppercase",
-                              }}>
-                                <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
-                                <span>🏆 Top {winnerCount} Prize Cutoff</span>
-                                <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
-                              </div>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
-
-                    {/* Scroll for more members button / indicator */}
-                    {currentLeaderboard.length > 5 && (
-                      <div
-                        className="leaderboard-scroll-hint"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "0.45rem",
-                          fontSize: "0.7rem",
-                          fontWeight: 700,
-                          color: "#c4b5fd",
-                          background: "rgba(124, 111, 255, 0.08)",
-                          border: "1px dashed rgba(124, 111, 255, 0.3)",
-                          borderRadius: 8,
-                          padding: "5px 10px",
-                          marginBottom: "0.75rem",
-                          cursor: "pointer",
-                          transition: "all 0.2s ease",
-                          userSelect: "none",
-                        }}
-                        onClick={() => {
-                          const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
-                          if (el) el.scrollBy({ top: 140, behavior: "smooth" });
-                        }}
-                        title="Click to scroll and see more group members"
-                      >
-                        <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
-                        <span style={{ fontSize: "0.8rem" }}>↓</span>
-                      </div>
-                    )}
-
-                    {/* Motivational Tip Banner */}
-                    <div style={{
-                      background: "rgba(168, 85, 247, 0.08)",
-                      border: "1px solid rgba(168, 85, 247, 0.2)",
-                      borderRadius: 10,
-                      padding: "0.55rem 0.8rem",
-                      marginBottom: "0.85rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}>
-                      <span style={{ fontSize: "0.95rem", flexShrink: 0 }}>🚀</span>
-                      <div style={{ fontSize: "0.71rem", color: "#c4b5fd", fontWeight: 600, lineHeight: 1.4 }}>
-                        {myRank > 0 && myRank <= winnerCount ? (
-                          <span>
-                            <strong style={{ color: "#e9d5ff" }}>Great job!</strong> You're currently holding <strong style={{ color: rankColors[myRank - 1] || "#fbbf24" }}>{myRank === 1 ? "1st" : myRank === 2 ? "2nd" : myRank === 3 ? "3rd" : `${myRank}th`} Place ({prizeMap[myRank]?.amount || "Prize"})</strong>. Keep practicing daily to secure it! 🔥
-                          </span>
-                        ) : (
-                          <span>
-                            <strong style={{ color: "#e9d5ff" }}>Stay consistent!</strong> Upload your daily speech challenge to climb into the <strong style={{ color: "#fbbf24" }}>Top {winnerCount} Prize Zone</strong>! 🔥
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Group Member Stats: 3 Micro-Cards docked at bottom */}
-                    <div className="leaderboard-stat-grid" style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(3, 1fr)",
-                      gap: "0.6rem",
-                      textAlign: "center",
-                      marginTop: "auto",
-                      paddingTop: "0.5rem",
-                    }}>
-                      <div className="leaderboard-stat-card members-card" style={{
-                        borderRadius: 10,
-                        padding: "0.55rem 0.4rem",
-                      }}>
-                        <div className="leaderboard-stat-label">MEMBERS</div>
-                        <div className="leaderboard-stat-val">{memberCount}</div>
-                      </div>
-                      <div className="leaderboard-stat-card submitted-card" style={{
-                        borderRadius: 10,
-                        padding: "0.55rem 0.4rem",
-                      }}>
-                        <div className="leaderboard-stat-label">SUBMITTED</div>
-                        <div className="leaderboard-stat-val">{submittedCount}</div>
-                      </div>
-                      <div className="leaderboard-stat-card pending-card" style={{
-                        borderRadius: 10,
-                        padding: "0.55rem 0.4rem",
-                      }}>
-                        <div className="leaderboard-stat-label">PENDING</div>
-                        <div className="leaderboard-stat-val">{pendingCount}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           </div>
         </main>
