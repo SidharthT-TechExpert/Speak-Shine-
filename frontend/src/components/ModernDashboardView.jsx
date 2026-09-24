@@ -5266,148 +5266,131 @@ export default function ModernDashboardView({
               {(() => {
                 const month = prizeSummary?.month || new Date().toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
                 const hasPrizeData = Boolean(prizeSummary);
+                const winnerCount = prizeSummary?.winnerCount || 3;
 
-                const rankIcons = ["🥇", "🥈", "🥉"];
-                const rankColors = ["#fbbf24", "#94a3b8", "#f97316"];
-                const rankGlows = [
+                // Rank styling — supports up to 6 winners (admin-configurable)
+                const rankIcons  = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅"];
+                const rankColors = ["#fbbf24", "#94a3b8", "#f97316", "#818cf8", "#34d399", "#60a5fa"];
+                const rankGlows  = [
                   "rgba(251,191,36,0.14)",
                   "rgba(148,163,184,0.08)",
                   "rgba(249,115,22,0.12)",
+                  "rgba(129,140,248,0.1)",
+                  "rgba(52,211,153,0.1)",
+                  "rgba(96,165,250,0.1)",
                 ];
 
-                // Build rows — include currentLeader from API
+                // Build rows dynamically — use ALL prizes from API (not sliced to 3)
                 const prizeRows = hasPrizeData
-                  ? (prizeSummary.prizes || []).slice(0, 3).map((p, i) => ({
-                      icon: rankIcons[i] || "🏅",
-                      color: rankColors[i] || "#7c6fff",
-                      glow: rankGlows[i] || "rgba(124,111,255,0.08)",
+                  ? (prizeSummary.prizes || []).map((p, i) => ({
+                      icon: rankIcons[i] ?? "🏅",
+                      color: rankColors[i] ?? "#7c6fff",
+                      glow: rankGlows[i] ?? "rgba(124,111,255,0.08)",
                       label: p.label || `Rank ${p.rank}`,
                       amount: p.amount != null ? `₹${p.amount.toLocaleString("en-IN")}` : null,
                       currentLeader: p.currentLeader || null,
                       monthlyScore: p.monthlyScore || 0,
                       streak: p.streak || 0,
                     }))
-                  : [
-                      { icon: "🥇", color: "#fbbf24", glow: "rgba(251,191,36,0.14)", label: "1st Place", amount: null, currentLeader: null, monthlyScore: 0, streak: 0 },
-                      { icon: "🥈", color: "#94a3b8", glow: "rgba(148,163,184,0.08)", label: "2nd Place", amount: null, currentLeader: null, monthlyScore: 0, streak: 0 },
-                      { icon: "🥉", color: "#f97316", glow: "rgba(249,115,22,0.12)", label: "3rd Place", amount: null, currentLeader: null, monthlyScore: 0, streak: 0 },
-                    ];
+                  : Array.from({ length: 3 }, (_, i) => ({
+                      icon: rankIcons[i],
+                      color: rankColors[i],
+                      glow: rankGlows[i],
+                      label: ["1st Place", "2nd Place", "3rd Place"][i],
+                      amount: null, currentLeader: null, monthlyScore: 0, streak: 0,
+                    }));
 
                 return (
-                  <div
-                    style={{
-                      background: "linear-gradient(135deg, #0d0a18 0%, #12092a 55%, #0d0a18 100%)",
-                      border: "1px solid rgba(168, 85, 247, 0.28)",
-                      borderRadius: 18,
-                      padding: "1.25rem 1.35rem",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {/* Purple glow orb */}
-                    <div style={{
-                      position: "absolute", top: -50, right: -50,
-                      width: 180, height: 180, borderRadius: "50%",
-                      background: "radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%)",
-                      pointerEvents: "none",
-                    }} />
-                    <div style={{
-                      position: "absolute", bottom: -40, left: -30,
-                      width: 140, height: 140, borderRadius: "50%",
-                      background: "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)",
-                      pointerEvents: "none",
-                    }} />
+                  <div style={{
+                    background: "linear-gradient(135deg, #0d0a18 0%, #12092a 55%, #0d0a18 100%)",
+                    border: "1px solid rgba(168, 85, 247, 0.28)",
+                    borderRadius: 18,
+                    padding: "1.25rem 1.35rem",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}>
+                    {/* Glow orbs */}
+                    <div style={{ position: "absolute", top: -50, right: -50, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", bottom: -40, left: -30, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
 
-                    {/* Header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", gap: "0.5rem" }}>
+                    {/* ── Card Header ── */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "0.85rem", gap: "0.5rem" }}>
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <span style={{ fontSize: "1.1rem" }}>🏆</span>
-                          <span style={{
-                            fontSize: "0.88rem", fontWeight: 800, color: "#f8fafc",
-                            letterSpacing: "-0.01em",
-                          }}>Month-End Prize Pool</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                          <span style={{ fontSize: "1.05rem" }}>🏆</span>
+                          <span style={{ fontSize: "0.88rem", fontWeight: 800, color: "#f8fafc", letterSpacing: "-0.01em" }}>
+                            Month-End Prize Pool
+                          </span>
                         </div>
-                        <div style={{ fontSize: "0.68rem", color: "#a855f7", fontWeight: 700, marginTop: 2, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                          {month}
+                        <div style={{ fontSize: "0.67rem", color: "#a855f7", fontWeight: 700, marginTop: 2, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {month} &nbsp;·&nbsp; Top {winnerCount} winners
                         </div>
                       </div>
-                      {/* LIVE pill */}
+                      {/* LIVE indicator */}
                       <div style={{
                         display: "flex", alignItems: "center", gap: "5px",
-                        background: "rgba(168,85,247,0.15)",
-                        border: "1px solid rgba(168,85,247,0.35)",
-                        borderRadius: 8,
-                        padding: "3px 10px",
-                        fontSize: "0.65rem",
-                        fontWeight: 800,
-                        color: "#c084fc",
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        whiteSpace: "nowrap",
+                        background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.35)",
+                        borderRadius: 8, padding: "3px 10px",
+                        fontSize: "0.63rem", fontWeight: 800, color: "#c084fc",
+                        letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
                       }}>
-                        <span style={{
-                          width: 6, height: 6, borderRadius: "50%",
-                          background: "#a855f7",
-                          display: "inline-block",
-                          animation: "pulse 1.8s ease-in-out infinite",
-                          flexShrink: 0,
-                        }} />
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a855f7", display: "inline-block", animation: "pulse 1.8s ease-in-out infinite", flexShrink: 0 }} />
                         Live
                       </div>
                     </div>
 
-                    {/* Prize rows */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.9rem" }}>
-                      {prizeRows.map((row, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.65rem",
-                            background: row.glow,
-                            border: `1px solid ${row.color}28`,
-                            borderRadius: 10,
-                            padding: "0.55rem 0.75rem",
-                          }}
-                        >
-                          {/* Rank icon */}
-                          <span style={{ fontSize: "1.3rem", lineHeight: 1, flexShrink: 0 }}>{row.icon}</span>
+                    {/* ── "Current Standing" section label ── */}
+                    <div style={{
+                      fontSize: "0.63rem", fontWeight: 800, color: "#64748b",
+                      letterSpacing: "0.09em", textTransform: "uppercase",
+                      marginBottom: "0.5rem",
+                      display: "flex", alignItems: "center", gap: "0.4rem",
+                    }}>
+                      <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.2)", display: "inline-block" }} />
+                      📊 Current Standing
+                      <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.2)", display: "inline-block" }} />
+                    </div>
 
-                          {/* Middle — rank label + current leader */}
+                    {/* ── Prize rows (dynamic count) ── */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "0.9rem" }}>
+                      {prizeRows.map((row, i) => (
+                        <div key={i} style={{
+                          display: "flex", alignItems: "center", gap: "0.65rem",
+                          background: row.glow,
+                          border: `1px solid ${row.color}28`,
+                          borderRadius: 10, padding: "0.5rem 0.75rem",
+                        }}>
+                          {/* Medal icon */}
+                          <span style={{ fontSize: "1.25rem", lineHeight: 1, flexShrink: 0 }}>{row.icon}</span>
+
+                          {/* Centre — rank label + current holder */}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: row.color, lineHeight: 1.2 }}>
+                            <div style={{ fontSize: "0.69rem", fontWeight: 700, color: row.color, lineHeight: 1.2 }}>
                               {row.label}
                             </div>
                             {row.currentLeader ? (
-                              <div style={{
-                                display: "flex", alignItems: "center", gap: "4px",
-                                marginTop: 3,
-                              }}>
-                                <span style={{ fontSize: "0.68rem", color: "#e2e8f0", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: 3, flexWrap: "wrap" }}>
+                                <span style={{
+                                  fontSize: "0.69rem", color: "#e2e8f0", fontWeight: 700,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110,
+                                }}>
                                   👤 {row.currentLeader}
                                 </span>
                                 {row.monthlyScore > 0 && (
                                   <span style={{
-                                    fontSize: "0.6rem", color: "#94a3b8", fontWeight: 600,
+                                    fontSize: "0.59rem", color: "#94a3b8", fontWeight: 600,
                                     background: "rgba(148,163,184,0.12)", borderRadius: 4,
                                     padding: "1px 5px", flexShrink: 0,
-                                  }}>
-                                    {row.monthlyScore} pts
-                                  </span>
+                                  }}>{row.monthlyScore} pts</span>
                                 )}
                                 {row.streak > 0 && (
-                                  <span style={{
-                                    fontSize: "0.6rem", color: "#f97316", fontWeight: 700,
-                                    flexShrink: 0,
-                                  }}>
+                                  <span style={{ fontSize: "0.59rem", color: "#f97316", fontWeight: 700, flexShrink: 0 }}>
                                     🔥{row.streak}d
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <div style={{ fontSize: "0.62rem", color: "#475569", marginTop: 2, fontStyle: "italic" }}>
+                              <div style={{ fontSize: "0.61rem", color: "#475569", marginTop: 2, fontStyle: "italic" }}>
                                 No one yet — be the first! 🚀
                               </div>
                             )}
@@ -5416,13 +5399,12 @@ export default function ModernDashboardView({
                           {/* Right — prize amount */}
                           <div style={{ textAlign: "right", flexShrink: 0 }}>
                             {row.amount != null ? (
-                              <div style={{ fontSize: "1rem", fontWeight: 900, color: row.color, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                              <div style={{ fontSize: "0.95rem", fontWeight: 900, color: row.color, letterSpacing: "-0.02em", lineHeight: 1 }}>
                                 {row.amount}
                               </div>
                             ) : (
                               <div style={{
-                                fontSize: "0.62rem", fontWeight: 700,
-                                color: "#64748b",
+                                fontSize: "0.61rem", fontWeight: 700, color: "#64748b",
                                 background: "rgba(100,116,139,0.12)",
                                 border: "1px dashed rgba(100,116,139,0.3)",
                                 borderRadius: 6, padding: "2px 7px",
@@ -5433,19 +5415,15 @@ export default function ModernDashboardView({
                       ))}
                     </div>
 
-                    {/* Motivational CTA */}
+                    {/* ── Motivational CTA ── */}
                     <div style={{
-                      background: "rgba(168,85,247,0.08)",
-                      border: "1px solid rgba(168,85,247,0.2)",
-                      borderRadius: 10,
-                      padding: "0.6rem 0.85rem",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.55rem",
+                      background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.2)",
+                      borderRadius: 10, padding: "0.6rem 0.85rem",
+                      display: "flex", alignItems: "center", gap: "0.55rem",
                     }}>
                       <span style={{ fontSize: "1rem", flexShrink: 0 }}>🚀</span>
-                      <div style={{ fontSize: "0.72rem", color: "#c4b5fd", fontWeight: 600, lineHeight: 1.45 }}>
-                        <strong style={{ color: "#e9d5ff" }}>Stay consistent, climb the leaderboard</strong> and win your share of this month's prize! Practice daily to stay in the top 3. 🔥
+                      <div style={{ fontSize: "0.71rem", color: "#c4b5fd", fontWeight: 600, lineHeight: 1.45 }}>
+                        <strong style={{ color: "#e9d5ff" }}>Stay consistent, climb the leaderboard</strong> and win your share of this month's prize! Practice daily to hold your spot in the top {winnerCount}. 🔥
                       </div>
                     </div>
                   </div>
