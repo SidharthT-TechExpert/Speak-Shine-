@@ -203,3 +203,62 @@ export async function disableSpecialModes(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * GET /api/dashboard/prize-info - Public prize pool info (all authenticated users)
+ * Returns prize amounts & month info only — no winner names/phones for privacy.
+ */
+export async function getPrizeInfo(req, res) {
+  try {
+    const { getMonthEndPrizeReportSummary } = await import("../services/whatsapp/whatsappService.js");
+    const summary = await getMonthEndPrizeReportSummary({ syncWithLeaderboard: true });
+
+    // Expose full name + prize amounts (no phone/userId for privacy)
+    const prizes = (summary.winners || []).map((w, i) => {
+      const rankLabel =
+        w.rank === 1 ? "🥇 1st Place" :
+        w.rank === 2 ? "🥈 2nd Place" :
+        w.rank === 3 ? "🥉 3rd Place" :
+        w.rank === 4 ? "🏅 4th Place" :
+        w.rank === 5 ? "🏅 5th Place" :
+                       `🏅 ${w.rank}th Place`;
+      return {
+        rank: w.rank || i + 1,
+        label: rankLabel,
+        amount: w.amount ?? null,
+        percentage: w.percentage ?? null,
+        currentLeader: w.name || null,      // full name — admin-visible anyway
+        streak: w.streak || 0,
+        monthlyScore: w.monthlyScore || 0,
+      };
+    });
+
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const month = nowIST.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+
+    return res.json({
+      success: true,
+      month,
+      monthName: summary.monthName,
+      year: summary.year,
+      totalCollection: summary.totalCollection,
+      distributedTotal: summary.distributedTotal,
+      winnerCount: summary.winnerCount || prizes.length,
+      prizes,
+    });
+  } catch (err) {
+    console.error("[Dashboard] getPrizeInfo error:", err.message);
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const month = nowIST.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+    return res.json({
+      success: true,
+      month,
+      winnerCount: 3,
+      prizes: [
+        { rank: 1, label: "🥇 1st Place", amount: null, percentage: null, currentLeader: null, streak: 0, monthlyScore: 0 },
+        { rank: 2, label: "🥈 2nd Place", amount: null, percentage: null, currentLeader: null, streak: 0, monthlyScore: 0 },
+        { rank: 3, label: "🥉 3rd Place", amount: null, percentage: null, currentLeader: null, streak: 0, monthlyScore: 0 },
+      ],
+    });
+  }
+}

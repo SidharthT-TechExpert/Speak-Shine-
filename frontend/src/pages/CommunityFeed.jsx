@@ -2649,6 +2649,14 @@ export default function CommunityFeed() {
                               </span>
                             )}
                           </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", marginTop: 2 }}>
+                            {u.currentBadge && <StreakBadge badge={u.currentBadge} compact />}
+                            {(u.streak > 0) && (
+                              <span style={{ fontSize: "0.68rem", color: "#fb923c", fontWeight: 700 }}>
+                                🔥 {u.streak}d
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
