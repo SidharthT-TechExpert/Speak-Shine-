@@ -211,7 +211,7 @@ export async function disableSpecialModes(req, res) {
 export async function getPrizeInfo(req, res) {
   try {
     const { getMonthEndPrizeReportSummary } = await import("../services/whatsapp/whatsappService.js");
-    const summary = await getMonthEndPrizeReportSummary({});
+    const summary = await getMonthEndPrizeReportSummary({ syncWithLeaderboard: true });
 
     // Expose full name + prize amounts (no phone/userId for privacy)
     const prizes = (summary.winners || []).map((w, i) => {

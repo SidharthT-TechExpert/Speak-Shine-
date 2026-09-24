@@ -6744,7 +6744,7 @@ audio { border-radius: 12px; }
   display: grid;
   grid-template-columns: minmax(340px, 1fr) minmax(0, 1.75fr);
   gap: 1.25rem;
-  align-items: stretch;
+  align-items: start;
   width: 100%;
 }
 
@@ -6752,18 +6752,40 @@ audio { border-radius: 12px; }
   order: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
 }
 
 .speakshine-leaderboard-box {
-  height: 100%;
+  height: auto;
 }
 
 .speakshine-perf-center-col {
   order: 2;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
+}
+
+.prize-pool-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+}
+
+.prize-pool-scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.prize-pool-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prize-pool-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.35);
+  border-radius: 99px;
+}
+
+.prize-pool-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.6);
 }
 
 @media (max-width: 1024px) {

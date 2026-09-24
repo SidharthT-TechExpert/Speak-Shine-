@@ -4361,7 +4361,6 @@ export default function ModernDashboardView({
               padding: "1.5rem",
               display: "flex",
               flexDirection: "column",
-              height: "100%",
               boxSizing: "border-box",
             }}>
               {/* Header with Title & Tabs */}
@@ -4481,7 +4480,7 @@ export default function ModernDashboardView({
                     </div>
                   ) : (
                     <>
-                      <div style={{ width: "100%", height: 230 }}>
+                      <div style={{ width: "100%", height: 250 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={chartPointsData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                             <defs>
@@ -4551,7 +4550,7 @@ export default function ModernDashboardView({
                     </div>
                   ) : (
                     <>
-                      <div style={{ width: "100%", height: 230 }}>
+                      <div style={{ width: "100%", height: 250 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
@@ -4725,9 +4724,9 @@ export default function ModernDashboardView({
                 </div>
               )}
 
-              {/* Session Performance Insights (Equalizes height with Leaderboard and fills empty space) */}
+              {/* Session Performance Insights */}
               <div className="perf-session-insights" style={{
-                marginTop: "auto",
+                marginTop: "1.25rem",
                 paddingTop: "1.25rem",
                 borderTop: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
               }}>
@@ -5351,46 +5350,57 @@ export default function ModernDashboardView({
                       <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.2)", display: "inline-block" }} />
                     </div>
 
-                    {/* ── Prize rows (dynamic count) ── */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "0.9rem" }}>
+                    {/* ── Prize rows (dynamic count & scrollable) ── */}
+                    <div
+                      className="prize-pool-scroll-container"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.45rem",
+                        marginBottom: "0.85rem",
+                        maxHeight: "225px",
+                        overflowY: "auto",
+                        paddingRight: "4px",
+                      }}
+                    >
                       {prizeRows.map((row, i) => (
                         <div key={i} style={{
                           display: "flex", alignItems: "center", gap: "0.65rem",
                           background: row.glow,
                           border: `1px solid ${row.color}28`,
-                          borderRadius: 10, padding: "0.5rem 0.75rem",
+                          borderRadius: 10, padding: "0.55rem 0.75rem",
                         }}>
                           {/* Medal icon */}
                           <span style={{ fontSize: "1.25rem", lineHeight: 1, flexShrink: 0 }}>{row.icon}</span>
 
                           {/* Centre — rank label + current holder */}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "0.69rem", fontWeight: 700, color: row.color, lineHeight: 1.2 }}>
+                            <div style={{ fontSize: "0.68rem", fontWeight: 700, color: row.color, lineHeight: 1.2 }}>
                               {row.label}
                             </div>
                             {row.currentLeader ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: 3, flexWrap: "wrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: 3, flexWrap: "wrap" }}>
                                 <span style={{
-                                  fontSize: "0.69rem", color: "#e2e8f0", fontWeight: 700,
-                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110,
+                                  fontSize: "0.74rem", color: "#f1f5f9", fontWeight: 700,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%",
                                 }}>
                                   👤 {row.currentLeader}
                                 </span>
                                 {row.monthlyScore > 0 && (
                                   <span style={{
-                                    fontSize: "0.59rem", color: "#94a3b8", fontWeight: 600,
+                                    fontSize: "0.6rem", color: "#94a3b8", fontWeight: 600,
                                     background: "rgba(148,163,184,0.12)", borderRadius: 4,
                                     padding: "1px 5px", flexShrink: 0,
                                   }}>{row.monthlyScore} pts</span>
                                 )}
                                 {row.streak > 0 && (
-                                  <span style={{ fontSize: "0.59rem", color: "#f97316", fontWeight: 700, flexShrink: 0 }}>
+                                  <span style={{ fontSize: "0.6rem", color: "#f97316", fontWeight: 700, flexShrink: 0 }}>
                                     🔥{row.streak}d
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <div style={{ fontSize: "0.61rem", color: "#475569", marginTop: 2, fontStyle: "italic" }}>
+                              <div style={{ fontSize: "0.62rem", color: "#475569", marginTop: 2, fontStyle: "italic" }}>
                                 No one yet — be the first! 🚀
                               </div>
                             )}
