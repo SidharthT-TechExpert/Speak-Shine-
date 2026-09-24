@@ -1149,25 +1149,14 @@ export default function ModernDashboardView({
       return 0;
     });
 
-    let activeRankCounter = 0;
-
     return itemsToDisplay.map((u, i) => {
       const isUser = isUserItem(u);
       const name = isUser ? (u.name?.includes("(You)") ? u.name : `${displayName} (You)`) : u.name;
       const streakDays = getStreak(u);
       const hasActiveStreak = streakDays > 0;
 
-      let rankNum = null;
-      let medal = "—";
-
-      if (hasActiveStreak) {
-        activeRankCounter += 1;
-        rankNum = activeRankCounter;
-        medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : isUser ? "👉" : String(rankNum);
-      } else {
-        rankNum = null;
-        medal = "—";
-      }
+      const rankNum = i + 1;
+      const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : `#${rankNum}`;
 
       const initials = isUser ? (avatarInitials || "YOU") : getInitials(name);
 
@@ -4944,7 +4933,7 @@ export default function ModernDashboardView({
                       >
                         {currentLeaderboard.map((u, i) => {
                           const isUser = u.isUser;
-                          const isWinningSpot = u.rank <= winnerCount;
+                          const isWinningSpot = typeof u.rank === "number" && u.rank >= 1 && u.rank <= winnerCount;
                           const userPrize = prizeMap[u.rank];
                           const showCutoffLineAfter = u.rank === winnerCount && currentLeaderboard.length > winnerCount;
                           const cfg = getRankCfg(u.rank);
