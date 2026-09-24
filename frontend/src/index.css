@@ -6749,6 +6749,62 @@ audio { border-radius: 12px; }
   width: 100%;
 }
 
+.unified-gamification-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.3fr);
+  gap: 1.25rem;
+  align-items: stretch;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.unified-gamification-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.unified-gamification-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.unified-prizes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.unified-section-subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] .unified-section-subtitle,
+.light .unified-section-subtitle {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 1024px) {
+  .unified-gamification-body {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .unified-prizes-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .speakshine-gamification-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);

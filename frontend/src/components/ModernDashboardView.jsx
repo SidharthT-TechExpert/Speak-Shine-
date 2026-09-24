@@ -4416,24 +4416,30 @@ export default function ModernDashboardView({
                   ref={leaderboardRef}
                   className="speakshine-card-box speakshine-unified-leaderboard-box"
                   style={{
-                    background: "linear-gradient(145deg, #0d0a18 0%, #130a2a 50%, #0d0a18 100%)",
-                    border: "1px solid rgba(168, 85, 247, 0.25)",
+                    background: isDark
+                      ? "linear-gradient(145deg, #0d0a18 0%, #130a2a 50%, #0d0a18 100%)"
+                      : "#ffffff",
+                    border: isDark ? "1px solid rgba(168, 85, 247, 0.25)" : "1px solid rgba(168, 85, 247, 0.3)",
                     borderRadius: 20,
-                    padding: "1.6rem",
+                    padding: "1.5rem 1.6rem",
                     position: "relative",
                     overflow: "hidden",
-                    boxShadow: "0 14px 40px rgba(0, 0, 0, 0.55)",
+                    boxShadow: isDark ? "0 14px 40px rgba(0, 0, 0, 0.55)" : "0 8px 30px rgba(0, 0, 0, 0.08)",
                     display: "flex",
                     flexDirection: "column",
                     boxSizing: "border-box",
                   }}
                 >
                   {/* Glowing background orbs */}
-                  <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.16) 0%, transparent 70%)", pointerEvents: "none" }} />
-                  <div style={{ position: "absolute", bottom: -50, left: -40, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+                  {isDark && (
+                    <>
+                      <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.16) 0%, transparent 70%)", pointerEvents: "none" }} />
+                      <div style={{ position: "absolute", bottom: -50, left: -40, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(251,191,36,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+                    </>
+                  )}
 
                   {/* Header with Trophy & Cohort Link */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem", position: "relative", zIndex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.1rem", flexWrap: "wrap", gap: "0.75rem", position: "relative", zIndex: 1 }}>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
                         <div style={{
@@ -4444,7 +4450,7 @@ export default function ModernDashboardView({
                         }}>
                           🏆
                         </div>
-                        <div className="leaderboard-header-title" style={{ fontSize: "1.15rem", fontWeight: 800, letterSpacing: "-0.01em", color: "#f8fafc" }}>
+                        <div className="leaderboard-header-title" style={{ fontSize: "1.15rem", fontWeight: 800, letterSpacing: "-0.01em", color: isDark ? "#f8fafc" : "#0f172a" }}>
                           Cohort Leaderboard &amp; Month-End Prize Pool
                         </div>
                       </div>
@@ -4463,7 +4469,7 @@ export default function ModernDashboardView({
                         flexWrap: "wrap",
                         background: "rgba(34, 197, 94, 0.08)",
                         border: "1px solid rgba(34, 197, 94, 0.22)",
-                        color: "#86efac",
+                        color: isDark ? "#86efac" : "#166534",
                       }}>
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
                         <span>{groupName} · {memberCount} members · {submittedCount} submitted · {pendingCount} pending</span>
@@ -4474,9 +4480,10 @@ export default function ModernDashboardView({
                       {/* LIVE Prize Pool Pill */}
                       <div style={{
                         display: "flex", alignItems: "center", gap: "6px",
-                        background: "rgba(168,85,247,0.16)", border: "1px solid rgba(168,85,247,0.4)",
+                        background: isDark ? "rgba(168,85,247,0.16)" : "rgba(168,85,247,0.1)",
+                        border: isDark ? "1px solid rgba(168,85,247,0.4)" : "1px solid rgba(168,85,247,0.3)",
                         borderRadius: 8, padding: "5px 11px",
-                        fontSize: "0.68rem", fontWeight: 800, color: "#c084fc",
+                        fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7e22ce",
                         letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap",
                       }}>
                         <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a855f7", display: "inline-block", animation: "pulse 1.8s ease-in-out infinite", flexShrink: 0 }} />
@@ -4505,520 +4512,547 @@ export default function ModernDashboardView({
                     </div>
                   </div>
 
-                  {/* ── Mini Prize Podium Hero Cards Ribbon ── */}
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(auto-fit, minmax(200px, 1fr))`,
-                    gap: "0.75rem",
-                    marginBottom: "1rem",
-                    position: "relative",
-                    zIndex: 1,
-                  }}>
-                    {prizeRows.map((p, i) => {
-                      const isUserLeadingThis = myUser && myUser.rank === p.rank;
-                      return (
-                        <div
-                          key={i}
-                          style={{
-                            background: p.glow,
-                            border: `1px solid ${p.color}35`,
-                            borderRadius: 14,
-                            padding: "0.75rem 0.95rem",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.75rem",
-                            transition: "all 0.2s ease",
-                            position: "relative",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {/* Left icon */}
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 10,
-                            background: `${p.color}18`,
-                            border: `1px solid ${p.color}40`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "1.35rem", flexShrink: 0,
-                          }}>
-                            {p.icon}
-                          </div>
-
-                          {/* Middle details */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
-                              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: p.color, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                {p.label}
-                              </div>
-                              {p.amount != null ? (
-                                <div style={{ fontSize: "0.95rem", fontWeight: 900, color: p.color }}>
-                                  {p.amount}
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: "0.62rem", color: "#94a3b8", fontWeight: 700 }}>TBA</div>
-                              )}
-                            </div>
-
-                            {/* Current leader spot */}
-                            <div style={{ fontSize: "0.76rem", color: "#f1f5f9", fontWeight: 700, marginTop: "2px", display: "flex", alignItems: "center", gap: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {p.currentLeader ? (
-                                <>
-                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    👤 {p.currentLeader}
-                                  </span>
-                                  {isUserLeadingThis && (
-                                    <span style={{
-                                      fontSize: "0.6rem", fontWeight: 800, padding: "1px 4px",
-                                      borderRadius: 4, background: "#a855f7", color: "#fff", flexShrink: 0,
-                                    }}>
-                                      YOU
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <span style={{ color: "#64748b", fontStyle: "italic", fontSize: "0.7rem" }}>No one yet</span>
-                              )}
-                            </div>
-
-                            {p.currentLeader && (
-                              <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "1px", display: "flex", gap: "6px" }}>
-                                {p.monthlyScore > 0 && <span>{p.monthlyScore} pts</span>}
-                                {p.streak > 0 && <span style={{ color: "#f97316", fontWeight: 700 }}>🔥 {p.streak}d</span>}
-                              </div>
-                            )}
-                          </div>
+                  {/* ── 2-Column Inner Body: Left (Prizes & Cohort Highlights) + Right (Live Rankings) ── */}
+                  <div className="unified-gamification-body">
+                    {/* LEFT COLUMN: Prize Podium, Milestone Record, Motivation, Stat cards */}
+                    <div className="unified-gamification-left">
+                      {/* Section Subtitle */}
+                      <div className="unified-section-subtitle">
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: "#c084fc", textTransform: "uppercase" }}>
+                          <span>🏆</span>
+                          <span>Month-End Prize Pool</span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 600 }}>
+                          Top {winnerCount} Earn Rewards
+                        </span>
+                      </div>
 
-              {/* All-Time Record Callout */}
-              <div
-                className="all-time-record-box"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "0.85rem 1.1rem",
-                  borderRadius: 14,
-                  background: "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)",
-                  border: "1px solid rgba(251, 191, 36, 0.2)",
-                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.2)",
-                  marginBottom: "1rem",
-                  position: "relative",
-                  overflow: "hidden",
-                  transition: "transform 0.2s ease, border-color 0.2s ease",
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.4)";
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.borderColor = "rgba(251, 191, 36, 0.2)";
-                }}
-              >
-                <div style={{
-                  position: "absolute", top: 0, right: 0, bottom: 0, width: "35%",
-                  background: "radial-gradient(ellipse at center, rgba(251, 191, 36, 0.08) 0%, transparent 70%)",
-                  pointerEvents: "none",
-                }} />
+                      {/* 2x2 Prize Grid */}
+                      <div className="unified-prizes-grid">
+                        {prizeRows.map((p, i) => {
+                          const isUserLeadingThis = myUser && myUser.rank === p.rank;
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                background: p.glow,
+                                border: `1px solid ${p.color}35`,
+                                borderRadius: 12,
+                                padding: "0.65rem 0.75rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                                gap: "0.35rem",
+                                transition: "all 0.2s ease",
+                                position: "relative",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {/* Top row: Medal + Label & Prize Amount */}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                  <span style={{ fontSize: "1rem" }}>{p.icon}</span>
+                                  <span style={{ fontSize: "0.7rem", fontWeight: 800, color: p.color, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                    {p.label}
+                                  </span>
+                                </div>
+                                {p.amount != null ? (
+                                  <div style={{ fontSize: "0.92rem", fontWeight: 900, color: p.color, fontVariantNumeric: "tabular-nums" }}>
+                                    {p.amount}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: "0.62rem", color: "#94a3b8", fontWeight: 700 }}>TBA</div>
+                                )}
+                              </div>
 
-                <div style={{ position: "relative", zIndex: 1 }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: "0.4rem",
-                    fontSize: "0.66rem", fontWeight: 800, letterSpacing: "0.08em",
-                    color: "#fbbf24", textTransform: "uppercase", marginBottom: "3px",
-                  }}>
-                    <span>⭐</span>
-                    <span>COHORT MILESTONE RECORD</span>
-                  </div>
-                  <div style={{ fontSize: "0.82rem", color: "#f1f0f5", fontWeight: 600 }}>
-                    {recordHolder} · <span style={{ color: "#94a3b8", fontWeight: 500 }}>{recordDate}</span>
-                  </div>
-                </div>
+                              {/* Bottom row: Leader details */}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0, marginTop: "2px" }}>
+                                <div style={{ fontSize: "0.72rem", color: isDark ? "#f1f5f9" : "#1e293b", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", minWidth: 0, overflow: "hidden" }}>
+                                  {p.currentLeader ? (
+                                    <>
+                                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        👤 {p.currentLeader}
+                                      </span>
+                                      {isUserLeadingThis && (
+                                        <span style={{
+                                          fontSize: "0.58rem", fontWeight: 800, padding: "1px 4px",
+                                          borderRadius: 4, background: "#a855f7", color: "#fff", flexShrink: 0,
+                                        }}>
+                                          YOU
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span style={{ color: "#64748b", fontStyle: "italic", fontSize: "0.68rem" }}>No one yet</span>
+                                  )}
+                                </div>
 
-                <div style={{
-                  position: "relative", zIndex: 1,
-                  display: "flex", alignItems: "baseline", gap: "3px",
-                }}>
-                  <span style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontSize: "1.75rem",
-                    fontWeight: 700,
-                    color: "#fbbf24",
-                    lineHeight: 1,
-                  }}>
-                    {recordScore}
-                  </span>
-                  <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#fbbf24" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
-                </div>
-              </div>
+                                {p.currentLeader && (
+                                  <div style={{ fontSize: "0.65rem", color: isDark ? "#94a3b8" : "#64748b", display: "flex", gap: "4px", flexShrink: 0 }}>
+                                    {p.monthlyScore > 0 && <span>{p.monthlyScore} pts</span>}
+                                    {p.streak > 0 && <span style={{ color: "#f97316", fontWeight: 700 }}>🔥 {p.streak}d</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
 
-              {/* Ranked Peer Rows (Scrollable Container) */}
-              <div
-                className="leaderboard-scroll-container"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.55rem",
-                  marginBottom: currentLeaderboard.length > 5 ? "0.6rem" : "1.25rem",
-                  maxHeight: "330px",
-                  overflowY: "auto",
-                  paddingRight: "4px",
-                  scrollBehavior: "smooth",
-                }}
-              >
-                {currentLeaderboard.map((u, i) => {
-                  const isRank1 = u.rank === 1;
-                  const isRank2 = u.rank === 2;
-                  const isRank3 = u.rank === 3;
-                  const isUser = u.isUser;
-                  const userPrize = prizeMap[u.rank];
-                  const isWinningSpot = u.rank <= winnerCount && userPrize;
-                  const showCutoffLineAfter = u.rank === winnerCount && currentLeaderboard.length > winnerCount;
-
-                  const rowClass = isUser
-                    ? "leaderboard-row user-row"
-                    : isRank1
-                    ? "leaderboard-row rank-1"
-                    : isRank2
-                    ? "leaderboard-row rank-2"
-                    : isRank3
-                    ? "leaderboard-row rank-3"
-                    : "leaderboard-row standard-row";
-
-                  const avatarBg = isRank1
-                    ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
-                    : isRank2
-                    ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
-                    : isRank3
-                    ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
-                    : isUser
-                    ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
-                    : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
-
-                  const avatarColor = isRank1 ? "#000000" : "#ffffff";
-                  const avatarBorder = isRank1
-                    ? "2px solid #fde68a"
-                    : isRank2
-                    ? "2px solid #e2e8f0"
-                    : isRank3
-                    ? "2px solid #fed7aa"
-                    : isUser
-                    ? "2px solid #c084fc"
-                    : "1px solid rgba(255, 255, 255, 0.12)";
-
-                  return (
-                    <React.Fragment key={u.id || `${u.name}-${i}`}>
+                      {/* Cohort Milestone Record Box */}
                       <div
-                        className={rowClass}
+                        className="all-time-record-box"
                         style={{
                           display: "flex",
-                          alignItems: "center",
                           justifyContent: "space-between",
-                          padding: isUser ? "0.8rem 0.95rem" : "0.7rem 0.85rem",
+                          alignItems: "center",
+                          padding: "0.65rem 0.9rem",
                           borderRadius: 12,
+                          background: isDark
+                            ? "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)"
+                            : "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                          border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(251, 191, 36, 0.4)",
+                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                          marginBottom: "0.7rem",
+                          position: "relative",
+                          overflow: "hidden",
+                          transition: "transform 0.2s ease, border-color 0.2s ease",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
-                          {/* Rank / Medal Emblem */}
-                          <div
-                            className="leaderboard-rank-num"
-                            style={{
-                              width: 24,
-                              textAlign: "center",
-                              fontSize: isRank1 || isRank2 || isRank3 ? "1.1rem" : "0.85rem",
-                              fontWeight: 800,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {u.medal}
+                        <div style={{ position: "relative", zIndex: 1 }}>
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: "0.35rem",
+                            fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.07em",
+                            color: isDark ? "#fbbf24" : "#b45309", textTransform: "uppercase", marginBottom: "2px",
+                          }}>
+                            <span>⭐</span>
+                            <span>COHORT MILESTONE RECORD</span>
                           </div>
-
-                          {/* Avatar Circle */}
-                          <div
-                            className="leaderboard-avatar"
-                            style={{
-                              background: avatarBg,
-                              color: avatarColor,
-                              border: avatarBorder,
-                              boxShadow: isRank1
-                                ? "0 0 10px rgba(251, 191, 36, 0.4)"
-                                : isUser
-                                ? "0 0 12px rgba(168, 85, 247, 0.4)"
-                                : "none",
-                              overflow: "hidden",
-                            }}
-                          >
-                            {u.avatarUrl ? (
-                              <img
-                                src={u.avatarUrl}
-                                alt={u.name}
-                                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                              />
-                            ) : (
-                              u.initials || "S"
-                            )}
-                          </div>
-
-                          {/* Name & Title */}
-                          <div style={{ minWidth: 0 }}>
-                            <div
-                              className="leaderboard-name"
-                              style={{
-                                fontSize: "0.88rem",
-                                fontWeight: 700,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.35rem",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              <span>{u.name}</span>
-                              {isRank1 && <span title="Current #1 Leader">👑</span>}
-                              {isUser && (
-                                <span
-                                  className="leaderboard-you-badge"
-                                  style={{
-                                    fontSize: "0.62rem",
-                                    fontWeight: 800,
-                                    padding: "1px 5px",
-                                    borderRadius: 4,
-                                    letterSpacing: "0.05em",
-                                  }}
-                                >
-                                  YOU
-                                </span>
-                              )}
-                            </div>
-                            <div
-                              className="leaderboard-subtitle"
-                              style={{
-                                fontSize: "0.72rem",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.35rem",
-                                marginTop: "3px",
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {u.currentBadge ? (
-                                <StreakBadge badge={u.currentBadge} compact />
-                              ) : (u.streakDays > 0) ? (
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "0.2rem",
-                                    padding: "0.1rem 0.4rem",
-                                    borderRadius: 999,
-                                    fontSize: "0.68rem",
-                                    fontWeight: 700,
-                                    color: "#a78bfa",
-                                    background: "rgba(167, 139, 250, 0.12)",
-                                    border: "1px solid rgba(167, 139, 250, 0.25)",
-                                  }}
-                                >
-                                  {u.badgeIcon} {u.badgeName}
-                                </span>
-                              ) : (
-                                <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>No active streak</span>
-                              )}
-
-                              {u.streakDays > 0 && (
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "0.2rem",
-                                    fontSize: "0.7rem",
-                                    fontWeight: 700,
-                                    color: "#f97316",
-                                    background: "rgba(249, 115, 22, 0.12)",
-                                    padding: "0.1rem 0.45rem",
-                                    borderRadius: 999,
-                                    border: "1px solid rgba(249, 115, 22, 0.28)",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  🔥 {u.streakDays}d
-                                </span>
-                              )}
-                            </div>
+                          <div style={{ fontSize: "0.78rem", color: isDark ? "#f1f0f5" : "#0f172a", fontWeight: 600 }}>
+                            {recordHolder} · <span style={{ color: isDark ? "#94a3b8" : "#64748b", fontWeight: 500 }}>{recordDate}</span>
                           </div>
                         </div>
 
-                        {/* Right — Prize Tag + Points & Status Icon */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
-                          {/* Prize Badge if winning */}
-                          {isWinningSpot && userPrize.amount && (
-                            <div
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "3px",
-                                background: userPrize.glow,
-                                border: `1px solid ${userPrize.color}50`,
-                                borderRadius: 8,
-                                padding: "3px 8px",
-                                fontSize: "0.74rem",
-                                fontWeight: 800,
-                                color: userPrize.color,
-                                letterSpacing: "-0.01em",
-                              }}
-                              title={`Holding ${userPrize.label} (${userPrize.amount})`}
-                            >
-                              <span>🏆</span>
-                              <span>{userPrize.amount}</span>
-                            </div>
-                          )}
-
-                          <div style={{ textAlign: "right", minWidth: 48 }}>
-                            <div
-                              className="leaderboard-pts-badge"
-                              style={{
-                                fontSize: "0.92rem",
-                                fontWeight: 800,
-                              }}
-                            >
-                              <span className="leaderboard-pts-num">{u.pts}</span>
-                              <span className="leaderboard-pts-label" style={{ fontSize: "0.72rem", fontWeight: 600 }}>pts</span>
-                            </div>
-                            <div style={{
-                              fontSize: "0.8rem",
-                              marginTop: "2px",
-                              lineHeight: 1,
-                            }}>
-                              <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
-                                {u.isCompletedToday ? "✅" : "⏳"}
-                              </span>
-                            </div>
-                          </div>
+                        <div style={{
+                          position: "relative", zIndex: 1,
+                          display: "flex", alignItems: "baseline", gap: "3px",
+                        }}>
+                          <span style={{
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            fontSize: "1.5rem",
+                            fontWeight: 700,
+                            color: isDark ? "#fbbf24" : "#b45309",
+                            lineHeight: 1,
+                          }}>
+                            {recordScore}
+                          </span>
+                          <span style={{ fontSize: "0.7rem", fontWeight: 700, color: isDark ? "#fbbf24" : "#b45309" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
                         </div>
                       </div>
 
-                      {/* Prize Cutoff Divider Line */}
-                      {showCutoffLineAfter && (
-                        <div style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.5rem",
-                          margin: "0.35rem 0",
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          color: "#64748b",
-                          letterSpacing: "0.06em",
-                          textTransform: "uppercase",
+                      {/* Motivational Position / Gap Banner */}
+                      <div style={{
+                        background: isDark ? "rgba(168, 85, 247, 0.08)" : "rgba(168, 85, 247, 0.05)",
+                        border: isDark ? "1px solid rgba(168, 85, 247, 0.2)" : "1px solid rgba(168, 85, 247, 0.25)",
+                        borderRadius: 12,
+                        padding: "0.55rem 0.8rem",
+                        marginBottom: "0.7rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.55rem",
+                      }}>
+                        <span style={{ fontSize: "1.05rem", flexShrink: 0 }}>🚀</span>
+                        <div style={{ fontSize: "0.72rem", color: isDark ? "#c4b5fd" : "#6b21a8", fontWeight: 600, lineHeight: 1.4 }}>
+                          {myRank > 0 && myRank <= winnerCount ? (
+                            <span>
+                              <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Great job!</strong> You're currently holding <strong style={{ color: rankColors[myRank - 1] || "#fbbf24" }}>{myRank === 1 ? "1st" : myRank === 2 ? "2nd" : myRank === 3 ? "3rd" : `Rank ${myRank}`} Place ({prizeMap[myRank]?.amount || "Prize"})</strong>. Keep practicing daily to lock in your reward! 🔥
+                            </span>
+                          ) : (
+                            <span>
+                              <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Stay consistent!</strong> {ptsGap > 0 ? (
+                                <>You are only <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>{ptsGap} pts</strong> away from <strong style={{ color: cutoffPrize?.color || "#fbbf24" }}>{cutoffPrize?.label || `Top ${winnerCount}`} ({cutoffPrize?.amount || "Prize"})</strong>! </>
+                              ) : (
+                                <>Practice daily to climb into the <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>Top {winnerCount} Prize Zone</strong>! </>
+                              )}
+                              Submit today's speaking challenge to climb the ranks! 🔥
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Group Member Stats: 3 Micro-Cards docked at bottom */}
+                      <div className="leaderboard-stat-grid" style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gap: "0.5rem",
+                        textAlign: "center",
+                        marginTop: "auto",
+                        paddingTop: "0.4rem",
+                      }}>
+                        <div className="leaderboard-stat-card members-card" style={{
+                          borderRadius: 10,
+                          padding: "0.5rem 0.35rem",
                         }}>
-                          <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
-                          <span>🏆 Top {winnerCount} Prize Cutoff</span>
-                          <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
+                          <div className="leaderboard-stat-label">MEMBERS</div>
+                          <div className="leaderboard-stat-val">{memberCount}</div>
+                        </div>
+                        <div className="leaderboard-stat-card submitted-card" style={{
+                          borderRadius: 10,
+                          padding: "0.5rem 0.35rem",
+                        }}>
+                          <div className="leaderboard-stat-label">SUBMITTED</div>
+                          <div className="leaderboard-stat-val">{submittedCount}</div>
+                        </div>
+                        <div className="leaderboard-stat-card pending-card" style={{
+                          borderRadius: 10,
+                          padding: "0.5rem 0.35rem",
+                        }}>
+                          <div className="leaderboard-stat-label">PENDING</div>
+                          <div className="leaderboard-stat-val">{pendingCount}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* RIGHT COLUMN: Live Practice Rankings */}
+                    <div className="unified-gamification-right">
+                      {/* Section Subtitle */}
+                      <div className="unified-section-subtitle">
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: "#38bdf8", textTransform: "uppercase" }}>
+                          <span>📊</span>
+                          <span>Live Practice Rankings</span>
+                        </div>
+                        <div style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontSize: "0.66rem",
+                          fontWeight: 700,
+                          color: "#86efac",
+                          background: "rgba(34, 197, 94, 0.1)",
+                          border: "1px solid rgba(34, 197, 94, 0.25)",
+                          padding: "2px 7px",
+                          borderRadius: 99,
+                        }}>
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
+                          <span>Live · {currentLeaderboard.length} Members</span>
+                        </div>
+                      </div>
+
+                      {/* Ranked Peer Rows (Scrollable Container) */}
+                      <div
+                        className="leaderboard-scroll-container"
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.45rem",
+                          marginBottom: currentLeaderboard.length > 5 ? "0.45rem" : "0",
+                          maxHeight: "360px",
+                          overflowY: "auto",
+                          paddingRight: "4px",
+                          scrollBehavior: "smooth",
+                        }}
+                      >
+                        {currentLeaderboard.map((u, i) => {
+                          const isRank1 = u.rank === 1;
+                          const isRank2 = u.rank === 2;
+                          const isRank3 = u.rank === 3;
+                          const isUser = u.isUser;
+                          const userPrize = prizeMap[u.rank];
+                          const isWinningSpot = u.rank <= winnerCount && userPrize;
+                          const showCutoffLineAfter = u.rank === winnerCount && currentLeaderboard.length > winnerCount;
+
+                          const rowClass = isUser
+                            ? "leaderboard-row user-row"
+                            : isRank1
+                            ? "leaderboard-row rank-1"
+                            : isRank2
+                            ? "leaderboard-row rank-2"
+                            : isRank3
+                            ? "leaderboard-row rank-3"
+                            : "leaderboard-row standard-row";
+
+                          const avatarBg = isRank1
+                            ? "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)"
+                            : isRank2
+                            ? "linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)"
+                            : isRank3
+                            ? "linear-gradient(135deg, #f97316 0%, #b45309 100%)"
+                            : isUser
+                            ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
+                            : "linear-gradient(135deg, #334155 0%, #1e293b 100%)";
+
+                          const avatarColor = isRank1 ? "#000000" : "#ffffff";
+                          const avatarBorder = isRank1
+                            ? "2px solid #fde68a"
+                            : isRank2
+                            ? "2px solid #e2e8f0"
+                            : isRank3
+                            ? "2px solid #fed7aa"
+                            : isUser
+                            ? "2px solid #c084fc"
+                            : "1px solid rgba(255, 255, 255, 0.12)";
+
+                          return (
+                            <React.Fragment key={u.id || `${u.name}-${i}`}>
+                              <div
+                                className={rowClass}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: isUser ? "0.65rem 0.85rem" : "0.55rem 0.75rem",
+                                  borderRadius: 11,
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0 }}>
+                                  {/* Rank / Medal Emblem */}
+                                  <div
+                                    className="leaderboard-rank-num"
+                                    style={{
+                                      width: 22,
+                                      textAlign: "center",
+                                      fontSize: isRank1 || isRank2 || isRank3 ? "1.05rem" : "0.82rem",
+                                      fontWeight: 800,
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {u.medal}
+                                  </div>
+
+                                  {/* Avatar Circle */}
+                                  <div
+                                    className="leaderboard-avatar"
+                                    style={{
+                                      width: 34,
+                                      height: 34,
+                                      borderRadius: "50%",
+                                      background: avatarBg,
+                                      color: avatarColor,
+                                      border: avatarBorder,
+                                      boxShadow: isRank1
+                                        ? "0 0 10px rgba(251, 191, 36, 0.4)"
+                                        : isUser
+                                        ? "0 0 10px rgba(168, 85, 247, 0.4)"
+                                        : "none",
+                                      overflow: "hidden",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontWeight: 800,
+                                      fontSize: "0.82rem",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {u.avatarUrl ? (
+                                      <img
+                                        src={u.avatarUrl}
+                                        alt={u.name}
+                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                                      />
+                                    ) : (
+                                      u.initials || "S"
+                                    )}
+                                  </div>
+
+                                  {/* Name & Title */}
+                                  <div style={{ minWidth: 0 }}>
+                                    <div
+                                      className="leaderboard-name"
+                                      style={{
+                                        fontSize: "0.84rem",
+                                        fontWeight: 700,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.3rem",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                      }}
+                                    >
+                                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
+                                      {isRank1 && <span title="Current #1 Leader">👑</span>}
+                                      {isUser && (
+                                        <span
+                                          className="leaderboard-you-badge"
+                                          style={{
+                                            fontSize: "0.58rem",
+                                            fontWeight: 800,
+                                            padding: "1px 4px",
+                                            borderRadius: 4,
+                                            letterSpacing: "0.05em",
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          YOU
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div
+                                      className="leaderboard-subtitle"
+                                      style={{
+                                        fontSize: "0.68rem",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.3rem",
+                                        marginTop: "2px",
+                                        flexWrap: "wrap",
+                                      }}
+                                    >
+                                      {u.currentBadge ? (
+                                        <StreakBadge badge={u.currentBadge} compact />
+                                      ) : (u.streakDays > 0) ? (
+                                        <span
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.2rem",
+                                            padding: "0.05rem 0.35rem",
+                                            borderRadius: 999,
+                                            fontSize: "0.65rem",
+                                            fontWeight: 700,
+                                            color: "#a78bfa",
+                                            background: "rgba(167, 139, 250, 0.12)",
+                                            border: "1px solid rgba(167, 139, 250, 0.25)",
+                                          }}
+                                        >
+                                          {u.badgeIcon} {u.badgeName}
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: "var(--muted)", fontSize: "0.68rem" }}>No active streak</span>
+                                      )}
+
+                                      {u.streakDays > 0 && (
+                                        <span
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.2rem",
+                                            fontSize: "0.68rem",
+                                            fontWeight: 700,
+                                            color: "#f97316",
+                                            background: "rgba(249, 115, 22, 0.12)",
+                                            padding: "0.05rem 0.4rem",
+                                            borderRadius: 999,
+                                            border: "1px solid rgba(249, 115, 22, 0.28)",
+                                            whiteSpace: "nowrap",
+                                          }}
+                                        >
+                                          🔥 {u.streakDays}d
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Right — Prize Tag + Points & Status Icon */}
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+                                  {/* Prize Badge if winning */}
+                                  {isWinningSpot && userPrize.amount && (
+                                    <div
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "2px",
+                                        background: userPrize.glow,
+                                        border: `1px solid ${userPrize.color}50`,
+                                        borderRadius: 7,
+                                        padding: "2px 7px",
+                                        fontSize: "0.72rem",
+                                        fontWeight: 800,
+                                        color: userPrize.color,
+                                        letterSpacing: "-0.01em",
+                                      }}
+                                      title={`Holding ${userPrize.label} (${userPrize.amount})`}
+                                    >
+                                      <span>🏆</span>
+                                      <span>{userPrize.amount}</span>
+                                    </div>
+                                  )}
+
+                                  <div style={{ textAlign: "right", minWidth: 44 }}>
+                                    <div
+                                      className="leaderboard-pts-badge"
+                                      style={{
+                                        fontSize: "0.88rem",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      <span className="leaderboard-pts-num">{u.pts}</span>
+                                      <span className="leaderboard-pts-label" style={{ fontSize: "0.68rem", fontWeight: 600 }}>pts</span>
+                                    </div>
+                                    <div style={{
+                                      fontSize: "0.75rem",
+                                      marginTop: "1px",
+                                      lineHeight: 1,
+                                    }}>
+                                      <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
+                                        {u.isCompletedToday ? "✅" : "⏳"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Prize Cutoff Divider Line */}
+                              {showCutoffLineAfter && (
+                                <div style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.5rem",
+                                  margin: "0.25rem 0",
+                                  fontSize: "0.62rem",
+                                  fontWeight: 800,
+                                  color: "#64748b",
+                                  letterSpacing: "0.06em",
+                                  textTransform: "uppercase",
+                                }}>
+                                  <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
+                                  <span>🏆 Top {winnerCount} Prize Cutoff</span>
+                                  <span style={{ flex: 1, height: 1, background: "rgba(100,116,139,0.25)" }} />
+                                </div>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+
+                      {/* Scroll for more members button / indicator */}
+                      {currentLeaderboard.length > 5 && (
+                        <div
+                          className="leaderboard-scroll-hint"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "0.45rem",
+                            fontSize: "0.7rem",
+                            fontWeight: 700,
+                            color: "#c4b5fd",
+                            background: "rgba(124, 111, 255, 0.08)",
+                            border: "1px dashed rgba(124, 111, 255, 0.3)",
+                            borderRadius: 9,
+                            padding: "5px 10px",
+                            marginTop: "0.45rem",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            userSelect: "none",
+                          }}
+                          onClick={() => {
+                            const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
+                            if (el) el.scrollBy({ top: 120, behavior: "smooth" });
+                          }}
+                          title="Click to scroll and see more group members"
+                        >
+                          <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
+                          <span style={{ fontSize: "0.8rem" }}>↓</span>
                         </div>
                       )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-
-              {/* Scroll for more members button / indicator */}
-              {currentLeaderboard.length > 5 && (
-                <div
-                  className="leaderboard-scroll-hint"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "0.45rem",
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                    color: "#c4b5fd",
-                    background: "rgba(124, 111, 255, 0.08)",
-                    border: "1px dashed rgba(124, 111, 255, 0.3)",
-                    borderRadius: 10,
-                    padding: "6px 12px",
-                    marginBottom: "0.9rem",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    userSelect: "none",
-                  }}
-                  onClick={() => {
-                    const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
-                    if (el) el.scrollBy({ top: 140, behavior: "smooth" });
-                  }}
-                  title="Click to scroll and see more group members"
-                >
-                  <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
-                  <span style={{ fontSize: "0.85rem" }}>↓</span>
-                </div>
-              )}
-
-              {/* Motivational Gap Banner */}
-              <div style={{
-                background: "rgba(168, 85, 247, 0.08)",
-                border: "1px solid rgba(168, 85, 247, 0.2)",
-                borderRadius: 12,
-                padding: "0.7rem 0.95rem",
-                marginBottom: "0.9rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.65rem",
-              }}>
-                <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>🚀</span>
-                <div style={{ fontSize: "0.74rem", color: "#c4b5fd", fontWeight: 600, lineHeight: 1.45 }}>
-                  {myRank > 0 && myRank <= winnerCount ? (
-                    <span>
-                      <strong style={{ color: "#e9d5ff" }}>Great job!</strong> You're currently holding <strong style={{ color: rankColors[myRank - 1] || "#fbbf24" }}>{myRank === 1 ? "1st" : myRank === 2 ? "2nd" : myRank === 3 ? "3rd" : `Rank ${myRank}`} Place ({prizeMap[myRank]?.amount || "Prize"})</strong>. Keep practicing daily to lock in your reward! 🔥
-                    </span>
-                  ) : (
-                    <span>
-                      <strong style={{ color: "#e9d5ff" }}>Stay consistent!</strong> {ptsGap > 0 ? (
-                        <>You are only <strong style={{ color: "#fbbf24" }}>{ptsGap} pts</strong> away from <strong style={{ color: cutoffPrize?.color || "#fbbf24" }}>{cutoffPrize?.label || `Top ${winnerCount}`} ({cutoffPrize?.amount || "Prize"})</strong>! </>
-                      ) : (
-                        <>Practice daily to climb into the <strong style={{ color: "#fbbf24" }}>Top {winnerCount} Prize Zone</strong>! </>
-                      )}
-                      Submit today's speaking challenge to climb the ranks! 🔥
-                    </span>
-                  )}
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Group Member Stats: 3 Micro-Cards docked at bottom */}
-              <div className="leaderboard-stat-grid" style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "0.6rem",
-                textAlign: "center",
-                marginTop: "auto",
-                paddingTop: "0.5rem",
-              }}>
-                <div className="leaderboard-stat-card members-card" style={{
-                  borderRadius: 10,
-                  padding: "0.55rem 0.4rem",
-                }}>
-                  <div className="leaderboard-stat-label">MEMBERS</div>
-                  <div className="leaderboard-stat-val">{memberCount}</div>
-                </div>
-                <div className="leaderboard-stat-card submitted-card" style={{
-                  borderRadius: 10,
-                  padding: "0.55rem 0.4rem",
-                }}>
-                  <div className="leaderboard-stat-label">SUBMITTED</div>
-                  <div className="leaderboard-stat-val">{submittedCount}</div>
-                </div>
-                <div className="leaderboard-stat-card pending-card" style={{
-                  borderRadius: 10,
-                  padding: "0.55rem 0.4rem",
-                }}>
-                  <div className="leaderboard-stat-label">PENDING</div>
-                  <div className="leaderboard-stat-val">{pendingCount}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+            );
+          })()}
 
           {/* ── Section 5: Performance Analytics Suite (Row 2 - Full Width) ── */}
           <div className="speakshine-perf-analytics-section">
