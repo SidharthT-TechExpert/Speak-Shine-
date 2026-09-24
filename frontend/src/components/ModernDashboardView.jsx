@@ -9,6 +9,7 @@ import MidnightCountdownTimer from "./MidnightCountdownTimer.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import Modal from "./Modal.jsx";
 import gsap from "gsap";
+import StreakBadge from "./StreakBadge.jsx";
 import { getBadgeForStreak, getBadgeProgress, STREAK_BADGES } from "../utils/streakBadges.js";
 import api from "../api/client.js";
 import { useShell } from "../context/ShellContext.jsx";
@@ -1169,7 +1170,7 @@ export default function ModernDashboardView({
 
       const initials = isUser ? (avatarInitials || "YOU") : getInitials(name);
 
-      const streakBadge = hasActiveStreak ? getBadgeForStreak(streakDays) : null;
+      const streakBadge = u.currentBadge || (hasActiveStreak ? getBadgeForStreak(streakDays) : null);
       const badgeName = hasActiveStreak ? (streakBadge ? streakBadge.name : "Active Speaker") : "No rank";
       const badgeIcon = hasActiveStreak ? (streakBadge ? streakBadge.icon : "🌱") : "⚪";
       const title = `${badgeName} · ${streakDays}d`;
@@ -1199,6 +1200,7 @@ export default function ModernDashboardView({
         title,
         badgeName,
         badgeIcon,
+        currentBadge: streakBadge,
         streakDays,
         pts,
         weeklySubmissions,
@@ -5106,9 +5108,57 @@ export default function ModernDashboardView({
                             </div>
                             <div
                               className="leaderboard-subtitle"
-                              style={{ fontSize: "0.72rem", display: "flex", alignItems: "center", gap: "0.3rem" }}
+                              style={{
+                                fontSize: "0.72rem",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.35rem",
+                                marginTop: "3px",
+                                flexWrap: "wrap",
+                              }}
                             >
-                              <span>{u.title}</span>
+                              {u.currentBadge ? (
+                                <StreakBadge badge={u.currentBadge} compact />
+                              ) : (u.streakDays > 0) ? (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.2rem",
+                                    padding: "0.1rem 0.4rem",
+                                    borderRadius: 999,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    color: "#a78bfa",
+                                    background: "rgba(167, 139, 250, 0.12)",
+                                    border: "1px solid rgba(167, 139, 250, 0.25)",
+                                  }}
+                                >
+                                  {u.badgeIcon} {u.badgeName}
+                                </span>
+                              ) : (
+                                <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>No active streak</span>
+                              )}
+
+                              {u.streakDays > 0 && (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.2rem",
+                                    fontSize: "0.7rem",
+                                    fontWeight: 700,
+                                    color: "#f97316",
+                                    background: "rgba(249, 115, 22, 0.12)",
+                                    padding: "0.1rem 0.45rem",
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(249, 115, 22, 0.28)",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  🔥 {u.streakDays}d
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

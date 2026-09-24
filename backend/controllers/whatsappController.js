@@ -213,7 +213,7 @@ export async function getGroups(req, res) {
 
 export async function getMonthEndPrizeSummary(req, res) {
   try {
-    const { totalCollection, winnerCount, calculationMethod, customAmounts, customWinnerNames, footerNote } = req.query || {};
+    const { totalCollection, winnerCount, calculationMethod, customAmounts, customWinnerNames, footerNote, syncWithLeaderboard } = req.query || {};
     const parsedCustom = customAmounts ? String(customAmounts).split(",").map(Number) : undefined;
     const parsedNames = customWinnerNames ? String(customWinnerNames).split(",") : undefined;
 
@@ -224,6 +224,7 @@ export async function getMonthEndPrizeSummary(req, res) {
       customAmounts: parsedCustom,
       customWinnerNames: parsedNames,
       footerNote,
+      syncWithLeaderboard: syncWithLeaderboard === "true" || syncWithLeaderboard === true,
     });
 
     return res.json(summary);

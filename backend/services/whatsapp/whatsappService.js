@@ -25,6 +25,7 @@ import WhatsAppAuth from "../../../models/whatsAppAuthSchema.js";
 import User from "../../../models/userSchema.js";
 import Auth from "../../../models/authSchema.js";
 import Transaction from "../../../models/transactionSchema.js";
+import { serializeStreakBadges } from "../../utils/streakBadges.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1567,24 +1568,56 @@ export async function getMonthEndPrizeReportSummary(options = {}) {
       customAmounts,
     });
 
-    // 4. Fetch Top Ranked Users from Leaderboard by monthlyScore
-    const allUsers = await User.find({}).sort({ monthlyScore: -1, streak: -1, name: 1 }).lean();
-    const topScorers = allUsers.slice(0, winnerCount);
+    // 4. Fetch Top Ranked Users from Leaderboard by monthlyScore (aligned with Dashboard Leaderboard)
+    let paidUsers = await User.find({ paid: true }).lean().catch(() => []);
+    if (!paidUsers || paidUsers.length === 0) {
+      paidUsers = await User.find({}).lean().catch(() => []);
+    }
+
+    const leaderboardSorted = [...paidUsers].sort((a, b) => {
+      const streakA = a.streak || 0;
+      const streakB = b.streak || 0;
+      const hasStreakA = streakA > 0;
+      const hasStreakB = streakB > 0;
+
+      // Active streak speakers always sort above 0-day speakers
+      if (hasStreakA && !hasStreakB) return -1;
+      if (!hasStreakA && hasStreakB) return 1;
+
+      const scoreA = a.monthlyScore ?? 0;
+      const scoreB = b.monthlyScore ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;          // higher pts first
+      if (b.completed !== a.completed) return b.completed ? 1 : -1; // submitted floats up
+      return streakB - streakA;                               // streak tiebreaker
+    });
+
+    const topScorers = leaderboardSorted.slice(0, winnerCount);
+
+    const useExplicitCustomNames = Array.isArray(options.customWinnerNames) && options.customWinnerNames.length > 0;
+    const customNamesSource = useExplicitCustomNames
+      ? options.customWinnerNames
+      : (options.syncWithLeaderboard ? [] : (dbStatus?.prizeCustomWinnerNames || []));
 
     // Map winners with clean names (no @ tags) directly from DB points leaderboard or stored custom names
     const winners = calc.amounts.map((amount, idx) => {
       const userObj = topScorers[idx];
       const dbName = userObj ? (userObj.registeredName || userObj.name || `Student ${idx + 1}`) : `Student ${idx + 1}`;
-      const rawName = (customWinnerNamesList[idx] && customWinnerNamesList[idx].trim())
-        ? customWinnerNamesList[idx].trim()
+      const rawName = (customNamesSource[idx] && String(customNamesSource[idx]).trim())
+        ? String(customNamesSource[idx]).trim()
         : dbName;
 
       const cleanName = String(rawName).replace(/^@~?/, "");
+      const badgeData = userObj ? serializeStreakBadges(userObj) : null;
+
       return {
         rank: idx + 1,
+        userId: userObj?.userId || null,
         name: cleanName,
         phone: userObj?.phone || null,
+        streak: userObj?.streak || 0,
         monthlyScore: userObj?.monthlyScore || 0,
+        avatarUrl: userObj?.avatarUrl || null,
+        currentBadge: badgeData?.currentBadge || null,
         amount,
         percentage: calc.percentages[idx] || 0,
       };
@@ -1768,7 +1801,9 @@ export async function saveMonthEndPrizeSettings(settings = {}) {
     updates.prizeCustomAmounts = settings.customAmounts.map(Number).filter(n => !isNaN(n));
   }
 
-  if (Array.isArray(settings.customWinnerNames)) {
+  if (settings.syncWithLeaderboard === true || settings.resetCustomNames === true) {
+    updates.prizeCustomWinnerNames = [];
+  } else if (Array.isArray(settings.customWinnerNames)) {
     updates.prizeCustomWinnerNames = settings.customWinnerNames.map(s => String(s || "").trim());
   }
 

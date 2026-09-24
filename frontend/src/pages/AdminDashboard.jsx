@@ -1045,15 +1045,16 @@ export default function AdminDashboard() {
         if (effectiveMethod) params.append("calculationMethod", effectiveMethod);
         if (effectiveCollection != null && effectiveCollection !== "") params.append("totalCollection", effectiveCollection);
         if (effectiveCustomAmounts) params.append("customAmounts", effectiveCustomAmounts);
-        if (effectiveWinnerNames) params.append("customWinnerNames", effectiveWinnerNames);
+        if (effectiveWinnerNames && !overrides?.syncWithLeaderboard) params.append("customWinnerNames", effectiveWinnerNames);
         if (effectiveFooterNote) params.append("footerNote", effectiveFooterNote);
+        if (overrides?.syncWithLeaderboard) params.append("syncWithLeaderboard", "true");
       }
 
       const queryString = params.toString() ? `?${params.toString()}` : "";
       const res = await api.get(`/whatsapp/month-end-summary${queryString}`);
       if (res.data?.success) {
         setWaPrizeSummary(res.data);
-        if (isInitialFetch) {
+        if (isInitialFetch || overrideParams.syncWithLeaderboard) {
           if (res.data.winnerCount) setPrizeWinnerCount(res.data.winnerCount);
           if (res.data.calculationMethod) setPrizeCalculationMethod(res.data.calculationMethod);
           setPrizeCustomTotalCollection(res.data.prizeCustomTotalCollection != null ? String(res.data.prizeCustomTotalCollection) : "");
@@ -1068,11 +1069,7 @@ export default function AdminDashboard() {
           }
           if (Array.isArray(res.data.winners)) {
             const names = res.data.winners.map(w => w.name);
-            setPrizeWinnerNames(prev => {
-              const next = [...prev];
-              names.forEach((n, i) => { next[i] = n || ""; });
-              return next;
-            });
+            setPrizeWinnerNames(names);
           }
         }
       }
@@ -5573,9 +5570,32 @@ export default function AdminDashboard() {
                 
                 {/* Winners Leaderboard Mapping Table */}
                 <div>
-                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.65rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#f8fafc", marginBottom: "0.65rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
                     <span>🥇 Winners Leaderboard Mapping ({prizeWinnerCount} Members)</span>
-                    <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>Mapped directly from DB points</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await loadWaPrizeSummary({ syncWithLeaderboard: true });
+                        msg("🔄 Winners synced directly with live leaderboard!", "info");
+                      }}
+                      style={{
+                        fontSize: "0.72rem",
+                        color: "#c084fc",
+                        background: "rgba(167, 139, 250, 0.15)",
+                        border: "1px solid rgba(167, 139, 250, 0.35)",
+                        borderRadius: 8,
+                        padding: "3px 9px",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.3rem",
+                        transition: "all 0.15s ease",
+                      }}
+                      title="Reset any custom overrides and sync with live DB leaderboard"
+                    >
+                      🔄 Sync with Leaderboard
+                    </button>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                     {(waPrizeSummary?.winners || []).slice(0, prizeWinnerCount).map((w, idx) => {
@@ -5636,7 +5656,7 @@ export default function AdminDashboard() {
                             }}
                             style={{
                               flex: 1,
-                              minWidth: 160,
+                              minWidth: 140,
                               fontSize: "0.88rem",
                               padding: "0.45rem 0.8rem",
                               background: "rgba(0,0,0,0.4)",
@@ -5647,6 +5667,27 @@ export default function AdminDashboard() {
                             }}
                             placeholder={w?.name || `Student ${idx + 1}`}
                           />
+
+                          {/* Winner Badge Pill */}
+                          {w?.currentBadge && (
+                            <StreakBadge badge={w.currentBadge} compact />
+                          )}
+
+                          {/* Winner Streak Pill */}
+                          {(w?.streak > 0) && (
+                            <span style={{
+                              fontSize: "0.74rem",
+                              color: "#fb923c",
+                              fontWeight: 700,
+                              background: "rgba(249, 115, 22, 0.12)",
+                              border: "1px solid rgba(249, 115, 22, 0.28)",
+                              padding: "2px 7px",
+                              borderRadius: 8,
+                              whiteSpace: "nowrap",
+                            }}>
+                              🔥 {w.streak}d
+                            </span>
+                          )}
 
                           {/* Leaderboard Points Badge */}
                           <div style={{
