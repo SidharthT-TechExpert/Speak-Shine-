@@ -6739,7 +6739,16 @@ audio { border-radius: 12px; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Section 4: Gamification Row (Leaderboard + Month-End Prize Pool) ── */
+/* ── Section 4: Unified Gamification & Prize Pool Hub ── */
+.speakshine-unified-gamification-section {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.speakshine-unified-leaderboard-box {
+  width: 100%;
+}
+
 .speakshine-gamification-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
