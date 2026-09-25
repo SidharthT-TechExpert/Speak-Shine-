@@ -99,14 +99,15 @@ async function restoreAuthFromMongo() {
   }
 }
 
-let isSyncingToMongo = false;
-async function syncAuthDirToMongo() {
-  if (isSyncingToMongo) return;
-  isSyncingToMongo = true;
+/**
+ * Flushes all Baileys auth files from AUTH_DIR to MongoDB.
+ * Exported so server shutdown handlers (SIGTERM / SIGINT) can guarantee credentials persistence across deployments.
+ */
+export async function flushAuthToMongo() {
   try {
-    if (!fs.existsSync(AUTH_DIR)) return;
+    if (!fs.existsSync(AUTH_DIR)) return 0;
     const files = fs.readdirSync(AUTH_DIR);
-    if (files.length === 0) return;
+    if (files.length === 0) return 0;
 
     const operations = [];
     for (const file of files) {
@@ -125,13 +126,27 @@ async function syncAuthDirToMongo() {
       } catch {}
     }
 
-    const chunkSize = 500;
-    for (let i = 0; i < operations.length; i += chunkSize) {
-      const chunk = operations.slice(i, i + chunkSize);
-      await WhatsAppAuth.bulkWrite(chunk, { ordered: false });
+    if (operations.length > 0) {
+      const chunkSize = 500;
+      for (let i = 0; i < operations.length; i += chunkSize) {
+        const chunk = operations.slice(i, i + chunkSize);
+        await WhatsAppAuth.bulkWrite(chunk, { ordered: false });
+      }
+      console.log(`[WhatsApp] 💾 Synced ${operations.length} session auth files to MongoDB`);
     }
+    return operations.length;
   } catch (err) {
-    console.warn("[WhatsApp] Could not sync auth to MongoDB:", err.message);
+    console.warn("[WhatsApp] Could not flush auth to MongoDB:", err.message);
+    return 0;
+  }
+}
+
+let isSyncingToMongo = false;
+async function syncAuthDirToMongo() {
+  if (isSyncingToMongo) return;
+  isSyncingToMongo = true;
+  try {
+    await flushAuthToMongo();
   } finally {
     isSyncingToMongo = false;
   }
@@ -378,17 +393,11 @@ export async function initWhatsAppBot() {
           : lastDisconnect?.error?.statusCode;
 
         const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-        const isTerminalDisconnect = isLoggedOut ||
-          statusCode === DisconnectReason.badSession ||
-          statusCode === DisconnectReason.forbidden ||
-          statusCode === DisconnectReason.multideviceMismatch ||
-          statusCode === DisconnectReason.connectionReplaced ||
-          reconnectAttempts >= 4;
 
-        console.log(`[WhatsApp] ⚠️ Connection closed. Status code: ${statusCode || "unknown"} (Attempt ${reconnectAttempts}). Terminal: ${isTerminalDisconnect}`);
+        console.log(`[WhatsApp] ⚠️ Connection closed. Status code: ${statusCode || "unknown"} (Attempt ${reconnectAttempts}). LoggedOut: ${isLoggedOut}`);
 
-        if (isTerminalDisconnect) {
-          console.log(`[WhatsApp] 🚪 Session invalid or failed after ${reconnectAttempts} attempts. Resetting auth credentials to generate new QR code...`);
+        if (isLoggedOut) {
+          console.log(`[WhatsApp] 🚪 Session explicitly logged out from WhatsApp device. Clearing credentials and preparing for new QR code...`);
           currentQR = null;
           currentQRDataUrl = null;
           userPhone = null;
@@ -398,9 +407,11 @@ export async function initWhatsAppBot() {
           broadcastStatus();
           scheduleReconnect(1500);
         } else {
-          // Restart required (515) or temporary socket drop
+          // Keep credentials safe in MongoDB! Calculate exponential backoff: 2s, 3s, 4.5s, 6.75s, ... max 30s
+          const backoffDelay = Math.min(Math.round(2000 * Math.pow(1.5, Math.min(reconnectAttempts - 1, 6))), 30000);
+          console.log(`[WhatsApp] 🔄 Scheduling reconnect in ${backoffDelay}ms (attempt ${reconnectAttempts}). Session credentials preserved.`);
           broadcastStatus();
-          scheduleReconnect(1500);
+          scheduleReconnect(backoffDelay);
         }
       }
     });

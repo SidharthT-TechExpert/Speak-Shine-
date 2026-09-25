@@ -4626,7 +4626,7 @@ export default function ModernDashboardView({
                         </div>
                       </div>
 
-                      {/* Subheader Status Pill */}
+                      {/* Single Unified Subheader Status Pill with Member Details */}
                       <div className="leaderboard-sub-pill" style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -4647,7 +4647,7 @@ export default function ModernDashboardView({
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
                       {/* LIVE Prize Pool Pill */}
                       <div style={{
                         display: "flex", alignItems: "center", gap: "6px",
@@ -4683,119 +4683,61 @@ export default function ModernDashboardView({
                     </div>
                   </div>
 
-                  {/* ── 2-Column Inner Body: Left (Prizes & Cohort Highlights) + Right (Live Rankings) ── */}
-                  <div className="unified-gamification-body">
-                    {/* LEFT COLUMN: Prize Podium, Milestone Record, Motivation, Stat cards */}
-                    <div className="unified-gamification-left">
-                      {/* Section Subtitle */}
-                      <div className="unified-section-subtitle">
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: "#c084fc", textTransform: "uppercase" }}>
-                          <span>🏆</span>
-                          <span>Month-End Prize Pool</span>
-                        </div>
-                        <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 600 }}>
-                          Top {winnerCount} Earn Rewards
-                        </span>
+                  {/* ── Top Highlights Row: Motivational Banner & Cohort Record Badge (Full Width) ── */}
+                  <div className="leaderboard-top-highlights" style={{
+                    display: "grid",
+                    gridTemplateColumns: recordHolder ? "minmax(0, 1.4fr) minmax(0, 1fr)" : "1fr",
+                    gap: "0.75rem",
+                    marginBottom: "1rem",
+                    position: "relative",
+                    zIndex: 1,
+                  }}>
+                    {/* Motivational Position / Gap Banner */}
+                    <div style={{
+                      background: isDark ? "rgba(168, 85, 247, 0.08)" : "rgba(168, 85, 247, 0.05)",
+                      border: isDark ? "1px solid rgba(168, 85, 247, 0.22)" : "1px solid rgba(168, 85, 247, 0.28)",
+                      borderRadius: 12,
+                      padding: "0.65rem 0.9rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.6rem",
+                    }}>
+                      <span style={{ fontSize: "1.15rem", flexShrink: 0 }}>🚀</span>
+                      <div style={{ fontSize: "0.75rem", color: isDark ? "#c4b5fd" : "#6b21a8", fontWeight: 600, lineHeight: 1.45 }}>
+                        {myRank > 0 && myRank <= winnerCount ? (
+                          <span>
+                            <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Great job!</strong> You're currently holding <strong style={{ color: prizeMap[myRank]?.color || (isDark ? "#fbbf24" : "#b45309") }}>{getRankCfg(myRank).label} ({prizeMap[myRank]?.amount || "Prize"})</strong>. Maintain this spot until month-end to secure your reward! 🔥
+                          </span>
+                        ) : (
+                          <span>
+                            <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Stay consistent!</strong> {ptsGap > 0 ? (
+                              <>You are only <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>{ptsGap} pts</strong> away from <strong style={{ color: cutoffPrize?.color || (isDark ? "#fbbf24" : "#b45309") }}>{cutoffPrize?.label || `Top ${winnerCount}`} ({cutoffPrize?.amount || "Prize"})</strong>! </>
+                            ) : (
+                              <>Practice daily to climb into the <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>Top {winnerCount} Prize Zone</strong>! </>
+                            )}
+                            Submit today's challenge to climb the ranks! 🔥
+                          </span>
+                        )}
                       </div>
+                    </div>
 
-                      {/* Dynamic Prize Grid (Adapts to Top 3, Top 4, Top 5, etc.) */}
-                      <div
-                        className="unified-prizes-grid"
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: winnerCount <= 2 ? "repeat(2, 1fr)" : "repeat(2, 1fr)",
-                          gap: "0.55rem",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        {prizeRows.map((p, i) => {
-                          const isUserLeadingThis = myUser && myUser.rank === p.rank;
-                          return (
-                            <div
-                              key={i}
-                              style={{
-                                background: p.glow,
-                                border: `1.5px solid ${p.border}`,
-                                borderRadius: 12,
-                                padding: "0.65rem 0.75rem",
-                                display: "flex",
-                                flexDirection: "column",
-                                justifyContent: "space-between",
-                                gap: "0.35rem",
-                                transition: "all 0.2s ease",
-                                position: "relative",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {/* Top row: Medal + Label & Prize Amount */}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                                  <span style={{ fontSize: "1rem" }}>{p.icon}</span>
-                                  <span style={{ fontSize: "0.7rem", fontWeight: 800, color: p.color, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                    {p.label}
-                                  </span>
-                                </div>
-                                {p.amount != null ? (
-                                  <div style={{ fontSize: "0.92rem", fontWeight: 900, color: p.color, fontVariantNumeric: "tabular-nums" }}>
-                                    {p.amount}
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: "0.62rem", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 700 }}>TBA</div>
-                                )}
-                              </div>
-
-                              {/* Bottom row: Leader details */}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", minWidth: 0, marginTop: "2px" }}>
-                                <div style={{ fontSize: "0.72rem", color: isDark ? "#f1f5f9" : (p.nameColorLight || "#1e293b"), fontWeight: 700, display: "flex", alignItems: "center", gap: "4px", minWidth: 0, overflow: "hidden" }}>
-                                  {p.currentLeader ? (
-                                    <>
-                                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                        👤 {p.currentLeader}
-                                      </span>
-                                      {isUserLeadingThis && (
-                                        <span style={{
-                                          fontSize: "0.58rem", fontWeight: 800, padding: "1px 4px",
-                                          borderRadius: 4, background: "#a855f7", color: "#fff", flexShrink: 0,
-                                        }}>
-                                          YOU
-                                        </span>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <span style={{ color: isDark ? "#64748b" : "#94a3b8", fontStyle: "italic", fontSize: "0.68rem" }}>No one yet</span>
-                                  )}
-                                </div>
-
-                                {p.currentLeader && (
-                                  <div style={{ fontSize: "0.65rem", color: isDark ? "#94a3b8" : "#64748b", display: "flex", gap: "4px", flexShrink: 0 }}>
-                                    {p.monthlyScore > 0 && <span>{p.monthlyScore} pts</span>}
-                                    {p.streak > 0 && <span style={{ color: "#f97316", fontWeight: 700 }}>🔥 {p.streak}d</span>}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Cohort Milestone Record Box */}
+                    {/* Cohort Milestone Record Box */}
+                    {recordHolder && (
                       <div
                         className="all-time-record-box"
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          padding: "0.65rem 0.9rem",
+                          padding: "0.65rem 0.95rem",
                           borderRadius: 12,
                           background: isDark
                             ? "linear-gradient(135deg, rgba(28, 20, 14, 0.95) 0%, rgba(18, 14, 28, 0.95) 100%)"
                             : "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
                           border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(251, 191, 36, 0.4)",
-                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                          marginBottom: "0.7rem",
+                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
                           position: "relative",
                           overflow: "hidden",
-                          transition: "transform 0.2s ease, border-color 0.2s ease",
                         }}
                       >
                         <div style={{ position: "relative", zIndex: 1 }}>
@@ -4818,7 +4760,7 @@ export default function ModernDashboardView({
                         }}>
                           <span style={{
                             fontFamily: "Georgia, 'Times New Roman', serif",
-                            fontSize: "1.5rem",
+                            fontSize: "1.45rem",
                             fontWeight: 700,
                             color: isDark ? "#fbbf24" : "#b45309",
                             lineHeight: 1,
@@ -4828,423 +4770,365 @@ export default function ModernDashboardView({
                           <span style={{ fontSize: "0.7rem", fontWeight: 700, color: isDark ? "#fbbf24" : "#b45309" }}>{recordUnit === "d" ? "streak" : "pts"}</span>
                         </div>
                       </div>
+                    )}
+                  </div>
 
-                      {/* Motivational Position / Gap Banner */}
-                      <div style={{
-                        background: isDark ? "rgba(168, 85, 247, 0.08)" : "rgba(168, 85, 247, 0.05)",
-                        border: isDark ? "1px solid rgba(168, 85, 247, 0.2)" : "1px solid rgba(168, 85, 247, 0.25)",
-                        borderRadius: 12,
-                        padding: "0.55rem 0.8rem",
-                        marginBottom: "0.7rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.55rem",
-                      }}>
-                        <span style={{ fontSize: "1.05rem", flexShrink: 0 }}>🚀</span>
-                        <div style={{ fontSize: "0.72rem", color: isDark ? "#c4b5fd" : "#6b21a8", fontWeight: 600, lineHeight: 1.4 }}>
-                          {myRank > 0 && myRank <= winnerCount ? (
-                            <span>
-                              <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Great job!</strong> You're currently holding <strong style={{ color: prizeMap[myRank]?.color || (isDark ? "#fbbf24" : "#b45309") }}>{getRankCfg(myRank).label} ({prizeMap[myRank]?.amount || "Prize"})</strong>. Maintain this spot until month-end to secure your reward! 🔥
-                            </span>
-                          ) : (
-                            <span>
-                              <strong style={{ color: isDark ? "#e9d5ff" : "#581c87" }}>Stay consistent!</strong> {ptsGap > 0 ? (
-                                <>You are only <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>{ptsGap} pts</strong> away from <strong style={{ color: cutoffPrize?.color || (isDark ? "#fbbf24" : "#b45309") }}>{cutoffPrize?.label || `Top ${winnerCount}`} ({cutoffPrize?.amount || "Prize"})</strong>! </>
-                              ) : (
-                                <>Practice daily to climb into the <strong style={{ color: isDark ? "#fbbf24" : "#b45309" }}>Top {winnerCount} Prize Zone</strong>! </>
-                              )}
-                              Submit today's speaking challenge to climb the ranks! 🔥
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Group Member Stats: 3 Micro-Cards docked at bottom */}
-                      <div className="leaderboard-stat-grid" style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(3, 1fr)",
-                        gap: "0.5rem",
-                        textAlign: "center",
-                        marginTop: "auto",
-                        paddingTop: "0.4rem",
-                      }}>
-                        <div className="leaderboard-stat-card members-card" style={{
-                          borderRadius: 10,
-                          padding: "0.5rem 0.35rem",
-                        }}>
-                          <div className="leaderboard-stat-label">MEMBERS</div>
-                          <div className="leaderboard-stat-val">{memberCount}</div>
-                        </div>
-                        <div className="leaderboard-stat-card submitted-card" style={{
-                          borderRadius: 10,
-                          padding: "0.5rem 0.35rem",
-                        }}>
-                          <div className="leaderboard-stat-label">SUBMITTED</div>
-                          <div className="leaderboard-stat-val">{submittedCount}</div>
-                        </div>
-                        <div className="leaderboard-stat-card pending-card" style={{
-                          borderRadius: 10,
-                          padding: "0.5rem 0.35rem",
-                        }}>
-                          <div className="leaderboard-stat-label">PENDING</div>
-                          <div className="leaderboard-stat-val">{pendingCount}</div>
-                        </div>
-                      </div>
+                  {/* ── Subtitle Bar: Live Practice Rankings ── */}
+                  <div className="unified-section-subtitle" style={{ position: "relative", zIndex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.76rem", fontWeight: 800, letterSpacing: "0.06em", color: "#38bdf8", textTransform: "uppercase" }}>
+                      <span>📊</span>
+                      <span>Live Practice Rankings</span>
                     </div>
-
-                    {/* RIGHT COLUMN: Live Practice Rankings */}
-                    <div className="unified-gamification-right">
-                      {/* Section Subtitle */}
-                      <div className="unified-section-subtitle">
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: "#38bdf8", textTransform: "uppercase" }}>
-                          <span>📊</span>
-                          <span>Live Practice Rankings</span>
-                        </div>
-                        <div style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          fontSize: "0.66rem",
-                          fontWeight: 700,
-                          color: "#86efac",
-                          background: "rgba(34, 197, 94, 0.1)",
-                          border: "1px solid rgba(34, 197, 94, 0.25)",
-                          padding: "2px 7px",
-                          borderRadius: 99,
-                        }}>
-                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
-                          <span>Live · {currentLeaderboard.length} Members</span>
-                        </div>
-                      </div>
-
-                      {/* Ranked Peer Rows (Scrollable Container) */}
-                      <div
-                        className="leaderboard-scroll-container"
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.45rem",
-                          marginBottom: currentLeaderboard.length > 5 ? "0.45rem" : "0",
-                          maxHeight: "360px",
-                          overflowY: "auto",
-                          paddingRight: "4px",
-                          scrollBehavior: "smooth",
-                        }}
-                      >
-                        {currentLeaderboard.map((u, i) => {
-                          const isUser = u.isUser;
-                          const isWinningSpot = typeof u.rank === "number" && u.rank >= 1 && u.rank <= winnerCount;
-                          const userPrize = prizeMap[u.rank];
-                          const showCutoffLineAfter = u.rank === winnerCount && currentLeaderboard.length > winnerCount;
-                          const cfg = getRankCfg(u.rank);
-
-                          const rankColor = isDark ? cfg.colorDark : cfg.colorLight;
-                          const rankGlow = isDark ? cfg.glowDark : cfg.glowLight;
-                          const rankBorder = isDark ? cfg.borderDark : cfg.borderLight;
-                          const rankNameColor = isDark ? "#ffffff" : (isUser ? "#4c1d95" : (isWinningSpot ? cfg.nameColorLight : "#0f172a"));
-
-                          // Dynamic Row Class
-                          const rowClass = isUser
-                            ? "leaderboard-row user-row"
-                            : isWinningSpot
-                            ? `leaderboard-row rank-${u.rank} winning-spot`
-                            : "leaderboard-row standard-row";
-
-                          // Row Inline Background & Border for crisp theme accuracy
-                          const rowBg = isUser
-                            ? (isDark ? "linear-gradient(90deg, rgba(168, 85, 247, 0.18) 0%, rgba(99, 102, 241, 0.1) 100%)" : "linear-gradient(90deg, #f5f3ff 0%, #ede9fe 100%)")
-                            : isWinningSpot
-                            ? rankGlow
-                            : (isDark ? "rgba(255, 255, 255, 0.025)" : "#ffffff");
-
-                          const rowBorder = isUser
-                            ? (isDark ? "1.5px solid rgba(168, 85, 247, 0.55)" : "1.5px solid #a855f7")
-                            : isWinningSpot
-                            ? `1.5px solid ${rankBorder}`
-                            : (isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0");
-
-                          const avatarBg = isWinningSpot
-                            ? cfg.avatarBg
-                            : isUser
-                            ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
-                            : (isDark ? "linear-gradient(135deg, #334155 0%, #1e293b 100%)" : "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)");
-
-                          const avatarColor = isWinningSpot ? cfg.avatarColor : (isDark ? "#ffffff" : "#0f172a");
-                          const avatarBorder = isWinningSpot ? cfg.avatarBorder : (isUser ? "2px solid #c084fc" : (isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid #cbd5e1"));
-
-                          return (
-                            <React.Fragment key={u.id || `${u.name}-${i}`}>
-                              <div
-                                className={rowClass}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  padding: isUser ? "0.65rem 0.85rem" : "0.55rem 0.75rem",
-                                  borderRadius: 11,
-                                  background: rowBg,
-                                  border: rowBorder,
-                                  boxShadow: isUser
-                                    ? (isDark ? "0 4px 16px rgba(168, 85, 247, 0.2)" : "0 2px 8px rgba(168, 85, 247, 0.12)")
-                                    : (isWinningSpot && isDark ? `0 2px 10px ${rankColor}12` : "none"),
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0 }}>
-                                  {/* Rank / Medal Emblem */}
-                                  <div
-                                    className="leaderboard-rank-num"
-                                    style={{
-                                      width: 24,
-                                      textAlign: "center",
-                                      fontSize: u.rank <= 3 ? "1.05rem" : "0.82rem",
-                                      fontWeight: 800,
-                                      color: isWinningSpot ? rankColor : (isDark ? "#94a3b8" : "#475569"),
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {u.rank === 1 ? "🥇" : u.rank === 2 ? "🥈" : u.rank === 3 ? "🥉" : `#${u.rank}`}
-                                  </div>
-
-                                  {/* Avatar Circle */}
-                                  <div
-                                    className="leaderboard-avatar"
-                                    style={{
-                                      width: 34,
-                                      height: 34,
-                                      borderRadius: "50%",
-                                      background: avatarBg,
-                                      color: avatarColor,
-                                      border: avatarBorder,
-                                      boxShadow: u.rank === 1
-                                        ? "0 0 10px rgba(251, 191, 36, 0.4)"
-                                        : isUser
-                                        ? "0 0 10px rgba(168, 85, 247, 0.4)"
-                                        : "none",
-                                      overflow: "hidden",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontWeight: 800,
-                                      fontSize: "0.82rem",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {u.avatarUrl ? (
-                                      <img
-                                        src={u.avatarUrl}
-                                        alt={u.name}
-                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                                      />
-                                    ) : (
-                                      u.initials || "S"
-                                    )}
-                                  </div>
-
-                                  {/* Name & Title */}
-                                  <div style={{ minWidth: 0 }}>
-                                    <div
-                                      className="leaderboard-name"
-                                      style={{
-                                        fontSize: "0.84rem",
-                                        fontWeight: 700,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "0.3rem",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        color: rankNameColor,
-                                      }}
-                                    >
-                                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
-                                      {u.rank === 1 && <span title="Current #1 Leader">👑</span>}
-                                      {isUser && (
-                                        <span
-                                          className="leaderboard-you-badge"
-                                          style={{
-                                            fontSize: "0.58rem",
-                                            fontWeight: 800,
-                                            padding: "1px 4px",
-                                            borderRadius: 4,
-                                            letterSpacing: "0.05em",
-                                            flexShrink: 0,
-                                            background: isDark ? "#a855f7" : "#ddd6fe",
-                                            color: isDark ? "#ffffff" : "#5b21b6",
-                                            border: isDark ? "none" : "1px solid #a855f7",
-                                          }}
-                                        >
-                                          YOU
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div
-                                      className="leaderboard-subtitle"
-                                      style={{
-                                        fontSize: "0.68rem",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "0.3rem",
-                                        marginTop: "2px",
-                                        flexWrap: "wrap",
-                                      }}
-                                    >
-                                      {u.currentBadge ? (
-                                        <StreakBadge badge={u.currentBadge} compact />
-                                      ) : (u.streakDays > 0) ? (
-                                        <span
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.2rem",
-                                            padding: "0.05rem 0.35rem",
-                                            borderRadius: 999,
-                                            fontSize: "0.65rem",
-                                            fontWeight: 700,
-                                            color: isDark ? "#a78bfa" : "#6d28d9",
-                                            background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(109, 40, 217, 0.08)",
-                                            border: isDark ? "1px solid rgba(167, 139, 250, 0.25)" : "1px solid rgba(109, 40, 217, 0.2)",
-                                          }}
-                                        >
-                                          {u.badgeIcon} {u.badgeName}
-                                        </span>
-                                      ) : (
-                                        <span style={{ color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.68rem" }}>No active streak</span>
-                                      )}
-
-                                      {u.streakDays > 0 && (
-                                        <span
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.2rem",
-                                            fontSize: "0.68rem",
-                                            fontWeight: 700,
-                                            color: isDark ? "#f97316" : "#ea580c",
-                                            background: isDark ? "rgba(249, 115, 22, 0.12)" : "rgba(234, 88, 12, 0.1)",
-                                            padding: "0.05rem 0.4rem",
-                                            borderRadius: 999,
-                                            border: isDark ? "1px solid rgba(249, 115, 22, 0.28)" : "1px solid rgba(234, 88, 12, 0.25)",
-                                            whiteSpace: "nowrap",
-                                          }}
-                                        >
-                                          🔥 {u.streakDays}d
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Right — Month-End Prize Tag + Points & Status Icon */}
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
-                                  {/* Highlighted Month-End Prize Chip for all Top N qualifying winners */}
-                                  {isWinningSpot && (
-                                    <div
-                                      className="leaderboard-prize-chip"
-                                      style={{
-                                        background: isDark ? `${rankColor}18` : `${rankColor}12`,
-                                        border: `1.5px solid ${rankColor}45`,
-                                        boxShadow: `0 2px 8px ${rankColor}15`,
-                                      }}
-                                      title={`Holding ${cfg.label}: Earns ${userPrize?.amount || "Month-End Prize"} if maintained to month-end`}
-                                    >
-                                      <div className="leaderboard-prize-amount" style={{ color: rankColor }}>
-                                        <span>🏆</span>
-                                        <span>{userPrize?.amount || (userPrize?.rawAmount ? `₹${userPrize.rawAmount}` : "TBA")}</span>
-                                      </div>
-                                      <div className="leaderboard-prize-tag" style={{ color: isDark ? "#94a3b8" : "#64748b" }}>
-                                        Month-End
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  <div style={{ textAlign: "right", minWidth: 44 }}>
-                                    <div
-                                      className="leaderboard-pts-badge"
-                                      style={{
-                                        fontSize: "0.88rem",
-                                        fontWeight: 800,
-                                      }}
-                                    >
-                                      <span className="leaderboard-pts-num" style={{ color: isWinningSpot ? rankColor : (isDark ? "#ffffff" : "#0f172a") }}>{u.pts}</span>
-                                      <span className="leaderboard-pts-label" style={{ fontSize: "0.68rem", fontWeight: 600, color: isDark ? "#94a3b8" : "#64748b" }}>pts</span>
-                                    </div>
-                                    <div style={{
-                                      fontSize: "0.75rem",
-                                      marginTop: "1px",
-                                      lineHeight: 1,
-                                    }}>
-                                      <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
-                                        {u.isCompletedToday ? "✅" : "⏳"}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Prize Cutoff Divider Line right after winnerCount */}
-                              {showCutoffLineAfter && (
-                                <div style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.5rem",
-                                  margin: "0.35rem 0",
-                                  fontSize: "0.62rem",
-                                  fontWeight: 800,
-                                  color: isDark ? "#94a3b8" : "#64748b",
-                                  letterSpacing: "0.06em",
-                                  textTransform: "uppercase",
-                                }}>
-                                  <span style={{ flex: 1, height: 1, background: isDark ? "rgba(148, 163, 184, 0.25)" : "rgba(100, 116, 139, 0.2)" }} />
-                                  <span style={{
-                                    padding: "2px 8px",
-                                    borderRadius: 99,
-                                    background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.15)",
-                                    border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(251, 191, 36, 0.35)",
-                                    color: isDark ? "#fbbf24" : "#b45309",
-                                  }}>
-                                    🏆 Top {winnerCount} Prize Cutoff
-                                  </span>
-                                  <span style={{ flex: 1, height: 1, background: isDark ? "rgba(148, 163, 184, 0.25)" : "rgba(100, 116, 139, 0.2)" }} />
-                                </div>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                      </div>
-
-                      {/* Scroll for more members button / indicator */}
-                      {currentLeaderboard.length > 5 && (
-                        <div
-                          className="leaderboard-scroll-hint"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "0.45rem",
-                            fontSize: "0.7rem",
-                            fontWeight: 700,
-                            color: isDark ? "#c4b5fd" : "#6d28d9",
-                            background: isDark ? "rgba(124, 111, 255, 0.08)" : "#f5f3ff",
-                            border: isDark ? "1px dashed rgba(124, 111, 255, 0.3)" : "1px dashed #ddd6fe",
-                            borderRadius: 9,
-                            padding: "5px 10px",
-                            marginTop: "0.45rem",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            userSelect: "none",
-                          }}
-                          onClick={() => {
-                            const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
-                            if (el) el.scrollBy({ top: 120, behavior: "smooth" });
-                          }}
-                          title="Click to scroll and see more group members"
-                        >
-                          <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
-                          <span style={{ fontSize: "0.8rem" }}>↓</span>
-                        </div>
-                      )}
+                    <div style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      fontSize: "0.68rem",
+                      fontWeight: 700,
+                      color: "#86efac",
+                      background: "rgba(34, 197, 94, 0.1)",
+                      border: "1px solid rgba(34, 197, 94, 0.25)",
+                      padding: "3px 9px",
+                      borderRadius: 99,
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
+                      <span>Live · {currentLeaderboard.length} Members</span>
                     </div>
                   </div>
+
+                  {/* ── Full-Width Ranked Peer Rows (Scrollable Container) ── */}
+                  <div
+                    className="leaderboard-scroll-container fullwidth-leaderboard-list"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.45rem",
+                      marginBottom: currentLeaderboard.length > 5 ? "0.45rem" : "0",
+                      maxHeight: "420px",
+                      overflowY: "auto",
+                      paddingRight: "4px",
+                      scrollBehavior: "smooth",
+                      position: "relative",
+                      zIndex: 1,
+                    }}
+                  >
+                    {currentLeaderboard.map((u, i) => {
+                      const isUser = u.isUser;
+                      const isWinningSpot = typeof u.rank === "number" && u.rank >= 1 && u.rank <= winnerCount;
+                      const userPrize = prizeMap[u.rank];
+                      const showCutoffLineAfter = u.rank === winnerCount && currentLeaderboard.length > winnerCount;
+                      const cfg = getRankCfg(u.rank);
+
+                      const rankColor = isDark ? cfg.colorDark : cfg.colorLight;
+                      const rankGlow = isDark ? cfg.glowDark : cfg.glowLight;
+                      const rankBorder = isDark ? cfg.borderDark : cfg.borderLight;
+                      const rankNameColor = isDark ? "#ffffff" : (isUser ? "#4c1d95" : (isWinningSpot ? cfg.nameColorLight : "#0f172a"));
+
+                      // Dynamic Row Class
+                      const rowClass = isUser
+                        ? "leaderboard-row user-row"
+                        : isWinningSpot
+                        ? `leaderboard-row rank-${u.rank} winning-spot`
+                        : "leaderboard-row standard-row";
+
+                      // Row Inline Background & Border
+                      const rowBg = isUser
+                        ? (isDark ? "linear-gradient(90deg, rgba(168, 85, 247, 0.18) 0%, rgba(99, 102, 241, 0.1) 100%)" : "linear-gradient(90deg, #f5f3ff 0%, #ede9fe 100%)")
+                        : isWinningSpot
+                        ? rankGlow
+                        : (isDark ? "rgba(255, 255, 255, 0.025)" : "#ffffff");
+
+                      const rowBorder = isUser
+                        ? (isDark ? "1.5px solid rgba(168, 85, 247, 0.55)" : "1.5px solid #a855f7")
+                        : isWinningSpot
+                        ? `1.5px solid ${rankBorder}`
+                        : (isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #e2e8f0");
+
+                      const avatarBg = isWinningSpot
+                        ? cfg.avatarBg
+                        : isUser
+                        ? "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)"
+                        : (isDark ? "linear-gradient(135deg, #334155 0%, #1e293b 100%)" : "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)");
+
+                      const avatarColor = isWinningSpot ? cfg.avatarColor : (isDark ? "#ffffff" : "#0f172a");
+                      const avatarBorder = isWinningSpot ? cfg.avatarBorder : (isUser ? "2px solid #c084fc" : (isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid #cbd5e1"));
+
+                      return (
+                        <React.Fragment key={u.id || `${u.name}-${i}`}>
+                          <div
+                            className={rowClass}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: isUser ? "0.7rem 0.95rem" : "0.6rem 0.85rem",
+                              borderRadius: 12,
+                              background: rowBg,
+                              border: rowBorder,
+                              boxShadow: isUser
+                                ? (isDark ? "0 4px 16px rgba(168, 85, 247, 0.2)" : "0 2px 8px rgba(168, 85, 247, 0.12)")
+                                : (isWinningSpot && isDark ? `0 2px 10px ${rankColor}12` : "none"),
+                              gap: "0.75rem",
+                            }}
+                          >
+                            {/* Left Group: Rank Medal + Avatar + Name & Subtitle Badges */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flex: 1 }}>
+                              {/* Rank / Medal Emblem */}
+                              <div
+                                className="leaderboard-rank-num"
+                                style={{
+                                  width: 26,
+                                  textAlign: "center",
+                                  fontSize: u.rank <= 3 ? "1.1rem" : "0.85rem",
+                                  fontWeight: 800,
+                                  color: isWinningSpot ? rankColor : (isDark ? "#94a3b8" : "#475569"),
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {u.rank === 1 ? "🥇" : u.rank === 2 ? "🥈" : u.rank === 3 ? "🥉" : `#${u.rank}`}
+                              </div>
+
+                              {/* Avatar Circle */}
+                              <div
+                                className="leaderboard-avatar"
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: "50%",
+                                  background: avatarBg,
+                                  color: avatarColor,
+                                  border: avatarBorder,
+                                  boxShadow: u.rank === 1
+                                    ? "0 0 10px rgba(251, 191, 36, 0.4)"
+                                    : isUser
+                                    ? "0 0 10px rgba(168, 85, 247, 0.4)"
+                                    : "none",
+                                  overflow: "hidden",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 800,
+                                  fontSize: "0.85rem",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {u.avatarUrl ? (
+                                  <img
+                                    src={u.avatarUrl}
+                                    alt={u.name}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                                  />
+                                ) : (
+                                  u.initials || "S"
+                                )}
+                              </div>
+
+                              {/* Name & Title / Streak Badge */}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div
+                                  className="leaderboard-name"
+                                  style={{
+                                    fontSize: "0.88rem",
+                                    fontWeight: 700,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    color: rankNameColor,
+                                  }}
+                                >
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
+                                  {u.rank === 1 && <span title="Current #1 Leader">👑</span>}
+                                  {isUser && (
+                                    <span
+                                      className="leaderboard-you-badge"
+                                      style={{
+                                        fontSize: "0.58rem",
+                                        fontWeight: 800,
+                                        padding: "1px 4px",
+                                        borderRadius: 4,
+                                        letterSpacing: "0.05em",
+                                        flexShrink: 0,
+                                        background: isDark ? "#a855f7" : "#ddd6fe",
+                                        color: isDark ? "#ffffff" : "#5b21b6",
+                                        border: isDark ? "none" : "1px solid #a855f7",
+                                      }}
+                                    >
+                                      YOU
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div
+                                  className="leaderboard-subtitle"
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.35rem",
+                                    marginTop: "2px",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  {u.currentBadge ? (
+                                    <StreakBadge badge={u.currentBadge} compact />
+                                  ) : (u.streakDays > 0) ? (
+                                    <span
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "0.2rem",
+                                        padding: "0.05rem 0.4rem",
+                                        borderRadius: 999,
+                                        fontSize: "0.66rem",
+                                        fontWeight: 700,
+                                        color: isDark ? "#a78bfa" : "#6d28d9",
+                                        background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(109, 40, 217, 0.08)",
+                                        border: isDark ? "1px solid rgba(167, 139, 250, 0.25)" : "1px solid rgba(109, 40, 217, 0.2)",
+                                      }}
+                                    >
+                                      {u.badgeIcon} {u.badgeName}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.68rem" }}>No active streak</span>
+                                  )}
+
+                                  {u.streakDays > 0 && (
+                                    <span
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "0.2rem",
+                                        fontSize: "0.68rem",
+                                        fontWeight: 700,
+                                        color: isDark ? "#f97316" : "#ea580c",
+                                        background: isDark ? "rgba(249, 115, 22, 0.12)" : "rgba(234, 88, 12, 0.1)",
+                                        padding: "0.05rem 0.4rem",
+                                        borderRadius: 999,
+                                        border: isDark ? "1px solid rgba(249, 115, 22, 0.28)" : "1px solid rgba(234, 88, 12, 0.25)",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      🔥 {u.streakDays}d
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right Group: Month-End Prize Tag + Points & Status Icon */}
+                            <div className="leaderboard-right-meta" style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+                              {/* Highlighted Month-End Prize Chip for all Top N qualifying winners */}
+                              {isWinningSpot && (
+                                <div
+                                  className="leaderboard-prize-chip"
+                                  style={{
+                                    background: isDark ? `${rankColor}18` : `${rankColor}12`,
+                                    border: `1.5px solid ${rankColor}45`,
+                                    boxShadow: `0 2px 8px ${rankColor}15`,
+                                  }}
+                                  title={`Holding ${cfg.label}: Earns ${userPrize?.amount || "Month-End Prize"} if maintained to month-end`}
+                                >
+                                  <div className="leaderboard-prize-amount" style={{ color: rankColor }}>
+                                    <span>🏆</span>
+                                    <span>{userPrize?.amount || (userPrize?.rawAmount ? `₹${userPrize.rawAmount}` : "TBA")}</span>
+                                  </div>
+                                  <div className="leaderboard-prize-tag" style={{ color: isDark ? "#94a3b8" : "#64748b" }}>
+                                    Month-End
+                                  </div>
+                                </div>
+                              )}
+
+                              <div style={{ textAlign: "right", minWidth: 46 }}>
+                                <div
+                                  className="leaderboard-pts-badge"
+                                  style={{
+                                    fontSize: "0.92rem",
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  <span className="leaderboard-pts-num" style={{ color: isWinningSpot ? rankColor : (isDark ? "#ffffff" : "#0f172a") }}>{u.pts}</span>
+                                  <span className="leaderboard-pts-label" style={{ fontSize: "0.7rem", fontWeight: 600, color: isDark ? "#94a3b8" : "#64748b" }}>pts</span>
+                                </div>
+                                <div style={{
+                                  fontSize: "0.75rem",
+                                  marginTop: "1px",
+                                  lineHeight: 1,
+                                }}>
+                                  <span title={u.isCompletedToday ? "Completed today" : "Pending submission"}>
+                                    {u.isCompletedToday ? "✅" : "⏳"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Prize Cutoff Divider Line right after winnerCount */}
+                          {showCutoffLineAfter && (
+                            <div style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              margin: "0.35rem 0",
+                              fontSize: "0.64rem",
+                              fontWeight: 800,
+                              color: isDark ? "#94a3b8" : "#64748b",
+                              letterSpacing: "0.06em",
+                              textTransform: "uppercase",
+                            }}>
+                              <span style={{ flex: 1, height: 1, background: isDark ? "rgba(148, 163, 184, 0.25)" : "rgba(100, 116, 139, 0.2)" }} />
+                              <span style={{
+                                padding: "2px 10px",
+                                borderRadius: 99,
+                                background: isDark ? "rgba(251, 191, 36, 0.08)" : "rgba(251, 191, 36, 0.15)",
+                                border: isDark ? "1px solid rgba(251, 191, 36, 0.25)" : "1px solid rgba(251, 191, 36, 0.35)",
+                                color: isDark ? "#fbbf24" : "#b45309",
+                              }}>
+                                🏆 Top {winnerCount} Prize Cutoff
+                              </span>
+                              <span style={{ flex: 1, height: 1, background: isDark ? "rgba(148, 163, 184, 0.25)" : "rgba(100, 116, 139, 0.2)" }} />
+                            </div>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  {/* Scroll for more members button / indicator */}
+                  {currentLeaderboard.length > 5 && (
+                    <div
+                      className="leaderboard-scroll-hint"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.45rem",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        color: isDark ? "#c4b5fd" : "#6d28d9",
+                        background: isDark ? "rgba(124, 111, 255, 0.08)" : "#f5f3ff",
+                        border: isDark ? "1px dashed rgba(124, 111, 255, 0.3)" : "1px dashed #ddd6fe",
+                        borderRadius: 9,
+                        padding: "6px 12px",
+                        marginTop: "0.55rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        userSelect: "none",
+                        position: "relative",
+                        zIndex: 1,
+                      }}
+                      onClick={() => {
+                        const el = leaderboardRef.current?.querySelector(".leaderboard-scroll-container");
+                        if (el) el.scrollBy({ top: 120, behavior: "smooth" });
+                      }}
+                      title="Click to scroll and see more group members"
+                    >
+                      <span>📜 Scroll for more members ({currentLeaderboard.length} members)</span>
+                      <span style={{ fontSize: "0.8rem" }}>↓</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

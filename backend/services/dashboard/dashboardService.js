@@ -74,7 +74,7 @@ export async function getTodayOverview() {
   // Check if today's question was genuinely published for today and has not reset
   const isQuestionSentToday = Boolean(
     status?.questionSentToday &&
-    (status?.lastPosterSentDate === todayIST || (!status?.lastResetDate && status?.lastPosterSentDate)) &&
+    (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST || !status?.lastResetDate || status?.lastResetDate !== todayIST) &&
     (status?.todayQuestion || status?.todayTopic)
   );
 
@@ -256,7 +256,7 @@ export async function getUserProfile(phone) {
   // Check if today's question was genuinely published for today and has not reset
   const isQuestionSentToday = Boolean(
     status?.questionSentToday &&
-    (status?.lastPosterSentDate === todayIST || (!status?.lastResetDate && status?.lastPosterSentDate)) &&
+    (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST || !status?.lastResetDate || status?.lastResetDate !== todayIST) &&
     (status?.todayQuestion || status?.todayTopic)
   );
 
@@ -549,6 +549,12 @@ export async function setTodayQuestion(topic, question, category) {
     throw new Error("question is required");
   }
   
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  const todayIST = `${y}-${mo}-${d}`;
+
   await Status.updateOne({}, {
     $set: {
       todayQuestion: question,
@@ -568,7 +574,8 @@ export async function setTodayQuestion(topic, question, category) {
       todayImageSearchQuery: null,
       todayImageInstructions: null,
       questionSentToday: true,
-      lastPosterSentDate: `${new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }).split(",")[0].split("/").map(p => p.padStart(2, "0")).join("-")}`, // fallback IST date
+      questionPublishedDate: todayIST,
+      lastPosterSentDate: todayIST,
     }
   }, { upsert: true });
   

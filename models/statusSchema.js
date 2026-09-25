@@ -24,6 +24,7 @@ const statusSchema = new mongoose.Schema({
   posterExpiresAt: { type: Date, default: null },
   lastPosterSentDate: { type: String, default: null },
   lastPosterSentTime: { type: String, default: null },
+  questionPublishedDate: { type: String, default: null }, // "YYYY-MM-DD" in IST when today's speaking challenge became live on the platform
   lastPosterStatus: { type: String, enum: ["pending", "success", "failed"], default: "pending" },
   lastPosterError: { type: String, default: null },
   lastPosterAttemptAt: { type: Date, default: null },
