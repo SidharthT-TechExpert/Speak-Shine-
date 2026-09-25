@@ -54,7 +54,7 @@ import submissionsRoutes from "../backend/routes/submissions.routes.js";
 import guestRoutes from "../backend/routes/guest.routes.js";
 import paymentRoutes from "../backend/routes/payment.routes.js";
 import whatsappRoutes from "../backend/routes/whatsapp.routes.js";
-import { initWhatsAppBot, setSocketIo as setWhatsAppSocketIo, sendDeploymentNotification } from "../backend/services/whatsapp/whatsappService.js";
+import { initWhatsAppBot, setSocketIo as setWhatsAppSocketIo, sendDeploymentNotification, flushAuthToMongo } from "../backend/services/whatsapp/whatsappService.js";
 
 console.log("[Routes] Loading MVC routes...");
 console.log("[Routes] Auth routes loaded:", !!authRoutes);
@@ -605,5 +605,19 @@ process.on("uncaughtException", async (err) => {
   } catch {}
   process.exit(1);
 });
+
+const handleGracefulShutdown = async (signal) => {
+  console.log(`\n🛑 [Server] Received ${signal}. Persisting WhatsApp auth state before exit...`);
+  try {
+    await flushAuthToMongo();
+    console.log("[Server] 💾 WhatsApp auth credentials safely flushed to MongoDB.");
+  } catch (err) {
+    console.warn("[Server] Warning: Failed to flush WhatsApp auth state on shutdown:", err.message);
+  }
+  process.exit(0);
+};
+
+process.on("SIGTERM", () => handleGracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => handleGracefulShutdown("SIGINT"));
 
 export default app;

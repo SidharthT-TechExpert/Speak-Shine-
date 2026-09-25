@@ -27,7 +27,7 @@ async function checkSubmissionWindowActive() {
 
   const isQuestionSentToday = Boolean(
     status?.questionSentToday &&
-    (status?.lastPosterSentDate === todayIST || (!status?.lastResetDate && status?.lastPosterSentDate)) &&
+    (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST || !status?.lastResetDate || status?.lastResetDate !== todayIST) &&
     (status?.todayQuestion || status?.todayTopic)
   );
 

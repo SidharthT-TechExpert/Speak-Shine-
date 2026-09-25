@@ -11,6 +11,7 @@ import { ensureTodayVocabulary } from "../ai/vocabularyGenerator.js";
 
 /**
  * Sends today's poster to TARGET_GROUP on WhatsApp if connected.
+ * Non-blocking: WhatsApp connection or dispatch failure will NEVER block or fail question publishing.
  */
 async function dispatchPosterToWhatsApp(details = {}) {
   try {
@@ -20,9 +21,20 @@ async function dispatchPosterToWhatsApp(details = {}) {
     }
     return { success: false, reason: "No TARGET_GROUP configured" };
   } catch (err) {
-    console.warn("[QuestionScheduler] WhatsApp poster auto-send skipped/failed:", err.message);
+    console.warn("[QuestionScheduler] WhatsApp poster auto-send skipped/failed (non-fatal):", err.message);
     return { success: false, error: err.message };
   }
+}
+
+/**
+ * Returns today's date in IST format "YYYY-MM-DD"
+ */
+function getTodayISTDate() {
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${d}`;
 }
 
 // Monthly reflection questions — shown on the last day of every month
@@ -149,6 +161,7 @@ async function publishAutoPictureDescription() {
     await Status.updateOne({}, {
       $set: {
         questionSentToday: true,
+        questionPublishedDate: getTodayISTDate(),
         isPictureDescriptionDay: true,
         isStorySummaryDay: false,
         isMonthlyReflectionDay: false,
@@ -218,6 +231,7 @@ export async function publishAutoSaturdayStory() {
     await Status.updateOne({}, {
       $set: {
         questionSentToday: true,
+        questionPublishedDate: getTodayISTDate(),
         isStorySummaryDay: true,
         isMonthlyReflectionDay: false,
         isMonthlyGoalsDay: false,
@@ -261,6 +275,7 @@ export async function publishManualQuestion(q) {
   await Status.updateOne({}, {
     $set: {
       questionSentToday: true,
+      questionPublishedDate: getTodayISTDate(),
       todayContentType: isStory ? "story_audio" : isPicture ? "picture_description" : "question",
       isStorySummaryDay: isStory,
       isPictureDescriptionDay: isPicture,
@@ -359,6 +374,7 @@ export async function publishDailyQuestion() {
         await Status.updateOne({}, {
           $set: {
             questionSentToday: true,
+            questionPublishedDate: getTodayISTDate(),
             isMonthlyReflectionDay: true,
             isMonthlyGoalsDay: false,
             isStorySummaryDay: false,
@@ -385,6 +401,7 @@ export async function publishDailyQuestion() {
       await Status.updateOne({}, {
         $set: {
           questionSentToday: true,
+          questionPublishedDate: getTodayISTDate(),
           isMonthlyReflectionDay: true,
           isMonthlyGoalsDay: false,
           isStorySummaryDay: false,
@@ -444,6 +461,7 @@ export async function publishDailyQuestion() {
         await Status.updateOne({}, {
           $set: {
             questionSentToday: true,
+            questionPublishedDate: getTodayISTDate(),
             isMonthlyGoalsDay: true,
             isMonthlyReflectionDay: false,
             isStorySummaryDay: false,
@@ -470,6 +488,7 @@ export async function publishDailyQuestion() {
       await Status.updateOne({}, {
         $set: {
           questionSentToday: true,
+          questionPublishedDate: getTodayISTDate(),
           isMonthlyGoalsDay: true,
           isMonthlyReflectionDay: false,
           isStorySummaryDay: false,
@@ -577,6 +596,7 @@ export async function publishDailyQuestion() {
     await Status.updateOne({}, {
       $set: {
         questionSentToday: true,
+        questionPublishedDate: getTodayISTDate(),
         todayContentType: "question",
         todayAudioUrl: null,
         todayStoryTranscript: null,
@@ -626,9 +646,10 @@ export async function shouldPublishQuestion() {
     const nowTime = `${String(nowIST.getHours()).padStart(2, "0")}:${String(nowIST.getMinutes()).padStart(2, "0")}`;
 
     const sendTime = status.posterSendTime || "08:00";
-    const todayIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, "0")}-${String(nowIST.getDate()).padStart(2, "0")}`;
+    const todayIST = getTodayISTDate();
+    const alreadyPublished = Boolean(status.questionSentToday && (status.questionPublishedDate === todayIST || status.lastPosterSentDate === todayIST));
     
-    return nowTime === sendTime && (!status.questionSentToday || status.lastPosterSentDate !== todayIST || status.lastPosterSentTime !== sendTime);
+    return nowTime === sendTime && !alreadyPublished;
   } catch (err) {
     console.error("[QuestionScheduler] Check time error:", err.message);
     return false;
@@ -641,7 +662,9 @@ export async function shouldPublishQuestion() {
 export async function catchUpPublishQuestion() {
   try {
     const status = await Status.findOne().lean();
-    if (!status || status.questionSentToday) return { catchUpNeeded: false };
+    const todayIST = getTodayISTDate();
+    const alreadyPublished = Boolean(status?.questionSentToday && (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST));
+    if (!status || alreadyPublished) return { catchUpNeeded: false };
 
     const sendTime = status.posterSendTime || "08:00";
     const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));

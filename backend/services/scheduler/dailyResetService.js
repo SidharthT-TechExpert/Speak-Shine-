@@ -277,6 +277,7 @@ export async function resetStatusFlags() {
         todayCategory: null,
         todayPosterImage: null,
         todayVocabulary: [],
+        questionPublishedDate: null,
       }
     }, { upsert: true });
 
@@ -359,6 +360,7 @@ export async function performDailyReset() {
         todayCategory: null,
         todayPosterImage: null,
         todayVocabulary: [],
+        questionPublishedDate: null,
         lastResetDate: todayIST,
         lastSubmissionReportDate: null,
         lastSubmissionReportTime: null,
