@@ -9,27 +9,83 @@ const ChatLauncher = lazy(() => import("./components/ChatLauncher.jsx"));
 const InstallPrompt = lazy(() => import("./components/InstallPrompt.jsx"));
 const WakeUpScreen  = lazy(() => import("./components/WakeUpScreen.jsx"));
 
-// Lazy-load all pages — each becomes its own JS chunk, only loaded when needed
-const Login           = lazy(() => import("./pages/Login.jsx"));
-const Register        = lazy(() => import("./pages/Register.jsx"));
-const ForgotPassword  = lazy(() => import("./pages/ForgotPassword.jsx"));
-const UserDashboard   = lazy(() => import("./pages/UserDashboard.jsx"));
-const AdminDashboard  = lazy(() => import("./pages/AdminDashboard.jsx"));
-const TrainerDashboard= lazy(() => import("./pages/TrainerDashboard.jsx"));
-const VideoAnalysis   = lazy(() => import("./pages/VideoAnalysis.jsx"));
-const CommunityFeed   = lazy(() => import("./pages/CommunityFeed.jsx"));
-const LiveSession     = lazy(() => import("./pages/LiveSession.jsx"));
-const LiveRooms       = lazy(() => import("./pages/LiveRooms.jsx"));
-const NotFound        = lazy(() => import("./pages/NotFound.jsx"));
-const PaymentWall     = lazy(() => import("./pages/PaymentWall.jsx"));
-const PaymentHistory  = lazy(() => import("./pages/PaymentHistory.jsx"));
-const Profile         = lazy(() => import("./pages/Profile.jsx"));
+// Lazy-load all pages with preloading support
+const pageImports = {
+  Login: () => import("./pages/Login.jsx"),
+  Register: () => import("./pages/Register.jsx"),
+  ForgotPassword: () => import("./pages/ForgotPassword.jsx"),
+  UserDashboard: () => import("./pages/UserDashboard.jsx"),
+  AdminDashboard: () => import("./pages/AdminDashboard.jsx"),
+  TrainerDashboard: () => import("./pages/TrainerDashboard.jsx"),
+  VideoAnalysis: () => import("./pages/VideoAnalysis.jsx"),
+  CommunityFeed: () => import("./pages/CommunityFeed.jsx"),
+  LiveSession: () => import("./pages/LiveSession.jsx"),
+  LiveRooms: () => import("./pages/LiveRooms.jsx"),
+  NotFound: () => import("./pages/NotFound.jsx"),
+  PaymentWall: () => import("./pages/PaymentWall.jsx"),
+  PaymentHistory: () => import("./pages/PaymentHistory.jsx"),
+  Profile: () => import("./pages/Profile.jsx"),
+};
+
+const Login           = lazy(pageImports.Login);
+const Register        = lazy(pageImports.Register);
+const ForgotPassword  = lazy(pageImports.ForgotPassword);
+const UserDashboard   = lazy(pageImports.UserDashboard);
+const AdminDashboard  = lazy(pageImports.AdminDashboard);
+const TrainerDashboard= lazy(pageImports.TrainerDashboard);
+const VideoAnalysis   = lazy(pageImports.VideoAnalysis);
+const CommunityFeed   = lazy(pageImports.CommunityFeed);
+const LiveSession     = lazy(pageImports.LiveSession);
+const LiveRooms       = lazy(pageImports.LiveRooms);
+const NotFound        = lazy(pageImports.NotFound);
+const PaymentWall     = lazy(pageImports.PaymentWall);
+const PaymentHistory  = lazy(pageImports.PaymentHistory);
+const Profile         = lazy(pageImports.Profile);
+
+export const routePreloaders = {
+  "/dashboard": pageImports.UserDashboard,
+  "/record": pageImports.VideoAnalysis,
+  "/video-analysis": pageImports.VideoAnalysis,
+  "/community": pageImports.CommunityFeed,
+  "/live/rooms": pageImports.LiveRooms,
+  "/payment": pageImports.PaymentWall,
+  "/payment-history": pageImports.PaymentHistory,
+  "/profile": pageImports.Profile,
+  "/admin": pageImports.AdminDashboard,
+  "/trainer": pageImports.TrainerDashboard,
+};
+
+export function preloadRoute(path) {
+  if (!path) return;
+  const loader = routePreloaders[path];
+  if (loader) loader();
+}
+
 import { AppShell } from "./components/Layout.jsx";
 
 function PageLoader() {
   return (
     <div className="spinner-wrap" style={{ height: "100vh" }}>
       <div className="spinner" />
+    </div>
+  );
+}
+
+export function PageContentLoader() {
+  return (
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "55vh",
+      padding: "2rem",
+      gap: "1rem",
+    }}>
+      <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
+      <span style={{ fontSize: "0.82rem", color: "var(--muted)", fontWeight: 600 }}>
+        Loading page content...
+      </span>
     </div>
   );
 }
@@ -140,85 +196,83 @@ function AppRoutes() {
   if (booting) return <PageLoader />;
 
   return (
-          <BrowserRouter>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-            {/* User auth */}
-            <Route path="/login" element={
-              <GuestRoute loginFor="user"><Login /></GuestRoute>
-            } />
-            {/* /register — open to guests, redirects logged-in users away */}
-            <Route path="/register" element={
-              <GuestRoute loginFor="user"><Register /></GuestRoute>
-            } />
-            {/* Forgot password — open to all (phone OTP verification required) */}
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+    <BrowserRouter>
+      <Routes>
+        {/* User auth */}
+        <Route path="/login" element={
+          <GuestRoute loginFor="user"><Suspense fallback={<PageLoader />}><Login /></Suspense></GuestRoute>
+        } />
+        {/* /register — open to guests, redirects logged-in users away */}
+        <Route path="/register" element={
+          <GuestRoute loginFor="user"><Suspense fallback={<PageLoader />}><Register /></Suspense></GuestRoute>
+        } />
+        {/* Forgot password — open to all (phone OTP verification required) */}
+        <Route path="/forgot-password" element={<Suspense fallback={<PageLoader />}><ForgotPassword /></Suspense>} />
 
-            {/* Admin auth */}
-            <Route path="/admin/login" element={
-              <GuestRoute loginFor="admin"><Login loginFor="admin" /></GuestRoute>
-            } />
+        {/* Admin auth */}
+        <Route path="/admin/login" element={
+          <GuestRoute loginFor="admin"><Suspense fallback={<PageLoader />}><Login loginFor="admin" /></Suspense></GuestRoute>
+        } />
 
-            {/* Trainer auth */}
-            <Route path="/trainer/login" element={
-              <GuestRoute loginFor="trainer"><Login loginFor="trainer" /></GuestRoute>
-            } />
+        {/* Trainer auth */}
+        <Route path="/trainer/login" element={
+          <GuestRoute loginFor="trainer"><Suspense fallback={<PageLoader />}><Login loginFor="trainer" /></Suspense></GuestRoute>
+        } />
 
-            {/* Live session full-screen interactive room (no sidebar/header) */}
-            <Route path="/live/:id" element={
-              <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
-                <LiveSession />
-              </ProtectedRoute>
-            } />
+        {/* Live session full-screen interactive room (no sidebar/header) */}
+        <Route path="/live/:id" element={
+          <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
+            <Suspense fallback={<PageLoader />}><LiveSession /></Suspense>
+          </ProtectedRoute>
+        } />
 
-            {/* Persistent App Shell with Sticky Header & Sidebar */}
-            <Route element={<AppShell />}>
-              {/* Root */}
-              <Route path="/" element={<HomeRedirect />} />
+        {/* Persistent App Shell with Sticky Header & Sidebar */}
+        <Route element={<AppShell />}>
+          {/* Root */}
+          <Route path="/" element={<HomeRedirect />} />
 
-              {/* Protected pages — guests see preview mode, logged-in users see real data */}
-              <Route path="/dashboard" element={<UserDashboard />} />
-              <Route path="/video-analysis" element={
-                <PaidRoute><VideoAnalysis /></PaidRoute>
-              } />
-              <Route path="/record" element={
-                <PaidRoute><VideoAnalysis /></PaidRoute>
-              } />
-              <Route path="/community" element={<CommunityFeed />} />
-              <Route path="/live/rooms" element={
-                <ProtectedRoute roles={["user","admin","admins","trainer","viewer"]} loginPath="/login">
-                  <LiveRooms />
-                </ProtectedRoute>
-              } />
-              <Route path="/payment" element={<PaymentWall />} />
-              <Route path="/payment-history" element={
-                <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
-                  <PaymentHistory />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute roles={["user","admin","admins","trainer","viewer"]} loginPath="/login">
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin" element={
-                <ProtectedRoute roles={["admin", "admins", "viewer"]} loginPath="/admin/login">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/trainer" element={
-                <ProtectedRoute roles={["trainer","admin","admins","viewer"]} loginPath="/trainer/login">
-                  <TrainerDashboard />
-                </ProtectedRoute>
-              } />
-            </Route>
+          {/* Protected pages — guests see preview mode, logged-in users see real data */}
+          <Route path="/dashboard" element={<UserDashboard />} />
+          <Route path="/video-analysis" element={
+            <PaidRoute><VideoAnalysis /></PaidRoute>
+          } />
+          <Route path="/record" element={
+            <PaidRoute><VideoAnalysis /></PaidRoute>
+          } />
+          <Route path="/community" element={<CommunityFeed />} />
+          <Route path="/live/rooms" element={
+            <ProtectedRoute roles={["user","admin","admins","trainer","viewer"]} loginPath="/login">
+              <LiveRooms />
+            </ProtectedRoute>
+          } />
+          <Route path="/payment" element={<PaymentWall />} />
+          <Route path="/payment-history" element={
+            <ProtectedRoute roles={["user","admin","admins","trainer"]} loginPath="/login">
+              <PaymentHistory />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute roles={["user","admin","admins","trainer","viewer"]} loginPath="/login">
+              <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute roles={["admin", "admins", "viewer"]} loginPath="/admin/login">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/trainer" element={
+            <ProtectedRoute roles={["trainer","admin","admins","viewer"]} loginPath="/trainer/login">
+              <TrainerDashboard />
+            </ProtectedRoute>
+          } />
+        </Route>
 
-            {/* Catch-all - 404 Page */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-            </Suspense>
-            <Suspense fallback={null}><ChatLauncherConditional /></Suspense>
-            <Suspense fallback={null}><InstallPrompt /></Suspense>
-          </BrowserRouter>
+        {/* Catch-all - 404 Page */}
+        <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
+      </Routes>
+      <Suspense fallback={null}><ChatLauncherConditional /></Suspense>
+      <Suspense fallback={null}><InstallPrompt /></Suspense>
+    </BrowserRouter>
   );
 }

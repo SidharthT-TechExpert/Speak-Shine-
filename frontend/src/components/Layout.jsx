@@ -92,11 +92,15 @@ function useInstall() {
   return { prompt, isInstalled, install };
 }
 
+import { PageContentLoader, preloadRoute } from "../App.jsx";
+
 export function AppShell() {
   return (
     <ShellProvider>
       <Layout isShellRoot={true}>
-        <Outlet />
+        <Suspense fallback={<PageContentLoader />}>
+          <Outlet />
+        </Suspense>
       </Layout>
     </ShellProvider>
   );
@@ -387,7 +391,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
 
         {/* Navigation Items */}
         <nav className="speakshine-sidebar-nav">
-          <Link to="/dashboard" className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}>
+          <Link
+            to="/dashboard"
+            onMouseEnter={() => preloadRoute("/dashboard")}
+            onTouchStart={() => preloadRoute("/dashboard")}
+            className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}
+          >
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -396,7 +405,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             </span>
             <span>Dashboard</span>
           </Link>
-          <Link to="/record" className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}>
+          <Link
+            to="/record"
+            onMouseEnter={() => preloadRoute("/record")}
+            onTouchStart={() => preloadRoute("/record")}
+            className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}
+          >
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.9L15 14"/>
@@ -405,7 +419,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             </span>
             <span>Video analysis</span>
           </Link>
-          <Link to="/community" className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}>
+          <Link
+            to="/community"
+            onMouseEnter={() => preloadRoute("/community")}
+            onTouchStart={() => preloadRoute("/community")}
+            className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}
+          >
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -415,7 +434,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             </span>
             <span>Community</span>
           </Link>
-          <Link to="/live/rooms" className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}>
+          <Link
+            to="/live/rooms"
+            onMouseEnter={() => preloadRoute("/live/rooms")}
+            onTouchStart={() => preloadRoute("/live/rooms")}
+            className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}
+          >
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h.01M2 8.82a15 15 0 0120 0"/>
@@ -425,7 +449,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             </span>
             <span>Live rooms</span>
           </Link>
-          <Link to="/payment-history" className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}>
+          <Link
+            to="/payment-history"
+            onMouseEnter={() => preloadRoute("/payment-history")}
+            onTouchStart={() => preloadRoute("/payment-history")}
+            className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}
+          >
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="5" width="20" height="14" rx="2"/>
@@ -438,6 +467,8 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
           {isLoggedIn && (
             <Link
               to="/profile"
+              onMouseEnter={() => preloadRoute("/profile")}
+              onTouchStart={() => preloadRoute("/profile")}
               className={`speakshine-nav-item${location.pathname === "/profile" ? " active" : ""}`}
             >
               <span className="nav-icon">
@@ -454,7 +485,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
           )}
 
           {(user?.role === "admin" || user?.role === "admins") && (
-            <Link to="/admin" className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}>
+            <Link
+              to="/admin"
+              onMouseEnter={() => preloadRoute("/admin")}
+              onTouchStart={() => preloadRoute("/admin")}
+              className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}
+            >
               <span className="nav-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -464,7 +500,12 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             </Link>
           )}
           {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
-            <Link to="/trainer" className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}>
+            <Link
+              to="/trainer"
+              onMouseEnter={() => preloadRoute("/trainer")}
+              onTouchStart={() => preloadRoute("/trainer")}
+              className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}
+            >
               <span className="nav-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
@@ -778,7 +819,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             </div>
 
             <nav className="speakshine-sidebar-nav" style={{ flex: 1 }}>
-              <Link to="/dashboard" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}>
+              <Link
+                to="/dashboard"
+                onMouseEnter={() => preloadRoute("/dashboard")}
+                onTouchStart={() => preloadRoute("/dashboard")}
+                onClick={() => setMenuOpen(false)}
+                className={`speakshine-nav-item${isDashboardActive ? " active" : ""}`}
+              >
                 <span className="nav-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -787,7 +834,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                 </span>
                 <span>Dashboard</span>
               </Link>
-              <Link to="/record" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}>
+              <Link
+                to="/record"
+                onMouseEnter={() => preloadRoute("/record")}
+                onTouchStart={() => preloadRoute("/record")}
+                onClick={() => setMenuOpen(false)}
+                className={`speakshine-nav-item${isVideoAnalysisActive ? " active" : ""}`}
+              >
                 <span className="nav-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.9L15 14"/>
@@ -796,7 +849,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                 </span>
                 <span>Video analysis</span>
               </Link>
-              <Link to="/community" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}>
+              <Link
+                to="/community"
+                onMouseEnter={() => preloadRoute("/community")}
+                onTouchStart={() => preloadRoute("/community")}
+                onClick={() => setMenuOpen(false)}
+                className={`speakshine-nav-item${isCommunityActive ? " active" : ""}`}
+              >
                 <span className="nav-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -806,7 +865,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                 </span>
                 <span>Community</span>
               </Link>
-              <Link to="/live/rooms" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}>
+              <Link
+                to="/live/rooms"
+                onMouseEnter={() => preloadRoute("/live/rooms")}
+                onTouchStart={() => preloadRoute("/live/rooms")}
+                onClick={() => setMenuOpen(false)}
+                className={`speakshine-nav-item${isLiveRoomsActive ? " active" : ""}`}
+              >
                 <span className="nav-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 20h.01M2 8.82a15 15 0 0120 0"/>
@@ -816,7 +881,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                 </span>
                 <span>Live rooms</span>
               </Link>
-              <Link to="/payment-history" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}>
+              <Link
+                to="/payment-history"
+                onMouseEnter={() => preloadRoute("/payment-history")}
+                onTouchStart={() => preloadRoute("/payment-history")}
+                onClick={() => setMenuOpen(false)}
+                className={`speakshine-nav-item${isPaymentsActive ? " active" : ""}`}
+              >
                 <span className="nav-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="2" y="5" width="20" height="14" rx="2"/>
@@ -829,6 +900,8 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
               {isLoggedIn && (
                 <Link
                   to="/profile"
+                  onMouseEnter={() => preloadRoute("/profile")}
+                  onTouchStart={() => preloadRoute("/profile")}
                   onClick={() => setMenuOpen(false)}
                   className={`speakshine-nav-item${location.pathname === "/profile" ? " active" : ""}`}
                 >
@@ -846,7 +919,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
               )}
 
               {(user?.role === "admin" || user?.role === "admins") && (
-                <Link to="/admin" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}>
+                <Link
+                  to="/admin"
+                  onMouseEnter={() => preloadRoute("/admin")}
+                  onTouchStart={() => preloadRoute("/admin")}
+                  onClick={() => setMenuOpen(false)}
+                  className={`speakshine-nav-item${location.pathname.startsWith("/admin") ? " active" : ""}`}
+                >
                   <span className="nav-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -856,7 +935,13 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                 </Link>
               )}
               {(user?.role === "trainer" || user?.role === "admin" || user?.role === "admins") && (
-                <Link to="/trainer" onClick={() => setMenuOpen(false)} className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}>
+                <Link
+                  to="/trainer"
+                  onMouseEnter={() => preloadRoute("/trainer")}
+                  onTouchStart={() => preloadRoute("/trainer")}
+                  onClick={() => setMenuOpen(false)}
+                  className={`speakshine-nav-item${location.pathname.startsWith("/trainer") ? " active" : ""}`}
+                >
                   <span className="nav-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
