@@ -89,7 +89,8 @@ function isFirstDayOfMonth() {
  */
 async function isStoryDay() {
   try {
-    const status = await Status.findOne().select("storyDays storyDay").lean();
+    const status = await Status.findOne().select("storyDays storyDay isStorySummaryDay todayContentType").lean();
+    if (status?.isStorySummaryDay || status?.todayContentType === "story_audio") return true;
     let days = [];
     if (Array.isArray(status?.storyDays) && status.storyDays.length > 0) {
       days = status.storyDays;
@@ -251,7 +252,7 @@ export async function publishAutoSaturdayStory() {
     await ensureTodayVocabulary().catch(err =>
       console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
     );
-    await dispatchPosterToWhatsApp({ topic: story.topic, question: story.question, category: STORY_SUMMARY_CATEGORY });
+    await dispatchPosterToWhatsApp({ topic: story.topic, question: story.question, category: STORY_SUMMARY_CATEGORY, contentType: "story_audio" });
     return { published: true, type: "story_summary", topic: story.topic, source: "auto" };
   } catch (err) {
     console.error("[QuestionScheduler] Story summary auto-publish failed:", err.message);
@@ -440,7 +441,9 @@ export async function publishDailyQuestion() {
 
     // ── 4. Story Summary Day → Auto Story Summary (e.g. Saturday) ────────
     if (await isStoryDay()) {
-      return await publishAutoSaturdayStory();
+      const storyResult = await publishAutoSaturdayStory();
+      if (storyResult?.published) return storyResult;
+      console.warn("[QuestionScheduler] ⚠️  Story summary auto-publish failed — falling back to next task:", storyResult?.error);
     }
 
     // ── 5. Picture Description Day → Auto Picture Description (e.g. Thursday) ──

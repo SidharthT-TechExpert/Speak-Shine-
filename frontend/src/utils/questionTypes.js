@@ -174,7 +174,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload description",
         rules: [
           { text: "Describe subjects, actions & atmosphere with natural expression", highlight: true },
-          { text: `Aim for 1–3 minutes of natural speaking (min 60s, max ${limits.maxLabel})` },
+          { text: `Minimum 60 seconds (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})` },
           { text: `Weave in at least ${reqCount} target vocabulary word${reqCount > 1 ? "s" : ""} (${vocabLevel})` },
         ],
         hasAudio: false,
@@ -198,8 +198,8 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload summary",
         rules: [
           { text: "Listen to the complete audio story first to catch the main turning point", highlight: true },
+          { text: `Minimum 60 seconds speaking (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})` },
           { text: `Retell in your own words using at least ${reqCount} target word${reqCount > 1 ? "s" : ""}` },
-          { text: "Aim for 1–3 minutes of relaxed speaking — pauses to think are normal!" },
         ],
         hasAudio: Boolean(today.audioUrl),
         hasImage: false,
@@ -270,7 +270,7 @@ export function getQuestionUIConfig(type, today = {}) {
         recordButtonLabel: "Record speaking video",
         uploadButtonLabel: "Upload video",
         rules: [
-          { text: `Aim for 1–3 minutes of natural, relaxed speaking (min 60s)`, highlight: true },
+          { text: `Minimum 60 seconds continuous speaking (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})`, highlight: true },
           { text: `Try integrating at least ${reqCount} of today's ${totalCount} target words (${vocabLevel})` },
           { text: "No need for scripted perfection — speak naturally from the heart" },
         ],

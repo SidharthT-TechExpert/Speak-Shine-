@@ -103,6 +103,54 @@ export function formatTextForHumanSpeech(rawText) {
  * @param {string} [voiceId] - ElevenLabs Voice ID
  * @param {object} [customVoiceSettings] - Stability, style, etc.
  */
+async function generateGoogleTtsBuffer(text) {
+  const clean = formatTextForHumanSpeech(text);
+  // Split into sentence / clause chunks <= 180 chars
+  const rawChunks = clean.match(/[^.!?\n]+[.!?\n]+/g) || [clean];
+  const chunks = [];
+
+  for (const rawChunk of rawChunks) {
+    let current = rawChunk.trim();
+    while (current.length > 180) {
+      let splitIdx = current.lastIndexOf(",", 180);
+      if (splitIdx === -1) splitIdx = current.lastIndexOf(" ", 180);
+      if (splitIdx === -1) splitIdx = 180;
+      chunks.push(current.slice(0, splitIdx).trim());
+      current = current.slice(splitIdx).trim();
+    }
+    if (current.length > 0) chunks.push(current);
+  }
+
+  const buffers = [];
+  for (const chunk of chunks) {
+    if (!chunk) continue;
+    try {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(chunk)}`;
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://translate.google.com/",
+        },
+      });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        buffers.push(buf);
+      }
+    } catch (err) {
+      console.warn("[StoryAudio] Google TTS chunk fetch failed:", err.message);
+    }
+  }
+
+  if (buffers.length === 0) {
+    throw new Error("Google TTS fallback failed to generate audio chunks");
+  }
+
+  return Buffer.concat(buffers);
+}
+
+/**
+ * Convert text to an MP3 Buffer using ElevenLabs TTS (with Google TTS fallback).
+ */
 async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSettings = null) {
   let lastError = null;
 
@@ -121,101 +169,103 @@ async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSett
   let targetVoiceId = voiceId || DEFAULT_VOICE_ID;
   let currentModel = "eleven_turbo_v2_5"; // Flagship conversational model with human cadence
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const apiKey = getKey();
+  try {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const apiKey = getKey();
 
-    if (!apiKey) {
-      throw new Error(
-        "All ElevenLabs API keys are exhausted or on cooldown. " +
-        "Add more keys via ELEVENLABS_API_KEYS or wait for cooldown to expire."
-      );
-    }
-
-    let res;
-    try {
-      res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${targetVoiceId}`, {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-          "Accept": "audio/mpeg",
-        },
-        body: JSON.stringify({
-          text: speechText,
-          model_id: currentModel,
-          voice_settings: settings,
-        }),
-      });
-    } catch (networkErr) {
-      // Network-level failure (DNS, timeout, etc.)
-      console.warn(`[StoryAudio] Network error on attempt ${attempt + 1}:`, networkErr.message);
-      markTransientError(apiKey);
-      lastError = networkErr;
-      continue;
-    }
-
-    // ── Success ──────────────────────────────────────────────────────────────
-    if (res.ok) {
-      return Buffer.from(await res.arrayBuffer());
-    }
-
-    // ── Handle error status codes ─────────────────────────────────────────────
-    const errText = await res.text().catch(() => "");
-    let detail = errText;
-    try { detail = JSON.parse(errText)?.detail?.message || errText; } catch {}
-
-    // If turbo_v2_5 is unsupported on this tier/account, fall back to eleven_multilingual_v2
-    if (res.status === 400 && currentModel === "eleven_turbo_v2_5") {
-      console.warn(`[StoryAudio] Turbo v2.5 model failed (${detail}). Falling back to eleven_multilingual_v2...`);
-      currentModel = "eleven_multilingual_v2";
-      continue; // retry with multilingual_v2 using same key
-    }
-
-    if (res.status === 429) {
-      // Rate limited — use Retry-After header if present
-      const retryAfter = parseRetryAfter(res.headers.get("Retry-After")) || 60;
-      markRateLimited(apiKey, retryAfter);
-      lastError = new Error(`Rate limited (429): ${detail}`);
-      continue; // try next key
-    }
-
-    if (res.status === 402) {
-      // Free users cannot use library voices via the API, or account quota reached
-      console.warn(`[StoryAudio] ElevenLabs 402 error: ${detail}`);
-      if (targetVoiceId !== DEFAULT_VOICE_ID) {
-        console.warn(`[StoryAudio] Voice "${targetVoiceId}" is restricted on free tier. Automatically retrying with Adam (${DEFAULT_VOICE_ID})...`);
-        targetVoiceId = DEFAULT_VOICE_ID;
-        settings.stability = 0.35;
-        settings.style = 0.10;
-        continue; // Retry with Adam using the same key
+      if (!apiKey) {
+        console.warn("[StoryAudio] No ElevenLabs API keys available — switching to Google TTS fallback...");
+        break;
       }
-      // If Adam also fails with 402, this key's monthly free characters are exhausted
-      markInvalid(apiKey);
-      lastError = new Error(`ElevenLabs quota or tier limit (402): ${detail}`);
-      continue; // Try next key in rotation
-    }
 
-    if (res.status === 401 || res.status === 403) {
-      // Invalid key or quota exceeded
-      markInvalid(apiKey);
-      lastError = new Error(`Auth/quota error (${res.status}): ${detail}`);
-      continue; // try next key
-    }
+      let res;
+      try {
+        res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${targetVoiceId}`, {
+          method: "POST",
+          headers: {
+            "xi-api-key": apiKey,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+          },
+          body: JSON.stringify({
+            text: speechText,
+            model_id: currentModel,
+            voice_settings: settings,
+          }),
+        });
+      } catch (networkErr) {
+        // Network-level failure (DNS, timeout, etc.)
+        console.warn(`[StoryAudio] Network error on attempt ${attempt + 1}:`, networkErr.message);
+        markTransientError(apiKey);
+        lastError = networkErr;
+        continue;
+      }
 
-    if (res.status >= 500) {
-      // ElevenLabs server error — short cooldown then retry
-      markTransientError(apiKey);
-      lastError = new Error(`ElevenLabs server error (${res.status}): ${detail}`);
-      continue;
-    }
+      // ── Success ──────────────────────────────────────────────────────────────
+      if (res.ok) {
+        return Buffer.from(await res.arrayBuffer());
+      }
 
-    // 4xx client errors other than 401/403/429 are not retryable
-    throw new Error(`ElevenLabs API error ${res.status}: ${detail}`);
+      // ── Handle error status codes ─────────────────────────────────────────────
+      const errText = await res.text().catch(() => "");
+      let detail = errText;
+      try { detail = JSON.parse(errText)?.detail?.message || errText; } catch {}
+
+      // If turbo_v2_5 is unsupported on this tier/account, fall back to eleven_multilingual_v2
+      if (res.status === 400 && currentModel === "eleven_turbo_v2_5") {
+        console.warn(`[StoryAudio] Turbo v2.5 model failed (${detail}). Falling back to eleven_multilingual_v2...`);
+        currentModel = "eleven_multilingual_v2";
+        continue; // retry with multilingual_v2 using same key
+      }
+
+      if (res.status === 429) {
+        // Rate limited — use Retry-After header if present
+        const retryAfter = parseRetryAfter(res.headers.get("Retry-After")) || 60;
+        markRateLimited(apiKey, retryAfter);
+        lastError = new Error(`Rate limited (429): ${detail}`);
+        continue; // try next key
+      }
+
+      if (res.status === 402) {
+        // Free users cannot use library voices via the API, or account quota reached
+        console.warn(`[StoryAudio] ElevenLabs 402 error: ${detail}`);
+        if (targetVoiceId !== DEFAULT_VOICE_ID) {
+          console.warn(`[StoryAudio] Voice "${targetVoiceId}" is restricted on free tier. Automatically retrying with Adam (${DEFAULT_VOICE_ID})...`);
+          targetVoiceId = DEFAULT_VOICE_ID;
+          settings.stability = 0.35;
+          settings.style = 0.10;
+          continue; // Retry with Adam using the same key
+        }
+        // If Adam also fails with 402, this key's monthly free characters are exhausted
+        markInvalid(apiKey);
+        lastError = new Error(`ElevenLabs quota or tier limit (402): ${detail}`);
+        continue; // Try next key in rotation
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        // Invalid key or quota exceeded
+        markInvalid(apiKey);
+        lastError = new Error(`Auth/quota error (${res.status}): ${detail}`);
+        continue; // try next key
+      }
+
+      if (res.status >= 500) {
+        // ElevenLabs server error — short cooldown then retry
+        markTransientError(apiKey);
+        lastError = new Error(`ElevenLabs server error (${res.status}): ${detail}`);
+        continue;
+      }
+
+      // 4xx client errors other than 401/403/429 are not retryable
+      console.warn(`[StoryAudio] ElevenLabs API error ${res.status}: ${detail}`);
+      break;
+    }
+  } catch (err) {
+    console.warn(`[StoryAudio] ElevenLabs TTS attempt encountered error: ${err.message}`);
   }
 
-  throw new Error(
-    `ElevenLabs TTS failed after ${MAX_ATTEMPTS} attempts. Last error: ${lastError?.message}`
-  );
+  console.log("[StoryAudio] 🎙️ Generating story audio via Google TTS fallback...");
+  return await generateGoogleTtsBuffer(text);
 }
 
 /**

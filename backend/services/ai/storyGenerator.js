@@ -165,57 +165,100 @@ Return ONLY valid JSON in this exact format, no markdown, no extra text:
 
   let lastError = null;
 
+const FALLBACK_STORIES = [
+  {
+    topic: "The Forgotten Presentation",
+    story: "Rohan had prepared his slides for days, but on the morning of the team review, his laptop refused to turn on. With only fifteen minutes left, Rohan took a deep breath, gathered a whiteboard marker, and walked into the meeting room. Instead of reading slides, he drew key diagrams on the board and spoke directly to his team. The presentation turned out to be the most engaging one he had ever delivered. Rohan realized that clear communication matters far more than fancy digital slides.",
+    summaryGuide: [
+      "Rohan's laptop failed right before an important team review",
+      "He adapted quickly by using a whiteboard and marker",
+      "He delivered an engaging presentation directly to his team",
+      "He learned that clear communication matters more than slides"
+    ],
+    question: "Listen to the story and record a short video summary in your own words.",
+    theme: "a mistake during a presentation",
+    character: { name: "Rohan", type: "a 25-year-old software trainee", pronoun: "he" },
+  },
+  {
+    topic: "The Unexpected Opportunity",
+    story: "Aisha was waiting at a quiet bus stop when an elderly woman dropped a folder full of architectural drawings. Aisha helped gather the papers and noticed the intricate floor plans. They struck up a conversation about urban design. It turned out the woman was a senior architect at a leading studio in the city. Impressed by Aisha's insight and enthusiasm, she handed Aisha her card and invited her for an internship interview. Aisha learned that being helpful and open to conversation can unlock unexpected doors.",
+    summaryGuide: [
+      "Aisha helped an elderly woman pick up dropped architectural plans at a bus stop",
+      "They had an engaging conversation about urban design",
+      "The woman turned out to be a senior architect and offered Aisha an interview",
+      "Aisha realized that being helpful and friendly can open unexpected opportunities"
+    ],
+    question: "Listen to the story and record a short video summary in your own words.",
+    theme: "a surprise opportunity from a stranger",
+    character: { name: "Aisha", type: "a 22-year-old design student", pronoun: "she" },
+  },
+  {
+    topic: "The Weekend Project",
+    story: "Maya and Daniel decided to fix up a small garden behind their shared apartment building. At first, the soil was dry and filled with weeds, and their first attempt at planting flowers failed. Instead of giving up, they researched soil nutrients and asked a local gardener for advice. Three weeks later, green shoots began to appear. Their neighbors started coming out to help water the plants every evening. Maya and Daniel discovered that perseverance and teamwork can transform a neglected space into a vibrant community spot.",
+    summaryGuide: [
+      "Maya and Daniel attempted to build a garden behind their shared apartment",
+      "Their initial attempt failed due to dry soil and weeds",
+      "They sought advice, improved the soil, and persevered",
+      "The garden succeeded and brought the entire neighborhood together"
+    ],
+    question: "Listen to the story and record a short video summary in your own words.",
+    theme: "a new hobby that brought people together",
+    character: { name: "Maya", type: "a 20-year-old college student", pronoun: "she" },
+  }
+];
+
   for (let attempt = 0; attempt < 5; attempt++) {
     const apiKey = getTextKey();
-    if (!apiKey) throw new Error("All Groq API keys exhausted — story generation unavailable");
-
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: getTextModel(),
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.85,
-        max_tokens: 3500,
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (res.status === 429) {
-      const errText = await res.text();
-      markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
-      continue;
-    }
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Groq API error ${res.status}: ${err.slice(0, 200)}`);
-    }
-
-    const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content?.trim();
-    if (!raw) throw new Error("Empty response from Groq");
-
-    let jsonStr = raw;
-    const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) jsonStr = fence[1].trim();
-    else {
-      const s = raw.indexOf("{");
-      const e = raw.lastIndexOf("}");
-      if (s !== -1 && e !== -1) jsonStr = raw.slice(s, e + 1);
-    }
+    if (!apiKey) break;
 
     try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: getTextModel(),
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.85,
+          max_tokens: 3500,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (res.status === 429) {
+        const errText = await res.text();
+        markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+        continue;
+      }
+
+      if (!res.ok) {
+        const err = await res.text();
+        console.warn(`[StoryGenerator] Groq API error ${res.status}: ${err.slice(0, 200)}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const raw = data.choices?.[0]?.message?.content?.trim();
+      if (!raw) continue;
+
+      let jsonStr = raw;
+      const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fence) jsonStr = fence[1].trim();
+      else {
+        const s = raw.indexOf("{");
+        const e = raw.lastIndexOf("}");
+        if (s !== -1 && e !== -1) jsonStr = raw.slice(s, e + 1);
+      }
+
       const parsed = JSON.parse(jsonStr);
       if (!parsed.topic || !parsed.story || !Array.isArray(parsed.summaryGuide) || !parsed.question) {
-        throw new Error("Missing required fields in story response");
+        continue;
       }
 
       const voiceRecommendation = await analyzeStoryVoice(parsed.story.trim(), {
         name: character.name,
         type: character.type,
         pronoun: character.pronoun,
-      });
+      }).catch(() => null);
 
       return {
         topic: parsed.topic.trim(),
@@ -228,10 +271,16 @@ Return ONLY valid JSON in this exact format, no markdown, no extra text:
       };
     } catch (parseErr) {
       lastError = parseErr;
-      console.warn("[StoryGenerator] JSON parse failed, retrying...", parseErr.message);
+      console.warn("[StoryGenerator] JSON parse or fetch failed, retrying...", parseErr.message);
       continue;
     }
   }
 
-  throw new Error(`Story generation failed after retries: ${lastError?.message}`);
+  console.warn(`[StoryGenerator] Groq AI generation unavailable (${lastError?.message || "All attempts failed"}). Using curated story fallback...`);
+  const fallback = FALLBACK_STORIES[Math.floor(Math.random() * FALLBACK_STORIES.length)];
+  const voiceRecommendation = await analyzeStoryVoice(fallback.story, fallback.character).catch(() => null);
+  return {
+    ...fallback,
+    voiceRecommendation,
+  };
 }
