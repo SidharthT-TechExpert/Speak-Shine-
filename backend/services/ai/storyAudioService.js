@@ -25,6 +25,7 @@ import {
   parseRetryAfter,
 } from "./elevenLabsKeyManager.js";
 import { findVoice, analyzeStoryVoice, STORY_VOICES } from "./storyVoiceAnalyzer.js";
+import { ensureStoryTitleHeader } from "./storyGenerator.js";
 
 // Fallback voice if none specified or matched
 const DEFAULT_VOICE_ID = STORY_VOICES.adam.id;
@@ -290,6 +291,8 @@ export async function generateAndUploadStoryAudio(
     throw new Error("Story text is too short to generate audio");
   }
 
+  const fullScript = ensureStoryTitleHeader(topic, storyText);
+
   // Determine which voice to use
   let selectedVoiceId = voiceId;
   let selectedSettings = voiceSettings;
@@ -304,7 +307,7 @@ export async function generateAndUploadStoryAudio(
   } else {
     // Automatically analyze character and select the most adaptable voice
     console.log(`[StoryAudio] Analyzing story to pick optimal character voice…`);
-    const analysis = await analyzeStoryVoice(storyText, characterHint);
+    const analysis = await analyzeStoryVoice(fullScript, characterHint);
     selectedVoiceId = analysis.voiceId;
     selectedSettings = selectedSettings || analysis.voiceSettings;
     voiceProfile = analysis;
@@ -312,9 +315,9 @@ export async function generateAndUploadStoryAudio(
   }
 
   const voiceName = voiceProfile?.name || voiceProfile?.voiceName || "Adam";
-  console.log(`[StoryAudio] Generating TTS for "${topic}" using voice: ${voiceName} (${storyText.length} chars)…`);
+  console.log(`[StoryAudio] Generating TTS for "${topic}" using voice: ${voiceName} (${fullScript.length} chars)…`);
 
-  const mp3Buffer = await textToMp3Buffer(storyText, selectedVoiceId, selectedSettings);
+  const mp3Buffer = await textToMp3Buffer(fullScript, selectedVoiceId, selectedSettings);
   console.log(`[StoryAudio] TTS done — ${(mp3Buffer.length / 1024).toFixed(1)} KB. Uploading to R2…`);
 
   const slug = topic

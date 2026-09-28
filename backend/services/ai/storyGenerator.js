@@ -110,6 +110,23 @@ export function pickFreshTheme(usedThemes = []) {
 }
 
 /**
+ * Ensures story text starts with the intro header format:
+ * "Today's Speak and Shine story is [Topic]."
+ */
+export function ensureStoryTitleHeader(topic, storyText) {
+  if (!storyText || typeof storyText !== "string") return "";
+  const cleanStory = storyText.trim();
+  if (!topic || typeof topic !== "string") return cleanStory;
+
+  const prefixRegex = /^Today['’]?s\s+Speak\s+(?:and|&)\s+Shine\s+story\s+is/i;
+  if (!prefixRegex.test(cleanStory)) {
+    const formattedTopic = topic.trim();
+    return `Today's Speak and Shine story is ${formattedTopic}.\n\n${cleanStory}`;
+  }
+  return cleanStory;
+}
+
+/**
  * Generate a listening story via Groq.
  * @param {object} options
  * @param {number}   [options.wordCount=200]   - target word count (100–400)
@@ -254,15 +271,18 @@ const FALLBACK_STORIES = [
         continue;
       }
 
-      const voiceRecommendation = await analyzeStoryVoice(parsed.story.trim(), {
+      const topic = parsed.topic.trim();
+      const formattedStory = ensureStoryTitleHeader(topic, parsed.story.trim());
+
+      const voiceRecommendation = await analyzeStoryVoice(formattedStory, {
         name: character.name,
         type: character.type,
         pronoun: character.pronoun,
       }).catch(() => null);
 
       return {
-        topic: parsed.topic.trim(),
-        story: parsed.story.trim(),
+        topic,
+        story: formattedStory,
         summaryGuide: parsed.summaryGuide.map(p => String(p).trim()),
         question: parsed.question.trim(),
         theme,
@@ -278,9 +298,11 @@ const FALLBACK_STORIES = [
 
   console.warn(`[StoryGenerator] Groq AI generation unavailable (${lastError?.message || "All attempts failed"}). Using curated story fallback...`);
   const fallback = FALLBACK_STORIES[Math.floor(Math.random() * FALLBACK_STORIES.length)];
-  const voiceRecommendation = await analyzeStoryVoice(fallback.story, fallback.character).catch(() => null);
+  const formattedFallbackStory = ensureStoryTitleHeader(fallback.topic, fallback.story);
+  const voiceRecommendation = await analyzeStoryVoice(formattedFallbackStory, fallback.character).catch(() => null);
   return {
     ...fallback,
+    story: formattedFallbackStory,
     voiceRecommendation,
   };
 }
