@@ -7,6 +7,7 @@ import SubmissionControls from "../components/SubmissionControls.jsx";
 import { useConfirm } from "../components/ConfirmDialog.jsx";
 import api from "../api/client.js";
 import StreakBadge from "../components/StreakBadge.jsx";
+import AdminHelpDeskTab from "../components/AdminHelpDeskTab.jsx";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, BarChart, Bar, Cell } from "recharts";
 
 const SCORES = { Fluency:"#7c6fff", Grammar:"#4ade80", Confidence:"#fbbf24", Vocabulary:"#ff6b9d" };
@@ -14,7 +15,7 @@ const tt = { background:"#16162a", border:"1px solid #252545", borderRadius:10, 
 const avg = (arr,k) => { const v=arr.filter(s=>s[k]!=null).map(s=>s[k]); return v.length?+(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
 const delta = (arr,k) => { if(arr.length<2)return null; const f=arr[0][k],l=arr[arr.length-1][k]; return(f==null||l==null)?null:+(l-f).toFixed(1); };
 const scoreColor = v => v>=7?"var(--success)":v>=5?"var(--warning)":"var(--danger)";
-const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"submissions",l:"📝 Submissions"},{id:"manual-questions",l:"📝 Manual Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
+const TABS = [{id:"overview",l:"📊 Overview"},{id:"students",l:"👥 Students"},{id:"compare",l:"⚖️ Compare"},{id:"improvement",l:"📈 Improvement"},{id:"submissions",l:"📝 Submissions"},{id:"help",l:"🆘 Help Desk & Doubts"},{id:"manual-questions",l:"📝 Manual Questions"},{id:"live",l:"🎥 Live Sessions"},{id:"controls",l:"🔄 Controls"}];
 
 export default function TrainerDashboard() {
   const [dash, setDash] = useState(null);
@@ -1765,6 +1766,9 @@ function ManualQuestionsPanel() {
           )}
         </>
       )}
+
+      {/* HELP DESK & DOUBTS */}
+      {tab === "help" && <AdminHelpDeskTab />}
     </div>
   );
 }

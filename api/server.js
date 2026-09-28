@@ -54,6 +54,7 @@ import submissionsRoutes from "../backend/routes/submissions.routes.js";
 import guestRoutes from "../backend/routes/guest.routes.js";
 import paymentRoutes from "../backend/routes/payment.routes.js";
 import whatsappRoutes from "../backend/routes/whatsapp.routes.js";
+import helpTicketRoutes from "../backend/routes/helpTicket.routes.js";
 import { initWhatsAppBot, setSocketIo as setWhatsAppSocketIo, sendDeploymentNotification, flushAuthToMongo } from "../backend/services/whatsapp/whatsappService.js";
 
 console.log("[Routes] Loading MVC routes...");
@@ -376,6 +377,8 @@ app.use("/api/payments",     paymentRoutes);
 console.log("[Routes] Payment routes mounted at /api/payments");
 app.use("/api/whatsapp",     whatsappRoutes);
 console.log("[Routes] WhatsApp routes mounted at /api/whatsapp");
+app.use("/api/help-tickets", helpTicketRoutes);
+console.log("[Routes] Help ticket routes mounted at /api/help-tickets");
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 

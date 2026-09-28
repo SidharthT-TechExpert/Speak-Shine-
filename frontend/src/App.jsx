@@ -5,7 +5,7 @@ import { ToastProvider } from "./components/Toast.jsx";
 import { ConfirmProvider } from "./components/ConfirmDialog.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import CustomCursor from "./components/CustomCursor.jsx";
-const ChatLauncher = lazy(() => import("./components/ChatLauncher.jsx"));
+const HelpDeskWidget = lazy(() => import("./components/HelpDeskWidget.jsx"));
 const InstallPrompt = lazy(() => import("./components/InstallPrompt.jsx"));
 const WakeUpScreen  = lazy(() => import("./components/WakeUpScreen.jsx"));
 
@@ -198,11 +198,11 @@ function PaidRoute({ children }) {
   return children;
 }
 
-// Hide ChatLauncher on live session interactive rooms (keep on /live/rooms directory)
-function ChatLauncherConditional() {
+// Hide HelpDeskWidget on live session interactive rooms (keep on /live/rooms directory)
+function HelpDeskWidgetConditional() {
   const location = useLocation();
   if (location.pathname.startsWith("/live/") && location.pathname !== "/live/rooms") return null;
-  return <ChatLauncher />;
+  return <HelpDeskWidget />;
 }
 
 export default function App() {
@@ -331,7 +331,7 @@ function AppRoutes() {
         {/* Catch-all - 404 Page */}
         <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
       </Routes>
-      <Suspense fallback={null}><ChatLauncherConditional /></Suspense>
+      <Suspense fallback={null}><HelpDeskWidgetConditional /></Suspense>
       <Suspense fallback={null}><InstallPrompt /></Suspense>
     </BrowserRouter>
   );

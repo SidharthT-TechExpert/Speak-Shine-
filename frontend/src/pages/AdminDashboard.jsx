@@ -14,6 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import StreakBadge from "../components/StreakBadge.jsx";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { getSharedSocket } from "../hooks/useSocket.js";
+import AdminHelpDeskTab from "../components/AdminHelpDeskTab.jsx";
 
 const InvoiceModal = lazy(() => import("../components/InvoiceModal.jsx"));
 
@@ -137,6 +138,12 @@ function AdminSidebarIcon({ id, active }) {
       return (
         <svg {...props}>
           <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" />
+        </svg>
+      );
+    case "help":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" x2="12.01" y1="17" y2="17" />
         </svg>
       );
     default:
@@ -2332,6 +2339,7 @@ export default function AdminDashboard() {
                 { id: "users", label: "Users & Members", badge: users.length || null },
                 { id: "registrations", label: "Registrations", badge: pendingRegs.length > 0 ? `${pendingRegs.length} new` : null, badgeColor: "#fbbf24" },
                 { id: "submissions", label: "Submissions" },
+                { id: "help", label: "Help Desk & Doubts", badge: "🆘 Doubts", badgeColor: "#a78bfa" },
                 { id: "live", label: "Live Sessions" },
                 { id: "payments", label: "Payments" },
               ].map(t => {
@@ -2458,7 +2466,7 @@ export default function AdminDashboard() {
               overview: "Overview", today: "Today's Challenge", reports: "Reports",
               points: "Points & Streaks", monitoring: "Live Monitor",
               users: "Users & Members", registrations: "Registrations",
-              submissions: "Submissions", live: "Live Sessions", payments: "Payments",
+              submissions: "Submissions", help: "Help Desk & Doubts", live: "Live Sessions", payments: "Payments",
               questions: "Question Bank", "manual-questions": "Manual Questions",
               whatsapp: "WhatsApp Bot", settings: "Settings",
               "student-detail": "Student Profile",
@@ -2544,6 +2552,7 @@ export default function AdminDashboard() {
                       { id: "users", label: "Users & Members", badge: users.length || null },
                       { id: "registrations", label: "Registrations", badge: pendingRegs.length > 0 ? `${pendingRegs.length}` : null },
                       { id: "submissions", label: "Submissions" },
+                      { id: "help", label: "Help Desk & Doubts" },
                       { id: "live", label: "Live Sessions" },
                       { id: "payments", label: "Payments" },
                       { id: "questions", label: "Question Bank" },
@@ -9452,6 +9461,9 @@ function ManualQuestionsPanel() {
           )}
         </>
       )}
+
+      {/* HELP DESK & DOUBTS */}
+      {tab === "help" && <AdminHelpDeskTab />}
     </div>
   );
 }
