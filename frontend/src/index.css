@@ -8740,3 +8740,52 @@ audio { border-radius: 12px; }
 .light .live-tip-card p {
   color: #64748b !important;
 }
+
+/* ── Smooth Page & Content Loading Skeleton Animations ── */
+@keyframes speakshineFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.speakshine-page-transition {
+  animation: speakshineFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes speakshineShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.speakshine-shimmer-box {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: speakshineShimmer 1.8s infinite linear;
+  border-radius: 14px;
+}
+
+[data-theme="light"] .speakshine-shimmer-box,
+.light .speakshine-shimmer-box {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.08) 0%,
+    rgba(148, 163, 184, 0.18) 50%,
+    rgba(148, 163, 184, 0.08) 100%
+  );
+  background-size: 200% 100%;
+}
+

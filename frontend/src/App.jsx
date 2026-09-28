@@ -73,19 +73,79 @@ function PageLoader() {
 
 export function PageContentLoader() {
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "55vh",
-      padding: "2rem",
-      gap: "1rem",
-    }}>
-      <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
-      <span style={{ fontSize: "0.82rem", color: "var(--muted)", fontWeight: 600 }}>
-        Loading page content...
-      </span>
+    <div
+      className="speakshine-page-transition"
+      style={{
+        width: "100%",
+        padding: "0.25rem 0 2rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "1.25rem",
+      }}
+    >
+      {/* Top Header Row Skeleton */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, minWidth: 220 }}>
+          <div className="speakshine-shimmer-box" style={{ width: "210px", height: "26px" }} />
+          <div className="speakshine-shimmer-box" style={{ width: "320px", height: "14px", opacity: 0.6 }} />
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+          <div className="speakshine-shimmer-box" style={{ width: "95px", height: "34px", borderRadius: "99px" }} />
+          <div className="speakshine-shimmer-box" style={{ width: "105px", height: "34px", borderRadius: "99px" }} />
+        </div>
+      </div>
+
+      {/* Hero Grid Skeleton */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.25rem" }}>
+        {/* Main Mission Card Skeleton */}
+        <div
+          className="speakshine-shimmer-box"
+          style={{
+            minHeight: "260px",
+            padding: "1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <div style={{ width: "120px", height: "22px", borderRadius: "99px", background: "rgba(139,92,246,0.22)" }} />
+            <div style={{ width: "75%", height: "26px", borderRadius: "8px", background: "rgba(255,255,255,0.12)" }} />
+            <div style={{ width: "92%", height: "16px", borderRadius: "6px", background: "rgba(255,255,255,0.06)" }} />
+          </div>
+          <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.75rem", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 180px", height: "44px", borderRadius: "12px", background: "rgba(139,92,246,0.25)" }} />
+            <div style={{ width: "130px", height: "44px", borderRadius: "12px", background: "rgba(255,255,255,0.08)" }} />
+          </div>
+        </div>
+
+        {/* Secondary Info Card Skeleton */}
+        <div
+          className="speakshine-shimmer-box"
+          style={{
+            minHeight: "260px",
+            padding: "1.5rem",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <div style={{ width: "150px", height: "18px", borderRadius: "6px", background: "rgba(255,255,255,0.12)" }} />
+            <div style={{ width: "100%", height: "86px", borderRadius: "12px", background: "rgba(255,255,255,0.05)" }} />
+          </div>
+          <div style={{ width: "100%", height: "46px", borderRadius: "12px", background: "rgba(251,191,36,0.16)" }} />
+        </div>
+      </div>
+
+      {/* Stat Grid Skeleton */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+        <div className="speakshine-shimmer-box" style={{ height: "95px", border: "1px solid var(--border)" }} />
+        <div className="speakshine-shimmer-box" style={{ height: "95px", border: "1px solid var(--border)" }} />
+        <div className="speakshine-shimmer-box" style={{ height: "95px", border: "1px solid var(--border)" }} />
+      </div>
     </div>
   );
 }

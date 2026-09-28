@@ -130,7 +130,7 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
 
   if (!isShellRoot && isInsideShell) {
     return (
-      <div className="speakshine-page-wrapper">
+      <div className="speakshine-page-wrapper speakshine-page-transition">
         {/* Read-only banner for viewer accounts */}
         {user?.role === "viewer" && (
           <div style={{
