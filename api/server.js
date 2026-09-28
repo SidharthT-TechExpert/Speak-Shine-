@@ -55,6 +55,7 @@ import guestRoutes from "../backend/routes/guest.routes.js";
 import paymentRoutes from "../backend/routes/payment.routes.js";
 import whatsappRoutes from "../backend/routes/whatsapp.routes.js";
 import helpTicketRoutes from "../backend/routes/helpTicket.routes.js";
+import { setSharedSocket } from "../backend/hooks/useSocket.js";
 import { initWhatsAppBot, setSocketIo as setWhatsAppSocketIo, sendDeploymentNotification, flushAuthToMongo } from "../backend/services/whatsapp/whatsappService.js";
 
 console.log("[Routes] Loading MVC routes...");
@@ -180,6 +181,7 @@ setOnlineUsersRef(onlineUsers);
 initializeChatSocket(io, onlineUsers);
 
 setSocketIO(io, onlineUsers);
+setSharedSocket(io);
 
 // ── Express setup ───────────────────────────────────────────────────────────
 const uploadDir = path.join(__dirname, "../tmp/uploads");
