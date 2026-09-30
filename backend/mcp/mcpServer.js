@@ -76,6 +76,16 @@ export function createSpeakShineMCPServer() {
             properties: {},
           },
         },
+        {
+          name: "publish_and_send_today_question",
+          description: "Publish today's speaking challenge question and dispatch the poster to the WhatsApp group. Use when scheduler is delayed/down or manual publishing is requested.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              force: { type: "boolean", description: "Set true to force generating a new question even if today's question was already published." },
+            },
+          },
+        },
       ],
     };
   });
@@ -241,6 +251,72 @@ export function createSpeakShineMCPServer() {
                     phone: u.phone,
                     streak: u.streak,
                   })),
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      if (name === "publish_and_send_today_question") {
+        const { publishDailyQuestion } = await import("../services/scheduler/questionSchedulerService.js");
+        const { sendDailyPosterToGroup } = await import("../services/whatsapp/whatsappService.js");
+        const Status = (await import("../../models/statusSchema.js")).default;
+        const dashboardService = await import("../services/dashboard/dashboardService.js");
+
+        if (args?.force) {
+          await Status.updateOne({}, { $set: { questionSentToday: false } });
+        }
+
+        const result = await publishDailyQuestion();
+
+        if (result?.alreadyPublished) {
+          const overview = await dashboardService.getTodayOverview();
+          const today = overview?.today || {};
+
+          const whatsappRes = await sendDailyPosterToGroup({
+            topic: today.topic,
+            question: today.question,
+            category: today.category,
+          });
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    alreadyPublished: true,
+                    whatsappSent: whatsappRes?.success ?? true,
+                    topic: today.topic,
+                    question: today.question,
+                    category: today.category,
+                    message: "Today's question was already published. Re-dispatched poster to WhatsApp group successfully!",
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  published: true,
+                  whatsappSent: true,
+                  type: result.type,
+                  topic: result.topic,
+                  category: result.category,
+                  message: "Successfully published today's question and dispatched poster to WhatsApp group!",
                 },
                 null,
                 2

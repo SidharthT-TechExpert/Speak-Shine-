@@ -84,6 +84,28 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
+      "/api/dashboard/publish-and-send-today-question": {
+        post: {
+          operationId: "publishAndSendTodayQuestion",
+          summary: "Publish today's speaking challenge question and dispatch poster to WhatsApp group",
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    force: { type: "boolean", description: "Set true to force publish a new question even if already published today" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Status of question publishing and WhatsApp dispatch" }
+          }
+        }
+      },
       "/api/users": {
         get: {
           operationId: "getAllStudentsAndStats",

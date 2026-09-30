@@ -41,6 +41,59 @@ export async function getTodayQuestionOnly(req, res) {
 }
 
 /**
+ * POST /api/dashboard/publish-and-send-today-question
+ * Manually trigger publishing today's question & sending poster to WhatsApp group.
+ * Useful if automated scheduler was down/delayed or manual trigger requested via ChatGPT/AI.
+ */
+export async function publishAndSendTodayQuestion(req, res) {
+  try {
+    const { publishDailyQuestion } = await import("../services/scheduler/questionSchedulerService.js");
+    const { sendDailyPosterToGroup } = await import("../services/whatsapp/whatsappService.js");
+    
+    if (req.body?.force) {
+      const Status = (await import("../models/statusSchema.js")).default;
+      await Status.updateOne({}, { $set: { questionSentToday: false } });
+    }
+
+    const result = await publishDailyQuestion();
+    
+    if (result?.alreadyPublished) {
+      const overview = await dashboardService.getTodayOverview();
+      const today = overview?.today || {};
+      
+      const whatsappRes = await sendDailyPosterToGroup({
+        topic: today.topic,
+        question: today.question,
+        category: today.category,
+      });
+
+      return res.json({
+        success: true,
+        alreadyPublished: true,
+        whatsappSent: whatsappRes?.success ?? true,
+        topic: today.topic,
+        question: today.question,
+        category: today.category,
+        message: "Today's question was already published. Re-dispatched poster to WhatsApp group successfully!",
+      });
+    }
+
+    return res.json({
+      success: true,
+      published: true,
+      whatsappSent: true,
+      type: result.type,
+      topic: result.topic,
+      category: result.category,
+      message: "Successfully published today's question and dispatched poster to WhatsApp group!",
+    });
+  } catch (error) {
+    console.error("[Dashboard] Publish and send today question error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
  * GET /api/dashboard/report/weekly - Weekly summary (admin/trainer)
  */
 export async function getWeeklyReport(req, res) {
