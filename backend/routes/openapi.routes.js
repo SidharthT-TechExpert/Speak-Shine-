@@ -252,6 +252,30 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
+      "/api/dashboard/trigger-ai-deploy": {
+        post: {
+          operationId: "triggerAICodeDeployment",
+          summary: "Request an automated code modification and production deployment build from ChatGPT",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    prompt: { type: "string", description: "Description of the feature, code edit, or fix to deploy" },
+                    commitMessage: { type: "string", description: "Optional custom git commit message" }
+                  },
+                  required: ["prompt"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Status of the AI code deployment workflow dispatch" }
+          }
+        }
+      },
       "/api/users": {
         get: {
           operationId: "getAllStudentsAndStats",

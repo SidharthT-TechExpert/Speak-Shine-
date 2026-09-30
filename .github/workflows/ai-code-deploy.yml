@@ -1,0 +1,60 @@
+name: AI Code & Deploy Workflow
+
+on:
+  repository_dispatch:
+    types: [ai-code-deploy]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Code change request prompt'
+        required: true
+
+concurrency:
+  group: speak-shine-production
+  cancel-in-progress: true
+
+jobs:
+  ai-build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vitest test suite
+        run: npm test
+
+      - name: Deploy to Production Host
+        uses: appleboy/ssh-action@master
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
+          INFISICAL_TOKEN: ${{ secrets.INFISICAL_TOKEN }}
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: ENV_FILE_CONTENT,INFISICAL_TOKEN,INFISICAL_CLIENT_ID,INFISICAL_CLIENT_SECRET
+          command_timeout: 15m
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="$HOME/Speak-Shine-"
+            fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose build --no-cache app
+            docker compose up -d --force-recreate --remove-orphans app
+            echo "🚀 AI Code deployment complete"

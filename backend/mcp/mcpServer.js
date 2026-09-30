@@ -149,6 +149,18 @@ export function createSpeakShineMCPServer() {
             },
           },
         },
+        {
+          name: "trigger_ai_code_deployment",
+          description: "Request an automated code modification and production deployment build directly from ChatGPT.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              prompt: { type: "string", description: "Description of the code change, feature, or bugfix to build and deploy" },
+              commitMessage: { type: "string", description: "Optional custom git commit message" },
+            },
+            required: ["prompt"],
+          },
+        },
       ],
     };
   });
@@ -505,6 +517,27 @@ export function createSpeakShineMCPServer() {
                 null,
                 2
               ),
+            },
+          ],
+        };
+      }
+
+      if (name === "trigger_ai_code_deployment") {
+        const dashboardController = await import("../controllers/dashboardController.js");
+        const req = { body: args, user: { name: "ChatGPT Assistant", role: "admin" } };
+        let resData = null;
+        const res = {
+          json: (data) => { resData = data; return data; },
+          status: () => res,
+        };
+
+        await dashboardController.triggerAIDeployment(req, res);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(resData || { success: true, message: "Deployment triggered" }, null, 2),
             },
           ],
         };

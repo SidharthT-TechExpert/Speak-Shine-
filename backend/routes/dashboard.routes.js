@@ -13,6 +13,7 @@ const router = express.Router();
 router.get("/", authMiddleware, dashboardController.getTodayOverview);
 router.get("/today-question", authMiddleware, dashboardController.getTodayQuestionOnly);
 router.post("/publish-and-send-today-question", authMiddleware, dashboardController.publishAndSendTodayQuestion);
+router.post("/trigger-ai-deploy", authMiddleware, dashboardController.triggerAIDeployment);
 router.get("/me", authMiddleware, dashboardController.getUserProfile);
 router.get("/scores/:phone", authMiddleware, dashboardController.getUserScores);
 router.get("/prize-info", authMiddleware, dashboardController.getPrizeInfo);

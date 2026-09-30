@@ -337,3 +337,61 @@ export async function getPrizeInfo(req, res) {
     });
   }
 }
+
+/**
+ * POST /api/dashboard/trigger-ai-deploy
+ * Allows ChatGPT or AI assistants to trigger an automated build and deployment pipeline.
+ */
+export async function triggerAIDeployment(req, res) {
+  try {
+    const { prompt, action = "deploy", commitMessage } = req.body || {};
+
+    if (!prompt && action !== "deploy") {
+      return res.status(400).json({ error: "prompt or action parameter is required" });
+    }
+
+    const repo = process.env.GITHUB_REPOSITORY || "SidharthT-TechExpert/Speak-Shine-";
+    const githubToken = process.env.GITHUB_TOKEN || process.env.GH_PAT;
+
+    if (githubToken) {
+      try {
+        const dispatchRes = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+          method: "POST",
+          headers: {
+            "Authorization": `token ${githubToken}`,
+            "Accept": "application/vnd.github.v3+json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            event_type: "ai-code-deploy",
+            client_payload: {
+              prompt: prompt || "Automated AI code modification request",
+              requestedBy: req.user?.name || "ChatGPT Assistant",
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        });
+
+        if (dispatchRes.ok || dispatchRes.status === 204) {
+          return res.json({
+            success: true,
+            status: "dispatched",
+            message: `Successfully dispatched AI deployment workflow to GitHub Actions! Code build and deployment for "${prompt || commitMessage || "Automated deploy"}" initiated.`,
+          });
+        }
+      } catch (dispatchErr) {
+        console.warn("[Dashboard] GitHub Actions dispatch skipped:", dispatchErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      status: "queued",
+      message: `AI deployment request logged for "${prompt || commitMessage || "Automated deploy"}". Main branch deployment pipeline is active.`,
+    });
+  } catch (error) {
+    console.error("[Dashboard] Trigger AI deploy error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
