@@ -56,6 +56,7 @@ import paymentRoutes from "../backend/routes/payment.routes.js";
 import whatsappRoutes from "../backend/routes/whatsapp.routes.js";
 import helpTicketRoutes from "../backend/routes/helpTicket.routes.js";
 import mcpRoutes from "../backend/routes/mcp.routes.js";
+import openapiRoutes from "../backend/routes/openapi.routes.js";
 import { setSharedSocket } from "../backend/hooks/useSocket.js";
 import { initWhatsAppBot, setSocketIo as setWhatsAppSocketIo, sendDeploymentNotification, flushAuthToMongo } from "../backend/services/whatsapp/whatsappService.js";
 
@@ -384,6 +385,7 @@ app.use("/api/help-tickets", helpTicketRoutes);
 console.log("[Routes] Help ticket routes mounted at /api/help-tickets");
 app.use("/api/mcp", mcpRoutes);
 console.log("[Routes] MCP routes mounted at /api/mcp");
+app.use("/api", openapiRoutes);
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 
