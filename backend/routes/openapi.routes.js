@@ -9,7 +9,7 @@ const router = express.Router();
 router.get("/openapi.json", (req, res) => {
   const host = req.get("host") || "speak-shine.sidhartht.online";
   const protocol = req.protocol === "https" || req.headers["x-forwarded-proto"] === "https" ? "https" : "https";
-  const baseUrl = `${protocol}://${host}/api`;
+  const baseUrl = `${protocol}://${host}`;
 
   const schema = {
     openapi: "3.1.0",
@@ -25,7 +25,7 @@ router.get("/openapi.json", (req, res) => {
       }
     ],
     paths: {
-      "/help-tickets/admin/tickets": {
+      "/api/help-tickets/admin/tickets": {
         get: {
           operationId: "getStudentDoubts",
           summary: "Fetch student help tickets, doubts, or grammar questions",
@@ -43,7 +43,7 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
-      "/help-tickets/admin/respond/{ticketId}": {
+      "/api/help-tickets/admin/respond/{ticketId}": {
         post: {
           operationId: "resolveStudentDoubt",
           summary: "Send a solution or grammar tip to resolve a student doubt",
@@ -75,7 +75,7 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
-      "/dashboard/today-question": {
+      "/api/dashboard/today-question": {
         get: {
           operationId: "getTodayPublishedQuestion",
           summary: "Get today's active speaking challenge question and topic",
@@ -84,7 +84,7 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
-      "/users": {
+      "/api/users": {
         get: {
           operationId: "getAllStudentsAndStats",
           summary: "Get all student profiles, streaks, freeze counts, and scores",

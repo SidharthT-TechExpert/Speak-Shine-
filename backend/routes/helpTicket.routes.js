@@ -12,14 +12,14 @@ router.get("/my-tickets", authMiddleware, helpTicketController.getMyTickets);
 router.get(
   "/admin/tickets",
   authMiddleware,
-  requireRole(["admin", "admins", "trainer", "viewer"]),
+  requireRole("admin", "admins", "trainer", "viewer"),
   helpTicketController.getAdminTickets
 );
 
 router.post(
   "/admin/respond/:id",
   authMiddleware,
-  requireRole(["admin", "admins", "trainer"]),
+  requireRole("admin", "admins", "trainer"),
   helpTicketController.respondTicket
 );
 
