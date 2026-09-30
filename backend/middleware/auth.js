@@ -46,12 +46,22 @@ export function authMiddleware(req, res, next) {
   // Read from httpOnly cookie first (preferred), fall back to Authorization header
   const cookieToken = req.cookies?.access_token;
   const header = req.headers.authorization;
-  const queryToken = req.query?.token;
+  const queryToken = req.query?.token || req.query?.apiKey;
+  const customApiKey = req.headers["x-mcp-key"] || req.headers["x-api-key"];
+  const secretKey = process.env.MCP_SECRET_KEY || process.env.JWT_SECRET;
+
   const raw = cookieToken
-    || (header?.startsWith("Bearer ") ? header.split(" ")[1] : null)
-    || queryToken;
+    || (header?.startsWith("Bearer ") ? header.split(" ")[1] : header)
+    || queryToken
+    || customApiKey;
 
   if (!raw) return res.status(401).json({ error: "No token provided" });
+
+  // System API Key / MCP Secret Key bypass for AI Actions & ChatGPT
+  if (secretKey && (raw === secretKey || customApiKey === secretKey)) {
+    req.user = { id: "mcp_admin", role: "admin", phone: "system_ai", name: "AI Assistant" };
+    return next();
+  }
 
   let decoded;
   try {
