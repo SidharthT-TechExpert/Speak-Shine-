@@ -21,7 +21,7 @@ import { authMiddleware, requireRole } from "../middleware/auth.js";
 const router = express.Router();
 
 // Admin only routes
-router.get("/status", authMiddleware, requireRole("admin", "admins"), getWhatsAppStatus);
+router.get("/status", authMiddleware, getWhatsAppStatus);
 router.get("/groups", authMiddleware, requireRole("admin", "admins"), getGroups);
 router.get("/month-end-summary", authMiddleware, requireRole("admin", "admins"), getMonthEndPrizeSummary);
 router.post("/send-poster", authMiddleware, requireRole("admin", "admins"), sendPoster);

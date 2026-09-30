@@ -13,7 +13,10 @@ import { uploadAvatar } from "../services/storage/cloudinaryService.js";
 export async function getAllUsers(req, res) {
   try {
     const users = await userService.getAllUsers();
-    if (req.query.compact === "true" || req.query.summary === "true") {
+    const isAdminRole = ["admin", "admins", "trainer", "viewer"].includes(req.user?.role);
+    
+    // Always enforce compact projection for regular user roles or when compact/summary is requested
+    if (!isAdminRole || req.query.compact === "true" || req.query.summary === "true") {
       const summary = users.map(u => ({
         name: u.registeredName || u.name || "Student",
         phone: u.phone,

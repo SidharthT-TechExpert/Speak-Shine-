@@ -63,7 +63,7 @@ function handleAvatarUpload(req, res, next) {
 }
 
 // ── User List & Profile ──────────────────────────────────────────────────────
-router.get("/", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getAllUsers);
+router.get("/", authMiddleware, userController.getAllUsers);
 router.get("/me", authMiddleware, userController.getMyProfile);
 router.patch("/me/profile", authMiddleware, localBypass(avatarUploadLimiter), handleAvatarUpload, userController.updateMyProfile);
 router.patch("/me/password", authMiddleware, userController.changeMyPassword);
