@@ -23,6 +23,7 @@
     "@aws-sdk/lib-storage": "^3.600.0",
     "@aws-sdk/s3-request-presigner": "^3.600.0",
     "@hapi/boom": "^9.1.4",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "argon2": "^0.41.1",
     "bcryptjs": "^3.0.3",
