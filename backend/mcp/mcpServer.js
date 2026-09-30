@@ -161,6 +161,28 @@ export function createSpeakShineMCPServer() {
             required: ["prompt"],
           },
         },
+        {
+          name: "block_or_unblock_student",
+          description: "Block (deactivate) or unblock (activate) a student account by phone number.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+            },
+            required: ["phone"],
+          },
+        },
+        {
+          name: "delete_student",
+          description: "Permanently delete a student account by phone number.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number to delete" },
+            },
+            required: ["phone"],
+          },
+        },
       ],
     };
   });
@@ -538,6 +560,34 @@ export function createSpeakShineMCPServer() {
             {
               type: "text",
               text: JSON.stringify(resData || { success: true, message: "Deployment triggered" }, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "block_or_unblock_student") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.toggleUserStatus(args.phone);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "delete_student") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.deleteUser(args.phone, "mcp_admin");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };

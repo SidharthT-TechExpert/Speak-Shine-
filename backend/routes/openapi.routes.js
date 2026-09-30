@@ -276,6 +276,42 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
+      "/api/users/{phone}/toggle": {
+        patch: {
+          operationId: "blockOrUnblockStudent",
+          summary: "Block or unblock a student account by phone number",
+          parameters: [
+            {
+              name: "phone",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Student mobile phone number"
+            }
+          ],
+          responses: {
+            "200": { description: "Updated student active status" }
+          }
+        }
+      },
+      "/api/users/{phone}": {
+        delete: {
+          operationId: "deleteStudent",
+          summary: "Permanently delete a student account by phone number",
+          parameters: [
+            {
+              name: "phone",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "Student mobile phone number to delete"
+            }
+          ],
+          responses: {
+            "200": { description: "Student account deletion confirmation" }
+          }
+        }
+      },
       "/api/users": {
         get: {
           operationId: "getAllStudentsAndStats",
