@@ -345,11 +345,25 @@ export async function getPrizeInfo(req, res) {
 export async function triggerAIDeployment(req, res) {
   try {
     const { prompt, action = "deploy", commitMessage, filePath, file_path, codeContent, code_content } = req.body || {};
-    const targetFilePath = filePath || file_path || null;
+    let targetFilePath = filePath || file_path || null;
     const targetCodeContent = codeContent || code_content || null;
 
     if (!prompt && action !== "deploy" && !targetFilePath) {
       return res.status(400).json({ error: "prompt or filePath parameter is required" });
+    }
+
+    // Smart auto-resolution of target file path from plain English prompt keywords
+    if (!targetFilePath && prompt) {
+      const p = String(prompt).toLowerCase();
+      if (p.includes("poster") || p.includes("svg") || p.includes("badge") || p.includes("canvas")) {
+        targetFilePath = "api/posterGenerator.js";
+      } else if (p.includes("whatsapp") || p.includes("bot") || p.includes("group") || p.includes("jid")) {
+        targetFilePath = "backend/services/whatsapp/whatsappService.js";
+      } else if (p.includes("user") || p.includes("student") || p.includes("block") || p.includes("role")) {
+        targetFilePath = "backend/controllers/userController.js";
+      } else if (p.includes("question") || p.includes("video") || p.includes("analysis") || p.includes("card") || p.includes("ui") || p.includes("font") || p.includes("color")) {
+        targetFilePath = "frontend/src/pages/VideoAnalysis.jsx";
+      }
     }
 
     const repo = process.env.GITHUB_REPOSITORY || "SidharthT-TechExpert/Speak-Shine-";
@@ -381,6 +395,7 @@ export async function triggerAIDeployment(req, res) {
           return res.json({
             success: true,
             status: "dispatched",
+            targetFile: targetFilePath || "main repository",
             message: `Successfully dispatched AI deployment workflow to GitHub Actions! Automated mobile code build & deployment initiated for "${targetFilePath || prompt || "Automated deploy"}".`,
           });
         }
@@ -392,6 +407,7 @@ export async function triggerAIDeployment(req, res) {
     return res.json({
       success: true,
       status: "queued",
+      targetFile: targetFilePath || "main repository",
       message: `AI deployment request logged for "${targetFilePath || prompt || "Automated deploy"}". Main branch deployment pipeline is active.`,
     });
   } catch (error) {
