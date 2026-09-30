@@ -123,6 +123,30 @@ export function createSpeakShineMCPServer() {
               pictureDescriptionDays: { type: "array", items: { type: "integer" }, description: "Days for picture description e.g. [4] for Thursday" },
             },
           },
+        {
+          name: "set_today_question",
+          description: "Manually set or update today's active speaking challenge question (topic, question text, category) based on user instructions before asking for approval to send to WhatsApp group.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              topic: { type: "string", description: "Topic title for today's challenge" },
+              question: { type: "string", description: "Detailed question or speaking prompt" },
+              category: { type: "string", description: "Category e.g. Daily Life, Opinion, Personal Experience, Fun Topic" },
+            },
+            required: ["topic", "question"],
+          },
+        },
+        {
+          name: "send_today_question_to_group",
+          description: "Dispatch the current active question poster to the WhatsApp group. Call this ONLY after user approves/allows sending in chat.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              topic: { type: "string", description: "Optional topic override" },
+              question: { type: "string", description: "Optional question override" },
+              category: { type: "string", description: "Optional category override" },
+            },
+          },
         },
       ],
     };
@@ -433,15 +457,53 @@ export function createSpeakShineMCPServer() {
         };
       }
 
-      if (name === "update_bot_settings") {
+      if (name === "set_today_question") {
         const dashboardService = await import("../services/dashboard/dashboardService.js");
-        const updated = await dashboardService.updateSettings(args);
+        const { topic, question, category = "General" } = args;
+        const result = await dashboardService.setTodayQuestion(topic, question, category);
 
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ success: true, settings: updated }, null, 2),
+              text: JSON.stringify(
+                {
+                  success: true,
+                  updatedTodayQuestion: {
+                    topic,
+                    question,
+                    category,
+                  },
+                  message: `Today's question has been updated to: "${topic}". Ask the user for confirmation in chat before sending to WhatsApp group!`,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      if (name === "send_today_question_to_group") {
+        const { sendDailyPosterToGroup } = await import("../services/whatsapp/whatsappService.js");
+        const { topic, question, category } = args || {};
+        const dispatchRes = await sendDailyPosterToGroup({ topic, question, category });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  whatsappSent: dispatchRes?.success ?? true,
+                  targetGroup: dispatchRes?.targetGroup,
+                  topic: dispatchRes?.topic,
+                  message: "Poster dispatched to WhatsApp group successfully!",
+                },
+                null,
+                2
+              ),
             },
           ],
         };

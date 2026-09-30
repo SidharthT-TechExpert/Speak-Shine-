@@ -25,6 +25,7 @@ router.get("/openapi.json", (req, res) => {
       }
     ],
     components: {
+      schemas: {},
       securitySchemes: {
         BearerAuth: {
           type: "http",
@@ -39,6 +40,62 @@ router.get("/openapi.json", (req, res) => {
       }
     ],
     paths: {
+      "/api/dashboard/today-question": {
+        get: {
+          operationId: "getTodayPublishedQuestion",
+          summary: "Get today's active speaking challenge question and topic",
+          responses: {
+            "200": { description: "Active speaking prompt data" }
+          }
+        },
+        patch: {
+          operationId: "setTodayQuestion",
+          summary: "Manually set or update today's active speaking challenge question before sending to group",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    topic: { type: "string", description: "Topic title for today's challenge" },
+                    question: { type: "string", description: "Detailed speaking question/task text" },
+                    category: { type: "string", description: "Category e.g. Daily Life, Opinion, Personal Experience, Fun Topic" }
+                  },
+                  required: ["topic", "question"]
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Updated question details" }
+          }
+        }
+      },
+      "/api/whatsapp/send-poster": {
+        post: {
+          operationId: "sendTodayQuestionToGroup",
+          summary: "Dispatch the current active question poster to the WhatsApp group after user approval",
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    topic: { type: "string", description: "Optional topic override" },
+                    question: { type: "string", description: "Optional question override" },
+                    category: { type: "string", description: "Optional category override" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "WhatsApp dispatch status" }
+          }
+        }
+      },
       "/api/whatsapp/status": {
         get: {
           operationId: "getWhatsAppStatus",
@@ -170,15 +227,6 @@ router.get("/openapi.json", (req, res) => {
           },
           responses: {
             "200": { description: "Doubt marked as resolved" }
-          }
-        }
-      },
-      "/api/dashboard/today-question": {
-        get: {
-          operationId: "getTodayPublishedQuestion",
-          summary: "Get today's active speaking challenge question and topic",
-          responses: {
-            "200": { description: "Active speaking prompt data" }
           }
         }
       },
