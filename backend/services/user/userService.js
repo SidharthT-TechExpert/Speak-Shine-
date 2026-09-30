@@ -1015,3 +1015,79 @@ export async function updateUserTheme(userId, { theme, isDark }) {
 
   return { theme: normalizedTheme, isDark: normalizedIsDark };
 }
+
+/**
+ * Adjust student wallet balance and history (admin/trainer)
+ */
+export async function adjustUserWallet(phone, { amount, type = "credit", reason = "Admin adjustment" } = {}) {
+  let user = await User.findOne({ phone });
+  if (!user) {
+    const stripped = phone.replace(/^(\+91|91)/, "");
+    user = await User.findOne({ $or: [{ phone: stripped }, { userId: { $regex: escapeRegex(stripped) } }] });
+  }
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const numAmount = Math.abs(Number(amount));
+  if (isNaN(numAmount) || numAmount === 0) {
+    const error = new Error("Valid wallet amount is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const isCredit = type === "credit";
+  const oldBalance = Number(user.walletBalance || 0);
+  let newBalance = isCredit ? oldBalance + numAmount : Math.max(0, oldBalance - numAmount);
+  newBalance = Math.round(newBalance * 100) / 100;
+
+  user.walletBalance = newBalance;
+  user.walletHistory = user.walletHistory || [];
+  user.walletHistory.push({
+    type: isCredit ? "credit" : "debit",
+    amount: numAmount,
+    reason: reason || (isCredit ? "Admin wallet credit" : "Admin wallet debit"),
+    balanceAfter: newBalance,
+    date: new Date(),
+  });
+
+  await user.save();
+
+  return {
+    success: true,
+    phone: user.phone || phone,
+    name: user.name,
+    walletBalance: newBalance,
+    previousBalance: oldBalance,
+    change: isCredit ? numAmount : -numAmount,
+  };
+}
+
+/**
+ * Reset failed login attempts and unlock account for user
+ */
+export async function resetStudentLoginAttempts(phone) {
+  const stripped = phone.replace(/^(\+91|91)/, "").replace(/\D/g, "");
+  const candidates = [phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean);
+
+  const auth = await Auth.findOne({ phone: { $in: candidates } });
+  if (!auth) {
+    const error = new Error("Auth account not found for phone number");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  auth.failedLoginAttempts = 0;
+  auth.lockUntil = null;
+  await auth.save();
+
+  return {
+    success: true,
+    message: `Reset failed login attempts and unlocked account for ${phone}`,
+    phone: auth.phone,
+    failedLoginAttempts: 0,
+    lockUntil: null,
+  };
+}

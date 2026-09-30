@@ -184,6 +184,71 @@ export function createSpeakShineMCPServer() {
             required: ["phone"],
           },
         },
+        {
+          name: "adjust_student_points",
+          description: "Add, set, or remove monthly score points for a student.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+              amount: { type: "number", description: "Points amount" },
+              mode: { type: "string", enum: ["add", "set", "remove"], description: "Mode: add (default), set, or remove" },
+              reason: { type: "string", description: "Optional reason for point adjustment" },
+            },
+            required: ["phone", "amount"],
+          },
+        },
+        {
+          name: "adjust_student_streak",
+          description: "Update or set a student's daily speaking streak count.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+              amount: { type: "number", description: "Streak count or adjustment amount" },
+              mode: { type: "string", enum: ["add", "set", "remove", "reset"], description: "Mode: add (default), set, remove, or reset" },
+            },
+            required: ["phone", "amount"],
+          },
+        },
+        {
+          name: "adjust_student_streak_freeze",
+          description: "Add, set, or remove streak freeze shields for a student.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+              amount: { type: "number", description: "Number of freeze shields" },
+              mode: { type: "string", enum: ["add", "set", "remove"], description: "Mode: add (default), set, or remove" },
+            },
+            required: ["phone", "amount"],
+          },
+        },
+        {
+          name: "adjust_student_wallet",
+          description: "Credit or debit a student's wallet balance in INR.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+              amount: { type: "number", description: "Wallet amount in INR" },
+              type: { type: "string", enum: ["credit", "debit"], description: "Credit (+ balance) or Debit (- balance)" },
+              reason: { type: "string", description: "Reason for credit/debit transaction" },
+            },
+            required: ["phone", "amount"],
+          },
+        },
+        {
+          name: "reset_student_login_attempts",
+          description: "Reset failed login attempts and unlock a student account.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+            },
+            required: ["phone"],
+          },
+        },
       ],
     };
   });
@@ -591,6 +656,65 @@ export function createSpeakShineMCPServer() {
               text: JSON.stringify(result, null, 2),
             },
           ],
+        };
+      }
+
+      if (name === "adjust_student_points") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.adjustUserPoints(args.phone, {
+          amount: args.amount,
+          mode: args.mode || "add",
+          reason: args.reason || "",
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "adjust_student_streak") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.adjustUserStreak(args.phone, {
+          amount: args.amount,
+          mode: args.mode || "add",
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "adjust_student_streak_freeze") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.adjustUserFreeze(args.phone, {
+          amount: args.amount,
+          mode: args.mode || "add",
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "adjust_student_wallet") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.adjustUserWallet(args.phone, {
+          amount: args.amount,
+          type: args.type || "credit",
+          reason: args.reason || "MCP admin adjustment",
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "reset_student_login_attempts") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.resetStudentLoginAttempts(args.phone);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 

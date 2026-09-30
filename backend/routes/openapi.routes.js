@@ -277,6 +277,108 @@ router.get("/openapi.json", (req, res) => {
           }
         }
       },
+      "/api/users/{phone}/points": {
+        patch: {
+          operationId: "adjustStudentPoints",
+          summary: "Add, set, or deduct monthly score points for a student",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "number", description: "Points amount" },
+                    mode: { type: "string", enum: ["add", "set", "remove"], description: "Adjustment mode" },
+                    reason: { type: "string", description: "Optional reason" }
+                  },
+                  required: ["amount"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Updated student points score" } }
+        }
+      },
+      "/api/users/{phone}/streak": {
+        patch: {
+          operationId: "adjustStudentStreak",
+          summary: "Update or set a student's daily speaking streak count",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "number", description: "Streak count or adjustment amount" },
+                    mode: { type: "string", enum: ["add", "set", "remove", "reset"], description: "Adjustment mode" }
+                  },
+                  required: ["amount"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Updated student streak count" } }
+        }
+      },
+      "/api/users/{phone}/freeze": {
+        patch: {
+          operationId: "adjustStudentStreakFreeze",
+          summary: "Add, set, or remove streak freeze shields for a student",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "number", description: "Number of streak freeze shields" },
+                    mode: { type: "string", enum: ["add", "set", "remove"], description: "Adjustment mode" }
+                  },
+                  required: ["amount"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Updated streak freeze shield count" } }
+        }
+      },
+      "/api/users/{phone}/wallet": {
+        post: {
+          operationId: "adjustStudentWallet",
+          summary: "Credit or debit a student's wallet balance with reason history logging",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    amount: { type: "number", description: "Wallet amount in INR" },
+                    type: { type: "string", enum: ["credit", "debit"], description: "Credit or debit operation" },
+                    reason: { type: "string", description: "Reason for credit/debit adjustment" }
+                  },
+                  required: ["amount"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Updated wallet balance and transaction history" } }
+        }
+      },
+      "/api/users/{phone}/reset-login-attempts": {
+        post: {
+          operationId: "resetStudentLoginAttempts",
+          summary: "Reset failed login attempts and unlock account for a student",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          responses: { "200": { description: "Account lockout reset confirmation" } }
+        }
+      },
       "/api/users/{phone}/toggle": {
         patch: {
           operationId: "blockOrUnblockStudent",

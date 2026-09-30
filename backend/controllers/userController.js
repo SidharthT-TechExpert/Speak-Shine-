@@ -423,3 +423,38 @@ export async function changeMyPhone(req, res) {
     res.status(500).json({ error: error.message || "Failed to change phone number" });
   }
 }
+
+/**
+ * POST /api/users/:phone/wallet
+ * Adjust user wallet balance (admin/trainer)
+ */
+export async function adjustUserWallet(req, res) {
+  try {
+    const { amount, type = "credit", reason } = req.body || {};
+    const result = await userService.adjustUserWallet(req.params.phone, { amount, type, reason });
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[AdjustUserWallet] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/users/:phone/reset-login-attempts
+ * Reset failed login attempts and unlock account (admin/trainer)
+ */
+export async function resetStudentLoginAttempts(req, res) {
+  try {
+    const result = await userService.resetStudentLoginAttempts(req.params.phone);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[ResetStudentLoginAttempts] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
