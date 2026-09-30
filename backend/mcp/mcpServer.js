@@ -123,6 +123,7 @@ export function createSpeakShineMCPServer() {
               pictureDescriptionDays: { type: "array", items: { type: "integer" }, description: "Days for picture description e.g. [4] for Thursday" },
             },
           },
+        },
         {
           name: "set_today_question",
           description: "Manually set or update today's active speaking challenge question (topic, question text, category) based on user instructions before asking for approval to send to WhatsApp group.",
