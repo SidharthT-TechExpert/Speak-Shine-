@@ -52,6 +52,10 @@ export function getCategoryTheme(category, contentType) {
   return CATEGORY_THEMES.default;
 }
 
+function stripLeadingPrefix(str) {
+  return String(str || "").replace(/^(?:\d+[\.\)]|[•\-\*])\s*/, "").replace(/^(?:\d+[\.\)]|[•\-\*])\s*/, "").trim();
+}
+
 /**
  * Parses raw question text into structured items.
  * Detects newlines, bullets, and numbered items like "1. ... 2. ... 3. ..."
@@ -65,10 +69,10 @@ export function parseQuestionItems(rawText) {
   if (rawLines.length > 1) {
     return rawLines.map((line, idx) => {
       const match = line.match(/^(\d+)[\.\)]\s*(.*)$/);
-      if (match) return { num: match[1], text: match[2].trim() };
+      if (match) return { num: match[1], text: stripLeadingPrefix(match[2]) };
       const bulletMatch = line.match(/^[•\-\*]\s*(.*)$/);
-      if (bulletMatch) return { num: String(idx + 1), text: bulletMatch[1].trim() };
-      return { num: String(idx + 1), text: line };
+      if (bulletMatch) return { num: String(idx + 1), text: stripLeadingPrefix(bulletMatch[1]) };
+      return { num: String(idx + 1), text: stripLeadingPrefix(line) };
     });
   }
 
@@ -81,15 +85,15 @@ export function parseQuestionItems(rawText) {
       const num = matches[i][1];
       const startIndex = matches[i].index + matches[i][0].length;
       const endIndex = (i + 1 < matches.length) ? matches[i + 1].index : text.length;
-      const itemText = text.substring(startIndex, endIndex).trim();
+      const itemText = stripLeadingPrefix(text.substring(startIndex, endIndex));
       if (itemText) items.push({ num, text: itemText });
     }
     if (items.length > 1) return items;
   }
 
   // 3. Single question prompt
-  const cleanSingle = text.replace(/^1[\.\)]\s*/, "").trim() || text;
-  return [{ num: null, text: cleanSingle }];
+  const cleanSingle = stripLeadingPrefix(text);
+  return [{ num: null, text: cleanSingle || text }];
 }
 
 /**

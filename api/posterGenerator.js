@@ -78,6 +78,10 @@ function wrapLines(text, maxChars) {
   return lines;
 }
 
+function stripLeadingPrefix(str) {
+  return String(str || "").replace(/^(?:\d+[\.\)]|[•\-\*])\s*/, "").replace(/^(?:\d+[\.\)]|[•\-\*])\s*/, "").trim();
+}
+
 function parseQuestionItems(rawText) {
   if (!rawText) return [];
   const text = String(rawText).trim();
@@ -87,10 +91,10 @@ function parseQuestionItems(rawText) {
   if (rawLines.length > 1) {
     return rawLines.map((line, idx) => {
       const match = line.match(/^(\d+)[\.\)]\s*(.*)$/);
-      if (match) return { num: match[1], text: match[2].trim() };
+      if (match) return { num: match[1], text: stripLeadingPrefix(match[2]) };
       const bulletMatch = line.match(/^[•\-\*]\s*(.*)$/);
-      if (bulletMatch) return { num: String(idx + 1), text: bulletMatch[1].trim() };
-      return { num: String(idx + 1), text: line };
+      if (bulletMatch) return { num: String(idx + 1), text: stripLeadingPrefix(bulletMatch[1]) };
+      return { num: String(idx + 1), text: stripLeadingPrefix(line) };
     });
   }
 
@@ -103,14 +107,15 @@ function parseQuestionItems(rawText) {
       const num = matches[i][1];
       const startIndex = matches[i].index + matches[i][0].length;
       const endIndex = (i + 1 < matches.length) ? matches[i + 1].index : text.length;
-      const itemText = text.substring(startIndex, endIndex).trim();
+      const itemText = stripLeadingPrefix(text.substring(startIndex, endIndex));
       if (itemText) items.push({ num, text: itemText });
     }
     if (items.length > 1) return items;
   }
 
   // 3. Otherwise single question prompt
-  return [{ num: null, text: text.replace(/^1[\.\)]\s*/, "").trim() || text }];
+  const cleanSingle = stripLeadingPrefix(text);
+  return [{ num: null, text: cleanSingle || text }];
 }
 
 /**
@@ -218,14 +223,14 @@ export function generateSVGPoster({
             stroke="${theme.primary}" stroke-width="1.2"/>
           <text x="0" y="4.5" text-anchor="middle"
             font-size="13" font-weight="800" fill="${theme.primary}"
-            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(numLabel)}</text>
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(numLabel)}</text>
         </g>
         
         <!-- Question text lines -->
         ${item.lines.map((line, li) => `
           <text x="52" y="${startY + li * ITEM_LINE_H}"
             font-size="${ITEM_FONT}" fill="#f8fafc" font-weight="600"
-            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(line)}</text>
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(line)}</text>
         `).join("")}
       </g>`;
     }).join("\n");
@@ -242,7 +247,7 @@ export function generateSVGPoster({
     qContentSvg = qLines.map((line, i) =>
       `<text x="28" y="${58 + i * Q_LINE_H}"
         font-size="${Q_FONT}" fill="#ffffff" font-weight="700"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(line)}</text>`
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(line)}</text>`
     ).join("\n    ");
   }
 
@@ -278,7 +283,7 @@ export function generateSVGPoster({
   const topicRows = topicLines.map((line, i) =>
     `<text x="${PAD + 28}" y="${topicY + 54 + i * TOPIC_LINE_H}"
       font-size="${TOPIC_FONT}" fill="#f1f5f9" font-style="italic" font-weight="400"
-      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(line)}</text>`
+      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(line)}</text>`
   ).join("\n  ");
 
   // Vocabulary Items
@@ -294,14 +299,14 @@ export function generateSVGPoster({
         
         <!-- Word and definition -->
         <text x="16" y="24" font-size="17" font-weight="700" fill="#a78bfa"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(w.word)}</text>
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(w.word)}</text>
         <text x="${16 + w.word.length * 10 + 12}" y="24" font-size="14" font-style="italic" fill="#94a3b8"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">— ${esc(w.meaning)}</text>
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">— ${esc(w.meaning)}</text>
         
         <!-- Example sentence -->
         ${w.exLines.map((exLine, li) =>
           `<text x="16" y="${46 + li * 20}" font-size="14" fill="#cbd5e1" font-style="italic"
-            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(exLine)}</text>`
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(exLine)}</text>`
         ).join("\n        ")}
       </g>`;
       curItemY += w.itemH + 10;
@@ -361,13 +366,13 @@ export function generateSVGPoster({
   <!-- ✦ Speak & Shine Title -->
   <text x="${W / 2}" y="70" text-anchor="middle"
     font-size="46" font-weight="900" letter-spacing="-0.5"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif"
     fill="url(#titleGrad)" filter="url(#titleGlow)">✦ Speak &amp; Shine</text>
 
   <!-- Subtitle -->
   <text x="${W / 2}" y="98" text-anchor="middle"
     font-size="12" fill="#64748b" letter-spacing="4" font-weight="700"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(challengeTypeLabel)}</text>
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(challengeTypeLabel)}</text>
 
   <!-- Category Badge Pill -->
   <g transform="translate(${W / 2}, 132)">
@@ -375,7 +380,7 @@ export function generateSVGPoster({
       fill="${theme.badgeBg || 'rgba(56, 189, 248, 0.1)'}" stroke="${theme.primary}" stroke-opacity="0.4" stroke-width="1.2"/>
     <text x="0" y="5" text-anchor="middle"
       font-size="13" font-weight="600" fill="${theme.primary}" letter-spacing="0.5"
-      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(badgeTitle)}</text>
+      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(badgeTitle)}</text>
   </g>
 
   <!-- ═══ TOPIC CARD ═══ -->
@@ -383,7 +388,7 @@ export function generateSVGPoster({
     fill="rgba(14, 18, 38, 0.7)" stroke="rgba(56, 189, 248, 0.15)" stroke-width="1.2"/>
   <text x="${PAD + 28}" y="${topicY + 28}"
     font-size="11" fill="#64748b" font-weight="800" letter-spacing="1.5"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(topicLabel)}</text>
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(topicLabel)}</text>
   ${topicRows}
 
   <!-- ═══ QUESTION CARD ═══ -->
@@ -392,7 +397,7 @@ export function generateSVGPoster({
       fill="rgba(14, 18, 38, 0.85)" stroke="${theme.primary}" stroke-opacity="0.25" stroke-width="1.2"/>
     <text x="28" y="30"
       font-size="11" fill="${isMultiQuestion ? theme.primary : '#f43f5e'}" font-weight="800" letter-spacing="1.5"
-      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(promptLabel)}</text>
+      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(promptLabel)}</text>
     ${qContentSvg}
   </g>
 
@@ -403,13 +408,13 @@ export function generateSVGPoster({
   
   <text x="${PAD + 24}" y="${vocabY + 32}"
     font-size="12" fill="#818cf8" font-weight="800" letter-spacing="1.5"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">◆ TODAY&apos;S VOCABULARY CHALLENGE</text>
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">◆ TODAY&apos;S VOCABULARY CHALLENGE</text>
   
   ${vocabRows}
 
   <text x="${PAD + 24}" y="${vocabY + VOCAB_CARD_H - 18}"
     font-size="13" fill="#94a3b8" font-weight="500"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">★ Use at least ${vocabRequiredCount} of today&apos;s ${wordsToRender.length} vocabulary words naturally in your speaking video!</text>
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">★ Use at least ${vocabRequiredCount} of today&apos;s ${wordsToRender.length} vocabulary words naturally in your speaking video!</text>
   ` : ''}
 
   <!-- ═══ FOOTER CTA BUTTON ═══ -->
@@ -418,7 +423,7 @@ export function generateSVGPoster({
       fill="url(#btnGrad)" filter="url(#btnGlow)"/>
     <text x="0" y="7" text-anchor="middle"
       font-size="17" font-weight="800" fill="#040510" letter-spacing="0.3"
-      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${esc(actionButtonLabel)}</text>
+      font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(actionButtonLabel)}</text>
   </g>
 
   <!-- Bottom Border Accent -->
