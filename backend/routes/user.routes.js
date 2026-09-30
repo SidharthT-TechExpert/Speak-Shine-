@@ -7,7 +7,7 @@ import express from "express";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
 import * as userController from "../controllers/userController.js";
-import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { authMiddleware, optionalAuthMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -63,7 +63,7 @@ function handleAvatarUpload(req, res, next) {
 }
 
 // ── User List & Profile ──────────────────────────────────────────────────────
-router.get("/", authMiddleware, userController.getAllUsers);
+router.get("/", optionalAuthMiddleware, userController.getAllUsers);
 router.get("/me", authMiddleware, userController.getMyProfile);
 router.patch("/me/profile", authMiddleware, localBypass(avatarUploadLimiter), handleAvatarUpload, userController.updateMyProfile);
 router.patch("/me/password", authMiddleware, userController.changeMyPassword);

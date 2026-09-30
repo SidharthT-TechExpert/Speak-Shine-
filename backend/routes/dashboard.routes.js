@@ -5,13 +5,13 @@
 
 import express from "express";
 import * as dashboardController from "../controllers/dashboardController.js";
-import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { authMiddleware, optionalAuthMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // Public authenticated routes (all roles)
 router.get("/", authMiddleware, dashboardController.getTodayOverview);
-router.get("/today-question", authMiddleware, dashboardController.getTodayQuestionOnly);
+router.get("/today-question", optionalAuthMiddleware, dashboardController.getTodayQuestionOnly);
 router.post("/publish-and-send-today-question", authMiddleware, dashboardController.publishAndSendTodayQuestion);
 router.post("/trigger-ai-deploy", authMiddleware, dashboardController.triggerAIDeployment);
 router.get("/me", authMiddleware, dashboardController.getUserProfile);
