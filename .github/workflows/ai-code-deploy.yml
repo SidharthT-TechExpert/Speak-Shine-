@@ -9,6 +9,9 @@ on:
         description: 'Code change request prompt'
         required: true
 
+permissions:
+  contents: write
+
 concurrency:
   group: speak-shine-production
   cancel-in-progress: true
@@ -30,8 +33,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Apply Code Changes (if payload provided)
+        if: ${{ github.event.client_payload.filePath && github.event.client_payload.codeContent }}
+        env:
+          FILE_PATH: ${{ github.event.client_payload.filePath }}
+          CODE_CONTENT: ${{ github.event.client_payload.codeContent }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const filePath = process.env.FILE_PATH;
+            const codeContent = process.env.CODE_CONTENT;
+            if (filePath && codeContent) {
+              fs.mkdirSync(path.dirname(filePath), { recursive: true });
+              fs.writeFileSync(filePath, codeContent, "utf8");
+              console.log(`[AI Workflow] Applied mobile code changes to ${filePath}`);
+            }
+          '
+
       - name: Run vitest test suite
         run: npm test
+
+      - name: Commit and Push AI Code Changes
+        if: ${{ github.event.client_payload.filePath && github.event.client_payload.codeContent }}
+        env:
+          FILE_PATH: ${{ github.event.client_payload.filePath }}
+          COMMIT_MSG: ${{ github.event.client_payload.commitMessage || github.event.client_payload.prompt || 'feat(ai): mobile code update' }}
+        run: |
+          git config user.name "Speak & Shine AI Bot"
+          git config user.email "ai-bot@speak-shine.online"
+          git add "$FILE_PATH"
+          git commit -m "$COMMIT_MSG"
+          git push origin main
 
       - name: Deploy to Production Host
         uses: appleboy/ssh-action@master
@@ -58,3 +91,4 @@ jobs:
             docker compose build --no-cache app
             docker compose up -d --force-recreate --remove-orphans app
             echo "🚀 AI Code deployment complete"
+

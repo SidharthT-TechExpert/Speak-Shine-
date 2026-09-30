@@ -264,9 +264,10 @@ router.get("/openapi.json", (req, res) => {
                   type: "object",
                   properties: {
                     prompt: { type: "string", description: "Description of the feature, code edit, or fix to deploy" },
+                    filePath: { type: "string", description: "Relative file path to create or update (e.g. frontend/src/pages/VideoAnalysis.jsx)" },
+                    codeContent: { type: "string", description: "Full code content string to write to the file" },
                     commitMessage: { type: "string", description: "Optional custom git commit message" }
-                  },
-                  required: ["prompt"]
+                  }
                 }
               }
             }

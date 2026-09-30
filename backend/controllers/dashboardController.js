@@ -344,10 +344,12 @@ export async function getPrizeInfo(req, res) {
  */
 export async function triggerAIDeployment(req, res) {
   try {
-    const { prompt, action = "deploy", commitMessage } = req.body || {};
+    const { prompt, action = "deploy", commitMessage, filePath, file_path, codeContent, code_content } = req.body || {};
+    const targetFilePath = filePath || file_path || null;
+    const targetCodeContent = codeContent || code_content || null;
 
-    if (!prompt && action !== "deploy") {
-      return res.status(400).json({ error: "prompt or action parameter is required" });
+    if (!prompt && action !== "deploy" && !targetFilePath) {
+      return res.status(400).json({ error: "prompt or filePath parameter is required" });
     }
 
     const repo = process.env.GITHUB_REPOSITORY || "SidharthT-TechExpert/Speak-Shine-";
@@ -366,6 +368,9 @@ export async function triggerAIDeployment(req, res) {
             event_type: "ai-code-deploy",
             client_payload: {
               prompt: prompt || "Automated AI code modification request",
+              filePath: targetFilePath,
+              codeContent: targetCodeContent,
+              commitMessage: commitMessage || prompt || "feat(ai): mobile code update",
               requestedBy: req.user?.name || "ChatGPT Assistant",
               timestamp: new Date().toISOString(),
             },
@@ -376,7 +381,7 @@ export async function triggerAIDeployment(req, res) {
           return res.json({
             success: true,
             status: "dispatched",
-            message: `Successfully dispatched AI deployment workflow to GitHub Actions! Code build and deployment for "${prompt || commitMessage || "Automated deploy"}" initiated.`,
+            message: `Successfully dispatched AI deployment workflow to GitHub Actions! Automated mobile code build & deployment initiated for "${targetFilePath || prompt || "Automated deploy"}".`,
           });
         }
       } catch (dispatchErr) {
@@ -387,7 +392,7 @@ export async function triggerAIDeployment(req, res) {
     return res.json({
       success: true,
       status: "queued",
-      message: `AI deployment request logged for "${prompt || commitMessage || "Automated deploy"}". Main branch deployment pipeline is active.`,
+      message: `AI deployment request logged for "${targetFilePath || prompt || "Automated deploy"}". Main branch deployment pipeline is active.`,
     });
   } catch (error) {
     console.error("[Dashboard] Trigger AI deploy error:", error.message);
