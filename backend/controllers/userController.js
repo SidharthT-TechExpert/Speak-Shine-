@@ -13,6 +13,18 @@ import { uploadAvatar } from "../services/storage/cloudinaryService.js";
 export async function getAllUsers(req, res) {
   try {
     const users = await userService.getAllUsers();
+    if (req.query.compact === "true" || req.query.summary === "true") {
+      const summary = users.map(u => ({
+        name: u.registeredName || u.name || "Student",
+        phone: u.phone,
+        streak: u.streak || 0,
+        streakFreeze: u.streakFreeze || 0,
+        completed: !!u.completed,
+        monthlyScore: u.monthlyScore || 0,
+        paid: !!u.paid,
+      }));
+      return res.json(summary);
+    }
     res.json(users);
   } catch (error) {
     console.error("[GetAllUsers] Error:", error.message);

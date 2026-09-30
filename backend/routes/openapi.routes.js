@@ -88,6 +88,15 @@ router.get("/openapi.json", (req, res) => {
         get: {
           operationId: "getAllStudentsAndStats",
           summary: "Get all student profiles, streaks, freeze counts, and scores",
+          parameters: [
+            {
+              name: "compact",
+              in: "query",
+              required: false,
+              schema: { type: "string", default: "true" },
+              description: "Returns compact student data to prevent payload size limits"
+            }
+          ],
           responses: {
             "200": { description: "List of enrolled students" }
           }
