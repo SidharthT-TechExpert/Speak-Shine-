@@ -11,7 +11,7 @@ const router = express.Router();
 
 // Public authenticated routes (all roles)
 router.get("/", authMiddleware, dashboardController.getTodayOverview);
-router.get("/today-question", authMiddleware, dashboardController.getTodayOverview);
+router.get("/today-question", authMiddleware, dashboardController.getTodayQuestionOnly);
 router.get("/me", authMiddleware, dashboardController.getUserProfile);
 router.get("/scores/:phone", authMiddleware, dashboardController.getUserScores);
 router.get("/prize-info", authMiddleware, dashboardController.getPrizeInfo);

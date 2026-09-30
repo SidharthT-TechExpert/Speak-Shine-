@@ -19,6 +19,28 @@ export async function getTodayOverview(req, res) {
 }
 
 /**
+ * GET /api/dashboard/today-question - Today's question only (lightweight for AI & ChatGPT Actions)
+ */
+export async function getTodayQuestionOnly(req, res) {
+  try {
+    const overview = await dashboardService.getTodayOverview();
+    const today = overview?.today || {};
+    res.json({
+      questionSent: today.questionSent ?? false,
+      topic: today.topic || null,
+      question: today.question || null,
+      category: today.category || null,
+      audioUrl: today.audioUrl || null,
+      imageUrl: today.imageUrl || null,
+      contentType: today.contentType || "question",
+    });
+  } catch (error) {
+    console.error("[Dashboard] Get today question error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
  * GET /api/dashboard/report/weekly - Weekly summary (admin/trainer)
  */
 export async function getWeeklyReport(req, res) {
