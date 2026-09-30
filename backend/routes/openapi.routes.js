@@ -24,7 +24,105 @@ router.get("/openapi.json", (req, res) => {
         description: "Speak & Shine Backend API Server"
       }
     ],
+    components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          description: "Enter your JWT_SECRET or MCP_SECRET_KEY as the Bearer Token"
+        }
+      }
+    },
+    security: [
+      {
+        BearerAuth: []
+      }
+    ],
     paths: {
+      "/api/whatsapp/status": {
+        get: {
+          operationId: "getWhatsAppStatus",
+          summary: "Check WhatsApp bot connection status, QR code, user phone, target group, and delivery log",
+          responses: {
+            "200": { description: "WhatsApp bot connection details and QR code if disconnected" }
+          }
+        }
+      },
+      "/api/whatsapp/reconnect": {
+        post: {
+          operationId: "reconnectWhatsApp",
+          summary: "Reconnect WhatsApp bot or force session reset to generate a fresh QR code",
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    force: { type: "boolean", description: "Set true to wipe session and generate fresh QR code" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Reconnection status message" }
+          }
+        }
+      },
+      "/api/dashboard/settings": {
+        get: {
+          operationId: "getBotSettings",
+          summary: "Get bot schedule settings (poster send time, story days, picture description days)",
+          responses: {
+            "200": { description: "Bot schedule settings" }
+          }
+        },
+        patch: {
+          operationId: "updateBotSettings",
+          summary: "Update bot schedule settings (posterSendTime, storyDays, pictureDescriptionDays)",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    posterSendTime: { type: "string", description: "Daily schedule time e.g. 08:00" },
+                    storyDays: { type: "array", items: { type: "integer" }, description: "Days for story summary (e.g. [6] for Saturday)" },
+                    pictureDescriptionDays: { type: "array", items: { type: "integer" }, description: "Days for picture description (e.g. [4] for Thursday)" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Updated settings" }
+          }
+        }
+      },
+      "/api/questions/generate-now": {
+        post: {
+          operationId: "generateQuestionsNow",
+          summary: "AI-generate a batch of 14 new speaking questions for the question bank",
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    count: { type: "integer", default: 14, description: "Number of questions to generate (7 to 28)" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Generation result summary" }
+          }
+        }
+      },
       "/api/help-tickets/admin/tickets": {
         get: {
           operationId: "getStudentDoubts",

@@ -86,6 +86,44 @@ export function createSpeakShineMCPServer() {
             },
           },
         },
+        {
+          name: "get_whatsapp_status",
+          description: "Check WhatsApp bot connection status (connected/connecting/disconnected), user phone, target group, delivery log, and QR code.",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
+        {
+          name: "reconnect_whatsapp",
+          description: "Reconnect WhatsApp bot or force session reset to generate a fresh QR code for scanning.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              force: { type: "boolean", description: "Set true to clear saved session credentials and generate a fresh QR code." },
+            },
+          },
+        },
+        {
+          name: "get_bot_settings",
+          description: "Get current bot schedule settings (posterSendTime, storyDays, pictureDescriptionDays).",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
+        {
+          name: "update_bot_settings",
+          description: "Update bot schedule settings (posterSendTime, storyDays, pictureDescriptionDays).",
+          inputSchema: {
+            type: "object",
+            properties: {
+              posterSendTime: { type: "string", description: "Daily schedule time e.g. '08:00'" },
+              storyDays: { type: "array", items: { type: "integer" }, description: "Days for story summary e.g. [6] for Saturday" },
+              pictureDescriptionDays: { type: "array", items: { type: "integer" }, description: "Days for picture description e.g. [4] for Thursday" },
+            },
+          },
+        },
       ],
     };
   });
@@ -321,6 +359,89 @@ export function createSpeakShineMCPServer() {
                 null,
                 2
               ),
+            },
+          ],
+        };
+      }
+
+      if (name === "get_whatsapp_status") {
+        const { getStatus } = await import("../services/whatsapp/whatsappService.js");
+        const status = getStatus();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  isConnected: status.isConnected,
+                  isConnecting: status.isConnecting,
+                  userPhone: status.userPhone || "Not connected",
+                  targetGroup: status.targetGroup || "Not configured",
+                  hasSavedSession: status.hasSavedCredentials,
+                  qrCodeAvailable: !!status.qrCodeDataUrl,
+                  qrCodeDataUrl: status.qrCodeDataUrl || null,
+                  instructions: status.isConnected
+                    ? "WhatsApp is connected and online."
+                    : status.qrCodeDataUrl
+                    ? "WhatsApp is disconnected. Scan the QR code data URL with WhatsApp (Linked Devices > Link a Device)."
+                    : "WhatsApp is connecting/reconnecting. Use reconnect_whatsapp tool with force:true to force a fresh QR code if needed.",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      if (name === "reconnect_whatsapp") {
+        const { restartWhatsAppBot } = await import("../services/whatsapp/whatsappService.js");
+        const force = !!args?.force;
+        await restartWhatsAppBot(force);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: force
+                    ? "Session reset triggered. Generating fresh QR code... Check get_whatsapp_status in a few seconds."
+                    : "Reconnection attempt initiated. Check get_whatsapp_status in a few seconds.",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      if (name === "get_bot_settings") {
+        const dashboardService = await import("../services/dashboard/dashboardService.js");
+        const settings = await dashboardService.getSettings();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(settings, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "update_bot_settings") {
+        const dashboardService = await import("../services/dashboard/dashboardService.js");
+        const updated = await dashboardService.updateSettings(args);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ success: true, settings: updated }, null, 2),
             },
           ],
         };
