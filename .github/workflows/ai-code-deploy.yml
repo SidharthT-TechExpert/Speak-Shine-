@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Apply Code Changes (if payload provided)
-        if: ${{ github.event.client_payload.filePath && github.event.client_payload.codeContent }}
+        if: github.event.client_payload.filePath && github.event.client_payload.codeContent
         env:
           FILE_PATH: ${{ github.event.client_payload.filePath }}
           CODE_CONTENT: ${{ github.event.client_payload.codeContent }}
@@ -55,7 +55,7 @@ jobs:
         run: npm test
 
       - name: Commit and Push AI Code Changes
-        if: ${{ github.event.client_payload.filePath && github.event.client_payload.codeContent }}
+        if: github.event.client_payload.filePath && github.event.client_payload.codeContent
         env:
           FILE_PATH: ${{ github.event.client_payload.filePath }}
           COMMIT_MSG: ${{ github.event.client_payload.commitMessage || github.event.client_payload.prompt || 'feat(ai): mobile code update' }}
@@ -91,4 +91,5 @@ jobs:
             docker compose build --no-cache app
             docker compose up -d --force-recreate --remove-orphans app
             echo "🚀 AI Code deployment complete"
+
 
