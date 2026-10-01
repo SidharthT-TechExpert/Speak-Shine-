@@ -6,6 +6,15 @@
 import * as userService from "../services/user/userService.js";
 import { uploadAvatar } from "../services/storage/cloudinaryService.js";
 
+function maskPhone(phone) {
+  if (!phone) return null;
+  const str = String(phone).replace(/\D/g, "");
+  if (str.length <= 4) return "••••";
+  const start = str.slice(0, 3);
+  const end = str.slice(-2);
+  return `${start}••••${end}`;
+}
+
 /**
  * GET /api/users
  * Get all users (admin/trainer)
@@ -19,7 +28,7 @@ export async function getAllUsers(req, res) {
     if (!isAdminRole || req.query.compact === "true" || req.query.summary === "true") {
       const summary = users.map(u => ({
         name: u.registeredName || u.name || "Student",
-        phone: u.phone,
+        phone: isAdminRole ? u.phone : maskPhone(u.phone),
         streak: u.streak || 0,
         streakFreeze: u.streakFreeze || 0,
         completed: !!u.completed,
@@ -484,6 +493,14 @@ export async function updateStudentPaidStatus(req, res) {
  */
 export async function getStudentWalletDetails(req, res) {
   try {
+    const isStaff = ["admin", "admins", "trainer", "viewer"].includes(req.user?.role);
+    const reqPhone = req.params.phone?.replace(/^(\+91|91)/, "").replace(/\D/g, "");
+    const userPhone = req.user?.phone?.replace(/^(\+91|91)/, "").replace(/\D/g, "");
+
+    if (!isStaff && reqPhone !== userPhone) {
+      return res.status(403).json({ error: "Access denied: Cannot view another student's wallet details" });
+    }
+
     const result = await userService.getStudentWalletDetails(req.params.phone);
     res.json(result);
   } catch (error) {

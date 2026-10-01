@@ -12,8 +12,8 @@ const router = express.Router();
 // Public authenticated routes (all roles)
 router.get("/", authMiddleware, dashboardController.getTodayOverview);
 router.get("/today-question", optionalAuthMiddleware, dashboardController.getTodayQuestionOnly);
-router.post("/publish-and-send-today-question", authMiddleware, dashboardController.publishAndSendTodayQuestion);
-router.post("/trigger-ai-deploy", authMiddleware, dashboardController.triggerAIDeployment);
+router.post("/publish-and-send-today-question", authMiddleware, requireRole("admin", "admins", "trainer"), dashboardController.publishAndSendTodayQuestion);
+router.post("/trigger-ai-deploy", authMiddleware, requireRole("admin", "admins"), dashboardController.triggerAIDeployment);
 router.get("/me", authMiddleware, dashboardController.getUserProfile);
 router.get("/scores/:phone", authMiddleware, dashboardController.getUserScores);
 router.get("/prize-info", authMiddleware, dashboardController.getPrizeInfo);
