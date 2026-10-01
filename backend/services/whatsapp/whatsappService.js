@@ -1406,9 +1406,17 @@ export async function sendCustomGroupMessage(messageText, options = {}) {
   }
   const targetGroup = formatGroupJid(rawTargetGroup);
 
-  const sock = await ensureWhatsAppConnected();
+  let sock = null;
+  try {
+    sock = await ensureWhatsAppConnected(12000);
+  } catch (connErr) {
+    console.warn(`[WhatsApp] Connection check failed in sendCustomGroupMessage: ${connErr.message} — triggering auto-reconnect...`);
+    await restartWhatsAppBot({ force: false }).catch(() => {});
+    sock = await ensureWhatsAppConnected(15000).catch(() => null);
+  }
+
   if (!sock) {
-    throw new Error("WhatsApp bot client is disconnected. Please reconnect WhatsApp first.");
+    throw new Error("WhatsApp bot is currently disconnected. Auto-reconnect was triggered. Please try your message again in a few seconds or call reconnect_whatsapp.");
   }
 
   let messageType = "text";
