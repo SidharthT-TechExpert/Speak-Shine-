@@ -101,9 +101,46 @@ async function sendSmsOTP(phone, otp) {
  * Handles both WhatsApp users (userId like "91xxx@s.whatsapp.net") and
  * web-only users (userId like "web:STRIPPED_PHONE").
  */
-export async function getAllUsers() {
+export async function getAllUsers(options = {}) {
+  const { page, limit, search, status } = options;
+
+  const queryFilter = {};
+
+  if (search && typeof search === "string" && search.trim()) {
+    const term = escapeRegex(search.trim());
+    queryFilter.$or = [
+      { name: { $regex: term, $options: "i" } },
+      { registeredName: { $regex: term, $options: "i" } },
+      { phone: { $regex: term, $options: "i" } },
+      { userId: { $regex: term, $options: "i" } },
+    ];
+  }
+
+  if (status === "paid") {
+    queryFilter.paid = true;
+  } else if (status === "unpaid") {
+    queryFilter.paid = false;
+  } else if (status === "completed") {
+    queryFilter.completed = true;
+  } else if (status === "pending") {
+    queryFilter.completed = false;
+  }
+
+  const shouldPaginate = page !== undefined || limit !== undefined;
+  const pageNum = Math.max(1, parseInt(page || "1", 10));
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit || "20", 10)));
+  const skipNum = (pageNum - 1) * limitNum;
+
+  let userQuery = User.find(queryFilter).sort({ name: 1 });
+  let totalCount = 0;
+
+  if (shouldPaginate) {
+    totalCount = await User.countDocuments(queryFilter);
+    userQuery = userQuery.skip(skipNum).limit(limitNum);
+  }
+
   const [users, auths] = await Promise.all([
-    User.find().lean(),
+    userQuery.lean(),
     Auth.find().select("phone role name isActive avatarUrl").lean(),
   ]);
 
@@ -132,6 +169,18 @@ export async function getAllUsers() {
       registeredName: auth.name || u.name,
     };
   });
+
+  if (shouldPaginate) {
+    return {
+      users: result,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limitNum),
+      },
+    };
+  }
 
   return result;
 }

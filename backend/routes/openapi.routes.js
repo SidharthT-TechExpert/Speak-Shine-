@@ -487,11 +487,39 @@ router.get("/openapi.json", (req, res) => {
           summary: "Get all student profiles, streaks, freeze counts, and scores",
           parameters: [
             {
+              name: "page",
+              in: "query",
+              required: false,
+              schema: { type: "integer", default: 1 },
+              description: "Page number for pagination (e.g. 1, 2, 3)"
+            },
+            {
+              name: "limit",
+              in: "query",
+              required: false,
+              schema: { type: "integer", default: 20 },
+              description: "Number of students per page (1 to 100, default 20)"
+            },
+            {
+              name: "search",
+              in: "query",
+              required: false,
+              schema: { type: "string" },
+              description: "Filter students by name or phone number"
+            },
+            {
+              name: "status",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["all", "paid", "unpaid", "completed", "pending"] },
+              description: "Filter by paid subscription status or today's video submission status"
+            },
+            {
               name: "compact",
               in: "query",
               required: false,
               schema: { type: "string", default: "true" },
-              description: "Returns compact student data to prevent payload size limits"
+              description: "Returns compact student objects to prevent ResponseTooLargeError"
             }
           ],
           responses: {

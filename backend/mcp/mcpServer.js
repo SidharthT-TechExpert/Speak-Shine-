@@ -77,6 +77,19 @@ export function createSpeakShineMCPServer() {
           },
         },
         {
+          name: "list_students_paginated",
+          description: "List students with pagination, search, and status filtering. Helps retrieve students in small groups to prevent ResponseTooLargeError.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              page: { type: "integer", description: "Page number (default 1)" },
+              limit: { type: "integer", description: "Number of students per page (1 to 100, default 20)" },
+              search: { type: "string", description: "Filter by student name or phone number" },
+              status: { type: "string", enum: ["all", "paid", "unpaid", "completed", "pending"], description: "Filter by paid subscription or today's submission completion status" },
+            },
+          },
+        },
+        {
           name: "publish_and_send_today_question",
           description: "Publish today's speaking challenge question and dispatch the poster to the WhatsApp group. Use when scheduler is delayed/down or manual publishing is requested.",
           inputSchema: {
@@ -819,6 +832,20 @@ export function createSpeakShineMCPServer() {
           audioUrl: args.audioUrl,
           asPoster: args.asPoster,
           targetGroup: args.targetGroup,
+        });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "list_students_paginated") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.getAllUsers({
+          page: args.page || 1,
+          limit: args.limit || 20,
+          search: args.search,
+          status: args.status,
         });
 
         return {

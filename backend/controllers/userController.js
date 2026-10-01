@@ -21,24 +21,42 @@ function maskPhone(phone) {
  */
 export async function getAllUsers(req, res) {
   try {
-    const users = await userService.getAllUsers();
-    const isAdminRole = ["admin", "admins", "trainer", "viewer"].includes(req.user?.role);
+    const { page, limit, search, query: searchParam, status, compact, summary, paginate } = req.query;
+    const isPaginated = page !== undefined || limit !== undefined || paginate === "true";
     
-    // Always enforce compact projection for regular user roles or when compact/summary is requested
-    if (!isAdminRole || req.query.compact === "true" || req.query.summary === "true") {
-      const summary = users.map(u => ({
-        name: u.registeredName || u.name || "Student",
-        phone: isAdminRole ? u.phone : maskPhone(u.phone),
-        avatarUrl: u.avatarUrl || null,
-        streak: u.streak || 0,
-        streakFreeze: u.streakFreeze || 0,
-        completed: !!u.completed,
-        monthlyScore: u.monthlyScore || 0,
-        paid: !!u.paid,
-      }));
-      return res.json(summary);
+    const result = await userService.getAllUsers({
+      page: isPaginated ? (page || 1) : undefined,
+      limit: isPaginated ? (limit || 20) : undefined,
+      search: search || searchParam,
+      status,
+    });
+
+    const isAdminRole = ["admin", "admins", "trainer", "viewer"].includes(req.user?.role);
+    const forceCompact = !isAdminRole || compact === "true" || summary === "true" || isPaginated;
+
+    const mapUserToCompact = (u) => ({
+      name: u.registeredName || u.name || "Student",
+      phone: isAdminRole ? u.phone : maskPhone(u.phone),
+      avatarUrl: u.avatarUrl || null,
+      streak: u.streak || 0,
+      streakFreeze: u.streakFreeze || 0,
+      completed: !!u.completed,
+      monthlyScore: u.monthlyScore || 0,
+      paid: !!u.paid,
+    });
+
+    if (result && result.pagination) {
+      return res.json({
+        users: forceCompact ? result.users.map(mapUserToCompact) : result.users,
+        pagination: result.pagination,
+      });
     }
-    res.json(users);
+
+    if (forceCompact && Array.isArray(result)) {
+      return res.json(result.map(mapUserToCompact));
+    }
+
+    res.json(result);
   } catch (error) {
     console.error("[GetAllUsers] Error:", error.message);
     res.status(500).json({ error: error.message });
