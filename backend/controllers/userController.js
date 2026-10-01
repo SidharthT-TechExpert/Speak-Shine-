@@ -477,3 +477,20 @@ export async function updateStudentPaidStatus(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * GET /api/users/:phone/wallet
+ * Get student wallet balance and transaction history (admin/trainer/viewer)
+ */
+export async function getStudentWalletDetails(req, res) {
+  try {
+    const result = await userService.getStudentWalletDetails(req.params.phone);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[GetStudentWalletDetails] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}

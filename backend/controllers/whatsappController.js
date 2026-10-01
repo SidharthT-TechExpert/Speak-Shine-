@@ -276,8 +276,8 @@ export async function saveMonthEndSettings(req, res) {
 
 export async function sendCustomGroupMessage(req, res) {
   try {
-    const { messageText, targetGroup } = req.body || {};
-    const result = await sendCustomGroupMessageService(messageText, { targetGroup });
+    const { messageText, imageUrl, audioUrl, targetGroup } = req.body || {};
+    const result = await sendCustomGroupMessageService(messageText, { imageUrl, audioUrl, targetGroup });
     return res.json({ success: true, ...result });
   } catch (err) {
     console.error("[WhatsAppController] sendCustomGroupMessage error:", err.message);

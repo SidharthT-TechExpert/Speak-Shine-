@@ -281,15 +281,27 @@ export function createSpeakShineMCPServer() {
           },
         },
         {
-          name: "send_custom_whatsapp_group_message",
-          description: "Generate and send any custom text announcement or message directly to the Speak & Shine WhatsApp group.",
+          name: "get_student_wallet_details",
+          description: "Get full wallet balance, transaction history (credits/debits), and referral earnings for a student.",
           inputSchema: {
             type: "object",
             properties: {
-              messageText: { type: "string", description: "The message text/announcement to post to the group" },
+              phone: { type: "string", description: "Student mobile phone number" },
+            },
+            required: ["phone"],
+          },
+        },
+        {
+          name: "send_custom_whatsapp_group_message",
+          description: "Generate and send any custom text, image, or audio voice note message directly to the Speak & Shine WhatsApp group. Defaults to text if no image or audio is provided.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              messageText: { type: "string", description: "Text message or image caption (required if no imageUrl or audioUrl)" },
+              imageUrl: { type: "string", description: "Optional image URL to broadcast an image message" },
+              audioUrl: { type: "string", description: "Optional audio URL to broadcast a voice note / audio message" },
               targetGroup: { type: "string", description: "Optional target group JID override" },
             },
-            required: ["messageText"],
           },
         },
       ],
@@ -789,9 +801,20 @@ export function createSpeakShineMCPServer() {
         };
       }
 
+      if (name === "get_student_wallet_details") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.getStudentWalletDetails(args.phone);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
       if (name === "send_custom_whatsapp_group_message") {
         const whatsappService = await import("../services/whatsapp/whatsappService.js");
         const result = await whatsappService.sendCustomGroupMessage(args.messageText, {
+          imageUrl: args.imageUrl,
+          audioUrl: args.audioUrl,
           targetGroup: args.targetGroup,
         });
 

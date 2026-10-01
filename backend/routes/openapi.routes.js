@@ -348,6 +348,12 @@ router.get("/openapi.json", (req, res) => {
         }
       },
       "/api/users/{phone}/wallet": {
+        get: {
+          operationId: "getStudentWalletDetails",
+          summary: "Get full wallet balance, transaction history, and referral earnings for a student",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          responses: { "200": { description: "Student wallet balance and transaction log" } }
+        },
         post: {
           operationId: "adjustStudentWallet",
           summary: "Credit or debit a student's wallet balance with reason history logging",
@@ -418,7 +424,7 @@ router.get("/openapi.json", (req, res) => {
       "/api/whatsapp/send-custom-message": {
         post: {
           operationId: "sendCustomWhatsAppGroupMessage",
-          summary: "Generate and send any custom text announcement or message directly to the target WhatsApp group",
+          summary: "Generate and broadcast text, image, or audio voice messages directly to the target WhatsApp group",
           requestBody: {
             required: true,
             content: {
@@ -426,10 +432,11 @@ router.get("/openapi.json", (req, res) => {
                 schema: {
                   type: "object",
                   properties: {
-                    messageText: { type: "string", description: "The custom text announcement message to broadcast to the group" },
+                    messageText: { type: "string", description: "Text message or image caption (required if no imageUrl or audioUrl)" },
+                    imageUrl: { type: "string", description: "Optional image URL to broadcast an image message" },
+                    audioUrl: { type: "string", description: "Optional audio URL to broadcast an audio voice note message" },
                     targetGroup: { type: "string", description: "Optional target group JID override" }
-                  },
-                  required: ["messageText"]
+                  }
                 }
               }
             }

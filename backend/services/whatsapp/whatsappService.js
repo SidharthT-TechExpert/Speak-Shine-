@@ -1394,14 +1394,13 @@ export async function sendDeploymentNotification({ status = "success", error = n
 }
 
 /**
- * Send a custom announcement or text message directly to the target WhatsApp group.
+ * Send a custom message (Text, Image, or Audio) directly to the target WhatsApp group.
+ * Supports text, imageUrl, and audioUrl.
  */
 export async function sendCustomGroupMessage(messageText, options = {}) {
-  if (!messageText || typeof messageText !== "string" || !messageText.trim()) {
-    throw new Error("messageText parameter is required");
-  }
+  const { imageUrl, audioUrl, targetGroup: customTarget } = options;
 
-  const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
+  const rawTargetGroup = customTarget || process.env.TARGET_GROUP;
   if (!rawTargetGroup) {
     throw new Error("TARGET_GROUP is not configured in environment or options");
   }
@@ -1412,12 +1411,43 @@ export async function sendCustomGroupMessage(messageText, options = {}) {
     throw new Error("WhatsApp bot client is disconnected. Please reconnect WhatsApp first.");
   }
 
-  await sock.sendMessage(targetGroup, { text: messageText.trim() });
-  console.log(`[WhatsApp] 📢 Custom group message broadcast to ${targetGroup}`);
+  let messageType = "text";
+
+  if (imageUrl) {
+    messageType = "image";
+    await sock.sendMessage(targetGroup, {
+      image: { url: imageUrl },
+      caption: messageText?.trim() || "",
+    });
+    console.log(`[WhatsApp] 🖼️ Custom image broadcast sent to ${targetGroup}`);
+  } else if (audioUrl) {
+    messageType = "audio";
+    const isVoiceNote = !options.asFile;
+    await sock.sendMessage(targetGroup, {
+      audio: { url: audioUrl },
+      mimetype: options.mimetype || "audio/mp4",
+      ptt: isVoiceNote,
+    });
+    if (messageText && messageText.trim()) {
+      await sock.sendMessage(targetGroup, { text: messageText.trim() });
+    }
+    console.log(`[WhatsApp] 🎧 Custom audio broadcast sent to ${targetGroup}`);
+  } else {
+    if (!messageText || typeof messageText !== "string" || !messageText.trim()) {
+      throw new Error("messageText is required when no imageUrl or audioUrl is provided");
+    }
+    messageType = "text";
+    await sock.sendMessage(targetGroup, { text: messageText.trim() });
+    console.log(`[WhatsApp] 📢 Custom text message broadcast to ${targetGroup}`);
+  }
+
   return {
     success: true,
     targetGroup,
-    messageText: messageText.trim(),
+    messageType,
+    imageUrl: imageUrl || null,
+    audioUrl: audioUrl || null,
+    messageText: messageText?.trim() || null,
     sentAt: new Date(),
   };
 }

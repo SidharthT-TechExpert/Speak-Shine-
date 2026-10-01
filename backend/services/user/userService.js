@@ -1121,3 +1121,30 @@ export async function updateStudentPaidStatus(phone, paid = true) {
     paidAt: user.paidAt,
   };
 }
+
+/**
+ * Get student wallet details and full transaction history
+ */
+export async function getStudentWalletDetails(phone) {
+  let user = await User.findOne({ phone }).lean();
+  if (!user) {
+    const stripped = phone.replace(/^(\+91|91)/, "");
+    user = await User.findOne({ $or: [{ phone: stripped }, { userId: { $regex: escapeRegex(stripped) } }] }).lean();
+  }
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    success: true,
+    phone: user.phone || phone,
+    name: user.name,
+    walletBalance: user.walletBalance || 0,
+    walletHistory: user.walletHistory || [],
+    referralCode: user.referralCode || null,
+    referralCount: user.referralCount || 0,
+    referralEarnings: user.referralEarnings || 0,
+  };
+}
