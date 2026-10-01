@@ -69,6 +69,7 @@ router.patch("/me/profile", authMiddleware, localBypass(avatarUploadLimiter), ha
 router.patch("/me/password", authMiddleware, userController.changeMyPassword);
 router.patch("/me/phone", authMiddleware, userController.changeMyPhone);
 router.patch("/me/theme", authMiddleware, userController.updateMyTheme);
+router.get("/me/api-key", authMiddleware, userController.getMyApiKey);
 router.get("/:phone", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), userController.getUserByPhone);
 
 // ── User Management (Admin) ──────────────────────────────────────────────────

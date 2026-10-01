@@ -1148,3 +1148,29 @@ export async function getStudentWalletDetails(phone) {
     referralEarnings: user.referralEarnings || 0,
   };
 }
+
+/**
+ * Get or generate a permanent Personal Student API Key for non-admin student access
+ */
+export async function getOrCreateUserApiKey(userId) {
+  const auth = await Auth.findById(userId);
+  if (!auth) {
+    const error = new Error("User account not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!auth.apiKey) {
+    const randomHex = (await import("crypto")).randomUUID().replace(/-/g, "");
+    auth.apiKey = `sk_user_${randomHex}`;
+    await auth.save();
+  }
+
+  return {
+    success: true,
+    apiKey: auth.apiKey,
+    role: auth.role || "user",
+    phone: auth.phone,
+    name: auth.name,
+  };
+}

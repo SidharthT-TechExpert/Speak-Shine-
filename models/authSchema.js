@@ -11,6 +11,7 @@ const authSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   theme: { type: String, enum: ["dark", "light"], default: "dark" },
   isDark: { type: Boolean, default: true },
+  apiKey: { type: String, unique: true, sparse: true },
   createdAt: { type: Date, default: Date.now },
   
   // Security: Account lockout after failed login attempts

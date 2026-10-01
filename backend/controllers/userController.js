@@ -494,3 +494,20 @@ export async function getStudentWalletDetails(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * GET /api/users/me/api-key
+ * Get or generate personal student API key (non-admin, permanent)
+ */
+export async function getMyApiKey(req, res) {
+  try {
+    const result = await userService.getOrCreateUserApiKey(req.user.id);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[GetMyApiKey] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}

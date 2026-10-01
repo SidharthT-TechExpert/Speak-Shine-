@@ -57,10 +57,25 @@ export function authMiddleware(req, res, next) {
 
   if (!raw) return res.status(401).json({ error: "No token provided" });
 
-  // System API Key / MCP Secret Key bypass for AI Actions & ChatGPT
+  // System API Key / MCP Secret Key bypass for AI Actions & ChatGPT (Admin System Key)
   if (secretKey && (raw === secretKey || customApiKey === secretKey)) {
     req.user = { id: "mcp_admin", role: "admin", phone: "system_ai", name: "AI Assistant" };
     return next();
+  }
+
+  // Personal Student API Key lookup (sk_user_...) for non-admin students
+  if (typeof raw === "string" && raw.startsWith("sk_user_")) {
+    return Auth.findOne({ apiKey: raw, isActive: true })
+      .select("role phone name")
+      .lean()
+      .then((authDoc) => {
+        if (!authDoc) {
+          return res.status(401).json({ error: "Invalid or disabled personal API key" });
+        }
+        req.user = { id: authDoc._id, role: authDoc.role || "user", phone: authDoc.phone, name: authDoc.name };
+        return next();
+      })
+      .catch((err) => res.status(500).json({ error: err.message }));
   }
 
   let decoded;
