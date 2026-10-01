@@ -505,6 +505,117 @@ Standard CRUD endpoints under `/api/users`, `/api/dashboard`, `/api/questions`, 
 |--------|------|-------------|
 | GET | `/api/monitoring` | CPU, RAM, queue stats, recent errors |
 
+### MCP & ChatGPT Integration
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/mcp/sse` | MCP SSE transport connection endpoint |
+| POST | `/api/mcp/messages` | MCP JSON-RPC message endpoint |
+| GET | `/api/mcp/openapi.json` | OpenAPI 3.0 specification for ChatGPT Custom Actions |
+| GET | `/api/users/me/api-key` | Generate permanent personal Student API Key (`sk_user_...`) |
+| GET | `/api/mcp/wallet` | Check student wallet balance and transaction ledger |
+| POST | `/api/mcp/points` | Manage student points (Add/Deduct/Set) — Admin |
+| POST | `/api/mcp/streak` | Update student streak count — Admin |
+| POST | `/api/mcp/streak/freeze` | Freeze student streak — Admin |
+| POST | `/api/mcp/wallet` | Credit or Debit student wallet — Admin |
+| POST | `/api/mcp/lockout/reset` | Reset locked out student login attempts — Admin |
+| POST | `/api/mcp/submission-status` | Toggle student submission status (`submitted`) — Admin |
+| POST | `/api/mcp/paid-status` | Toggle student paid membership status (`paid`) — Admin |
+| POST | `/api/mcp/weekly-reset` | Execute weekly reset across students — Admin |
+| POST | `/api/mcp/whatsapp/broadcast` | Broadcast Rich Media (Text, Image, Audio) to WhatsApp Group — Admin |
+
+---
+
+## MCP Server & ChatGPT Custom Actions Setup
+
+The Speak & Shine backend includes an integrated **Model Context Protocol (MCP)** server and an **OpenAPI 3.0 Gateway** for ChatGPT Custom Actions, Claude Desktop, and Cursor.
+
+### Environment Variables & Keys
+
+| Variable | Description |
+|----------|-------------|
+| `MCP_SECRET_KEY` | System-wide Admin Key for administrative MCP/ChatGPT operations. If not explicitly set, falls back to `JWT_SECRET`. |
+| Student API Key | Generated per-user via `GET /api/users/me/api-key`. Format: `sk_user_<64_hex_chars>`. Does not expire. |
+
+### Role-Based Access Control & Privacy Safeguards
+
+1. **Admin Key (`MCP_SECRET_KEY`)**:
+   - Full access to read and update student points, streaks, wallets, lockouts, payment statuses, weekly resets, and send WhatsApp group broadcasts.
+2. **Student Personal API Key (`sk_user_...`)**:
+   - Permanently tied to the requesting student (`user` role).
+   - Can inspect personal wallet balance and report details.
+   - **Privacy Protection**: Phone numbers are automatically masked (`+91 ****** 9012`) for non-admin callers. Passwords are never retrieved or returned under any circumstances.
+   - **Admin Action Blocking**: Blocked from modifying user scores, streaks, wallets, resetting lockouts, or sending broadcasts (`403 Forbidden`).
+
+---
+
+### Setup Instructions for ChatGPT Custom Actions
+
+Follow these steps to connect ChatGPT directly to your Speak & Shine backend:
+
+#### Step 1: Create or Edit a Custom GPT
+1. Open [ChatGPT](https://chatgpt.com/) and navigate to **My GPTs** -> **Create a GPT** (or edit an existing one).
+2. Go to the **Configure** tab.
+
+#### Step 2: Add Actions
+1. Click **Add Actions** at the bottom of the configuration page.
+2. Under **Schema**, paste the OpenAPI JSON or import it from your live API URL:
+   `https://<your-domain>/api/mcp/openapi.json`
+
+#### Step 3: Configure Authentication
+1. Click the ⚙️ gear icon next to **Authentication**.
+2. Select **API Key**.
+3. Set **Auth Type** to **Bearer**.
+4. Paste your key:
+   - For **Admin Access**: Paste your `MCP_SECRET_KEY` (or `JWT_SECRET`).
+   - For **Student Access**: Paste a personal Student API key (`sk_user_...`).
+5. Save the configuration.
+
+#### Step 4: Interact with ChatGPT in Plain English
+You can now speak to ChatGPT to manage student records and broadcast notifications:
+
+* **Manage Points**: *"Add 50 points to student 9876543210 for extra effort."*
+* **Freeze Streak**: *"Freeze streak for phone 9876543210."*
+* **Wallet Credit/Debit**: *"Credit $20 to student 9876543210's wallet with note 'Bonus'."*
+* **Reset Failed Login Attempts**: *"Reset login lock for student 9876543210."*
+* **Check Wallet**: *"Show wallet balance and transactions for 9876543210."*
+* **Status Updates**: *"Mark student 9876543210 as paid and submitted."*
+* **Weekly Reset**: *"Execute weekly reset."*
+* **WhatsApp Group Broadcasts (Rich Media)**:
+  - **Text Announcement**: *"Send WhatsApp group message: Evening session starts at 7 PM."*
+  - **Poster Image**: *"Broadcast poster image https://example.com/poster.jpg to WhatsApp group with caption 'Special Workshop'."*
+  - **Voice Note / Audio**: *"Send audio message https://example.com/audio.mp3 to WhatsApp group."*
+
+---
+
+### Setup Instructions for MCP Clients (Claude Desktop / Cursor)
+
+#### Connecting via SSE
+Connect your MCP client to the Server-Sent Events (SSE) endpoint:
+
+```text
+GET https://<your-domain>/api/mcp/sse?apiKey=<YOUR_API_KEY>
+```
+
+#### Sample `claude_desktop_config.json`
+```json
+{
+  "mcpServers": {
+    "speak-shine": {
+      "url": "https://your-domain.com/api/mcp/sse?apiKey=YOUR_MCP_SECRET_KEY",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+---
+
+### Automatic WhatsApp Reconnection
+
+If WhatsApp disconnects due to session expiry or server restart, the server automatically executes `ensureWhatsAppConnected()` on message send attempts using stored credentials, preventing message failures without manual intervention.
+
+---
+
 ---
 
 ## New Features & Enhancements
