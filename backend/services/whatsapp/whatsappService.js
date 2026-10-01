@@ -1406,8 +1406,8 @@ export async function sendCustomGroupMessage(messageText, options = {}) {
   }
   const targetGroup = formatGroupJid(rawTargetGroup);
 
-  const sock = getBaileysSocket();
-  if (!sock || !isWhatsAppConnected()) {
+  const sock = await ensureWhatsAppConnected();
+  if (!sock) {
     throw new Error("WhatsApp bot client is disconnected. Please reconnect WhatsApp first.");
   }
 
