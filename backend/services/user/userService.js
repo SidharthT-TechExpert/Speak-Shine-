@@ -104,7 +104,7 @@ async function sendSmsOTP(phone, otp) {
 export async function getAllUsers() {
   const [users, auths] = await Promise.all([
     User.find().lean(),
-    Auth.find().select("phone role name isActive").lean(),
+    Auth.find().select("phone role name isActive avatarUrl").lean(),
   ]);
 
   // Build lookup maps for fast joining
@@ -126,6 +126,7 @@ export async function getAllUsers() {
     return {
       ...u,
       phone: stripped || phone,
+      avatarUrl: u.avatarUrl || auth.avatarUrl || null,
       role: auth.role || "user",
       isActive: auth.isActive ?? true,
       registeredName: auth.name || u.name,

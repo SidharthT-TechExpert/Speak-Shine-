@@ -338,6 +338,7 @@ export function createSpeakShineMCPServer() {
                   id: user._id,
                   name: user.registeredName || user.name,
                   phone: user.phone,
+                  avatarUrl: user.avatarUrl || null,
                   streak: user.streak || 0,
                   streakFreeze: user.streakFreeze || 0,
                   monthlyScore: user.monthlyScore || 0,

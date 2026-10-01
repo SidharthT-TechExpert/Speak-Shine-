@@ -29,6 +29,7 @@ export async function getAllUsers(req, res) {
       const summary = users.map(u => ({
         name: u.registeredName || u.name || "Student",
         phone: isAdminRole ? u.phone : maskPhone(u.phone),
+        avatarUrl: u.avatarUrl || null,
         streak: u.streak || 0,
         streakFreeze: u.streakFreeze || 0,
         completed: !!u.completed,
