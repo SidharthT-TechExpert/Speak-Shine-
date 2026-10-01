@@ -1492,13 +1492,37 @@ export async function sendCustomGroupMessage(messageText, options = {}) {
     }
 
     if (!imagePayload) {
-      throw new Error(`Unable to load image from provided imageUrl: ${imageUrl}`);
+      try {
+        console.warn(`[WhatsApp] Unable to load image payload from ${imageUrl}, auto-rendering poster buffer...`);
+        const { generatePNGPosterBuffer } = await import("../../../api/posterGenerator.js");
+        imagePayload = await generatePNGPosterBuffer({
+          topic: options.topic || "Notice",
+          question: messageText || "Special Announcement",
+          category: options.category || "Announcement",
+        });
+      } catch (genErr) {
+        throw new Error(`Unable to load or render image: ${genErr.message}`);
+      }
     }
 
-    await sock.sendMessage(targetGroup, {
-      image: imagePayload,
-      caption: messageText?.trim() || "",
-    });
+    try {
+      await sock.sendMessage(targetGroup, {
+        image: imagePayload,
+        caption: messageText?.trim() || "",
+      });
+    } catch (sendErr) {
+      console.warn(`[WhatsApp] Image send failed (${sendErr.message}), auto-generating poster buffer fallback...`);
+      const { generatePNGPosterBuffer } = await import("../../../api/posterGenerator.js");
+      const fallbackPosterBuffer = await generatePNGPosterBuffer({
+        topic: options.topic || "Notice",
+        question: messageText || "Special Announcement",
+        category: options.category || "Announcement",
+      });
+      await sock.sendMessage(targetGroup, {
+        image: fallbackPosterBuffer,
+        caption: messageText?.trim() || "",
+      });
+    }
     console.log(`[WhatsApp] 🖼️ Custom image broadcast sent to ${targetGroup}`);
   } else if (audioUrl) {
     messageType = "audio";
@@ -1872,7 +1896,24 @@ export async function sendMonthEndPrizeReportToGroup(options = {}) {
   await ensureWhatsAppConnected(15000);
 
   console.log(`[WhatsApp] 🏆 Dispatching Month-End Prize Report to ${targetGroup}...`);
-  await sock.sendMessage(targetGroup, { text: summary.previewMessage });
+  try {
+    const { generatePNGPosterBuffer } = await import("../../../api/posterGenerator.js");
+    const winnersList = (summary.winners || []).map(w => `${w.rank}. ${w.name} — ₹${w.amount}`).join("\n");
+    const posterBuffer = await generatePNGPosterBuffer({
+      topic: `${summary.monthName} ${summary.year} Prize Winners 🏆`,
+      question: `MONTH-END PRIZE DISTRIBUTION\nTotal Collection: ₹${summary.totalCollection}\n\n🏆 WINNERS & PRIZES:\n${winnersList}\n\n${summary.footerNote || "*Winner prizes have been credited to your wallets.*"}`,
+      category: "Monthly Reflection",
+    });
+
+    await sock.sendMessage(targetGroup, {
+      image: posterBuffer,
+      caption: summary.previewMessage,
+    });
+    console.log(`[WhatsApp] 🎨 Visual Month-End Prize Poster sent to ${targetGroup}`);
+  } catch (imgErr) {
+    console.warn("[WhatsApp] Could not send poster image, sending text report:", imgErr.message);
+    await sock.sendMessage(targetGroup, { text: summary.previewMessage });
+  }
   console.log(`[WhatsApp] ✅ Month-End Prize Report sent successfully to ${targetGroup}!`);
 
   // Automatically credit winning students' wallets in MongoDB

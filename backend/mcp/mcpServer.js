@@ -318,6 +318,21 @@ export function createSpeakShineMCPServer() {
             },
           },
         },
+        {
+          name: "send_month_end_prize_report",
+          description: "Generate and broadcast the Month-End Prize Distribution Report and Winner Poster image to the Speak & Shine WhatsApp group. Dynamically calculates winner prize rewards based on total monthly collection, active leaderboard rankings, calculation method/ratios (or custom amounts), renders the visual prize poster, and automatically credits winning students' MongoDB wallets.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              totalCollection: { type: "number", description: "Total monthly collection amount in INR (auto-calculated from monthly transactions/paid users if omitted)" },
+              winnerCount: { type: "integer", description: "Number of top winners to reward (e.g. 3, 4, 5, 6)" },
+              customWinnerNames: { type: "array", items: { type: "string" }, description: "Optional custom winner names array to override leaderboard" },
+              customAmounts: { type: "array", items: { type: "number" }, description: "Optional custom prize amounts array in INR" },
+              footerNote: { type: "string", description: "Optional footer note e.g. '*Winner prizes have been credited to your wallets.*'" },
+              targetGroup: { type: "string", description: "Optional target group JID override" },
+            },
+          },
+        },
       ],
     };
   });
@@ -833,6 +848,15 @@ export function createSpeakShineMCPServer() {
           asPoster: args.asPoster,
           targetGroup: args.targetGroup,
         });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "send_month_end_prize_report") {
+        const whatsappService = await import("../services/whatsapp/whatsappService.js");
+        const result = await whatsappService.sendMonthEndPrizeReportToGroup(args || {});
 
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

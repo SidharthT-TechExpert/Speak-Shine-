@@ -445,6 +445,31 @@ router.get("/openapi.json", (req, res) => {
           responses: { "200": { description: "Broadcast confirmation status" } }
         }
       },
+      "/api/whatsapp/send-month-end-report": {
+        post: {
+          operationId: "sendMonthEndPrizeReport",
+          summary: "Generate and broadcast Month-End Prize Distribution Report and Winner Poster image to Speak & Shine WhatsApp group, and credit winner wallets in MongoDB",
+          requestBody: {
+            required: false,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    totalCollection: { type: "number", description: "Total monthly collection amount in INR (auto-calculated if omitted)" },
+                    winnerCount: { type: "integer", description: "Number of top winners to reward (e.g. 3, 4, 5, 6)" },
+                    customWinnerNames: { type: "array", items: { type: "string" }, description: "Optional custom winner names array to override leaderboard" },
+                    customAmounts: { type: "array", items: { type: "number" }, description: "Optional custom prize amounts array in INR" },
+                    footerNote: { type: "string", description: "Optional footer note text" },
+                    targetGroup: { type: "string", description: "Optional target group JID override" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Month-end prize broadcast status and wallet credit summary" } }
+        }
+      },
       "/api/users/{phone}/toggle": {
         patch: {
           operationId: "blockOrUnblockStudent",
