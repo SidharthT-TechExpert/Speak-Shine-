@@ -9,6 +9,7 @@ import {
   sendSubmissionReport,
   sendSlotReport,
   sendTestAdminAlert,
+  sendCustomGroupMessage,
   getGroups,
   reconnectWhatsApp,
   logoutWhatsApp,
@@ -27,6 +28,7 @@ router.get("/month-end-summary", authMiddleware, requireRole("admin", "admins"),
 router.post("/send-poster", authMiddleware, requireRole("admin", "admins"), sendPoster);
 router.post("/send-submission-report", authMiddleware, requireRole("admin", "admins"), sendSubmissionReport);
 router.post("/send-slot-report", authMiddleware, requireRole("admin", "admins"), sendSlotReport);
+router.post("/send-custom-message", authMiddleware, requireRole("admin", "admins"), sendCustomGroupMessage);
 router.post("/send-month-end-report", authMiddleware, requireRole("admin", "admins"), sendMonthEndPrizeReport);
 router.post("/save-month-end-settings", authMiddleware, requireRole("admin", "admins"), saveMonthEndSettings);
 router.post("/send-test-admin-alert", authMiddleware, requireRole("admin", "admins"), sendTestAdminAlert);

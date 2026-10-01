@@ -6,6 +6,7 @@ import {
   getStatus,
   sendDailyPosterToGroup,
   sendDailySubmissionReportToGroup,
+  sendCustomGroupMessage as sendCustomGroupMessageService,
   getSubmissionReportSummary,
   getParticipatingGroups,
   restartWhatsAppBot,
@@ -270,6 +271,17 @@ export async function saveMonthEndSettings(req, res) {
   } catch (err) {
     console.error("[WhatsAppController] saveMonthEndSettings error:", err.message);
     return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function sendCustomGroupMessage(req, res) {
+  try {
+    const { messageText, targetGroup } = req.body || {};
+    const result = await sendCustomGroupMessageService(messageText, { targetGroup });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error("[WhatsAppController] sendCustomGroupMessage error:", err.message);
+    return res.status(400).json({ success: false, error: err.message });
   }
 }
 

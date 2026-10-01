@@ -458,3 +458,22 @@ export async function resetStudentLoginAttempts(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * PATCH /api/users/:phone/paid
+ * Update user paid subscription status (admin/trainer)
+ */
+export async function updateStudentPaidStatus(req, res) {
+  try {
+    const { paid } = req.body || {};
+    const isPaid = paid !== undefined ? Boolean(paid) : true;
+    const result = await userService.updateStudentPaidStatus(req.params.phone, isPaid);
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[UpdateStudentPaidStatus] Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}

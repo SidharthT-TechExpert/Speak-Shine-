@@ -1091,3 +1091,33 @@ export async function resetStudentLoginAttempts(phone) {
     lockUntil: null,
   };
 }
+
+/**
+ * Update student paid subscription status (admin/trainer)
+ */
+export async function updateStudentPaidStatus(phone, paid = true) {
+  let user = await User.findOne({ phone });
+  if (!user) {
+    const stripped = phone.replace(/^(\+91|91)/, "");
+    user = await User.findOne({ $or: [{ phone: stripped }, { userId: { $regex: escapeRegex(stripped) } }] });
+  }
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  user.paid = Boolean(paid);
+  if (user.paid) {
+    user.paidAt = new Date();
+  }
+  await user.save();
+
+  return {
+    success: true,
+    phone: user.phone || phone,
+    name: user.name,
+    paid: user.paid,
+    paidAt: user.paidAt,
+  };
+}

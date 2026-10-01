@@ -379,6 +379,64 @@ router.get("/openapi.json", (req, res) => {
           responses: { "200": { description: "Account lockout reset confirmation" } }
         }
       },
+      "/api/users/{phone}/toggle-submitted": {
+        patch: {
+          operationId: "updateStudentSubmittedStatus",
+          summary: "Toggle or set a student's submission completion status for today",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          responses: { "200": { description: "Updated submission status" } }
+        }
+      },
+      "/api/users/{phone}/paid": {
+        patch: {
+          operationId: "updateStudentPaidStatus",
+          summary: "Update student subscription paid status",
+          parameters: [{ name: "phone", in: "path", required: true, schema: { type: "string" }, description: "Student phone number" }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    paid: { type: "boolean", description: "Paid status (true = active paid subscriber, false = unpaid)" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Updated paid status confirmation" } }
+        }
+      },
+      "/api/users/reset/weekly": {
+        post: {
+          operationId: "resetWeeklySubmissions",
+          summary: "Reset weekly submission counts for all students",
+          responses: { "200": { description: "Weekly submission reset confirmation" } }
+        }
+      },
+      "/api/whatsapp/send-custom-message": {
+        post: {
+          operationId: "sendCustomWhatsAppGroupMessage",
+          summary: "Generate and send any custom text announcement or message directly to the target WhatsApp group",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    messageText: { type: "string", description: "The custom text announcement message to broadcast to the group" },
+                    targetGroup: { type: "string", description: "Optional target group JID override" }
+                  },
+                  required: ["messageText"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Broadcast confirmation status" } }
+        }
+      },
       "/api/users/{phone}/toggle": {
         patch: {
           operationId: "blockOrUnblockStudent",

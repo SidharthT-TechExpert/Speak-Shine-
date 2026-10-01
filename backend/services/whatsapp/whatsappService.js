@@ -1394,6 +1394,35 @@ export async function sendDeploymentNotification({ status = "success", error = n
 }
 
 /**
+ * Send a custom announcement or text message directly to the target WhatsApp group.
+ */
+export async function sendCustomGroupMessage(messageText, options = {}) {
+  if (!messageText || typeof messageText !== "string" || !messageText.trim()) {
+    throw new Error("messageText parameter is required");
+  }
+
+  const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
+  if (!rawTargetGroup) {
+    throw new Error("TARGET_GROUP is not configured in environment or options");
+  }
+  const targetGroup = formatGroupJid(rawTargetGroup);
+
+  const sock = getBaileysSocket();
+  if (!sock || !isWhatsAppConnected()) {
+    throw new Error("WhatsApp bot client is disconnected. Please reconnect WhatsApp first.");
+  }
+
+  await sock.sendMessage(targetGroup, { text: messageText.trim() });
+  console.log(`[WhatsApp] 📢 Custom group message broadcast to ${targetGroup}`);
+  return {
+    success: true,
+    targetGroup,
+    messageText: messageText.trim(),
+    sentAt: new Date(),
+  };
+}
+
+/**
  * Calculate money distribution split across Top 3..6 winners.
  * Supported calculation methods:
  * - 'preset_top3': 50% / 33.3% / 16.7% (e.g. ₹30, ₹20, ₹10 for ₹60)

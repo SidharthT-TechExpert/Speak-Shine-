@@ -80,6 +80,7 @@ router.patch("/:phone/fine", authMiddleware, requireRole("admin", "admins"), use
 router.patch("/:phone/points", authMiddleware, requireRole("admin", "admins", "trainer"), userController.adjustUserPoints);
 router.patch("/:phone/streak", authMiddleware, requireRole("admin", "admins", "trainer"), userController.adjustUserStreak);
 router.patch("/:phone/freeze", authMiddleware, requireRole("admin", "admins", "trainer"), userController.adjustUserFreeze);
+router.patch("/:phone/paid", authMiddleware, requireRole("admin", "admins", "trainer"), userController.updateStudentPaidStatus);
 router.post("/:phone/wallet", authMiddleware, requireRole("admin", "admins", "trainer"), userController.adjustUserWallet);
 router.post("/:phone/reset-login-attempts", authMiddleware, requireRole("admin", "admins", "trainer"), userController.resetStudentLoginAttempts);
 

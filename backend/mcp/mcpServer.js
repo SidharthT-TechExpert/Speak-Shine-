@@ -249,6 +249,49 @@ export function createSpeakShineMCPServer() {
             required: ["phone"],
           },
         },
+        {
+          name: "update_student_submitted_status",
+          description: "Toggle or set today's submission completion status (completed: true/false) for a student.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+            },
+            required: ["phone"],
+          },
+        },
+        {
+          name: "update_student_paid_status",
+          description: "Update student subscription paid status (paid: true/false).",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "Student mobile phone number" },
+              paid: { type: "boolean", description: "Paid status (true = active paid subscriber, false = unpaid)" },
+            },
+            required: ["phone"],
+          },
+        },
+        {
+          name: "reset_weekly_submissions",
+          description: "Reset weekly submission counts for all students.",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
+        {
+          name: "send_custom_whatsapp_group_message",
+          description: "Generate and send any custom text announcement or message directly to the Speak & Shine WhatsApp group.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              messageText: { type: "string", description: "The message text/announcement to post to the group" },
+              targetGroup: { type: "string", description: "Optional target group JID override" },
+            },
+            required: ["messageText"],
+          },
+        },
       ],
     };
   });
@@ -712,6 +755,45 @@ export function createSpeakShineMCPServer() {
       if (name === "reset_student_login_attempts") {
         const userService = await import("../services/user/userService.js");
         const result = await userService.resetStudentLoginAttempts(args.phone);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "update_student_submitted_status") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.toggleSubmissionStatus(args.phone);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "update_student_paid_status") {
+        const userService = await import("../services/user/userService.js");
+        const isPaid = args.paid !== undefined ? Boolean(args.paid) : true;
+        const result = await userService.updateStudentPaidStatus(args.phone, isPaid);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "reset_weekly_submissions") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.resetWeeklySubmissions();
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      if (name === "send_custom_whatsapp_group_message") {
+        const whatsappService = await import("../services/whatsapp/whatsappService.js");
+        const result = await whatsappService.sendCustomGroupMessage(args.messageText, {
+          targetGroup: args.targetGroup,
+        });
 
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
