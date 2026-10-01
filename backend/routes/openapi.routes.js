@@ -432,9 +432,10 @@ router.get("/openapi.json", (req, res) => {
                 schema: {
                   type: "object",
                   properties: {
-                    messageText: { type: "string", description: "Text message or image caption (required if no imageUrl or audioUrl)" },
-                    imageUrl: { type: "string", description: "Optional image URL to broadcast an image message" },
-                    audioUrl: { type: "string", description: "Optional audio URL to broadcast an audio voice note message" },
+                    messageText: { type: "string", description: "Text message or poster caption (required if no imageUrl or audioUrl)" },
+                    imageUrl: { type: "string", description: "Optional image URL, Base64 data URI, or local file path to broadcast an image message" },
+                    audioUrl: { type: "string", description: "Optional audio URL, Base64 data URI, or local file path to broadcast an audio voice note message" },
+                    asPoster: { type: "boolean", description: "Set true to render messageText into a high-definition Speak & Shine poster image before broadcasting to group" },
                     targetGroup: { type: "string", description: "Optional target group JID override" }
                   }
                 }

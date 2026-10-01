@@ -1398,7 +1398,7 @@ export async function sendDeploymentNotification({ status = "success", error = n
  * Supports text, imageUrl, and audioUrl.
  */
 export async function sendCustomGroupMessage(messageText, options = {}) {
-  const { imageUrl, audioUrl, targetGroup: customTarget } = options;
+  const { imageUrl, audioUrl, asPoster, targetGroup: customTarget } = options;
 
   const rawTargetGroup = customTarget || process.env.TARGET_GROUP;
   if (!rawTargetGroup) {
@@ -1421,18 +1421,123 @@ export async function sendCustomGroupMessage(messageText, options = {}) {
 
   let messageType = "text";
 
+  // CASE 1: Render dynamically generated visual poster if asPoster=true
+  if (asPoster && messageText) {
+    messageType = "image";
+    const { generatePNGPosterBuffer } = await import("../../../api/posterGenerator.js");
+    const posterBuffer = await generatePNGPosterBuffer({
+      topic: options.topic || "Announcement",
+      question: messageText,
+      category: options.category || "Notice",
+    });
+
+    await sock.sendMessage(targetGroup, {
+      image: posterBuffer,
+      caption: messageText?.trim() || "",
+    });
+    console.log(`[WhatsApp] 🎨 Custom rendered poster broadcast sent to ${targetGroup}`);
+
+    return {
+      success: true,
+      targetGroup,
+      messageType: "poster_image",
+      messageText: messageText?.trim() || null,
+      sentAt: new Date(),
+    };
+  }
+
+  // CASE 2: Image URL, Base64 Data URI, Buffer, or local File Path provided
   if (imageUrl) {
     messageType = "image";
+    let imagePayload = null;
+
+    if (Buffer.isBuffer(imageUrl)) {
+      imagePayload = imageUrl;
+    } else if (typeof imageUrl === "string") {
+      const trimmedUrl = imageUrl.trim();
+
+      // Base64 Data URI
+      if (trimmedUrl.startsWith("data:image/")) {
+        const base64Data = trimmedUrl.split(";base64,").pop();
+        imagePayload = Buffer.from(base64Data, "base64");
+      } 
+      // Local File Path or file:// URI
+      else if (trimmedUrl.startsWith("file://") || fs.existsSync(trimmedUrl.replace(/^file:\/\//, ""))) {
+        const cleanPath = trimmedUrl.replace(/^file:\/\//, "");
+        if (fs.existsSync(cleanPath)) {
+          imagePayload = fs.readFileSync(cleanPath);
+        } else {
+          imagePayload = { url: trimmedUrl };
+        }
+      } 
+      // HTTP / HTTPS URL
+      else if (/^https?:\/\//i.test(trimmedUrl)) {
+        try {
+          console.log(`[WhatsApp] 🌐 Pre-fetching remote image for broadcast: ${trimmedUrl}`);
+          const res = await fetch(trimmedUrl);
+          if (res.ok) {
+            const arrBuf = await res.arrayBuffer();
+            imagePayload = Buffer.from(arrBuf);
+          } else {
+            console.warn(`[WhatsApp] Remote image HTTP status ${res.status}, falling back to URL payload`);
+            imagePayload = { url: trimmedUrl };
+          }
+        } catch (fetchErr) {
+          console.warn("[WhatsApp] Could not pre-fetch remote image, passing URL directly to Baileys:", fetchErr.message);
+          imagePayload = { url: trimmedUrl };
+        }
+      } else {
+        imagePayload = { url: trimmedUrl };
+      }
+    }
+
+    if (!imagePayload) {
+      throw new Error(`Unable to load image from provided imageUrl: ${imageUrl}`);
+    }
+
     await sock.sendMessage(targetGroup, {
-      image: { url: imageUrl },
+      image: imagePayload,
       caption: messageText?.trim() || "",
     });
     console.log(`[WhatsApp] 🖼️ Custom image broadcast sent to ${targetGroup}`);
   } else if (audioUrl) {
     messageType = "audio";
+    let audioPayload = null;
+    if (Buffer.isBuffer(audioUrl)) {
+      audioPayload = audioUrl;
+    } else if (typeof audioUrl === "string") {
+      const trimmedAudio = audioUrl.trim();
+      if (trimmedAudio.startsWith("data:audio/")) {
+        const base64Data = trimmedAudio.split(";base64,").pop();
+        audioPayload = Buffer.from(base64Data, "base64");
+      } else if (trimmedAudio.startsWith("file://") || fs.existsSync(trimmedAudio.replace(/^file:\/\//, ""))) {
+        const cleanPath = trimmedAudio.replace(/^file:\/\//, "");
+        if (fs.existsSync(cleanPath)) {
+          audioPayload = fs.readFileSync(cleanPath);
+        } else {
+          audioPayload = { url: trimmedAudio };
+        }
+      } else if (/^https?:\/\//i.test(trimmedAudio)) {
+        try {
+          console.log(`[WhatsApp] 🎧 Pre-fetching remote audio for broadcast: ${trimmedAudio}`);
+          const res = await fetch(trimmedAudio);
+          if (res.ok) {
+            const arrBuf = await res.arrayBuffer();
+            audioPayload = Buffer.from(arrBuf);
+          } else {
+            audioPayload = { url: trimmedAudio };
+          }
+        } catch {
+          audioPayload = { url: trimmedAudio };
+        }
+      } else {
+        audioPayload = { url: trimmedAudio };
+      }
+    }
+
     const isVoiceNote = !options.asFile;
     await sock.sendMessage(targetGroup, {
-      audio: { url: audioUrl },
+      audio: audioPayload,
       mimetype: options.mimetype || "audio/mp4",
       ptt: isVoiceNote,
     });

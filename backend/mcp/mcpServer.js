@@ -293,13 +293,14 @@ export function createSpeakShineMCPServer() {
         },
         {
           name: "send_custom_whatsapp_group_message",
-          description: "Generate and send any custom text, image, or audio voice note message directly to the Speak & Shine WhatsApp group. Defaults to text if no image or audio is provided.",
+          description: "Generate and send any custom text, poster image, or audio voice note message directly to the Speak & Shine WhatsApp group. Supports text, imageUrl (HTTP/HTTPS, Base64 data URI, or local file path), audioUrl, or setting asPoster=true to automatically render the message text as a high-definition poster image.",
           inputSchema: {
             type: "object",
             properties: {
-              messageText: { type: "string", description: "Text message or image caption (required if no imageUrl or audioUrl)" },
-              imageUrl: { type: "string", description: "Optional image URL to broadcast an image message" },
-              audioUrl: { type: "string", description: "Optional audio URL to broadcast a voice note / audio message" },
+              messageText: { type: "string", description: "Text message or poster caption (required if no imageUrl or audioUrl)" },
+              imageUrl: { type: "string", description: "Optional image URL, Base64 data URI, or local file path to broadcast an image" },
+              audioUrl: { type: "string", description: "Optional audio URL, Base64 data URI, or local file path to broadcast a voice note / audio" },
+              asPoster: { type: "boolean", description: "Set true to automatically render the messageText into a visually stunning Speak & Shine poster image before broadcasting to the group." },
               targetGroup: { type: "string", description: "Optional target group JID override" },
             },
           },
@@ -816,6 +817,7 @@ export function createSpeakShineMCPServer() {
         const result = await whatsappService.sendCustomGroupMessage(args.messageText, {
           imageUrl: args.imageUrl,
           audioUrl: args.audioUrl,
+          asPoster: args.asPoster,
           targetGroup: args.targetGroup,
         });
 
