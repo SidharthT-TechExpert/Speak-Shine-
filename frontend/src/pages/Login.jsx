@@ -303,29 +303,6 @@ export default function Login({ loginFor = "user" }) {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <a
-              href="https://wa.me/?text=Hello%20Trainer,%20my%20Speak%20%26%20Shine%20account%20has%20been%20deactivated.%20Please%20help%20me%20reactivate%20my%20access."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="speakshine-btn-primary"
-              style={{
-                width: "100%",
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                color: "#ffffff",
-                borderRadius: 12,
-                padding: "0.85rem 1.25rem",
-                fontWeight: 700,
-                boxShadow: "0 4px 16px rgba(16, 185, 129, 0.35)",
-              }}
-            >
-              💬 Contact Support / Trainer on WhatsApp
-            </a>
-
             <button
               type="button"
               onClick={() => {
@@ -338,10 +315,11 @@ export default function Login({ loginFor = "user" }) {
                 border: "1px solid rgba(255, 255, 255, 0.15)",
                 color: "#cbd5e1",
                 borderRadius: 12,
-                padding: "0.8rem 1.25rem",
-                fontSize: "0.88rem",
+                padding: "0.85rem 1.25rem",
+                fontSize: "0.9rem",
                 fontWeight: 700,
                 cursor: "pointer",
+                transition: "all 0.2s ease",
               }}
             >
               🔄 Check Again / Try Login
