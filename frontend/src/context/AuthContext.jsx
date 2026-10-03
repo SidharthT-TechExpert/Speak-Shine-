@@ -201,6 +201,43 @@ export function AuthProvider({ children }) {
     return () => socket.off("force:logout", onForceLogout);
   }, [user, booting, clearSession]);
 
+  const verifyAccountStatus = useCallback(async () => {
+    if (!user) return true;
+    try {
+      const { data } = await api.get("/users/me");
+      if (data?.auth) {
+        const userTheme = data.auth.theme || (data.auth.isDark === false ? "light" : "dark");
+        const isDarkVal = data.auth.isDark ?? (userTheme !== "light");
+        const userData = {
+          phone: data.auth.phone,
+          role:  data.auth.role,
+          name:  data.auth.name,
+          avatarUrl: data.auth.avatarUrl || data.user?.avatarUrl || null,
+          paid:  data.user?.paid ?? false,
+          theme: userTheme,
+          isDark: isDarkVal,
+        };
+        setUser(userData);
+        try { localStorage.setItem("speakshine_user", JSON.stringify(userData)); } catch {}
+        return true;
+      }
+    } catch (err) {
+      const status = err.response?.status;
+      const code = err.response?.data?.code;
+      const errMsg = String(err.response?.data?.error || "").toLowerCase();
+      if (status === 403 || code === "ACCOUNT_DISABLED" || errMsg.includes("disabled") || errMsg.includes("deactivated") || errMsg.includes("blocked")) {
+        console.warn("[Auth] Account disabled/blocked on navigation check");
+        clearSession();
+        try { sessionStorage.setItem("account_disabled_notice", "true"); } catch {}
+        if (!window.location.pathname.startsWith("/login")) {
+          window.location.href = "/login";
+        }
+        return false;
+      }
+    }
+    return true;
+  }, [user, clearSession]);
+
   const updateUser = useCallback((updatedFields) => {
     setUser((prev) => {
       if (!prev) return prev;
@@ -216,7 +253,7 @@ export function AuthProvider({ children }) {
   useEffect(() => () => stopRefresh(), [stopRefresh]);
 
   return (
-    <AuthContext.Provider value={{ user, token, booting, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, booting, login, logout, updateUser, verifyAccountStatus }}>
       {children}
     </AuthContext.Provider>
   );

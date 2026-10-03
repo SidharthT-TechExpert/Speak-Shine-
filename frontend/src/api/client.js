@@ -146,15 +146,22 @@ api.interceptors.response.use(
       }
     }
 
-    // Account disabled by admin
-    if (err.response?.status === 403 && err.response?.data?.code === "ACCOUNT_DISABLED") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("user");
-      localStorage.removeItem("speakshine_user");
-      try { sessionStorage.setItem("account_disabled_notice", "true"); } catch {}
-      if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
+    // Account disabled or access forbidden (403)
+    if (err.response?.status === 403) {
+      const code = err.response?.data?.code;
+      const errMsg = String(err.response?.data?.error || err.message || "").toLowerCase();
+      const isReadonly = code === "VIEWER_READONLY" || errMsg.includes("read-only");
+
+      if (!isReadonly) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        localStorage.removeItem("speakshine_user");
+        localStorage.removeItem("dashboard_cache");
+        try { sessionStorage.setItem("account_disabled_notice", "true"); } catch {}
+        if (!window.location.pathname.startsWith("/login")) {
+          window.location.href = "/login";
+        }
       }
     }
 

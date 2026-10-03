@@ -249,6 +249,20 @@ export default function App() {
   );
 }
 
+// Automatically check account status on every route transition if user is logged in
+function RouteAccountGuard() {
+  const location = useLocation();
+  const { user, verifyAccountStatus } = useAuth();
+
+  useEffect(() => {
+    if (user && verifyAccountStatus && !location.pathname.startsWith("/login")) {
+      verifyAccountStatus();
+    }
+  }, [location.pathname, user, verifyAccountStatus]);
+
+  return null;
+}
+
 // Wait for the proactive boot token refresh before rendering protected UI,
 // so requests + socket never fire with an expired token.
 function AppRoutes() {
@@ -257,6 +271,7 @@ function AppRoutes() {
 
   return (
     <BrowserRouter>
+      <RouteAccountGuard />
       <Routes>
         {/* User auth */}
         <Route path="/login" element={
