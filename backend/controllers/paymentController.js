@@ -141,6 +141,9 @@ export async function createOrder(req, res) {
   try {
     const totalFee = await getPaymentAmount();
 
+    // Determine if user wants to use wallet balance or pay full amount via direct gateway
+    const useWallet = req.body?.useWallet !== false && req.body?.paymentMethod !== "upi" && req.body?.paymentMethod !== "razorpay";
+
     // Find user to check wallet balance
     let phone = req.user.phone;
     let user = phone ? await findUserByPhone(phone) : null;
@@ -152,10 +155,11 @@ export async function createOrder(req, res) {
       }
     }
 
-    const currentWallet = user ? Math.max(0, Number(user.walletBalance) || 0) : 0;
+    const rawWallet = user ? Math.max(0, Number(user.walletBalance) || 0) : 0;
+    const currentWallet = useWallet ? rawWallet : 0;
 
-    // CASE 1: 100% Wallet Balance Cover (walletBalance >= totalFee)
-    if (user && currentWallet >= totalFee && totalFee > 0) {
+    // CASE 1: 100% Wallet Balance Cover (walletBalance >= totalFee AND useWallet is true)
+    if (useWallet && user && currentWallet >= totalFee && totalFee > 0) {
       const newBalance = currentWallet - totalFee;
       user.walletBalance = newBalance;
       user.paid = true;
@@ -203,10 +207,11 @@ export async function createOrder(req, res) {
         walletDiscountApplied: totalFee,
         netPayableINR: 0,
         walletBalance: newBalance,
+        useWallet: true,
       });
     }
 
-    // CASE 2: Partial Wallet Discount or Standard Gateway Checkout
+    // CASE 2: Partial Wallet Discount or Direct Gateway Checkout
     const walletDiscountApplied = Math.min(currentWallet, totalFee);
     const netPayableINR = Math.max(0, totalFee - walletDiscountApplied);
     const amountPaise = Math.round(netPayableINR * 100);
@@ -230,6 +235,7 @@ export async function createOrder(req, res) {
         name: String(req.user.name || ""),
         totalFee: String(totalFee),
         walletDiscountApplied: String(walletDiscountApplied),
+        useWallet: String(useWallet),
       },
     });
 
@@ -241,7 +247,8 @@ export async function createOrder(req, res) {
       totalFee,
       walletDiscountApplied,
       netPayableINR,
-      walletBalance: currentWallet,
+      walletBalance: rawWallet,
+      useWallet,
     });
   } catch (err) {
     const razorpayMsg = err?.error?.description || err?.message || "Failed to create payment order";
@@ -348,16 +355,22 @@ export async function verifyPayment(req, res) {
 
     // Fetch amount from Razorpay for accurate logging
     let amountINR = 0;
+    let noteDiscount = null;
     try {
       const rzp = getRazorpay();
       const orderDetails = await rzp.orders.fetch(razorpay_order_id);
       amountINR = orderDetails.amount / 100;
+      if (orderDetails.notes?.walletDiscountApplied !== undefined) {
+        noteDiscount = Math.max(0, Number(orderDetails.notes.walletDiscountApplied) || 0);
+      }
     } catch { /* non-critical */ }
 
     // Deduct applied wallet discount from user balance if discount was used
     const currentWallet = Math.max(0, Number(user.walletBalance) || 0);
     const totalFee = await getPaymentAmount();
-    const discountUsed = Math.min(currentWallet, Math.max(0, totalFee - amountINR));
+    const discountUsed = noteDiscount !== null
+      ? Math.min(currentWallet, noteDiscount)
+      : (amountINR > 0 ? Math.min(currentWallet, Math.max(0, totalFee - amountINR)) : 0);
 
     if (discountUsed > 0) {
       const newBalance = Math.max(0, currentWallet - discountUsed);

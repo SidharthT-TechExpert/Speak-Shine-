@@ -43,6 +43,7 @@ export default function PaymentWall({ onSuccess }) {
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletHistory, setWalletHistory] = useState([]);
   const [showWalletHistoryModal, setShowWalletHistoryModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("wallet"); // "wallet" | "upi"
 
   useEffect(() => {
     api.get("/payments/config")
@@ -62,7 +63,8 @@ export default function PaymentWall({ onSuccess }) {
       .catch(() => {});
   }, []);
 
-  const walletDiscount = Math.min(walletBalance, planAmount);
+  const useWallet = paymentMethod === "wallet" && walletBalance > 0;
+  const walletDiscount = useWallet ? Math.min(walletBalance, planAmount) : 0;
   const netPayable = Math.max(0, planAmount - walletDiscount);
 
   const handlePay = async () => {
@@ -70,8 +72,11 @@ export default function PaymentWall({ onSuccess }) {
     setLoading(true);
 
     try {
-      // 1. Create order on backend (Checks wallet balance)
-      const { data: order } = await api.post("/payments/create-order");
+      // 1. Create order on backend (Checks wallet balance preference)
+      const { data: order } = await api.post("/payments/create-order", {
+        useWallet,
+        paymentMethod,
+      });
 
       // CASE A: 100% Covered by Wallet Balance
       if (order.walletCovered) {
@@ -615,9 +620,9 @@ export default function PaymentWall({ onSuccess }) {
                 <span>Standard Subscription Fee:</span>
                 <span>₹{planAmount}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#4ade80", fontWeight: 700, marginBottom: "0.35rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)", paddingBottom: "0.35rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: useWallet ? "#4ade80" : "var(--muted)", fontWeight: 700, marginBottom: "0.35rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)", paddingBottom: "0.35rem" }}>
                 <span>🎁 Wallet Discount Applied:</span>
-                <span>-₹{walletDiscount}</span>
+                <span>{useWallet ? `-₹${walletDiscount}` : "₹0 (Saved for later)"}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", color: "#ffffff", fontWeight: 900, fontSize: "0.9rem" }}>
                 <span>Net Amount Payable:</span>
@@ -628,6 +633,122 @@ export default function PaymentWall({ onSuccess }) {
             </div>
           )}
         </div>
+
+        {/* Payment Method Selector (Shown when user has money in wallet) */}
+        {walletBalance > 0 && (
+          <div style={{
+            background: "rgba(255, 255, 255, 0.03)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            borderRadius: 16,
+            padding: "1.1rem 1.25rem",
+            marginBottom: "1.25rem",
+          }}>
+            <div style={{
+              fontSize: "0.75rem",
+              fontWeight: 800,
+              color: "#a78bfa",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: "0.75rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+            }}>
+              <span>💳</span> Choose Payment Option
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+              {/* Option A: Wallet */}
+              <div
+                onClick={() => setPaymentMethod("wallet")}
+                style={{
+                  border: paymentMethod === "wallet"
+                    ? "2px solid #4ade80"
+                    : "1px solid rgba(255, 255, 255, 0.12)",
+                  background: paymentMethod === "wallet"
+                    ? "rgba(74, 222, 128, 0.12)"
+                    : "rgba(255, 255, 255, 0.02)",
+                  borderRadius: 12,
+                  padding: "0.85rem 1rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    border: paymentMethod === "wallet" ? "6px solid #4ade80" : "2px solid rgba(255, 255, 255, 0.3)",
+                    background: "#000",
+                    flexShrink: 0,
+                  }} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span>💰 Use Wallet Money</span>
+                      <span style={{ fontSize: "0.7rem", background: "rgba(74, 222, 128, 0.2)", color: "#4ade80", padding: "0.15rem 0.45rem", borderRadius: 10, fontWeight: 700 }}>
+                        ₹{walletBalance} Balance
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
+                      {walletBalance >= planAmount
+                        ? "Deduct from wallet balance (Pay ₹0 Net)"
+                        : `Apply ₹${walletBalance} discount & pay net ₹${planAmount - walletBalance} via UPI`}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#4ade80", textAlign: "right" }}>
+                  {walletBalance >= planAmount ? "₹0 Net" : `₹${planAmount - walletBalance}`}
+                </div>
+              </div>
+
+              {/* Option B: Direct UPI / Razorpay */}
+              <div
+                onClick={() => setPaymentMethod("upi")}
+                style={{
+                  border: paymentMethod === "upi"
+                    ? "2px solid #7c6fff"
+                    : "1px solid rgba(255, 255, 255, 0.12)",
+                  background: paymentMethod === "upi"
+                    ? "rgba(124, 111, 255, 0.12)"
+                    : "rgba(255, 255, 255, 0.02)",
+                  borderRadius: 12,
+                  padding: "0.85rem 1rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    border: paymentMethod === "upi" ? "6px solid #7c6fff" : "2px solid rgba(255, 255, 255, 0.3)",
+                    background: "#000",
+                    flexShrink: 0,
+                  }} />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff" }}>
+                      <span>📲 Pay Direct via UPI / QR Code</span>
+                    </div>
+                    <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
+                      Pay full ₹{planAmount} directly and save your ₹{walletBalance} wallet balance
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#a5b4fc", textAlign: "right" }}>
+                  ₹{planAmount}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
@@ -682,7 +803,9 @@ export default function PaymentWall({ onSuccess }) {
               ? "⚡ Activate Now for ₹0 (100% Covered by Wallet)"
               : walletDiscount > 0
                 ? `💳 Pay Net ₹${netPayable} (₹${walletDiscount} Wallet Discount Applied)`
-                : `💳 Pay ₹${planAmount} & Unlock Access`
+                : paymentMethod === "upi" && walletBalance > 0
+                  ? `📲 Pay ₹${planAmount} via UPI (Keep Wallet ₹${walletBalance})`
+                  : `💳 Pay ₹${planAmount} & Unlock Access`
           )}
         </button>
 
