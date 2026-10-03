@@ -9,7 +9,7 @@
  */
 
 import User from "../../models/userSchema.js";
-import { escapeRegex } from "../utils/phoneUtils.js";
+import { escapeRegex, findUserByPhone } from "../utils/phoneUtils.js";
 import { isMonthlyGracePeriod, getMonthlyGracePeriodInfo } from "../utils/gracePeriodUtils.js";
 
 export async function requirePaid(req, res, next) {
@@ -35,12 +35,7 @@ export async function requirePaid(req, res, next) {
   }
 
   try {
-    let user = await User.findOne({ phone }).select("paid").lean();
-    if (!user) {
-      user = await User.findOne({
-        userId: { $regex: `^${escapeRegex(phone)}(@|:)` },
-      }).select("paid").lean();
-    }
+    const user = await findUserByPhone(phone);
 
     if (!user || !user.paid) {
       return res.status(403).json({

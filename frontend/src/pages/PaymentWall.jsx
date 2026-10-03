@@ -38,7 +38,7 @@ export default function PaymentWall({ onSuccess }) {
   const [planAmount, setPlanAmount] = useState(DEFAULT_PLAN_AMOUNT);
   const [graceStatus] = useState(() => getMonthlyGracePeriodStatus());
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { updateUser, user } = useAuth();
 
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletHistory, setWalletHistory] = useState([]);
@@ -75,10 +75,14 @@ export default function PaymentWall({ onSuccess }) {
 
       // CASE A: 100% Covered by Wallet Balance
       if (order.walletCovered) {
+        const discountApplied = order.walletDiscountApplied || order.totalFee || planAmount;
         const txObj = {
           name: user?.name || user?.registeredName || "Student Member",
           phone: user?.phone,
-          amount: order.totalFee || planAmount,
+          amount: 0,
+          totalFee: order.totalFee || planAmount,
+          walletDiscountApplied: discountApplied,
+          isWalletCovered: true,
           razorpayOrderId: "wallet_payment",
           razorpayPaymentId: "wallet_covered",
           status: "success",
@@ -88,9 +92,10 @@ export default function PaymentWall({ onSuccess }) {
 
         setSuccessTx(txObj);
         setPaid(true);
-        setWalletBalance(order.walletBalance || 0);
-        if (user) {
-          login({ ...user, paid: true });
+        const newBal = order.walletBalance ?? 0;
+        setWalletBalance(newBal);
+        if (updateUser) {
+          updateUser({ paid: true, walletBalance: newBal });
         }
         setLoading(false);
         return;
@@ -140,7 +145,10 @@ export default function PaymentWall({ onSuccess }) {
             const txObj = {
               name: user?.name || user?.registeredName || "Student Member",
               phone: user?.phone,
-              amount: order.netPayableINR || planAmount,
+              amount: order.netPayableINR ?? Math.max(0, planAmount - (order.walletDiscountApplied || 0)),
+              totalFee: order.totalFee || planAmount,
+              walletDiscountApplied: order.walletDiscountApplied || 0,
+              isWalletCovered: false,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               status: "success",
@@ -150,7 +158,7 @@ export default function PaymentWall({ onSuccess }) {
 
             setSuccessTx(txObj);
             setPaid(true);
-            if (user) login({ ...user, paid: true });
+            if (updateUser) updateUser({ paid: true });
           } catch (verifyErr) {
             const errStatus = verifyErr?.response?.status;
             const errMsg = verifyErr?.response?.data?.error || "";
@@ -158,7 +166,10 @@ export default function PaymentWall({ onSuccess }) {
               const txObj = {
                 name: user?.name || user?.registeredName || "Student Member",
                 phone: user?.phone,
-                amount: order.netPayableINR || planAmount,
+                amount: order.netPayableINR ?? Math.max(0, planAmount - (order.walletDiscountApplied || 0)),
+                totalFee: order.totalFee || planAmount,
+                walletDiscountApplied: order.walletDiscountApplied || 0,
+                isWalletCovered: false,
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
                 status: "success",
@@ -167,7 +178,7 @@ export default function PaymentWall({ onSuccess }) {
               };
               setSuccessTx(txObj);
               setPaid(true);
-              if (user) login({ ...user, paid: true });
+              if (updateUser) updateUser({ paid: true });
             } else {
               setError(errMsg || "Payment verification failed. Please contact support.");
             }
@@ -202,10 +213,11 @@ export default function PaymentWall({ onSuccess }) {
   };
 
   const handleContinueToDashboard = () => {
+    if (updateUser) updateUser({ paid: true });
     if (onSuccess) {
       onSuccess();
     } else {
-      window.location.href = "/video-analysis";
+      navigate("/video-analysis", { replace: true });
     }
   };
 
@@ -310,8 +322,18 @@ export default function PaymentWall({ onSuccess }) {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", paddingBottom: "0.6rem", marginBottom: "0.6rem" }}>
                 <span style={{ fontSize: "0.76rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>AMOUNT PAID:</span>
-                <span style={{ fontSize: "1.2rem", fontWeight: 900, color: "#4ade80" }}>₹{netPayable}</span>
+                <span style={{ fontSize: "1.2rem", fontWeight: 900, color: "#4ade80" }}>
+                  {successTx?.isWalletCovered || successTx?.amount === 0
+                    ? "₹0 (100% Covered by Wallet)"
+                    : `₹${successTx?.amount ?? netPayable}`}
+                </span>
               </div>
+              {successTx?.walletDiscountApplied > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", color: "#4ade80", marginBottom: "0.4rem" }}>
+                  <span style={{ color: "var(--muted)" }}>Wallet Discount:</span>
+                  <span style={{ fontWeight: 700 }}>-₹{successTx.walletDiscountApplied}</span>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "0.4rem" }}>
                 <span style={{ color: "var(--muted)" }}>Plan:</span>
                 <span style={{ fontWeight: 600 }}>Speak &amp; Shine Full Membership</span>

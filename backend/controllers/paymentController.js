@@ -10,7 +10,7 @@ import User from "../../models/userSchema.js";
 import Transaction from "../../models/transactionSchema.js";
 import Auth from "../../models/authSchema.js";
 import Status from "../../models/statusSchema.js";
-import { escapeRegex, getPhoneLookupVariants } from "../utils/phoneUtils.js";
+import { escapeRegex, getPhoneLookupVariants, findUserByPhone } from "../utils/phoneUtils.js";
 import { creditReferralRewardIfEligible, ensureUserReferralCode, getReferralRewardAmount } from "../services/referral/referralService.js";
 
 function getRazorpay() {
@@ -20,35 +20,6 @@ function getRazorpay() {
     throw new Error("Razorpay credentials not configured");
   }
   return new Razorpay({ key_id, key_secret });
-}
-
-// Helper: find user by phone (handles both plain and WhatsApp formats)
-async function findUserByPhone(phone) {
-  const candidates = [...new Set(getPhoneLookupVariants(phone))];
-
-  for (const candidate of candidates) {
-    let user = await User.findOne({ phone: candidate });
-    if (user) return user;
-
-    user = await User.findOne({
-      userId: { $regex: `^${escapeRegex(candidate)}(@|:)` },
-    });
-    if (user) return user;
-  }
-
-  for (const candidate of candidates) {
-    const user = await User.findOne({ phone: { $regex: new RegExp(`^${escapeRegex(candidate)}$`, "i") } });
-    if (user) return user;
-  }
-
-  // Last resort: match userId containing the bare 10-digit number anywhere before @
-  const bare = String(phone).replace(/\D/g, "").replace(/^91/, "").slice(-10);
-  if (bare.length === 10) {
-    const user = await User.findOne({ userId: { $regex: `^(91)?${escapeRegex(bare)}(@|:)` } });
-    if (user) return user;
-  }
-
-  return null;
 }
 
 /**

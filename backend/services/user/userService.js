@@ -11,7 +11,7 @@ import Auth from "../../../models/authSchema.js";
 import Status from "../../../models/statusSchema.js";
 import { ensureUserReferralCode, getReferralRewardAmount } from "../referral/referralService.js";
 import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
-import { escapeRegex } from "../../utils/phoneUtils.js";
+import { escapeRegex, findUserByPhone } from "../../utils/phoneUtils.js";
 import { validatePassword } from "../../utils/validationUtils.js";
 
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
@@ -197,21 +197,7 @@ export async function getUserProfile(userId) {
   }
 
   const stripped = auth.phone ? auth.phone.replace(/^(\+91|91)/, "").replace(/\D/g, "") : "";
-  const phoneCandidates = [...new Set([auth.phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
-  let user = await User.findOne({ phone: { $in: phoneCandidates } });
-
-  if (!user && stripped) {
-    user = await User.findOne({
-      $or: [
-        { phone: { $regex: escapeRegex(stripped) } },
-        { userId: { $regex: escapeRegex(stripped) } }
-      ]
-    });
-    if (user && !user.phone) {
-      user.phone = stripped;
-      await user.save();
-    }
-  }
+  let user = await findUserByPhone(auth.phone);
 
   // Auto-create tracking User document if missing for this active Auth user
   if (!user) {

@@ -13,6 +13,7 @@ import PendingRegistration from "../../../models/pendingRegistrationSchema.js";
 import { generateUniqueReferralCode, validateReferralCode } from "../referral/referralService.js";
 import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { validatePassword } from "../../utils/validationUtils.js";
+import { findUserByPhone } from "../../utils/phoneUtils.js";
 
 const OTP_TTL = 300; // 5 minutes
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
@@ -277,10 +278,7 @@ export async function loginUser(phone, password, ipAddress) {
   // Fetch paid status from User tracking document
   let paid = false;
   try {
-    const stripped = auth.phone?.replace(/^(\+91|91)/, "");
-    const userDoc = await User.findOne({
-      $or: [{ phone: auth.phone }, { phone: stripped }],
-    }).select("paid").lean();
+    const userDoc = await findUserByPhone(auth.phone);
     paid = userDoc?.paid ?? false;
   } catch { /* non-critical — default false */ }
 

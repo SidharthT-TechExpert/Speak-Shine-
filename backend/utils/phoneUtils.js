@@ -105,6 +105,42 @@ export function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+import User from "../../models/userSchema.js";
+
+/**
+ * Find User document by phone using all canonical format variations,
+ * matching phone field, userId prefix, case-insensitive regex, and bare 10-digit number.
+ * @param {string} phone - Raw phone number or contact string
+ * @returns {Promise<Document|null>} - User document or null
+ */
+export async function findUserByPhone(phone) {
+  if (!phone) return null;
+  const candidates = [...new Set(getPhoneLookupVariants(phone))];
+
+  for (const candidate of candidates) {
+    let user = await User.findOne({ phone: candidate });
+    if (user) return user;
+
+    user = await User.findOne({
+      userId: { $regex: `^${escapeRegex(candidate)}(@|:)` },
+    });
+    if (user) return user;
+  }
+
+  for (const candidate of candidates) {
+    const user = await User.findOne({ phone: { $regex: new RegExp(`^${escapeRegex(candidate)}$`, "i") } });
+    if (user) return user;
+  }
+
+  const bare = String(phone).replace(/\D/g, "").replace(/^91/, "").slice(-10);
+  if (bare.length === 10) {
+    const user = await User.findOne({ userId: { $regex: `^(91)?${escapeRegex(bare)}(@|:)` } });
+    if (user) return user;
+  }
+
+  return null;
+}
+
 /**
  * Format phone number for display
  * @param {string} phone - Phone number
