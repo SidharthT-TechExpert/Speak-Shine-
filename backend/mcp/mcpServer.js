@@ -176,6 +176,30 @@ export function createSpeakShineMCPServer() {
           },
         },
         {
+          name: "change_user_role",
+          description: "Change or update a user/student account role (user, trainer, admin, admins, viewer) by mobile phone number.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "User mobile phone number" },
+              role: { type: "string", enum: ["user", "trainer", "admin", "admins", "viewer"], description: "New role to assign: user, trainer, admin, admins, or viewer" },
+            },
+            required: ["phone", "role"],
+          },
+        },
+        {
+          name: "update_user_role",
+          description: "Alias for change_user_role. Update a user/student account role by mobile phone number.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              phone: { type: "string", description: "User mobile phone number" },
+              role: { type: "string", enum: ["user", "trainer", "admin", "admins", "viewer"], description: "New role to assign: user, trainer, admin, admins, or viewer" },
+            },
+            required: ["phone", "role"],
+          },
+        },
+        {
           name: "block_or_unblock_student",
           description: "Block (deactivate) or unblock (activate) a student account by phone number.",
           inputSchema: {
@@ -711,6 +735,20 @@ export function createSpeakShineMCPServer() {
             {
               type: "text",
               text: JSON.stringify(resData || { success: true, message: "Deployment triggered" }, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "change_user_role" || name === "update_user_role") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.updateUserRole(args.phone, args.role, "mcp_admin");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };

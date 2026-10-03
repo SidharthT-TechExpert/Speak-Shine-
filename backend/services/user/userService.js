@@ -5,6 +5,7 @@
 
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import { randomInt } from "crypto";
 import User from "../../../models/userSchema.js";
 import Auth from "../../../models/authSchema.js";
@@ -456,32 +457,30 @@ export async function updateUserRole(phone, newRole, requesterId) {
     throw error;
   }
 
-  // Resolve the requester's own role
-  const requester = await Auth.findById(requesterId).select("role").lean();
-  if (!requester) {
-    const error = new Error("Requester not found");
-    error.statusCode = 404;
-    throw error;
+  // Resolve the requester's own role if valid ObjectId
+  if (requesterId && mongoose.Types.ObjectId.isValid(requesterId)) {
+    const requester = await Auth.findById(requesterId).select("role").lean();
+    if (requester?.role === "admins") {
+      if (newRole === "admin" || newRole === "admins") {
+        const error = new Error("You do not have permission to assign admin-level roles");
+        error.statusCode = 403;
+        throw error;
+      }
+      // Also block changing the role of an existing admin/admins account
+      const target = await Auth.findOne({ phone }).select("role").lean();
+      if (target && (target.role === "admin" || target.role === "admins")) {
+        const error = new Error("You do not have permission to change an admin-level account");
+        error.statusCode = 403;
+        throw error;
+      }
+    }
   }
 
-  // admins-tier restriction: cannot assign or touch admin-level roles
-  if (requester.role === "admins") {
-    if (newRole === "admin" || newRole === "admins") {
-      const error = new Error("You do not have permission to assign admin-level roles");
-      error.statusCode = 403;
-      throw error;
-    }
-    // Also block changing the role of an existing admin/admins account
-    const target = await Auth.findOne({ phone }).select("role").lean();
-    if (target && (target.role === "admin" || target.role === "admins")) {
-      const error = new Error("You do not have permission to change an admin-level account");
-      error.statusCode = 403;
-      throw error;
-    }
-  }
+  const stripped = phone ? phone.replace(/^(\+91|91)/, "").replace(/\D/g, "") : "";
+  const candidates = [...new Set([phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
 
   const auth = await Auth.findOneAndUpdate(
-    { phone },
+    { phone: { $in: candidates } },
     { role: newRole },
     { new: true }
   );
@@ -492,7 +491,7 @@ export async function updateUserRole(phone, newRole, requesterId) {
     throw error;
   }
 
-  return { success: true, role: auth.role };
+  return { success: true, phone: auth.phone, name: auth.name, role: auth.role };
 }
 
 /**
