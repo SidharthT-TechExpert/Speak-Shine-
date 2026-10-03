@@ -151,7 +151,10 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
-      window.location.href = "/login?reason=disabled";
+      localStorage.removeItem("speakshine_user");
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login?reason=disabled";
+      }
     }
 
     return Promise.reject(err);

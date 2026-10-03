@@ -79,10 +79,17 @@ export function getOnlineUsers() {
  */
 export function forceLogoutUser(phone) {
   if (!_io || !_onlineUsers) return;
-  const socketId = _onlineUsers.get(phone);
-  if (socketId) {
+  const variants = phoneVariants(phone);
+  const socketIds = new Set();
+
+  for (const variant of variants) {
+    const socketId = _onlineUsers.get(variant);
+    if (socketId) socketIds.add(socketId);
+  }
+
+  for (const socketId of socketIds) {
     _io.to(socketId).emit("force:logout", { reason: "Account disabled by admin" });
-    console.log(`[Chat] force:logout sent to ${phone} (socket ${socketId})`);
+    console.log(`[Chat] 🛑 force:logout dispatched to socket ${socketId} for ${phone}`);
   }
 }
 

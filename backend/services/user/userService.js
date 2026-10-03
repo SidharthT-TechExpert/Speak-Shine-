@@ -502,9 +502,14 @@ export async function updateUserRole(phone, newRole, requesterId) {
  * When re-enabling: reset consecutiveSkips so they don't get auto-disabled again immediately.
  */
 export async function toggleUserStatus(phone) {
-  const auth = await Auth.findOne({ phone });
+  const stripped = phone ? phone.replace(/^(\+91|91)/, "").replace(/\D/g, "") : "";
+  const candidates = [...new Set([phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
+  let auth = await Auth.findOne({ phone: { $in: candidates } });
+  if (!auth && stripped) {
+    auth = await Auth.findOne({ phone: { $regex: escapeRegex(stripped) } });
+  }
   if (!auth) {
-    const error = new Error("Not found");
+    const error = new Error("Account not found");
     error.statusCode = 404;
     throw error;
   }

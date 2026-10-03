@@ -92,8 +92,24 @@ export function AuthProvider({ children }) {
           return;
         }
       } catch (err) {
+        const status = err.response?.status;
+        const errCode = err.response?.data?.code;
+
+        // Account disabled by admin (403) or token rejected — clear session and stop boot
+        if (status === 403 || errCode === "ACCOUNT_DISABLED") {
+          console.warn("[Auth] Account disabled on boot check");
+          if (!cancelled) {
+            clearSession();
+            setBooting(false);
+            if (!window.location.pathname.startsWith("/login")) {
+              window.location.href = "/login?reason=disabled";
+            }
+          }
+          return;
+        }
+
         // 2. If access_token expired (401), attempt silent refresh
-        if (err.response?.status === 401) {
+        if (status === 401) {
           try {
             const sessionValid = await ensureFreshToken();
             if (!cancelled && sessionValid) {
