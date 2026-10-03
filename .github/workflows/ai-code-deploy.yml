@@ -58,12 +58,14 @@ jobs:
         if: github.event.client_payload.filePath && github.event.client_payload.codeContent
         env:
           FILE_PATH: ${{ github.event.client_payload.filePath }}
-          COMMIT_MSG: ${{ github.event.client_payload.commitMessage || github.event.client_payload.prompt || 'feat(ai): mobile code update' }}
+          CUSTOM_MSG: ${{ github.event.client_payload.commitMessage }}
+          PROMPT_MSG: ${{ github.event.client_payload.prompt }}
         run: |
           git config user.name "Speak & Shine AI Bot"
           git config user.email "ai-bot@speak-shine.online"
           git add "$FILE_PATH"
-          git commit -m "$COMMIT_MSG"
+          MSG="${CUSTOM_MSG:-${PROMPT_MSG:-feat(ai): mobile code update}}"
+          git commit -m "$MSG"
           git push origin main
 
       - name: Deploy to Production Host
