@@ -218,7 +218,7 @@ export default function App() {
       cache: "no-store",
       signal: AbortSignal.timeout(4000),
     })
-      .then(r => { if (r.ok) setServerReady(true); else setServerReady(false); })
+      .then(r => { if (r.ok || r.status === 429) setServerReady(true); else setServerReady(false); })
       .catch(() => setServerReady(false)); // server sleeping — show WakeUpScreen
   }, []);
 
@@ -249,14 +249,18 @@ export default function App() {
   );
 }
 
-// Automatically check account status on every route transition if user is logged in
+// Automatically check account status on route transition if user is logged in
 function RouteAccountGuard() {
   const location = useLocation();
   const { user, verifyAccountStatus } = useAuth();
+  const lastPathRef = useRef(null);
 
   useEffect(() => {
     if (user && verifyAccountStatus && !location.pathname.startsWith("/login")) {
-      verifyAccountStatus();
+      if (lastPathRef.current !== location.pathname) {
+        lastPathRef.current = location.pathname;
+        verifyAccountStatus();
+      }
     }
   }, [location.pathname, user, verifyAccountStatus]);
 

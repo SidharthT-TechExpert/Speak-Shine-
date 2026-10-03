@@ -35,7 +35,7 @@ export default function WakeUpScreen({ onReady }) {
           cache: "no-store",
           signal: AbortSignal.timeout(5000),
         });
-        if (res.ok && !cancelled) {
+        if ((res.ok || res.status === 429) && !cancelled) {
           onReady();
           return;
         }

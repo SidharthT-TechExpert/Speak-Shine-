@@ -201,8 +201,13 @@ export function AuthProvider({ children }) {
     return () => socket.off("force:logout", onForceLogout);
   }, [user, booting, clearSession]);
 
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   const verifyAccountStatus = useCallback(async () => {
-    if (!user) return true;
+    if (!userRef.current) return true;
     try {
       const { data } = await api.get("/users/me");
       if (data?.auth) {
@@ -217,8 +222,19 @@ export function AuthProvider({ children }) {
           theme: userTheme,
           isDark: isDarkVal,
         };
-        setUser(userData);
-        try { localStorage.setItem("speakshine_user", JSON.stringify(userData)); } catch {}
+        const prev = userRef.current;
+        if (
+          !prev ||
+          prev.phone !== userData.phone ||
+          prev.role !== userData.role ||
+          prev.name !== userData.name ||
+          prev.paid !== userData.paid ||
+          prev.avatarUrl !== userData.avatarUrl ||
+          prev.theme !== userData.theme
+        ) {
+          setUser(userData);
+          try { localStorage.setItem("speakshine_user", JSON.stringify(userData)); } catch {}
+        }
         return true;
       }
     } catch (err) {
@@ -236,7 +252,7 @@ export function AuthProvider({ children }) {
       }
     }
     return true;
-  }, [user, clearSession]);
+  }, [clearSession]);
 
   const updateUser = useCallback((updatedFields) => {
     setUser((prev) => {
