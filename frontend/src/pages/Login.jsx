@@ -143,12 +143,18 @@ export default function Login({ loginFor = "user" }) {
   const [errors, setErrors]           = useState({ phone: "", password: "" });
   const [serverError, setServerError] = useState("");
   const [loading, setLoading]         = useState(false);
+  const [isAccountBlocked, setIsAccountBlocked] = useState(false);
 
-  // Show "account disabled" message if redirected from a disabled session
+  // Check for account disabled notice and clean up URL parameters
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("reason") === "disabled") {
-      setServerError("Your account has been disabled. Contact your administrator.");
+    const hasNotice = sessionStorage.getItem("account_disabled_notice") === "true";
+    if (params.get("reason") === "disabled" || hasNotice) {
+      sessionStorage.removeItem("account_disabled_notice");
+      setIsAccountBlocked(true);
+      if (window.history?.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
   }, []);
 
@@ -226,15 +232,125 @@ export default function Login({ loginFor = "user" }) {
       else                              navigate("/dashboard", { replace: true });
     } catch (err) {
       const code = err.response?.data?.code;
+      const status = err.response?.status;
+      const errMsg = err.response?.data?.error || err.message || "";
+
+      if (status === 403 && (code === "ACCOUNT_DISABLED" || errMsg.toLowerCase().includes("disabled") || errMsg.toLowerCase().includes("deactivated"))) {
+        setIsAccountBlocked(true);
+        setServerError("");
+        return;
+      }
+
       if (code === "PENDING_APPROVAL") {
         setServerError("⏳ Your registration is awaiting admin approval. Please check back later.");
       } else {
-        setServerError(err.response?.data?.error || "Invalid phone or password.");
+        setServerError(errMsg || "Invalid phone or password.");
       }
     } finally {
       setLoading(false);
     }
   };
+
+  if (isAccountBlocked) {
+    return (
+      <div className="speakshine-auth-page">
+        <div style={{ position: "absolute", top: "1.25rem", right: "1.25rem", zIndex: 10 }}>
+          <ThemeToggle compact />
+        </div>
+        <div className="speakshine-auth-card" style={{ textAlign: "center", padding: "2.5rem 1.8rem" }}>
+          <div style={{ fontSize: "3.5rem", marginBottom: "0.85rem" }}>🚫</div>
+
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+            background: "rgba(248, 113, 113, 0.15)",
+            border: "1px solid rgba(248, 113, 113, 0.35)",
+            color: "#f87171",
+            padding: "0.35rem 0.9rem",
+            borderRadius: 20,
+            fontSize: "0.82rem",
+            fontWeight: 800,
+            letterSpacing: "0.05em",
+            marginBottom: "1rem",
+          }}>
+            ACCOUNT DEACTIVATED
+          </div>
+
+          <h2 style={{ fontSize: "1.45rem", fontWeight: 800, color: "#ffffff", marginBottom: "0.6rem" }}>
+            Access Temporarily Suspended
+          </h2>
+
+          <p style={{ color: "#94a3b8", fontSize: "0.9rem", lineHeight: 1.6, maxWidth: 360, margin: "0 auto 1.5rem" }}>
+            Your Speak & Shine account has been deactivated by an administrator. Login is disabled until an admin releases the hold.
+          </p>
+
+          <div style={{
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: 14,
+            padding: "1rem 1.1rem",
+            textAlign: "left",
+            marginBottom: "1.5rem",
+            fontSize: "0.82rem",
+            color: "#cbd5e1",
+          }}>
+            <div style={{ color: "var(--muted)", fontSize: "0.74rem", textTransform: "uppercase", fontWeight: 700, marginBottom: "0.4rem" }}>
+              Status Details
+            </div>
+            <div style={{ marginBottom: "0.3rem" }}>• <strong>Account Status:</strong> Hold Active (Deactivated)</div>
+            <div>• <strong>Reactivation:</strong> Contact your trainer or administrator</div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <a
+              href="https://wa.me/?text=Hello%20Trainer,%20my%20Speak%20%26%20Shine%20account%20has%20been%20deactivated.%20Please%20help%20me%20reactivate%20my%20access."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="speakshine-btn-primary"
+              style={{
+                width: "100%",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.5rem",
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                color: "#ffffff",
+                borderRadius: 12,
+                padding: "0.85rem 1.25rem",
+                fontWeight: 700,
+                boxShadow: "0 4px 16px rgba(16, 185, 129, 0.35)",
+              }}
+            >
+              💬 Contact Support / Trainer on WhatsApp
+            </a>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsAccountBlocked(false);
+                setServerError("");
+              }}
+              style={{
+                width: "100%",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                color: "#cbd5e1",
+                borderRadius: 12,
+                padding: "0.8rem 1.25rem",
+                fontSize: "0.88rem",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              🔄 Check Again / Try Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="speakshine-auth-page">

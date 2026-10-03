@@ -101,8 +101,9 @@ export function AuthProvider({ children }) {
           if (!cancelled) {
             clearSession();
             setBooting(false);
+            try { sessionStorage.setItem("account_disabled_notice", "true"); } catch {}
             if (!window.location.pathname.startsWith("/login")) {
-              window.location.href = "/login?reason=disabled";
+              window.location.href = "/login";
             }
           }
           return;
@@ -188,8 +189,11 @@ export function AuthProvider({ children }) {
     const onForceLogout = ({ reason } = {}) => {
       console.warn("[Auth] Force logout received:", reason);
       clearSession();
+      try { sessionStorage.setItem("account_disabled_notice", "true"); } catch {}
       setTimeout(() => {
-        window.location.href = "/login?reason=disabled";
+        if (!window.location.pathname.startsWith("/login")) {
+          window.location.href = "/login";
+        }
       }, 100);
     };
 

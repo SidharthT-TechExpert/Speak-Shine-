@@ -152,8 +152,9 @@ api.interceptors.response.use(
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
       localStorage.removeItem("speakshine_user");
+      try { sessionStorage.setItem("account_disabled_notice", "true"); } catch {}
       if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login?reason=disabled";
+        window.location.href = "/login";
       }
     }
 
