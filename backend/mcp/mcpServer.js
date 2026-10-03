@@ -915,6 +915,15 @@ export function createSpeakShineMCPServer() {
         };
       }
 
+      if (name === "change_user_role" || name === "update_user_role") {
+        const userService = await import("../services/user/userService.js");
+        const result = await userService.updateUserRole(args.phone, args.role);
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
       throw new Error(`Tool not found: ${name}`);
     } catch (err) {
       return {

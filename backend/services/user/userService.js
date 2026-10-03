@@ -479,14 +479,29 @@ export async function updateUserRole(phone, newRole, requesterId) {
   const stripped = phone ? phone.replace(/^(\+91|91)/, "").replace(/\D/g, "") : "";
   const candidates = [...new Set([phone, stripped, `91${stripped}`, `+91${stripped}`].filter(Boolean))];
 
-  const auth = await Auth.findOneAndUpdate(
+  let auth = await Auth.findOneAndUpdate(
     { phone: { $in: candidates } },
     { role: newRole },
     { new: true }
   );
 
+  // If Auth record does not exist yet, search User collection and create Auth document
   if (!auth) {
-    const error = new Error("Auth record not found");
+    const userDoc = await findUserByPhone(phone);
+    if (userDoc) {
+      const canonPhone = stripped || userDoc.phone || phone;
+      auth = await Auth.create({
+        phone: canonPhone,
+        name: userDoc.name || "Student",
+        role: newRole,
+        isActive: true,
+      });
+      console.log(`[UserService] Created missing Auth record for ${canonPhone} with role ${newRole}`);
+    }
+  }
+
+  if (!auth) {
+    const error = new Error(`User with phone ${phone} not found`);
     error.statusCode = 404;
     throw error;
   }
