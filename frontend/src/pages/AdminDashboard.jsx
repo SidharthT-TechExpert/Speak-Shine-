@@ -7586,6 +7586,9 @@ export default function AdminDashboard() {
       {/* MANUAL QUESTIONS */}
       {tab==="manual-questions" && <ManualQuestionsPanel />}
 
+      {/* HELP DESK & DOUBTS */}
+      {tab === "help" && <AdminHelpDeskTab />}
+
       {/* STUDENT DETAIL */}
       {tab==="student-detail" && selectedStudent && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 1000, margin: "0 auto" }}>
@@ -9462,8 +9465,6 @@ function ManualQuestionsPanel() {
         </>
       )}
 
-      {/* HELP DESK & DOUBTS */}
-      {tab === "help" && <AdminHelpDeskTab />}
     </div>
   );
 }
