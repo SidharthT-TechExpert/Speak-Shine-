@@ -160,7 +160,7 @@ export async function createOrder(req, res) {
 
     // CASE 1: 100% Wallet Balance Cover (walletBalance >= totalFee AND useWallet is true)
     if (useWallet && user && currentWallet >= totalFee && totalFee > 0) {
-      const newBalance = currentWallet - totalFee;
+      const newBalance = Math.round((currentWallet - totalFee) * 100) / 100;
       user.walletBalance = newBalance;
       user.paid = true;
       user.paidAt = new Date();
@@ -212,8 +212,8 @@ export async function createOrder(req, res) {
     }
 
     // CASE 2: Partial Wallet Discount or Direct Gateway Checkout
-    const walletDiscountApplied = Math.min(currentWallet, totalFee);
-    const netPayableINR = Math.max(0, totalFee - walletDiscountApplied);
+    const walletDiscountApplied = Math.round(Math.min(currentWallet, totalFee) * 100) / 100;
+    const netPayableINR = Math.round(Math.max(0, totalFee - walletDiscountApplied) * 100) / 100;
     const amountPaise = Math.round(netPayableINR * 100);
 
     if (amountPaise < 100) {
@@ -373,7 +373,7 @@ export async function verifyPayment(req, res) {
       : (amountINR > 0 ? Math.min(currentWallet, Math.max(0, totalFee - amountINR)) : 0);
 
     if (discountUsed > 0) {
-      const newBalance = Math.max(0, currentWallet - discountUsed);
+      const newBalance = Math.round(Math.max(0, currentWallet - discountUsed) * 100) / 100;
       user.walletBalance = newBalance;
       if (!Array.isArray(user.walletHistory)) user.walletHistory = [];
       user.walletHistory.push({

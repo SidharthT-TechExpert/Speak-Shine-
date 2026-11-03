@@ -64,8 +64,9 @@ export default function PaymentWall({ onSuccess }) {
   }, []);
 
   const useWallet = paymentMethod === "wallet" && walletBalance > 0;
-  const walletDiscount = useWallet ? Math.min(walletBalance, planAmount) : 0;
-  const netPayable = Math.max(0, planAmount - walletDiscount);
+  const walletDiscount = useWallet ? Math.round(Math.min(walletBalance, planAmount) * 100) / 100 : 0;
+  const netPayable = Math.round(Math.max(0, planAmount - walletDiscount) * 100) / 100;
+  const remainingWallet = Math.round(Math.max(0, walletBalance - walletDiscount) * 100) / 100;
 
   const handlePay = async () => {
     setError(null);
@@ -562,7 +563,7 @@ export default function PaymentWall({ onSuccess }) {
           </div>
         </div>
 
-        {/* Wallet Balance & Rewards Card */}
+        {/* Wallet Balance Status Card */}
         <div style={{
           background: walletBalance > 0
             ? "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)"
@@ -575,13 +576,13 @@ export default function PaymentWall({ onSuccess }) {
           marginBottom: "1.25rem",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-              <span style={{ fontSize: "1.25rem" }}>💰</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+              <span style={{ fontSize: "1.35rem" }}>💰</span>
               <div>
-                <div style={{ fontSize: "0.74rem", fontWeight: 700, color: walletBalance > 0 ? "#4ade80" : "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <div style={{ fontSize: "0.72rem", fontWeight: 700, color: walletBalance > 0 ? "#4ade80" : "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   Wallet Balance
                 </div>
-                <div style={{ fontSize: "1.2rem", fontWeight: 900, color: walletBalance > 0 ? "#4ade80" : "#ffffff" }}>
+                <div style={{ fontSize: "1.25rem", fontWeight: 900, color: walletBalance > 0 ? "#4ade80" : "#ffffff" }}>
                   ₹{walletBalance}
                 </div>
               </div>
@@ -596,7 +597,7 @@ export default function PaymentWall({ onSuccess }) {
                   border: "1px solid rgba(255, 255, 255, 0.18)",
                   color: "#cbd5e1",
                   borderRadius: 10,
-                  padding: "0.35rem 0.7rem",
+                  padding: "0.4rem 0.75rem",
                   fontSize: "0.75rem",
                   fontWeight: 700,
                   cursor: "pointer",
@@ -607,29 +608,23 @@ export default function PaymentWall({ onSuccess }) {
             )}
           </div>
 
-          {/* Breakdown if discount applies */}
           {walletBalance > 0 && (
             <div style={{
-              background: "rgba(0, 0, 0, 0.25)",
-              borderRadius: 12,
-              padding: "0.75rem 0.9rem",
-              marginTop: "0.65rem",
-              fontSize: "0.8rem",
+              marginTop: "0.6rem",
+              paddingTop: "0.6rem",
+              borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+              fontSize: "0.78rem",
+              color: "#94a3b8",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", marginBottom: "0.3rem" }}>
-                <span>Standard Subscription Fee:</span>
-                <span>₹{planAmount}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: useWallet ? "#4ade80" : "var(--muted)", fontWeight: 700, marginBottom: "0.35rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)", paddingBottom: "0.35rem" }}>
-                <span>🎁 Wallet Discount Applied:</span>
-                <span>{useWallet ? `-₹${walletDiscount}` : "₹0 (Saved for later)"}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#ffffff", fontWeight: 900, fontSize: "0.9rem" }}>
-                <span>Net Amount Payable:</span>
-                <span style={{ color: netPayable === 0 ? "#4ade80" : "#38bdf8" }}>
-                  {netPayable === 0 ? "₹0 (100% Covered)" : `₹${netPayable}`}
-                </span>
-              </div>
+              <span>✨</span>
+              <span>
+                {walletBalance >= planAmount
+                  ? "You have enough wallet balance to cover 100% of your membership!"
+                  : `You can use your ₹${walletBalance} wallet balance to discount your membership fee.`}
+              </span>
             </div>
           )}
         </div>
@@ -688,20 +683,22 @@ export default function PaymentWall({ onSuccess }) {
                   }} />
                   <div>
                     <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span>💰 Use Wallet Money</span>
+                      <span>💰 Pay with Wallet</span>
                       <span style={{ fontSize: "0.7rem", background: "rgba(74, 222, 128, 0.2)", color: "#4ade80", padding: "0.15rem 0.45rem", borderRadius: 10, fontWeight: 700 }}>
-                        ₹{walletBalance} Balance
+                        ₹{walletBalance} Available
                       </span>
                     </div>
                     <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
                       {walletBalance >= planAmount
-                        ? "Deduct from wallet balance (Pay ₹0 Net)"
-                        : `Apply ₹${walletBalance} discount & pay net ₹${planAmount - walletBalance} via UPI`}
+                        ? `Deduct ₹${planAmount} from wallet (₹${remainingWallet} balance left)`
+                        : `Apply ₹${walletBalance} discount · Pay net ₹${netPayable} via UPI`}
                     </div>
                   </div>
                 </div>
-                <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#4ade80", textAlign: "right" }}>
-                  {walletBalance >= planAmount ? "₹0 Net" : `₹${planAmount - walletBalance}`}
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#4ade80" }}>
+                    {walletBalance >= planAmount ? "₹0 Net" : `₹${netPayable} Net`}
+                  </div>
                 </div>
               </div>
 
@@ -738,17 +735,73 @@ export default function PaymentWall({ onSuccess }) {
                       <span>📲 Pay Direct via UPI / QR Code</span>
                     </div>
                     <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
-                      Pay full ₹{planAmount} directly and save your ₹{walletBalance} wallet balance
+                      Pay full ₹{planAmount} directly · Save your ₹{walletBalance} wallet balance
                     </div>
                   </div>
                 </div>
-                <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#a5b4fc", textAlign: "right" }}>
-                  ₹{planAmount}
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#a5b4fc" }}>
+                    ₹{planAmount} Full
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Payment Summary / Bill Details Card */}
+        <div style={{
+          background: "rgba(255, 255, 255, 0.03)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          borderRadius: 16,
+          padding: "1rem 1.25rem",
+          marginBottom: "1.25rem",
+        }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
+            Payment Summary
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <span>Membership Plan Fee:</span>
+            <span>₹{planAmount}</span>
+          </div>
+          {walletBalance > 0 && (
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              color: useWallet ? "#4ade80" : "var(--muted)",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              marginBottom: "0.4rem",
+            }}>
+              <span>{useWallet ? "🎁 Wallet Discount Applied:" : "Wallet Balance:"}</span>
+              <span>{useWallet ? `-₹${walletDiscount}` : "₹0 (Kept in wallet)"}</span>
+            </div>
+          )}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+            paddingTop: "0.5rem",
+            marginTop: "0.2rem",
+          }}>
+            <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff" }}>
+              Total Amount Payable:
+            </span>
+            <span style={{
+              fontSize: "1.1rem",
+              fontWeight: 900,
+              color: netPayable === 0 ? "#4ade80" : "#38bdf8",
+            }}>
+              {netPayable === 0 ? "₹0 (100% Covered)" : `₹${netPayable}`}
+            </span>
+          </div>
+          {useWallet && walletDiscount > 0 && (
+            <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "right" }}>
+              Remaining wallet balance after activation: ₹{remainingWallet}
+            </div>
+          )}
+        </div>
 
         {/* Error */}
         {error && (
@@ -816,7 +869,9 @@ export default function PaymentWall({ onSuccess }) {
           marginTop: "1rem",
           lineHeight: 1.6,
         }}>
-          Secured by Razorpay · Instant UPI &amp; QR Code payment accepted<br />
+          {netPayable === 0
+            ? "⚡ 100% Wallet Payment · Instant Activation (No external payment required)"
+            : "Secured by Razorpay · Instant UPI & QR Code payment accepted"}<br />
           Contact your trainer if you believe this is a mistake.
         </p>
       </div>
