@@ -43,13 +43,22 @@ export default function PaymentWall({ onSuccess }) {
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletHistory, setWalletHistory] = useState([]);
   const [showWalletHistoryModal, setShowWalletHistoryModal] = useState(false);
+  const [showWalletConfirmModal, setShowWalletConfirmModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("wallet"); // "wallet" | "upi"
+  const [pricing, setPricing] = useState({
+    coursePrice: DEFAULT_PLAN_AMOUNT,
+    taxAmount: 0,
+    totalAmount: DEFAULT_PLAN_AMOUNT,
+  });
 
   useEffect(() => {
     api.get("/payments/config")
       .then(({ data }) => {
-        const amount = Number(data?.amount);
-        if (Number.isFinite(amount) && amount >= 1) setPlanAmount(amount);
+        const cp = Number(data?.coursePrice ?? data?.amount ?? DEFAULT_PLAN_AMOUNT);
+        const tx = Number(data?.taxAmount ?? 0);
+        const tot = Number(data?.totalAmount ?? (cp + tx));
+        setPricing({ coursePrice: cp, taxAmount: tx, totalAmount: tot });
+        setPlanAmount(tot);
       })
       .catch(() => {});
 
@@ -63,30 +72,77 @@ export default function PaymentWall({ onSuccess }) {
       .catch(() => {});
   }, []);
 
-  const useWallet = paymentMethod === "wallet" && walletBalance > 0;
-  const walletDiscount = useWallet ? Math.round(Math.min(walletBalance, planAmount) * 100) / 100 : 0;
-  const netPayable = Math.round(Math.max(0, planAmount - walletDiscount) * 100) / 100;
-  const remainingWallet = Math.round(Math.max(0, walletBalance - walletDiscount) * 100) / 100;
+  const coursePrice = pricing.coursePrice;
+  const taxAmount = pricing.taxAmount;
+  const totalAmount = pricing.totalAmount;
 
+  const useWallet = paymentMethod === "wallet" && walletBalance > 0;
+  // When paying with wallet: tax is waived (₹0)! Target fee is ONLY coursePrice.
+  const isFullWalletCoverage = useWallet && walletBalance >= coursePrice;
+
+  const walletDiscount = useWallet
+    ? Math.round(Math.min(walletBalance, coursePrice) * 100) / 100
+    : 0;
+
+  // Direct gateway charges coursePrice + taxAmount. Wallet charges coursePrice with tax waived.
+  const netPayable = isFullWalletCoverage
+    ? 0
+    : useWallet
+      ? Math.round(Math.max(0, (coursePrice - walletDiscount) + taxAmount) * 100) / 100
+      : totalAmount;
+
+  const remainingWallet = isFullWalletCoverage
+    ? Math.round(Math.max(0, walletBalance - coursePrice) * 100) / 100
+    : Math.round(Math.max(0, walletBalance - walletDiscount) * 100) / 100;
+
+  // Step 1: User clicks main action button
   const handlePay = async () => {
+    setError(null);
+    // If 100% wallet coverage: NEVER pay silently in the background!
+    // Require explicit confirmation dialog so user has full control.
+    if (useWallet && isFullWalletCoverage) {
+      setShowWalletConfirmModal(true);
+      return;
+    }
+
+    await executeOrder({ confirmWalletPayment: false });
+  };
+
+  // Step 2: User explicitly clicked "Confirm & Activate" in modal
+  const handleConfirmWalletPayment = async () => {
+    setShowWalletConfirmModal(false);
+    await executeOrder({ confirmWalletPayment: true });
+  };
+
+  const executeOrder = async ({ confirmWalletPayment = false } = {}) => {
     setError(null);
     setLoading(true);
 
     try {
-      // 1. Create order on backend (Checks wallet balance preference)
+      // 1. Create order on backend (strictly honors user preference and confirmation)
       const { data: order } = await api.post("/payments/create-order", {
         useWallet,
         paymentMethod,
+        confirmWalletPayment,
       });
 
-      // CASE A: 100% Covered by Wallet Balance
+      // CASE A: Server requires confirmation before deducting wallet balance
+      if (order.requiresConfirmation && !confirmWalletPayment) {
+        setLoading(false);
+        setShowWalletConfirmModal(true);
+        return;
+      }
+
+      // CASE B: 100% Covered by Wallet Balance and user explicitly confirmed
       if (order.walletCovered) {
-        const discountApplied = order.walletDiscountApplied || order.totalFee || planAmount;
+        const discountApplied = order.walletDiscountApplied || order.coursePrice || coursePrice;
         const txObj = {
           name: user?.name || user?.registeredName || "Student Member",
           phone: user?.phone,
           amount: 0,
-          totalFee: order.totalFee || planAmount,
+          totalFee: order.totalFee || coursePrice,
+          coursePrice: order.coursePrice || coursePrice,
+          taxAmount: 0,
           walletDiscountApplied: discountApplied,
           isWalletCovered: true,
           razorpayOrderId: "wallet_payment",
@@ -98,7 +154,7 @@ export default function PaymentWall({ onSuccess }) {
 
         setSuccessTx(txObj);
         setPaid(true);
-        const newBal = order.walletBalance ?? 0;
+        const newBal = order.walletBalance ?? remainingWallet;
         setWalletBalance(newBal);
         if (updateUser) {
           updateUser({ paid: true, walletBalance: newBal });
@@ -107,7 +163,7 @@ export default function PaymentWall({ onSuccess }) {
         return;
       }
 
-      // CASE B: Requires Gateway Payment (Partial Wallet Discount or Full Payment)
+      // CASE C: Requires Gateway Payment (UPI / QR Code)
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         setError("Payment system failed to load. Please check your internet connection and try again.");
@@ -151,8 +207,10 @@ export default function PaymentWall({ onSuccess }) {
             const txObj = {
               name: user?.name || user?.registeredName || "Student Member",
               phone: user?.phone,
-              amount: order.netPayableINR ?? Math.max(0, planAmount - (order.walletDiscountApplied || 0)),
-              totalFee: order.totalFee || planAmount,
+              amount: order.netPayableINR ?? Math.max(0, totalAmount - (order.walletDiscountApplied || 0)),
+              totalFee: order.totalFee || totalAmount,
+              coursePrice,
+              taxAmount,
               walletDiscountApplied: order.walletDiscountApplied || 0,
               isWalletCovered: false,
               razorpayOrderId: response.razorpay_order_id,
@@ -172,8 +230,10 @@ export default function PaymentWall({ onSuccess }) {
               const txObj = {
                 name: user?.name || user?.registeredName || "Student Member",
                 phone: user?.phone,
-                amount: order.netPayableINR ?? Math.max(0, planAmount - (order.walletDiscountApplied || 0)),
-                totalFee: order.totalFee || planAmount,
+                amount: order.netPayableINR ?? Math.max(0, totalAmount - (order.walletDiscountApplied || 0)),
+                totalFee: order.totalFee || totalAmount,
+                coursePrice,
+                taxAmount,
                 walletDiscountApplied: order.walletDiscountApplied || 0,
                 isWalletCovered: false,
                 razorpayOrderId: response.razorpay_order_id,
@@ -417,6 +477,83 @@ export default function PaymentWall({ onSuccess }) {
 
   return (
     <Layout title="Unlock Full Access">
+      {/* Wallet Deduction Confirmation Modal (Prevents accidental/background payments) */}
+      {showWalletConfirmModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
+          zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "1rem",
+        }}>
+          <div style={{
+            background: "#0f172a", border: "1px solid rgba(74, 222, 128, 0.4)",
+            borderRadius: 20, width: "100%", maxWidth: 440,
+            padding: "1.75rem", boxShadow: "0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(74, 222, 128, 0.15)",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: "2.8rem", marginBottom: "0.75rem" }}>
+              💰
+            </div>
+            <h3 style={{ margin: "0 0 0.5rem", fontSize: "1.25rem", fontWeight: 800, color: "#ffffff" }}>
+              Confirm Wallet Payment
+            </h3>
+            <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 1.25rem", lineHeight: 1.5 }}>
+              Deduct <strong style={{ color: "#4ade80" }}>₹${coursePrice}</strong> from your wallet balance to activate membership?
+            </p>
+
+            <div style={{
+              background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.1)",
+              borderRadius: 14, padding: "1rem", marginBottom: "1.25rem", textAlign: "left",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "#cbd5e1", marginBottom: "0.35rem" }}>
+                <span>Course Base Price:</span>
+                <span style={{ fontWeight: 700 }}>₹${coursePrice}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "#4ade80", marginBottom: "0.35rem" }}>
+                <span>Tax / GST:</span>
+                <span style={{ fontWeight: 700 }}>₹0 (Waived for Wallet!)</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
+                <span>Current Wallet Balance:</span>
+                <span>₹${walletBalance}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#ffffff", fontWeight: 800, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: "0.45rem", marginTop: "0.45rem" }}>
+                <span>Balance After Activation:</span>
+                <span style={{ color: "#4ade80" }}>₹${remainingWallet}</span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                type="button"
+                onClick={() => setShowWalletConfirmModal(false)}
+                disabled={loading}
+                style={{
+                  flex: 1, padding: "0.75rem", borderRadius: 12,
+                  border: "1px solid rgba(255, 255, 255, 0.2)", background: "rgba(255, 255, 255, 0.05)",
+                  color: "#ffffff", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmWalletPayment}
+                disabled={loading}
+                style={{
+                  flex: 1.4, padding: "0.75rem", borderRadius: 12, border: "none",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  color: "#ffffff", fontWeight: 800, fontSize: "0.9rem", cursor: "pointer",
+                  boxShadow: "0 4px 15px rgba(16, 185, 129, 0.4)",
+                }}
+              >
+                {loading ? "Activating..." : `Confirm ₹${coursePrice}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Wallet History Modal */}
       {showWalletHistoryModal && (
         <div style={{
@@ -588,24 +725,22 @@ export default function PaymentWall({ onSuccess }) {
               </div>
             </div>
 
-            {walletHistory.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowWalletHistoryModal(true)}
-                style={{
-                  background: "rgba(255, 255, 255, 0.08)",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
-                  color: "#cbd5e1",
-                  borderRadius: 10,
-                  padding: "0.4rem 0.75rem",
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                📜 Wallet History ({walletHistory.length})
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowWalletHistoryModal(true)}
+              style={{
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                color: "#cbd5e1",
+                borderRadius: 10,
+                padding: "0.4rem 0.75rem",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              📜 Wallet History {walletHistory.length > 0 ? `(${walletHistory.length})` : ""}
+            </button>
           </div>
 
           {walletBalance > 0 && (
@@ -683,21 +818,21 @@ export default function PaymentWall({ onSuccess }) {
                   }} />
                   <div>
                     <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span>💰 Pay with Wallet</span>
+                      <span>💰 Pay with Wallet (Tax Free!)</span>
                       <span style={{ fontSize: "0.7rem", background: "rgba(74, 222, 128, 0.2)", color: "#4ade80", padding: "0.15rem 0.45rem", borderRadius: 10, fontWeight: 700 }}>
                         ₹{walletBalance} Available
                       </span>
                     </div>
                     <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
-                      {walletBalance >= planAmount
-                        ? `Deduct ₹${planAmount} from wallet (₹${remainingWallet} balance left)`
-                        : `Apply ₹${walletBalance} discount · Pay net ₹${netPayable} via UPI`}
+                      {walletBalance >= coursePrice
+                        ? `Deduct ₹${coursePrice} from wallet · Tax (₹${taxAmount}) is waived! (₹${remainingWallet} balance left)`
+                        : `Apply ₹${walletBalance} discount towards course fee · Pay net ₹${netPayable} via UPI`}
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#4ade80" }}>
-                    {walletBalance >= planAmount ? "₹0 Net" : `₹${netPayable} Net`}
+                    {walletBalance >= coursePrice ? "₹0 Net" : `₹${netPayable} Net`}
                   </div>
                 </div>
               </div>
@@ -735,13 +870,13 @@ export default function PaymentWall({ onSuccess }) {
                       <span>📲 Pay Direct via UPI / QR Code</span>
                     </div>
                     <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
-                      Pay full ₹{planAmount} directly · Save your ₹{walletBalance} wallet balance
+                      Pay full ₹{totalAmount} (Course ₹{coursePrice} + Tax ₹{taxAmount}) · Save your ₹{walletBalance} wallet balance
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#a5b4fc" }}>
-                    ₹{planAmount} Full
+                    ₹{totalAmount} Full
                   </div>
                 </div>
               </div>
@@ -761,8 +896,18 @@ export default function PaymentWall({ onSuccess }) {
             Payment Summary
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-            <span>Membership Plan Fee:</span>
-            <span>₹{planAmount}</span>
+            <span>Course Base Price:</span>
+            <span>₹{coursePrice}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+            <span>Tax / GST:</span>
+            {isFullWalletCoverage ? (
+              <span style={{ color: "#4ade80", fontWeight: 700 }}>
+                ₹0 <span style={{ textDecoration: "line-through", color: "var(--muted)", fontSize: "0.75rem" }}>₹{taxAmount}</span> (Waived)
+              </span>
+            ) : (
+              <span>₹{taxAmount}</span>
+            )}
           </div>
           {walletBalance > 0 && (
             <div style={{
@@ -773,8 +918,8 @@ export default function PaymentWall({ onSuccess }) {
               fontWeight: 700,
               marginBottom: "0.4rem",
             }}>
-              <span>{useWallet ? "🎁 Wallet Discount Applied:" : "Wallet Balance:"}</span>
-              <span>{useWallet ? `-₹${walletDiscount}` : "₹0 (Kept in wallet)"}</span>
+              <span>{useWallet ? "🎁 Wallet Deduction:" : "Wallet Balance:"}</span>
+              <span>{useWallet ? `-₹${isFullWalletCoverage ? coursePrice : walletDiscount}` : "₹0 (Kept in wallet)"}</span>
             </div>
           )}
           <div style={{
@@ -793,10 +938,10 @@ export default function PaymentWall({ onSuccess }) {
               fontWeight: 900,
               color: netPayable === 0 ? "#4ade80" : "#38bdf8",
             }}>
-              {netPayable === 0 ? "₹0 (100% Covered)" : `₹${netPayable}`}
+              {netPayable === 0 ? "₹0 (100% Covered by Wallet)" : `₹${netPayable}`}
             </span>
           </div>
-          {useWallet && walletDiscount > 0 && (
+          {useWallet && (isFullWalletCoverage || walletDiscount > 0) && (
             <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "right" }}>
               Remaining wallet balance after activation: ₹{remainingWallet}
             </div>
@@ -853,12 +998,12 @@ export default function PaymentWall({ onSuccess }) {
         >
           {loading ? "Processing…" : (
             netPayable === 0
-              ? "⚡ Activate Now for ₹0 (100% Covered by Wallet)"
+              ? "⚡ Activate Now for ₹0 (100% Covered by Wallet · Tax Waived)"
               : walletDiscount > 0
                 ? `💳 Pay Net ₹${netPayable} (₹${walletDiscount} Wallet Discount Applied)`
                 : paymentMethod === "upi" && walletBalance > 0
-                  ? `📲 Pay ₹${planAmount} via UPI (Keep Wallet ₹${walletBalance})`
-                  : `💳 Pay ₹${planAmount} & Unlock Access`
+                  ? `📲 Pay ₹${totalAmount} via UPI (Keep Wallet ₹${walletBalance})`
+                  : `💳 Pay ₹${totalAmount} & Unlock Access`
           )}
         </button>
 

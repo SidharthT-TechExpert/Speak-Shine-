@@ -692,28 +692,26 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 >
                   <span>💳 Payments</span>
                 </Link>
-                {walletHistory.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowHistory((h) => !h)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "#94a3b8",
-                      fontSize: "0.72rem",
-                      textDecoration: "underline",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    {showHistory ? "Hide Activity" : "View Activity"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowHistory((h) => !h)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#94a3b8",
+                    fontSize: "0.72rem",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {showHistory ? "Hide Activity" : `View Activity ${walletHistory.length > 0 ? `(${walletHistory.length})` : ""}`}
+                </button>
               </div>
             </div>
 
             {/* Optional Wallet History Dropdown */}
-            {showHistory && walletHistory.length > 0 && (
+            {showHistory && (
               <div
                 style={{
                   background: "rgba(0, 0, 0, 0.4)",
@@ -729,7 +727,12 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                 <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Recent Wallet Activity
                 </div>
-                {walletHistory.slice(-5).reverse().map((entry, idx) => (
+                {walletHistory.length === 0 ? (
+                  <div style={{ fontSize: "0.78rem", color: "#94a3b8", textAlign: "center", padding: "0.5rem" }}>
+                    No wallet activity recorded yet.
+                  </div>
+                ) : (
+                  walletHistory.slice(-5).reverse().map((entry, idx) => (
                   <div
                     key={idx}
                     style={{
@@ -777,7 +780,7 @@ export default function UserProfileModal({ isOpen, onClose, user, onThemeToggle 
                       Bal: ₹{entry.balanceAfter}
                     </span>
                   </div>
-                ))}
+                )))}
               </div>
             )}
 

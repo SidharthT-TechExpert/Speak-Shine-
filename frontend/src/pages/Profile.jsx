@@ -629,23 +629,27 @@ export default function Profile() {
             </div>
 
             {/* Wallet Activity Collapsible Card */}
-            {walletHistory.length > 0 && (
-              <div className="pf-card" style={{ padding: 0, overflow:"hidden" }}>
-                <button
-                  onClick={() => setShowHistory(h => !h)}
-                  style={{ width:"100%", background:"none", border:"none", cursor:"pointer", padding:"1.1rem 1.4rem", display:"flex", alignItems:"center", justifyContent:"space-between", color:"var(--text)" }}
-                >
-                  <div style={{ display:"flex", alignItems:"center", gap:"0.75rem" }}>
-                    <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,var(--primary),#4338ca)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.9rem", fontWeight:900, color:"#fff" }}>₹</div>
-                    <span style={{ fontWeight:800, fontSize:"0.95rem" }}>Wallet Activity</span>
-                    <span style={{ background:"var(--border3)", color:"var(--primary)", fontSize:"0.68rem", fontWeight:800, padding:"0.12rem 0.55rem", borderRadius:99 }}>{walletHistory.length}</span>
-                  </div>
-                  <span style={{ color:"var(--muted)", fontSize:"0.85rem", transition:"transform 0.2s", display:"inline-block", transform:showHistory?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
-                </button>
-                {showHistory && (
-                  <div style={{ padding:"0 1.25rem 1.25rem", display:"flex", flexDirection:"column", gap:"0.45rem" }}>
-                    <div style={{ height:1, background:"var(--border)", marginBottom:"0.35rem" }} />
-                    {walletHistory.slice(-8).reverse().map((e, i) => (
+            <div className="pf-card" style={{ padding: 0, overflow:"hidden" }}>
+              <button
+                onClick={() => setShowHistory(h => !h)}
+                style={{ width:"100%", background:"none", border:"none", cursor:"pointer", padding:"1.1rem 1.4rem", display:"flex", alignItems:"center", justifyContent:"space-between", color:"var(--text)" }}
+              >
+                <div style={{ display:"flex", alignItems:"center", gap:"0.75rem" }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,var(--primary),#4338ca)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.9rem", fontWeight:900, color:"#fff" }}>₹</div>
+                  <span style={{ fontWeight:800, fontSize:"0.95rem" }}>Wallet Activity</span>
+                  <span style={{ background:"var(--border3)", color:"var(--primary)", fontSize:"0.68rem", fontWeight:800, padding:"0.12rem 0.55rem", borderRadius:99 }}>{walletHistory.length}</span>
+                </div>
+                <span style={{ color:"var(--muted)", fontSize:"0.85rem", transition:"transform 0.2s", display:"inline-block", transform:showHistory?"rotate(180deg)":"rotate(0deg)" }}>▾</span>
+              </button>
+              {showHistory && (
+                <div style={{ padding:"0 1.25rem 1.25rem", display:"flex", flexDirection:"column", gap:"0.45rem" }}>
+                  <div style={{ height:1, background:"var(--border)", marginBottom:"0.35rem" }} />
+                  {walletHistory.length === 0 ? (
+                    <p style={{ textAlign:"center", color:"var(--muted)", padding:"1rem", fontSize:"0.82rem", margin:0 }}>
+                      No wallet transactions recorded yet.
+                    </p>
+                  ) : (
+                    walletHistory.slice(-8).reverse().map((e, i) => (
                       <div key={i} className="pf-hist-row" style={{
                         display:"flex", justifyContent:"space-between", alignItems:"center", gap:"1rem",
                         padding:"0.65rem 0.85rem",
@@ -664,11 +668,11 @@ export default function Profile() {
                           ₹{e.balanceAfter}
                         </span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Refer & Earn Banner Card */}
             <div className="pf-ref-card">

@@ -62,10 +62,19 @@ function getRequestPhone(rawPhone = "") {
 
 import { getMonthlyGracePeriodInfo } from "../utils/gracePeriodUtils.js";
 
+export async function getPaymentPricing() {
+  const status = await Status.findOne().select("coursePrice taxAmount paymentAmount").lean();
+  const cp = Number(status?.coursePrice ?? status?.paymentAmount ?? 5);
+  const tax = Number(status?.taxAmount ?? 0);
+  const coursePrice = Number.isFinite(cp) && cp >= 1 ? Math.round(cp * 100) / 100 : 5;
+  const taxAmount = Number.isFinite(tax) && tax >= 0 ? Math.round(tax * 100) / 100 : 0;
+  const totalFee = Math.round((coursePrice + taxAmount) * 100) / 100;
+  return { coursePrice, taxAmount, totalFee };
+}
+
 async function getPaymentAmount() {
-  const status = await Status.findOne().select("paymentAmount").lean();
-  const amount = Number(status?.paymentAmount ?? 5);
-  return Number.isFinite(amount) && amount >= 1 ? Math.round(amount * 100) / 100 : 5;
+  const pricing = await getPaymentPricing();
+  return pricing.totalFee;
 }
 
 /**
@@ -73,11 +82,14 @@ async function getPaymentAmount() {
  */
 export async function getPaymentConfig(req, res) {
   try {
-    const amount = await getPaymentAmount();
+    const { coursePrice, taxAmount, totalFee } = await getPaymentPricing();
     const referralRewardAmount = await getReferralRewardAmount();
     const gracePeriod = getMonthlyGracePeriodInfo();
     res.json({
-      amount,
+      amount: totalFee,
+      totalAmount: totalFee,
+      coursePrice,
+      taxAmount,
       referralRewardAmount,
       currency: "INR",
       gracePeriod,
@@ -139,10 +151,11 @@ export async function getUserWallet(req, res) {
  */
 export async function createOrder(req, res) {
   try {
-    const totalFee = await getPaymentAmount();
+    const { coursePrice, taxAmount, totalFee } = await getPaymentPricing();
 
-    // Determine if user wants to use wallet balance or pay full amount via direct gateway
-    const useWallet = req.body?.useWallet !== false && req.body?.paymentMethod !== "upi" && req.body?.paymentMethod !== "razorpay";
+    const paymentMethod = req.body?.paymentMethod || (req.body?.useWallet ? "wallet" : "upi");
+    const useWallet = req.body?.useWallet !== false && paymentMethod !== "upi" && paymentMethod !== "razorpay";
+    const confirmWalletPayment = Boolean(req.body?.confirmWalletPayment === true);
 
     // Find user to check wallet balance
     let phone = req.user.phone;
@@ -158,17 +171,40 @@ export async function createOrder(req, res) {
     const rawWallet = user ? Math.max(0, Number(user.walletBalance) || 0) : 0;
     const currentWallet = useWallet ? rawWallet : 0;
 
-    // CASE 1: 100% Wallet Balance Cover (walletBalance >= totalFee AND useWallet is true)
-    if (useWallet && user && currentWallet >= totalFee && totalFee > 0) {
-      const newBalance = Math.round((currentWallet - totalFee) * 100) / 100;
+    // ── WALLET PAYMENT RULE ──────────────────────────────────────────────
+    // When paying via Wallet, user ONLY pays the coursePrice (Tax is EXEMPT / WAIVED).
+    const walletTargetFee = coursePrice;
+
+    // CASE 1: 100% Wallet Balance Cover (walletBalance >= coursePrice AND useWallet is true)
+    if (useWallet && user && currentWallet >= walletTargetFee && walletTargetFee > 0) {
+      // 🛡️ CRITICAL BUG FIX: Never auto-deduct without explicit user confirmation!
+      // If user has not explicitly clicked Confirm in the confirmation dialog, return preview order.
+      if (!confirmWalletPayment) {
+        return res.json({
+          success: true,
+          walletCovered: true,
+          requiresConfirmation: true,
+          totalFee,
+          coursePrice,
+          taxAmount,
+          walletRequiredAmount: walletTargetFee,
+          walletDiscountApplied: walletTargetFee,
+          netPayableINR: 0,
+          walletBalance: currentWallet,
+          useWallet: true,
+          message: `Activate full membership for ₹${walletTargetFee} from your wallet balance (Tax of ₹${taxAmount} is waived)?`,
+        });
+      }
+
+      const newBalance = Math.round((currentWallet - walletTargetFee) * 100) / 100;
       user.walletBalance = newBalance;
       user.paid = true;
       user.paidAt = new Date();
       if (!Array.isArray(user.walletHistory)) user.walletHistory = [];
       user.walletHistory.push({
         type: "debit",
-        amount: totalFee,
-        reason: "💳 Subscription Activated (100% Wallet Balance Covered)",
+        amount: walletTargetFee,
+        reason: `💳 Subscription Activated via Wallet (Course Price ₹${walletTargetFee}${taxAmount > 0 ? `, Tax ₹${taxAmount} Waived` : ""})`,
         balanceAfter: newBalance,
         date: new Date(),
       });
@@ -181,30 +217,33 @@ export async function createOrder(req, res) {
         userId: user.userId || null,
         razorpayOrderId: `wallet_${Date.now()}`,
         razorpayPaymentId: `wallet_pay_${Date.now()}`,
-        amount: totalFee,
+        amount: walletTargetFee,
         status: "success",
         method: "wallet",
         source: "wallet",
-        note: "Activated 100% using Wallet Balance",
+        note: `Activated 100% using Wallet Balance (Course Price ₹${walletTargetFee}, Tax Waived)`,
       }).catch(() => {});
 
       // Socket broadcast
       const io = req.app?.get("io");
       if (io) {
         io.emit("user:paid_status", { phone: user.phone || phone, paid: true, paidAt: user.paidAt, name: user.name });
-        io.emit("payment:recorded", { phone: user.phone || phone, name: user.name, amount: totalFee, razorpayPaymentId: "wallet_pay", createdAt: new Date() });
+        io.emit("payment:recorded", { phone: user.phone || phone, name: user.name, amount: walletTargetFee, razorpayPaymentId: "wallet_pay", createdAt: new Date() });
       }
 
       // Credit referral reward (₹5) to referrer if eligible
       await creditReferralRewardIfEligible(user, io);
 
-      console.log(`[Payment] ⚡ 100% Wallet Cover Activated for ${user.phone}. Fee: ₹${totalFee}, New balance: ₹${newBalance}`);
+      console.log(`[Payment] ⚡ 100% Wallet Cover Activated for ${user.phone}. Course Price: ₹${walletTargetFee} (Tax ₹${taxAmount} waived), New balance: ₹${newBalance}`);
       return res.json({
         success: true,
         walletCovered: true,
-        message: `Subscription activated 100% using your wallet balance (₹${totalFee} deducted)!`,
+        confirmed: true,
+        message: `Subscription activated 100% using your wallet balance (₹${walletTargetFee} deducted, Tax waived)!`,
         totalFee,
-        walletDiscountApplied: totalFee,
+        coursePrice,
+        taxAmount,
+        walletDiscountApplied: walletTargetFee,
         netPayableINR: 0,
         walletBalance: newBalance,
         useWallet: true,
@@ -212,8 +251,10 @@ export async function createOrder(req, res) {
     }
 
     // CASE 2: Partial Wallet Discount or Direct Gateway Checkout
-    const walletDiscountApplied = Math.round(Math.min(currentWallet, totalFee) * 100) / 100;
-    const netPayableINR = Math.round(Math.max(0, totalFee - walletDiscountApplied) * 100) / 100;
+    // If using partial wallet, discount applies up to coursePrice. Remaining course balance + tax is paid via gateway.
+    const walletDiscountApplied = useWallet ? Math.round(Math.min(currentWallet, coursePrice) * 100) / 100 : 0;
+    const netCoursePrice = Math.max(0, coursePrice - walletDiscountApplied);
+    const netPayableINR = Math.round((netCoursePrice + taxAmount) * 100) / 100;
     const amountPaise = Math.round(netPayableINR * 100);
 
     if (amountPaise < 100) {
@@ -231,9 +272,11 @@ export async function createOrder(req, res) {
       receipt,
       notes: {
         userId: String(req.user.id || ""),
-        phone: String(req.user.phone || phone || ""),
+        phone: String(user?.phone || req.user.phone || phone || ""),
         name: String(req.user.name || ""),
         totalFee: String(totalFee),
+        coursePrice: String(coursePrice),
+        taxAmount: String(taxAmount),
         walletDiscountApplied: String(walletDiscountApplied),
         useWallet: String(useWallet),
       },
@@ -245,6 +288,8 @@ export async function createOrder(req, res) {
       currency: order.currency,
       key: process.env.RAZORPAY_KEY_ID,
       totalFee,
+      coursePrice,
+      taxAmount,
       walletDiscountApplied,
       netPayableINR,
       walletBalance: rawWallet,
@@ -625,16 +670,23 @@ export async function getMyTransactions(req, res) {
 
     if (!phone) return res.status(400).json({ error: "Cannot resolve user phone" });
 
-    const transactions = await Transaction.find({ phone })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
-
-    // Also get current paid status from user doc
+    const phoneCandidates = [...new Set(getPhoneLookupVariants(phone))];
     const user = await findUserByPhone(phone);
+
+    const transactions = await Transaction.find({
+      $or: [
+        { phone: { $in: phoneCandidates } },
+        ...(user?.userId ? [{ userId: user.userId }] : []),
+      ]
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
 
     res.json({
       transactions,
+      walletBalance: user?.walletBalance || 0,
+      walletHistory: Array.isArray(user?.walletHistory) ? user.walletHistory : [],
       paid:      user?.paid      ?? false,
       paidAt:    user?.paidAt    ?? null,
       paymentId: user?.razorpayPaymentId ?? null,

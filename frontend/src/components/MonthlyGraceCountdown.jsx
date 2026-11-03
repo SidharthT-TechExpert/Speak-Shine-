@@ -188,7 +188,8 @@ export default function MonthlyGraceCountdown({ onPaymentSuccess }) {
     }
 
     try {
-      const { data: order } = await api.post("/payments/create-order");
+      // Never silently charge wallet without explicit confirmation; pass useWallet: false for direct gateway checkout
+      const { data: order } = await api.post("/payments/create-order", { useWallet: false, paymentMethod: "upi" });
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,

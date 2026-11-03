@@ -106,7 +106,7 @@ export default function PaymentHistory() {
     }
 
     try {
-      const { data: order } = await api.post("/payments/create-order");
+      const { data: order } = await api.post("/payments/create-order", { useWallet: false, paymentMethod: "upi" });
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
@@ -203,7 +203,7 @@ export default function PaymentHistory() {
   if (loading) return <Layout title="Payments"><div className="spinner-wrap"><div className="spinner" /></div></Layout>;
   if (error)   return <Layout title="Payments"><div className="error-box"><p>{error}</p></div></Layout>;
 
-  const { transactions = [], paidAt, paymentId } = data || {};
+  const { transactions = [], paidAt, paymentId, walletBalance = 0, walletHistory = [] } = data || {};
   const { days, hours, minutes, seconds } = graceStatus.countdown;
 
   return (
@@ -273,8 +273,8 @@ export default function PaymentHistory() {
             Manage your monthly speaking cohort membership, instant UPI renewals, and download official GST-compliant tax receipts.
           </p>
 
-          {/* 4 Quick-KPI Stat Micro-Cards */}
-          <div className="payment-kpi-grid">
+          {/* 5 Quick-KPI Stat Micro-Cards */}
+          <div className="payment-kpi-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
             {/* Card 1: Membership Status */}
             <div className="payment-kpi-card">
               <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -316,6 +316,16 @@ export default function PaymentHistory() {
               </div>
               <div style={{ fontSize: "1.15rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7c3aed", marginTop: 2 }}>
                 {transactions.length} <span style={{ fontSize: "0.75rem", fontWeight: 500, color: isDark ? "#94a3b8" : "#64748b" }}>logged</span>
+              </div>
+            </div>
+
+            {/* Card 5: Available Wallet Balance */}
+            <div className="payment-kpi-card">
+              <div style={{ fontSize: "0.68rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                WALLET BALANCE
+              </div>
+              <div style={{ fontSize: "1.15rem", fontWeight: 800, color: walletBalance > 0 ? "#4ade80" : isDark ? "#ffffff" : "#0f172a", marginTop: 2 }}>
+                ₹{walletBalance}
               </div>
             </div>
           </div>
@@ -672,6 +682,129 @@ export default function PaymentHistory() {
             )}
           </div>
         )}
+
+        {/* ── Section 2.5: Wallet & Rewards History ── */}
+        <div className="speakshine-card-box" style={{
+          background: isDark ? "#0d0a18" : "#ffffff",
+          border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: isDark ? "0 12px 36px rgba(0, 0, 0, 0.45)" : "0 4px 18px rgba(0, 0, 0, 0.04)",
+          marginBottom: "1.5rem",
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: "1.35rem 1.6rem",
+            borderBottom: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.2rem", color: "#fff",
+              }}>
+                💰
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem", color: isDark ? "#ffffff" : "#0f172a" }}>
+                  Wallet &amp; Referral Earnings History
+                </div>
+                <div style={{ fontSize: "0.8rem", color: isDark ? "#94a3b8" : "#64748b", marginTop: "0.15rem" }}>
+                  Track credits earned from referrals &amp; discounts used for course subscriptions
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{
+                fontSize: "0.85rem", fontWeight: 800,
+                color: walletBalance > 0 ? "#4ade80" : "var(--muted)",
+                background: isDark ? "rgba(74, 222, 128, 0.12)" : "#dcfce7",
+                border: isDark ? "1px solid rgba(74, 222, 128, 0.25)" : "1px solid #86efac",
+                padding: "0.35rem 0.85rem", borderRadius: 99,
+              }}>
+                Balance: ₹{walletBalance}
+              </div>
+            </div>
+          </div>
+
+          {walletHistory.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "2.5rem 1.5rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>👛</div>
+              <div style={{ fontWeight: 800, fontSize: "0.98rem", color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.2rem" }}>
+                No Wallet Transactions Yet
+              </div>
+              <div style={{ fontSize: "0.8rem", maxWidth: 420, margin: "0 auto" }}>
+                Earn wallet rewards by inviting friends to join Speak &amp; Shine. Wallet credits can be used directly to pay for memberships without tax!
+              </div>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem", textAlign: "left" }}>
+                <thead>
+                  <tr style={{
+                    background: isDark ? "rgba(255, 255, 255, 0.02)" : "#f8fafc",
+                    borderBottom: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    fontSize: "0.72rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}>
+                    <th style={{ padding: "0.85rem 1.25rem" }}>Date &amp; Time</th>
+                    <th style={{ padding: "0.85rem 1.25rem" }}>Type</th>
+                    <th style={{ padding: "0.85rem 1.25rem" }}>Description / Reason</th>
+                    <th style={{ padding: "0.85rem 1.25rem", textAlign: "right" }}>Amount</th>
+                    <th style={{ padding: "0.85rem 1.25rem", textAlign: "right" }}>Balance After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...walletHistory].reverse().map((tx, idx) => (
+                    <tr key={idx} style={{
+                      borderBottom: isDark ? "1px solid rgba(255, 255, 255, 0.04)" : "1px solid #f1f5f9",
+                    }}>
+                      <td style={{ padding: "0.9rem 1.25rem", color: isDark ? "#cbd5e1" : "#334155", whiteSpace: "nowrap" }}>
+                        {new Date(tx.date).toLocaleString("en-IN", {
+                          timeZone: "Asia/Kolkata", day: "2-digit", month: "short",
+                          year: "numeric", hour: "2-digit", minute: "2-digit",
+                        })}
+                      </td>
+                      <td style={{ padding: "0.9rem 1.25rem" }}>
+                        <span style={{
+                          padding: "0.2rem 0.55rem", borderRadius: 6, fontSize: "0.72rem", fontWeight: 800,
+                          textTransform: "uppercase",
+                          background: tx.type === "credit" ? "rgba(74, 222, 128, 0.12)" : "rgba(248, 113, 113, 0.12)",
+                          color: tx.type === "credit" ? "#4ade80" : "#f87171",
+                          border: `1px solid ${tx.type === "credit" ? "rgba(74, 222, 128, 0.3)" : "rgba(248, 113, 113, 0.3)"}`,
+                        }}>
+                          {tx.type}
+                        </span>
+                      </td>
+                      <td style={{ padding: "0.9rem 1.25rem", color: isDark ? "#ffffff" : "#0f172a", fontWeight: 600 }}>
+                        {tx.reason || "Wallet transaction"}
+                      </td>
+                      <td style={{
+                        padding: "0.9rem 1.25rem", textAlign: "right",
+                        fontWeight: 800,
+                        color: tx.type === "credit" ? "#4ade80" : "#f87171",
+                      }}>
+                        {tx.type === "credit" ? `+₹${tx.amount}` : `-₹${tx.amount}`}
+                      </td>
+                      <td style={{ padding: "0.9rem 1.25rem", textAlign: "right", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 700 }}>
+                        ₹{tx.balanceAfter}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         {/* ── Section 3: Transaction History & Official Invoices ── */}
         <div className="speakshine-card-box" style={{

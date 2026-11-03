@@ -692,6 +692,8 @@ export async function getSettings() {
           ? [status.pictureDescriptionDay]
           : (status.pictureDescriptionDay === -1 ? [] : [4])),
     pictureDescriptionDay: status.pictureDescriptionDay ?? (Array.isArray(status.pictureDescriptionDays) && status.pictureDescriptionDays.length > 0 ? status.pictureDescriptionDays[0] : -1),
+    coursePrice: status.coursePrice ?? status.paymentAmount ?? 5,
+    taxAmount: status.taxAmount ?? 0,
     paymentAmount: status.paymentAmount ?? 5,
     referralRewardAmount: status.referralRewardAmount ?? 5,
     durationDefaultMax: status.durationDefaultMax ?? 300,
@@ -785,6 +787,8 @@ export async function updateSettings(input, ...rest) {
 
   const {
     posterSendTime, questionGenerateTime, vocabWordCount, vocabRequiredCount, vocabLevel, storyWordCount, storyLevel, storyDay, storyDays,
+    coursePrice,
+    taxAmount,
     paymentAmount,
     referralRewardAmount,
     durationDefaultMax, durationDefaultFull,
@@ -1077,14 +1081,29 @@ export async function updateSettings(input, ...rest) {
     updates.pictureDescriptionDays = day === -1 ? [] : [day];
   }
 
-  if (paymentAmount !== undefined) {
-    const amount = Number(paymentAmount);
-    if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
-      const error = new Error("paymentAmount must be between ₹1 and ₹100000");
+  if (coursePrice !== undefined || taxAmount !== undefined || paymentAmount !== undefined) {
+    const currentStatus = await Status.findOne().select("coursePrice taxAmount paymentAmount").lean();
+    let finalCp = coursePrice !== undefined
+      ? Number(coursePrice)
+      : (paymentAmount !== undefined && taxAmount === undefined
+          ? Number(paymentAmount)
+          : Number(currentStatus?.coursePrice ?? currentStatus?.paymentAmount ?? 5));
+    let finalTax = taxAmount !== undefined ? Number(taxAmount) : Number(currentStatus?.taxAmount ?? 0);
+
+    if (!Number.isFinite(finalCp) || finalCp < 1 || finalCp > 100000) {
+      const error = new Error("coursePrice must be between ₹1 and ₹100000");
       error.statusCode = 400;
       throw error;
     }
-    updates.paymentAmount = Math.round(amount * 100) / 100;
+    if (!Number.isFinite(finalTax) || finalTax < 0 || finalTax > 50000) {
+      const error = new Error("taxAmount must be between ₹0 and ₹50000");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    updates.coursePrice = Math.round(finalCp * 100) / 100;
+    updates.taxAmount = Math.round(finalTax * 100) / 100;
+    updates.paymentAmount = Math.round((updates.coursePrice + updates.taxAmount) * 100) / 100;
   }
 
   if (referralRewardAmount !== undefined) {

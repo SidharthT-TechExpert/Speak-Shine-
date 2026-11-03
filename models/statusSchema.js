@@ -61,6 +61,8 @@ const statusSchema = new mongoose.Schema({
   pictureDescriptionDays: { type: [Number], default: [4] },
   pictureDescriptionDay: { type: Number, default: 4, min: -1, max: 6 },
   // Payment & Referral settings (admin-configurable)
+  coursePrice: { type: Number, default: 5, min: 1, max: 100000 },
+  taxAmount: { type: Number, default: 0, min: 0, max: 50000 },
   paymentAmount: { type: Number, default: 5, min: 1, max: 100000 },
   referralRewardAmount: { type: Number, default: 5, min: 0, max: 10000 },
   // Duration scoring settings (admin-configurable)

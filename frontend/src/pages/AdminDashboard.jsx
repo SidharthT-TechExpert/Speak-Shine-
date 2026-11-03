@@ -436,6 +436,8 @@ export default function AdminDashboard() {
     storyDay: 6,
     pictureDescriptionDays: [4],
     pictureDescriptionDay: 4,
+    coursePrice: 5,
+    taxAmount: 0,
     paymentAmount: 5,
     referralRewardAmount: 5,
     durationDefaultMax: 300,
@@ -938,7 +940,9 @@ export default function AdminDashboard() {
           ? s.data.pictureDescriptionDays
           : (s.data.pictureDescriptionDay !== undefined && s.data.pictureDescriptionDay !== -1 ? [s.data.pictureDescriptionDay] : [4]),
         pictureDescriptionDay: s.data.pictureDescriptionDay ?? (Array.isArray(s.data.pictureDescriptionDays) && s.data.pictureDescriptionDays.length > 0 ? s.data.pictureDescriptionDays[0] : -1),
-        paymentAmount: s.data.paymentAmount ?? 5,
+        coursePrice: s.data.coursePrice ?? s.data.paymentAmount ?? 5,
+        taxAmount: s.data.taxAmount ?? 0,
+        paymentAmount: s.data.paymentAmount ?? ((s.data.coursePrice ?? 5) + (s.data.taxAmount ?? 0)),
         referralRewardAmount: s.data.referralRewardAmount ?? 5,
         durationDefaultMax: s.data.durationDefaultMax ?? 300,
         durationDefaultFull: s.data.durationDefaultFull ?? 300,
@@ -1452,7 +1456,9 @@ export default function AdminDashboard() {
           ? fresh.data.pictureDescriptionDays
           : (fresh.data.pictureDescriptionDay !== undefined && fresh.data.pictureDescriptionDay !== -1 ? [fresh.data.pictureDescriptionDay] : [4]),
         pictureDescriptionDay: fresh.data.pictureDescriptionDay ?? -1,
-        paymentAmount: fresh.data.paymentAmount ?? 5,
+        coursePrice: fresh.data.coursePrice ?? fresh.data.paymentAmount ?? 5,
+        taxAmount: fresh.data.taxAmount ?? 0,
+        paymentAmount: fresh.data.paymentAmount ?? ((fresh.data.coursePrice ?? 5) + (fresh.data.taxAmount ?? 0)),
         referralRewardAmount: fresh.data.referralRewardAmount ?? 5,
         durationDefaultMax: fresh.data.durationDefaultMax ?? 300,
         durationDefaultFull: fresh.data.durationDefaultFull ?? 300,
@@ -7395,13 +7401,13 @@ export default function AdminDashboard() {
               <form onSubmit={e => saveSettings(e, "payment")}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.25rem", marginBottom: "1.5rem" }}>
                   
-                  {/* Membership Amount */}
+                  {/* Course Price (Base Membership Fee) */}
                   <div style={{ padding: "1.25rem", borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
                     <label className="form-label" style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.3rem" }}>
-                      💰 Premium Membership Fee (INR)
+                      📚 Course Base Price (INR)
                     </label>
                     <p style={{ color: "var(--muted)", fontSize: "0.78rem", margin: "0 0 0.75rem" }}>
-                      Amount shown on the payment wall and charged at checkout.
+                      Base course fee. When paying with wallet, students pay ONLY this amount (tax is waived).
                     </p>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                       <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--accent)" }}>₹</span>
@@ -7409,12 +7415,78 @@ export default function AdminDashboard() {
                         className="form-input"
                         type="number"
                         min={1} max={100000} step="0.01"
-                        value={settings.paymentAmount}
-                        onChange={e => setSettings(s => ({ ...s, paymentAmount: e.target.value }))}
+                        value={settings.coursePrice ?? settings.paymentAmount ?? 5}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSettings(s => ({
+                            ...s,
+                            coursePrice: val,
+                            paymentAmount: (Number(val) || 0) + (Number(s.taxAmount) || 0),
+                          }));
+                        }}
                         required
                         style={{ width: 140, fontSize: "1.1rem", fontWeight: 700 }}
                       />
                       <span style={{ fontSize: "0.82rem", color: "var(--muted)" }}>INR</span>
+                    </div>
+                  </div>
+
+                  {/* Tax Amount */}
+                  <div style={{ padding: "1.25rem", borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                    <label className="form-label" style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.3rem" }}>
+                      🧾 Tax Amount / GST (INR)
+                    </label>
+                    <p style={{ color: "var(--muted)", fontSize: "0.78rem", margin: "0 0 0.75rem" }}>
+                      Added to gateway/UPI payments. Note: Automatically exempted (₹0) on wallet payments.
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "#38bdf8" }}>₹</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min={0} max={100000} step="0.01"
+                        value={settings.taxAmount ?? 0}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSettings(s => ({
+                            ...s,
+                            taxAmount: val,
+                            paymentAmount: (Number(s.coursePrice ?? s.paymentAmount) || 0) + (Number(val) || 0),
+                          }));
+                        }}
+                        required
+                        style={{ width: 140, fontSize: "1.1rem", fontWeight: 700 }}
+                      />
+                      <span style={{ fontSize: "0.82rem", color: "var(--muted)" }}>INR</span>
+                    </div>
+                  </div>
+
+                  {/* Live Gateway Total & Wallet Rule Banner */}
+                  <div style={{
+                    gridColumn: "1 / -1",
+                    padding: "1rem 1.25rem",
+                    borderRadius: 12,
+                    background: "rgba(124, 111, 255, 0.08)",
+                    border: "1px solid rgba(124, 111, 255, 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "1rem",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "var(--text)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span>💳 Direct Gateway / UPI Total:</span>
+                        <span style={{ color: "#7c6fff", fontSize: "1.1rem" }}>
+                          ₹{((Number(settings.coursePrice ?? settings.paymentAmount) || 0) + (Number(settings.taxAmount) || 0)).toFixed(2)}
+                        </span>
+                        <span style={{ fontSize: "0.76rem", color: "var(--muted)", fontWeight: 500 }}>
+                          (Course ₹{Number(settings.coursePrice ?? settings.paymentAmount) || 0} + Tax ₹{Number(settings.taxAmount) || 0})
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: "0.25rem", fontWeight: 600 }}>
+                        💰 Wallet Rule: When paying from wallet, users are charged ONLY Course Price (₹{Number(settings.coursePrice ?? settings.paymentAmount) || 0}) — Tax is waived!
+                      </div>
                     </div>
                   </div>
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createOrder } from "./paymentController.js";
+import { createOrder, getPaymentPricing } from "./paymentController.js";
 import User from "../../models/userSchema.js";
 import Status from "../../models/statusSchema.js";
 import Auth from "../../models/authSchema.js";
+import Transaction from "../../models/transactionSchema.js";
 
 vi.mock("razorpay", () => {
   return {
@@ -30,7 +31,20 @@ vi.mock("../../models/statusSchema.js", () => ({
   default: {
     findOne: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({ paymentAmount: 5 }),
+        lean: vi.fn().mockResolvedValue({ coursePrice: 100, taxAmount: 18, paymentAmount: 118 }),
+      }),
+    }),
+  },
+}));
+
+vi.mock("../../models/transactionSchema.js", () => ({
+  default: {
+    create: vi.fn().mockResolvedValue({}),
+    find: vi.fn().mockReturnValue({
+      sort: vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnValue({
+          lean: vi.fn().mockResolvedValue([]),
+        }),
       }),
     }),
   },
@@ -44,7 +58,7 @@ vi.mock("../../models/authSchema.js", () => ({
 
 vi.mock("../utils/phoneUtils.js", () => ({
   findUserByPhone: vi.fn(),
-  getPhoneLookupVariants: vi.fn(),
+  getPhoneLookupVariants: vi.fn().mockReturnValue(["9876543210"]),
   escapeRegex: vi.fn(),
 }));
 
@@ -71,27 +85,29 @@ describe("Payment Controller - Wallet vs Direct Gateway Options", () => {
   it("should create partial wallet order when useWallet is true and walletBalance > 0", async () => {
     const mockUser = {
       phone: "9876543210",
-      walletBalance: 2,
+      walletBalance: 20,
       walletHistory: [],
       save: vi.fn(),
     };
     findUserByPhone.mockResolvedValue(mockUser);
 
-    req.body = { useWallet: true };
+    req.body = { useWallet: true, paymentMethod: "wallet" };
     await createOrder(req, res);
 
     expect(res.json).toHaveBeenCalled();
     const response = res.json.mock.calls[0][0];
-    expect(response.totalFee).toBe(5);
-    expect(response.walletDiscountApplied).toBe(2);
-    expect(response.netPayableINR).toBe(3);
+    expect(response.totalFee).toBe(118);
+    expect(response.coursePrice).toBe(100);
+    expect(response.taxAmount).toBe(18);
+    expect(response.walletDiscountApplied).toBe(20);
+    expect(response.netPayableINR).toBe(98); // (100 - 20) + 18
     expect(response.useWallet).toBe(true);
   });
 
   it("should bypass wallet deduction and order full fee when useWallet is false", async () => {
     const mockUser = {
       phone: "9876543210",
-      walletBalance: 10,
+      walletBalance: 150,
       walletHistory: [],
       save: vi.fn(),
     };
@@ -102,9 +118,58 @@ describe("Payment Controller - Wallet vs Direct Gateway Options", () => {
 
     expect(res.json).toHaveBeenCalled();
     const response = res.json.mock.calls[0][0];
-    expect(response.totalFee).toBe(5);
+    expect(response.totalFee).toBe(118);
+    expect(response.coursePrice).toBe(100);
+    expect(response.taxAmount).toBe(18);
     expect(response.walletDiscountApplied).toBe(0);
-    expect(response.netPayableINR).toBe(5);
+    expect(response.netPayableINR).toBe(118);
     expect(response.useWallet).toBe(false);
+  });
+
+  it("should require confirmation without auto-debiting when wallet balance >= coursePrice", async () => {
+    const mockUser = {
+      phone: "9876543210",
+      walletBalance: 120,
+      walletHistory: [],
+      paid: false,
+      save: vi.fn(),
+    };
+    findUserByPhone.mockResolvedValue(mockUser);
+
+    // Initial visit / createOrder without confirmWalletPayment
+    req.body = { useWallet: true, paymentMethod: "wallet" };
+    await createOrder(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const response = res.json.mock.calls[0][0];
+    expect(response.walletCovered).toBe(true);
+    expect(response.requiresConfirmation).toBe(true);
+    expect(response.walletRequiredAmount).toBe(100); // Only coursePrice, tax waived!
+    expect(mockUser.save).not.toHaveBeenCalled(); // 🛡️ Did NOT auto-debit!
+    expect(mockUser.paid).toBe(false);
+  });
+
+  it("should only deduct coursePrice (exempt tax) and activate when confirmWalletPayment is true", async () => {
+    const mockUser = {
+      phone: "9876543210",
+      walletBalance: 120,
+      walletHistory: [],
+      paid: false,
+      save: vi.fn().mockResolvedValue(true),
+    };
+    findUserByPhone.mockResolvedValue(mockUser);
+
+    req.body = { useWallet: true, paymentMethod: "wallet", confirmWalletPayment: true };
+    await createOrder(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const response = res.json.mock.calls[0][0];
+    expect(response.walletCovered).toBe(true);
+    expect(response.confirmed).toBe(true);
+    expect(mockUser.walletBalance).toBe(20); // 120 - 100 coursePrice (tax of 18 was waived!)
+    expect(mockUser.paid).toBe(true);
+    expect(mockUser.save).toHaveBeenCalled();
+    expect(mockUser.walletHistory.length).toBe(1);
+    expect(mockUser.walletHistory[0].amount).toBe(100);
   });
 });
