@@ -446,18 +446,17 @@ export default function HelpDeskWidget() {
           bottom: "1.5rem",
           right: "1.5rem",
           zIndex: 9998,
-          width: 52,
-          height: 52,
+          width: 50,
+          height: 50,
           borderRadius: "50%",
           background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
           color: "#fff",
-          border: "2px solid rgba(255,255,255,0.25)",
-          boxShadow: "0 8px 24px rgba(139,92,246,0.45)",
+          border: "1.5px solid rgba(255,255,255,0.2)",
+          boxShadow: "0 8px 24px rgba(139,92,246,0.4)",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: "1.4rem",
           transition: "transform 0.2s ease, box-shadow 0.2s ease",
         }}
         onMouseEnter={e => {
@@ -466,10 +465,15 @@ export default function HelpDeskWidget() {
         }}
         onMouseLeave={e => {
           e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "0 8px 24px rgba(139,92,246,0.45)";
+          e.currentTarget.style.boxShadow = "0 8px 24px rgba(139,92,246,0.4)";
         }}
       >
-        🆘
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <line x1="9" y1="10" x2="9.01" y2="10" strokeWidth="2.5" />
+          <line x1="12" y1="10" x2="12.01" y2="10" strokeWidth="2.5" />
+          <line x1="15" y1="10" x2="15.01" y2="10" strokeWidth="2.5" />
+        </svg>
         {hasUnread && (
           <span
             style={{
