@@ -477,50 +477,144 @@ export default function PaymentWall({ onSuccess }) {
 
   return (
     <Layout title="Unlock Full Access">
-      {/* Wallet Deduction Confirmation Modal (Prevents accidental/background payments) */}
+      {/* Scoped CSS for responsive 2-column layout and animations */}
+      <style>{`
+        .pw-container {
+          max-width: 1060px;
+          margin: 1.5rem auto 3rem;
+          padding: 0 1.25rem;
+          box-sizing: border-box;
+        }
+        .pw-grid {
+          display: grid;
+          grid-template-columns: 1.12fr 0.98fr;
+          gap: 2rem;
+          align-items: start;
+        }
+        @media (max-width: 880px) {
+          .pw-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+          .pw-container {
+            margin: 1rem auto 2rem;
+            padding: 0 1rem;
+          }
+        }
+        .pw-card {
+          background: rgba(15, 23, 42, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          box-sizing: border-box;
+        }
+        .pw-option-card {
+          border: 1.5px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 14px;
+          padding: 0.95rem 1.1rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .pw-option-card:hover {
+          border-color: rgba(255, 255, 255, 0.22);
+          background: rgba(255, 255, 255, 0.04);
+        }
+        .pw-option-active-wallet {
+          border-color: #10b981 !important;
+          background: rgba(16, 185, 129, 0.08) !important;
+          box-shadow: 0 0 20px rgba(16, 185, 129, 0.12);
+        }
+        .pw-option-active-upi {
+          border-color: #7c6fff !important;
+          background: rgba(124, 111, 255, 0.08) !important;
+          box-shadow: 0 0 20px rgba(124, 111, 255, 0.12);
+        }
+        .pw-btn-primary {
+          width: 100%;
+          border: none;
+          border-radius: 14px;
+          padding: 0.95rem 1.5rem;
+          font-size: 1rem;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+          color: #ffffff;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+        }
+        .pw-btn-primary:active {
+          transform: scale(0.99);
+        }
+      `}</style>
+
+      {/* ── Wallet Deduction Confirmation Modal ── */}
       {showWalletConfirmModal && (
         <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
-          zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          width: "100vw", height: "100vh",
+          backgroundColor: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          zIndex: 99999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           padding: "1rem",
+          boxSizing: "border-box",
         }}>
           <div style={{
-            background: "#0f172a", border: "1px solid rgba(74, 222, 128, 0.4)",
-            borderRadius: 20, width: "100%", maxWidth: 440,
-            padding: "1.75rem", boxShadow: "0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(74, 222, 128, 0.15)",
+            background: "#0f172a",
+            border: "1px solid rgba(74, 222, 128, 0.35)",
+            borderRadius: 20,
+            width: "100%",
+            maxWidth: 370,
+            margin: "auto",
+            padding: "1.6rem",
+            boxShadow: "0 25px 60px rgba(0, 0, 0, 0.8), 0 0 25px rgba(74, 222, 128, 0.12)",
             textAlign: "center",
+            boxSizing: "border-box",
+            maxHeight: "90vh",
+            overflowY: "auto",
           }}>
-            <div style={{ fontSize: "2.8rem", marginBottom: "0.75rem" }}>
-              💰
+            <div style={{
+              width: 52, height: 52, borderRadius: 16,
+              background: "rgba(74, 222, 128, 0.12)",
+              border: "1px solid rgba(74, 222, 128, 0.25)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "1.75rem", margin: "0 auto 1rem",
+            }}>
+              👛
             </div>
-            <h3 style={{ margin: "0 0 0.5rem", fontSize: "1.25rem", fontWeight: 800, color: "#ffffff" }}>
+            <h3 style={{ margin: "0 0 0.4rem", fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
               Confirm Wallet Payment
             </h3>
             <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 1.25rem", lineHeight: 1.5 }}>
-              Deduct <strong style={{ color: "#4ade80" }}>₹${coursePrice}</strong> from your wallet balance to activate membership?
+              Pay <strong style={{ color: "#4ade80" }}>₹{coursePrice}</strong> from your wallet balance to activate full membership access?
             </p>
 
             <div style={{
-              background: "rgba(255, 255, 255, 0.04)", border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: 14, padding: "1rem", marginBottom: "1.25rem", textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: 12,
+              padding: "0.65rem 0.95rem",
+              marginBottom: "1.25rem",
+              fontSize: "0.82rem",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "#cbd5e1", marginBottom: "0.35rem" }}>
-                <span>Course Base Price:</span>
-                <span style={{ fontWeight: 700 }}>₹${coursePrice}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "#4ade80", marginBottom: "0.35rem" }}>
-                <span>Tax / GST:</span>
-                <span style={{ fontWeight: 700 }}>₹0 (Waived for Wallet!)</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
-                <span>Current Wallet Balance:</span>
-                <span>₹${walletBalance}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#ffffff", fontWeight: 800, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: "0.45rem", marginTop: "0.45rem" }}>
-                <span>Balance After Activation:</span>
-                <span style={{ color: "#4ade80" }}>₹${remainingWallet}</span>
-              </div>
+              <span style={{ color: "#94a3b8" }}>Wallet: ₹{walletBalance}</span>
+              <span style={{ color: "rgba(255, 255, 255, 0.2)" }}>→</span>
+              <span style={{ color: "#4ade80", fontWeight: 700 }}>₹{remainingWallet} remaining</span>
             </div>
 
             <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -529,9 +623,15 @@ export default function PaymentWall({ onSuccess }) {
                 onClick={() => setShowWalletConfirmModal(false)}
                 disabled={loading}
                 style={{
-                  flex: 1, padding: "0.75rem", borderRadius: 12,
-                  border: "1px solid rgba(255, 255, 255, 0.2)", background: "rgba(255, 255, 255, 0.05)",
-                  color: "#ffffff", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer",
+                  flex: 1,
+                  padding: "0.75rem",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  fontSize: "0.88rem",
+                  cursor: "pointer",
                 }}
               >
                 Cancel
@@ -541,42 +641,50 @@ export default function PaymentWall({ onSuccess }) {
                 onClick={handleConfirmWalletPayment}
                 disabled={loading}
                 style={{
-                  flex: 1.4, padding: "0.75rem", borderRadius: 12, border: "none",
+                  flex: 1.35,
+                  padding: "0.75rem",
+                  borderRadius: 12,
+                  border: "none",
                   background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                  color: "#ffffff", fontWeight: 800, fontSize: "0.9rem", cursor: "pointer",
-                  boxShadow: "0 4px 15px rgba(16, 185, 129, 0.4)",
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  fontSize: "0.88rem",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 18px rgba(16, 185, 129, 0.35)",
                 }}
               >
-                {loading ? "Activating..." : `Confirm ₹${coursePrice}`}
+                {loading ? "Activating…" : `Confirm ₹${coursePrice}`}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Wallet History Modal */}
+      {/* ── Wallet Transaction History Modal ── */}
       {showWalletHistoryModal && (
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)",
-          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "1rem",
+          background: "rgba(0, 0, 0, 0.8)", backdropFilter: "blur(8px)",
+          zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "1rem", boxSizing: "border-box",
         }}>
           <div style={{
             background: "#0f172a", border: "1px solid rgba(255, 255, 255, 0.15)",
-            borderRadius: 20, width: "100%", maxWidth: 520, maxHeight: "80vh",
+            borderRadius: 20, width: "100%", maxWidth: 480, maxHeight: "80vh",
             overflowY: "auto", padding: "1.5rem", boxShadow: "0 25px 60px rgba(0,0,0,0.8)",
+            boxSizing: "border-box",
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.2rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)", paddingBottom: "0.75rem" }}>
-              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span>💰</span> Wallet Transaction History
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)", paddingBottom: "0.75rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span>👛</span> Wallet Activity
               </h3>
               <button
                 type="button"
                 onClick={() => setShowWalletHistoryModal(false)}
                 style={{
                   background: "rgba(255, 255, 255, 0.1)", border: "none", color: "#fff",
-                  borderRadius: "50%", width: 30, height: 30, fontSize: "1rem", cursor: "pointer",
+                  borderRadius: "50%", width: 28, height: 28, fontSize: "0.9rem", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 ✕
@@ -584,9 +692,11 @@ export default function PaymentWall({ onSuccess }) {
             </div>
 
             {walletHistory.length === 0 ? (
-              <p style={{ textAlign: "center", color: "var(--muted)", padding: "1.5rem" }}>No wallet transactions found.</p>
+              <p style={{ textAlign: "center", color: "var(--muted)", padding: "1.75rem 1rem", fontSize: "0.85rem", margin: 0 }}>
+                No wallet transactions recorded yet.
+              </p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {[...walletHistory].reverse().map((tx, idx) => (
                   <div key={idx} style={{
                     background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)",
@@ -594,7 +704,7 @@ export default function PaymentWall({ onSuccess }) {
                   }}>
                     <div>
                       <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.2rem" }}>
-                        {tx.reason}
+                        {tx.reason || "Wallet transaction"}
                       </div>
                       <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
                         {new Date(tx.date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -602,10 +712,10 @@ export default function PaymentWall({ onSuccess }) {
                       </div>
                     </div>
                     <div style={{
-                      fontWeight: 900, fontSize: "0.95rem",
+                      fontWeight: 800, fontSize: "0.88rem",
                       color: tx.type === "credit" ? "#4ade80" : "#f87171",
                       background: tx.type === "credit" ? "rgba(74, 222, 128, 0.1)" : "rgba(248, 113, 113, 0.1)",
-                      padding: "0.25rem 0.6rem", borderRadius: 8,
+                      padding: "0.2rem 0.55rem", borderRadius: 8,
                       border: `1px solid ${tx.type === "credit" ? "rgba(74, 222, 128, 0.3)" : "rgba(248, 113, 113, 0.3)"}`,
                     }}>
                       {tx.type === "credit" ? `+₹${tx.amount}` : `-₹${tx.amount}`}
@@ -618,407 +728,372 @@ export default function PaymentWall({ onSuccess }) {
         </div>
       )}
 
-      <div style={{
-        maxWidth: 480, margin: "2rem auto", padding: "0 1rem",
-      }}>
-        {/* Header */}
-        <div style={{
-          background: "linear-gradient(135deg, #1a1a2e 0%, #0f0f23 100%)",
-          border: "1px solid rgba(124,111,255,0.3)",
-          borderRadius: 20,
-          padding: "2rem 1.5rem",
-          textAlign: "center",
-          marginBottom: "1.5rem",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          <div style={{
-            position: "absolute", top: -50, right: -50,
-            width: 180, height: 180, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(124,111,255,0.2) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }} />
-          <div style={{ fontSize: "3rem", marginBottom: "0.75rem" }}>
-            {graceStatus.isGracePeriod ? "🎁" : "🔒"}
-          </div>
-          <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text)", marginBottom: "0.5rem" }}>
-            {graceStatus.isGracePeriod
-              ? `Unlock Full ${graceStatus.monthName} Membership`
-              : "Payment Required"}
-          </h1>
-          <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.6 }}>
-            {graceStatus.isGracePeriod
-              ? `Day ${graceStatus.dayOfMonth} of 2 is active. You can practice speaking for free right now, or complete your monthly membership now for uninterrupted access.`
-              : "Your account is on a payment hold. Complete the payment below to unlock video submission, analysis, and all premium features."}
-          </p>
-        </div>
-
-        {/* Plan card */}
-        <div style={{
-          background: "rgba(124,111,255,0.06)",
-          border: "2px solid rgba(124,111,255,0.3)",
-          borderRadius: 16,
-          padding: "1.5rem",
-          marginBottom: "1.25rem",
-        }}>
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            marginBottom: "1rem",
-          }}>
+      {/* ── Main Layout: Responsive 2-Column Desktop Grid ── */}
+      <div className="pw-container">
+        <div className="pw-grid">
+          
+          {/* ════════ COLUMN 1: Value Proposition & Membership Benefits ════════ */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            
+            {/* Header Badge & Title */}
             <div>
-              <div style={{ fontSize: "0.7rem", color: "#a78bfa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.25rem" }}>
-                Premium Membership
-              </div>
-              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)" }}>
-                Speak &amp; Shine Full Access
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#7c6fff" }}>
-                ₹{planAmount}
-              </div>
-              <div style={{ fontSize: "0.7rem", color: "var(--muted)" }}>one-time</div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {[
-              "📹 Daily video submission & AI analysis",
-              "📊 Fluency, grammar & confidence scores",
-              "🔥 Streak tracking & leaderboard",
-              "💬 Community feed & live sessions",
-              "🎓 Vocabulary challenges & feedback",
-            ].map((item) => (
-              <div key={item} style={{
-                display: "flex", alignItems: "center", gap: "0.5rem",
-                fontSize: "0.85rem", color: "var(--text)",
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.45rem",
+                background: "rgba(124, 111, 255, 0.12)",
+                border: "1px solid rgba(124, 111, 255, 0.28)",
+                borderRadius: 99,
+                padding: "0.3rem 0.85rem",
+                fontSize: "0.74rem",
+                fontWeight: 800,
+                color: "#a78bfa",
+                letterSpacing: "0.04em",
+                marginBottom: "0.75rem",
               }}>
-                <span style={{ color: "#4ade80", flexShrink: 0 }}>✓</span>
-                {item}
+                <span>✨</span>
+                <span>{graceStatus.isGracePeriod ? `${graceStatus.monthName.toUpperCase()} TRIAL WINDOW ACTIVE` : "PREMIUM MEMBERSHIP"}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <h1 style={{
+                fontSize: "1.65rem",
+                fontWeight: 800,
+                color: "#ffffff",
+                lineHeight: 1.25,
+                margin: "0 0 0.5rem",
+                letterSpacing: "-0.01em",
+              }}>
+                {graceStatus.isGracePeriod
+                  ? `Unlock Full ${graceStatus.monthName} Membership`
+                  : "Unlock Full AI Fluency Practice"}
+              </h1>
+              <p style={{
+                color: "#94a3b8",
+                fontSize: "0.9rem",
+                lineHeight: 1.55,
+                margin: 0,
+              }}>
+                {graceStatus.isGracePeriod
+                  ? `Day ${graceStatus.dayOfMonth} of 2 free access is running. Lock in your monthly membership now for seamless speaking practice all month.`
+                  : "Practice speaking every day, get instant AI pronunciation and grammar scores, and interact in live cohort practice rooms."}
+              </p>
+            </div>
 
-        {/* Wallet Balance Status Card */}
-        <div style={{
-          background: walletBalance > 0
-            ? "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)"
-            : "rgba(255, 255, 255, 0.04)",
-          border: walletBalance > 0
-            ? "1px solid rgba(16, 185, 129, 0.35)"
-            : "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: 16,
-          padding: "1.1rem 1.25rem",
-          marginBottom: "1.25rem",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-              <span style={{ fontSize: "1.35rem" }}>💰</span>
-              <div>
-                <div style={{ fontSize: "0.72rem", fontWeight: 700, color: walletBalance > 0 ? "#4ade80" : "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Wallet Balance
+            {/* Plan Overview Card */}
+            <div className="pw-card" style={{ padding: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "1.25rem" }}>
+                <div>
+                  <div style={{ fontSize: "0.74rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.2rem" }}>
+                    Selected Plan
+                  </div>
+                  <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff" }}>
+                    Speak &amp; Shine Cohort Access
+                  </div>
                 </div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 900, color: walletBalance > 0 ? "#4ade80" : "#ffffff" }}>
-                  ₹{walletBalance}
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: "1.6rem", fontWeight: 900, color: "#ffffff", letterSpacing: "-0.02em" }}>
+                    ₹{coursePrice}
+                  </span>
+                  <span style={{ fontSize: "0.8rem", color: "#94a3b8", marginLeft: "0.25rem" }}>
+                    /month
+                  </span>
                 </div>
+              </div>
+
+              {/* Benefits Checklist */}
+              <div style={{
+                borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                paddingTop: "1.1rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.8rem",
+              }}>
+                {[
+                  "Daily video practice submission & AI evaluation",
+                  "Instant fluency, grammar & confidence scoring",
+                  "CEFR level benchmark & detailed feedback",
+                  "Interactive Live Practice Rooms & cohort feed",
+                  "Daily streak tracking & leaderboard rankings",
+                ].map((feature, idx) => (
+                  <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.87rem", color: "#e2e8f0" }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: "50%",
+                      background: "rgba(74, 222, 128, 0.15)",
+                      color: "#4ade80", fontSize: "0.72rem", fontWeight: 900,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      ✓
+                    </div>
+                    <span>{feature}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
+            {/* Trust Badges */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+              padding: "0.75rem 1rem",
+              borderRadius: 14,
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              fontSize: "0.75rem",
+              color: "#94a3b8",
+            }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <span>🔒</span> 256-Bit Encrypted
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <span>⚡</span> Instant Activation
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <span>🛡️</span> Zero Auto-Deductions
+              </span>
+            </div>
+
+          </div>
+
+          {/* ════════ COLUMN 2: Checkout Panel & Payment Actions ════════ */}
+          <div className="pw-card" style={{ padding: "1.6rem" }}>
+            
+            {/* Checkout Header */}
+            <div style={{ marginBottom: "1.25rem", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "0.85rem" }}>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff" }}>
+                Checkout
+              </div>
+              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+                Select your payment method to proceed
+              </div>
+            </div>
+
+            {/* Wallet Balance Strip (If user has wallet balance) */}
+            {walletBalance > 0 && (
+              <div style={{
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid rgba(16, 185, 129, 0.22)",
+                borderRadius: 12,
+                padding: "0.7rem 0.95rem",
+                marginBottom: "1rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "1.1rem" }}>👛</span>
+                  <div>
+                    <span style={{ fontSize: "0.7rem", color: "#94a3b8", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                      Wallet Balance
+                    </span>
+                    <span style={{ fontSize: "1rem", fontWeight: 900, color: "#4ade80" }}>
+                      ₹{walletBalance}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWalletHistoryModal(true)}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    color: "#cbd5e1",
+                    borderRadius: 8,
+                    padding: "0.35rem 0.65rem",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  History {walletHistory.length > 0 ? `(${walletHistory.length})` : ""}
+                </button>
+              </div>
+            )}
+
+            {/* Payment Method Selector (Shown when user has wallet money) */}
+            {walletBalance > 0 && (
+              <div style={{ marginBottom: "1.25rem" }}>
+                <div style={{ fontSize: "0.74rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.65rem" }}>
+                  Payment Method
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+                  {/* Option 1: Wallet */}
+                  <div
+                    onClick={() => setPaymentMethod("wallet")}
+                    className={`pw-option-card ${paymentMethod === "wallet" ? "pw-option-active-wallet" : ""}`}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        border: paymentMethod === "wallet" ? "5px solid #10b981" : "2px solid rgba(255, 255, 255, 0.3)",
+                        background: "#000", flexShrink: 0,
+                      }} />
+                      <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff", display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                        <span>💰 Pay with Wallet</span>
+                        <span style={{ fontSize: "0.7rem", background: "rgba(16, 185, 129, 0.18)", color: "#4ade80", padding: "0.15rem 0.45rem", borderRadius: 6, fontWeight: 700 }}>
+                          ₹{walletBalance}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#4ade80" }}>
+                      {isFullWalletCoverage ? "₹0" : `₹${netPayable}`}
+                    </div>
+                  </div>
+
+                  {/* Option 2: UPI / QR Code */}
+                  <div
+                    onClick={() => setPaymentMethod("upi")}
+                    className={`pw-option-card ${paymentMethod === "upi" ? "pw-option-active-upi" : ""}`}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        border: paymentMethod === "upi" ? "5px solid #7c6fff" : "2px solid rgba(255, 255, 255, 0.3)",
+                        background: "#000", flexShrink: 0,
+                      }} />
+                      <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff" }}>
+                        <span>📲 Pay via UPI / QR Code</span>
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#a5b4fc" }}>
+                      ₹{totalAmount}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Summary */}
+            <div style={{
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: 14,
+              padding: "1rem",
+              marginBottom: "1.25rem",
+            }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.65rem" }}>
+                Payment Summary
+              </div>
+
+              {paymentMethod === "wallet" && useWallet ? (
+                /* WALLET SUMMARY */
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.4rem" }}>
+                    <span>Course Price:</span>
+                    <span>₹{coursePrice}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#4ade80", fontSize: "0.85rem", fontWeight: 700, marginBottom: "0.4rem" }}>
+                    <span>Wallet Deduction:</span>
+                    <span>-₹{isFullWalletCoverage ? coursePrice : walletDiscount}</span>
+                  </div>
+                  {!isFullWalletCoverage && taxAmount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.4rem" }}>
+                      <span>Tax / GST:</span>
+                      <span>₹{taxAmount}</span>
+                    </div>
+                  )}
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                    paddingTop: "0.6rem",
+                    marginTop: "0.2rem",
+                  }}>
+                    <span style={{ fontSize: "0.88rem", fontWeight: 800, color: "#ffffff" }}>
+                      Total Due:
+                    </span>
+                    <span style={{ fontSize: "1.15rem", fontWeight: 900, color: netPayable === 0 ? "#4ade80" : "#38bdf8" }}>
+                      ₹{netPayable}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                /* UPI SUMMARY (Clean, zero wallet mentions) */
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.4rem" }}>
+                    <span>Course Price:</span>
+                    <span>₹{coursePrice}</span>
+                  </div>
+                  {taxAmount > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.4rem" }}>
+                      <span>Tax / GST:</span>
+                      <span>₹{taxAmount}</span>
+                    </div>
+                  )}
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                    paddingTop: "0.6rem",
+                    marginTop: "0.2rem",
+                  }}>
+                    <span style={{ fontSize: "0.88rem", fontWeight: 800, color: "#ffffff" }}>
+                      Total Due:
+                    </span>
+                    <span style={{ fontSize: "1.15rem", fontWeight: 900, color: "#a5b4fc" }}>
+                      ₹{totalAmount}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Error Notification */}
+            {error && (
+              <div style={{
+                background: "rgba(248, 113, 113, 0.12)",
+                border: "1px solid rgba(248, 113, 113, 0.3)",
+                borderRadius: 12,
+                padding: "0.75rem 0.95rem",
+                marginBottom: "1rem",
+                color: "#f87171",
+                fontSize: "0.82rem",
+                lineHeight: 1.45,
+              }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            {/* Primary Action Button */}
             <button
-              type="button"
-              onClick={() => setShowWalletHistoryModal(true)}
+              onClick={handlePay}
+              disabled={loading}
+              className="pw-btn-primary"
               style={{
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
-                color: "#cbd5e1",
-                borderRadius: 10,
-                padding: "0.4rem 0.75rem",
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                cursor: "pointer",
+                background: loading
+                  ? "rgba(124, 111, 255, 0.4)"
+                  : netPayable === 0
+                    ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                    : "linear-gradient(135deg, #7c6fff 0%, #6366f1 100%)",
+                boxShadow: loading ? "none" : netPayable === 0 ? "0 6px 20px rgba(16, 185, 129, 0.35)" : "0 6px 20px rgba(124, 111, 255, 0.35)",
+                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              📜 Wallet History {walletHistory.length > 0 ? `(${walletHistory.length})` : ""}
+              {loading ? (
+                <span>Processing…</span>
+              ) : netPayable === 0 ? (
+                <span>⚡ Activate Membership (₹0)</span>
+              ) : paymentMethod === "upi" ? (
+                <span>📲 Pay ₹{totalAmount} via UPI</span>
+              ) : (
+                <span>💳 Pay ₹{netPayable}</span>
+              )}
             </button>
+
+            {/* Security subtext */}
+            <div style={{ textAlign: "center", color: "#64748b", fontSize: "0.74rem", marginTop: "0.85rem" }}>
+              Secure payment via Razorpay &amp; UPI. Instant access activated upon confirmation.
+            </div>
+
           </div>
 
-          {walletBalance > 0 && (
-            <div style={{
-              marginTop: "0.6rem",
-              paddingTop: "0.6rem",
-              borderTop: "1px solid rgba(255, 255, 255, 0.08)",
-              fontSize: "0.78rem",
-              color: "#94a3b8",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}>
-              <span>✨</span>
-              <span>
-                {walletBalance >= planAmount
-                  ? "You have enough wallet balance to cover 100% of your membership!"
-                  : `You can use your ₹${walletBalance} wallet balance to discount your membership fee.`}
-              </span>
-            </div>
-          )}
         </div>
-
-        {/* Payment Method Selector (Shown when user has money in wallet) */}
-        {walletBalance > 0 && (
-          <div style={{
-            background: "rgba(255, 255, 255, 0.03)",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            borderRadius: 16,
-            padding: "1.1rem 1.25rem",
-            marginBottom: "1.25rem",
-          }}>
-            <div style={{
-              fontSize: "0.75rem",
-              fontWeight: 800,
-              color: "#a78bfa",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              marginBottom: "0.75rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}>
-              <span>💳</span> Choose Payment Option
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-              {/* Option A: Wallet */}
-              <div
-                onClick={() => setPaymentMethod("wallet")}
-                style={{
-                  border: paymentMethod === "wallet"
-                    ? "2px solid #4ade80"
-                    : "1px solid rgba(255, 255, 255, 0.12)",
-                  background: paymentMethod === "wallet"
-                    ? "rgba(74, 222, 128, 0.12)"
-                    : "rgba(255, 255, 255, 0.02)",
-                  borderRadius: 12,
-                  padding: "0.85rem 1rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    border: paymentMethod === "wallet" ? "6px solid #4ade80" : "2px solid rgba(255, 255, 255, 0.3)",
-                    background: "#000",
-                    flexShrink: 0,
-                  }} />
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span>💰 Pay with Wallet (Tax Free!)</span>
-                      <span style={{ fontSize: "0.7rem", background: "rgba(74, 222, 128, 0.2)", color: "#4ade80", padding: "0.15rem 0.45rem", borderRadius: 10, fontWeight: 700 }}>
-                        ₹{walletBalance} Available
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
-                      {walletBalance >= coursePrice
-                        ? `Deduct ₹${coursePrice} from wallet · Tax (₹${taxAmount}) is waived! (₹${remainingWallet} balance left)`
-                        : `Apply ₹${walletBalance} discount towards course fee · Pay net ₹${netPayable} via UPI`}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#4ade80" }}>
-                    {walletBalance >= coursePrice ? "₹0 Net" : `₹${netPayable} Net`}
-                  </div>
-                </div>
-              </div>
-
-              {/* Option B: Direct UPI / Razorpay */}
-              <div
-                onClick={() => setPaymentMethod("upi")}
-                style={{
-                  border: paymentMethod === "upi"
-                    ? "2px solid #7c6fff"
-                    : "1px solid rgba(255, 255, 255, 0.12)",
-                  background: paymentMethod === "upi"
-                    ? "rgba(124, 111, 255, 0.12)"
-                    : "rgba(255, 255, 255, 0.02)",
-                  borderRadius: 12,
-                  padding: "0.85rem 1rem",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    border: paymentMethod === "upi" ? "6px solid #7c6fff" : "2px solid rgba(255, 255, 255, 0.3)",
-                    background: "#000",
-                    flexShrink: 0,
-                  }} />
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: "0.88rem", color: "#ffffff" }}>
-                      <span>📲 Pay Direct via UPI / QR Code</span>
-                    </div>
-                    <div style={{ fontSize: "0.76rem", color: "#cbd5e1", marginTop: "0.15rem" }}>
-                      Pay full ₹{totalAmount} (Course ₹{coursePrice} + Tax ₹{taxAmount}) · Save your ₹{walletBalance} wallet balance
-                    </div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 900, fontSize: "0.95rem", color: "#a5b4fc" }}>
-                    ₹{totalAmount} Full
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Payment Summary / Bill Details Card */}
-        <div style={{
-          background: "rgba(255, 255, 255, 0.03)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: 16,
-          padding: "1rem 1.25rem",
-          marginBottom: "1.25rem",
-        }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.6rem" }}>
-            Payment Summary
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-            <span>Course Base Price:</span>
-            <span>₹{coursePrice}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#cbd5e1", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-            <span>Tax / GST:</span>
-            {isFullWalletCoverage ? (
-              <span style={{ color: "#4ade80", fontWeight: 700 }}>
-                ₹0 <span style={{ textDecoration: "line-through", color: "var(--muted)", fontSize: "0.75rem" }}>₹{taxAmount}</span> (Waived)
-              </span>
-            ) : (
-              <span>₹{taxAmount}</span>
-            )}
-          </div>
-          {walletBalance > 0 && (
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              color: useWallet ? "#4ade80" : "var(--muted)",
-              fontSize: "0.85rem",
-              fontWeight: 700,
-              marginBottom: "0.4rem",
-            }}>
-              <span>{useWallet ? "🎁 Wallet Deduction:" : "Wallet Balance:"}</span>
-              <span>{useWallet ? `-₹${isFullWalletCoverage ? coursePrice : walletDiscount}` : "₹0 (Kept in wallet)"}</span>
-            </div>
-          )}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-            paddingTop: "0.5rem",
-            marginTop: "0.2rem",
-          }}>
-            <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#ffffff" }}>
-              Total Amount Payable:
-            </span>
-            <span style={{
-              fontSize: "1.1rem",
-              fontWeight: 900,
-              color: netPayable === 0 ? "#4ade80" : "#38bdf8",
-            }}>
-              {netPayable === 0 ? "₹0 (100% Covered by Wallet)" : `₹${netPayable}`}
-            </span>
-          </div>
-          {useWallet && (isFullWalletCoverage || walletDiscount > 0) && (
-            <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.4rem", textAlign: "right" }}>
-              Remaining wallet balance after activation: ₹{remainingWallet}
-            </div>
-          )}
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div style={{
-            background: "rgba(248,113,113,0.1)",
-            border: "1px solid rgba(248,113,113,0.3)",
-            borderRadius: 10,
-            padding: "0.85rem 1rem",
-            marginBottom: "1rem",
-            color: "#f87171",
-            fontSize: "0.85rem",
-          }}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        {/* Pay button */}
-        <button
-          onClick={handlePay}
-          disabled={loading}
-          style={{
-            width: "100%",
-            background: loading
-              ? "rgba(124,111,255,0.4)"
-              : netPayable === 0
-                ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                : "linear-gradient(135deg, #7c6fff 0%, #6d5ce7 100%)",
-            color: "#fff",
-            border: "none",
-            borderRadius: 14,
-            padding: "1rem 1.5rem",
-            fontSize: "1.05rem",
-            fontWeight: 800,
-            cursor: loading ? "not-allowed" : "pointer",
-            letterSpacing: "0.03em",
-            boxShadow: loading ? "none" : netPayable === 0 ? "0 6px 24px rgba(16,185,129,0.35)" : "0 6px 24px rgba(124,111,255,0.35)",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = netPayable === 0 ? "0 10px 30px rgba(16,185,129,0.45)" : "0 10px 30px rgba(124,111,255,0.45)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = netPayable === 0 ? "0 6px 24px rgba(16,185,129,0.35)" : "0 6px 24px rgba(124,111,255,0.35)";
-          }}
-        >
-          {loading ? "Processing…" : (
-            netPayable === 0
-              ? "⚡ Activate Now for ₹0 (100% Covered by Wallet · Tax Waived)"
-              : walletDiscount > 0
-                ? `💳 Pay Net ₹${netPayable} (₹${walletDiscount} Wallet Discount Applied)`
-                : paymentMethod === "upi" && walletBalance > 0
-                  ? `📲 Pay ₹${totalAmount} via UPI (Keep Wallet ₹${walletBalance})`
-                  : `💳 Pay ₹${totalAmount} & Unlock Access`
-          )}
-        </button>
-
-        <p style={{
-          textAlign: "center",
-          fontSize: "0.75rem",
-          color: "var(--muted)",
-          marginTop: "1rem",
-          lineHeight: 1.6,
-        }}>
-          {netPayable === 0
-            ? "⚡ 100% Wallet Payment · Instant Activation (No external payment required)"
-            : "Secured by Razorpay · Instant UPI & QR Code payment accepted"}<br />
-          Contact your trainer if you believe this is a mistake.
-        </p>
       </div>
     </Layout>
   );
