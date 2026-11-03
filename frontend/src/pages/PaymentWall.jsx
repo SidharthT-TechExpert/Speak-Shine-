@@ -1,8 +1,8 @@
 /**
  * PaymentWall
  * Shown to unpaid users when they try to access a gated feature.
- * Handles Razorpay Standard Checkout flow end-to-end and Wallet balance payments.
- * Features instant verification, success confirmation, and 1-click invoice download.
+ * Unified, responsive, high-aesthetic SaaS checkout experience.
+ * Fully respects wallet cash value (tax-free) and Razorpay UPI payments.
  */
 
 import { useState, useEffect, lazy, Suspense } from "react";
@@ -68,7 +68,6 @@ export default function PaymentWall({ onSuccess }) {
           const bal = Number(data.walletBalance) || 0;
           setWalletBalance(bal);
           setWalletHistory(data.walletHistory || []);
-          // Automatically pick UPI if wallet balance is zero
           if (bal <= 0) {
             setPaymentMethod("upi");
           }
@@ -103,17 +102,14 @@ export default function PaymentWall({ onSuccess }) {
   // Step 1: User clicks main action button
   const handlePay = async () => {
     setError(null);
-    // If using wallet balance: NEVER pay silently in the background!
-    // Require explicit confirmation dialog so user has full control of their cash.
     if (useWallet && isFullWalletCoverage) {
       setShowWalletConfirmModal(true);
       return;
     }
-
     await executeOrder({ confirmWalletPayment: false });
   };
 
-  // Step 2: User explicitly clicked "Confirm & Pay" in confirmation modal
+  // Step 2: User explicitly confirmed wallet deduction
   const handleConfirmWalletPayment = async () => {
     setShowWalletConfirmModal(false);
     await executeOrder({ confirmWalletPayment: true });
@@ -124,21 +120,20 @@ export default function PaymentWall({ onSuccess }) {
     setLoading(true);
 
     try {
-      // 1. Create order on backend (strictly honors user preference and confirmation)
       const { data: order } = await api.post("/payments/create-order", {
         useWallet,
         paymentMethod,
         confirmWalletPayment,
       });
 
-      // CASE A: Server requires confirmation before deducting wallet balance
+      // CASE A: Server requires confirmation
       if (order.requiresConfirmation && !confirmWalletPayment) {
         setLoading(false);
         setShowWalletConfirmModal(true);
         return;
       }
 
-      // CASE B: 100% Covered by Wallet Balance and user explicitly confirmed
+      // CASE B: 100% Covered by Wallet Cash
       if (order.walletCovered) {
         const discountApplied = order.walletDiscountApplied || order.coursePrice || coursePrice;
         const txObj = {
@@ -168,7 +163,7 @@ export default function PaymentWall({ onSuccess }) {
         return;
       }
 
-      // CASE C: Requires Gateway Payment (UPI / QR Code)
+      // CASE C: Requires UPI / Gateway Payment
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         setError("Payment system failed to load. Please check your internet connection and try again.");
@@ -267,7 +262,7 @@ export default function PaymentWall({ onSuccess }) {
           name: user?.name || "",
           contact: user?.phone || "",
         },
-        theme: { color: "#7c6fff" },
+        theme: { color: "#8B5CF6" },
       };
 
       const rzp = new window.Razorpay(options);
@@ -297,22 +292,22 @@ export default function PaymentWall({ onSuccess }) {
     return (
       <Layout title="Payment Failed">
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 py-8 max-w-md mx-auto">
-          <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-3xl mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-3xl mb-4 text-rose-400">
             ✕
           </div>
-          <h2 className="text-rose-400 text-2xl font-black mb-2">
+          <h2 className="text-white text-2xl font-black mb-2 tracking-tight">
             Payment Unsuccessful
           </h2>
-          <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+          <p className="text-slate-400 text-sm mb-5 leading-relaxed">
             {error || "Something went wrong while processing your transaction."}
           </p>
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 mb-6">
-            No money was deducted. You can retry with a different UPI app or wallet cash.
+          <div className="w-full p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-400 mb-6 leading-relaxed">
+            No money was deducted. You can safely retry or use your wallet balance.
           </div>
           <button
             type="button"
             onClick={() => { setFailed(false); setError(null); }}
-            className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm cursor-pointer shadow-lg shadow-purple-500/25 transition-all mb-3"
+            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm cursor-pointer shadow-lg shadow-purple-500/25 transition-all mb-3"
           >
             🔄 Try Again
           </button>
@@ -345,27 +340,28 @@ export default function PaymentWall({ onSuccess }) {
         )}
 
         <div className="max-w-xl mx-auto my-6 sm:my-12 px-4">
-          <div className="relative rounded-3xl border border-emerald-500/30 bg-gradient-to-b from-[#0e1d16] via-[#09140f] to-[#060e0a] p-6 sm:p-9 shadow-2xl text-center overflow-hidden">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/20">
+          <div className="relative rounded-3xl border border-emerald-500/30 bg-gradient-to-b from-[#111c16] via-[#0c1510] to-[#070e0a] p-6 sm:p-9 shadow-[0_20px_60px_rgba(0,0,0,0.7),0_0_40px_rgba(34,197,94,0.15)] text-center overflow-hidden">
+            
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-3xl text-emerald-400 shadow-lg shadow-emerald-500/20">
               ✓
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide uppercase mb-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wider uppercase mb-3">
               <span>●</span> Membership Activated
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-white mb-2">
+            <h1 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">
               Welcome to the Cohort!
             </h1>
             <p className="text-slate-400 text-sm max-w-md mx-auto mb-6 leading-relaxed">
-              Your 30-day Speak &amp; Shine full pass is now active. Daily AI speech evaluation, live practice rooms, and fluency metrics are unlocked.
+              Your 30-day Speak &amp; Shine full pass is now active. Daily AI speech evaluation, live practice rooms, and fluency metrics are fully unlocked.
             </p>
 
             {/* Receipt Summary Card */}
-            <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-4 sm:p-5 text-left mb-6 space-y-3">
-              <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
+            <div className="rounded-2xl bg-black/40 border border-white/5 p-4 sm:p-5 text-left mb-6 space-y-3">
+              <div className="flex justify-between items-center pb-2.5 border-b border-white/10">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Payment Summary</span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                   {isWallet ? "Wallet Cash" : "UPI Gateway"}
                 </span>
               </div>
@@ -378,10 +374,10 @@ export default function PaymentWall({ onSuccess }) {
               {isWallet ? (
                 <>
                   <div className="flex justify-between items-center text-sm text-emerald-400 font-semibold">
-                    <span>Paid using Wallet Cash</span>
+                    <span>Paid via Wallet Cash</span>
                     <span>-₹{coursePrice}</span>
                   </div>
-                  <div className="flex justify-between items-center text-xs text-slate-400">
+                  <div className="flex justify-between items-center text-xs text-slate-400 pt-1 border-t border-white/5">
                     <span>Remaining Wallet Balance</span>
                     <span className="font-bold text-white">₹{walletBalance}</span>
                   </div>
@@ -394,7 +390,7 @@ export default function PaymentWall({ onSuccess }) {
                       <span>₹{taxAmount}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center text-sm text-white font-bold pt-1 border-t border-slate-800/80">
+                  <div className="flex justify-between items-center text-sm text-white font-bold pt-1 border-t border-white/5">
                     <span>Total Paid</span>
                     <span className="text-emerald-400 text-base">₹{successTx?.amount ?? totalAmount}</span>
                   </div>
@@ -402,9 +398,9 @@ export default function PaymentWall({ onSuccess }) {
               )}
 
               {successTx?.razorpayPaymentId && (
-                <div className="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-slate-800">
+                <div className="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-white/5">
                   <span>Reference ID</span>
-                  <span className="font-mono text-slate-300">{successTx.razorpayPaymentId}</span>
+                  <span className="font-mono text-purple-300">{successTx.razorpayPaymentId}</span>
                 </div>
               )}
             </div>
@@ -414,14 +410,14 @@ export default function PaymentWall({ onSuccess }) {
               <button
                 type="button"
                 onClick={handleContinueToDashboard}
-                className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-sm cursor-pointer shadow-lg shadow-purple-500/30 transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-sm cursor-pointer shadow-lg shadow-purple-500/30 transition-all flex items-center justify-center gap-2"
               >
                 <span>🚀</span> Start Speaking Challenges
               </button>
               <button
                 type="button"
                 onClick={() => setShowInvoiceModal(true)}
-                className="py-3.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-sm cursor-pointer transition-colors flex items-center justify-center gap-2"
+                className="py-3.5 px-5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 font-bold text-sm cursor-pointer transition-colors flex items-center justify-center gap-2"
               >
                 <span>📄</span> Official Invoice
               </button>
@@ -432,33 +428,38 @@ export default function PaymentWall({ onSuccess }) {
     );
   }
 
-  // ── MAIN CHECKOUT INTERFACE ────────────────────────────────────────────────
+  // ── MAIN UNIFIED CHECKOUT VIEW ─────────────────────────────────────────────
   return (
     <Layout title="Unlock Full Access">
-      {/* ── Wallet Deduction Confirmation Modal (Compact, responsive, centered, INR only) ── */}
+      
+      {/* ── Wallet Deduction Confirmation Modal (Compact, centered, ₹ INR only) ── */}
       {showWalletConfirmModal && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-emerald-500/40 p-6 shadow-2xl text-center animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-[#130f24] border border-emerald-500/40 p-6 shadow-2xl text-center animate-in fade-in zoom-in-95 duration-150">
             <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-2xl">
               👛
             </div>
-            <h3 className="text-lg font-bold text-white mb-1.5">
+            <h3 className="text-lg font-bold text-white mb-1.5 tracking-tight">
               Confirm Wallet Payment
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 mb-4 leading-relaxed">
-              Deduct <strong className="text-emerald-400 font-bold">₹{coursePrice}</strong> from your earned wallet cash to activate full 30-day cohort membership?
+              Deduct <strong className="text-emerald-400 font-bold">₹{coursePrice}</strong> from your earned wallet cash to activate 30-day cohort membership?
             </p>
 
-            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 mb-5 space-y-2 text-xs">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 mb-5 space-y-2 text-xs">
               <div className="flex justify-between text-slate-400">
                 <span>Current Wallet Balance:</span>
-                <span className="text-slate-200 font-bold">₹{walletBalance}</span>
+                <span className="text-white font-bold">₹{walletBalance}</span>
               </div>
               <div className="flex justify-between text-emerald-400 font-semibold">
-                <span>Amount to Pay (Course Price):</span>
+                <span>Deduction (Course Price):</span>
                 <span>-₹{coursePrice}</span>
               </div>
-              <div className="flex justify-between text-slate-400 pt-1.5 border-t border-slate-700/60 font-semibold">
+              <div className="flex justify-between text-slate-400">
+                <span>Tax / GST:</span>
+                <span className="text-emerald-400 font-semibold">Waived (₹0)</span>
+              </div>
+              <div className="flex justify-between text-slate-300 pt-2 border-t border-slate-800 font-semibold">
                 <span>Balance After Payment:</span>
                 <span className="text-emerald-400 font-bold">₹{remainingWallet} left</span>
               </div>
@@ -479,7 +480,7 @@ export default function PaymentWall({ onSuccess }) {
                 disabled={loading}
                 className="flex-[1.6] py-2.5 px-3 rounded-xl border-none bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs cursor-pointer shadow-lg shadow-emerald-500/25 transition-all"
               >
-                {loading ? "Activating…" : `Confirm & Pay ₹${coursePrice}`}
+                {loading ? "Activating…" : `Confirm & Pay ₹{coursePrice}`}
               </button>
             </div>
           </div>
@@ -489,11 +490,11 @@ export default function PaymentWall({ onSuccess }) {
       {/* ── Wallet Transaction History Modal ── */}
       {showWalletHistoryModal && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-slate-900 border border-slate-700 p-5 sm:p-6 shadow-2xl flex flex-col">
+          <div className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-[#130f24] border border-purple-500/30 p-5 sm:p-6 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="text-xl">👛</span>
-                <h3 className="text-base font-bold text-white">Wallet &amp; Referral History</h3>
+                <h3 className="text-base font-bold text-white tracking-tight">Wallet &amp; Referral History</h3>
               </div>
               <button
                 type="button"
@@ -511,7 +512,7 @@ export default function PaymentWall({ onSuccess }) {
                 </div>
               ) : (
                 [...walletHistory].reverse().map((tx, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-800">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                     <div>
                       <div className="text-xs font-semibold text-white">
                         {tx.reason || "Wallet transaction"}
@@ -521,7 +522,7 @@ export default function PaymentWall({ onSuccess }) {
                         {" · "}Balance: ₹{tx.balanceAfter}
                       </div>
                     </div>
-                    <div className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
+                    <div className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
                       tx.type === "credit"
                         ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
                         : "text-rose-400 bg-rose-500/10 border-rose-500/20"
@@ -536,185 +537,175 @@ export default function PaymentWall({ onSuccess }) {
         </div>
       )}
 
-      {/* ── Main Responsive Content Container (Balanced 6xl container) ── */}
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      {/* ── Unified Master Checkout Experience ── */}
+      <div className="w-full max-w-5xl mx-auto py-2 sm:py-6 px-2 sm:px-4">
         
-        {/* Main Grid: Left Value Proposition (col-span-7) + Right Sticky Checkout (col-span-5) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+        {/* Single Cohesive Master Glassmorphic Card */}
+        <div className="relative rounded-3xl border border-purple-500/20 bg-[#100D1C] shadow-[0_20px_60px_rgba(0,0,0,0.6),0_0_40px_rgba(139,92,246,0.12)] overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+          
+          {/* Subtle Ambient Radial Glow */}
+          <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-purple-600/10 via-indigo-600/5 to-transparent pointer-events-none" />
 
-          {/* ════════ LEFT COLUMN: Value Proposition & Membership Details ════════ */}
-          <div className="lg:col-span-7 space-y-6">
-            
-            {/* Header / Pill */}
+          {/* ════════ LEFT COLUMN: Membership Overview (7 cols) ════════ */}
+          <div className="lg:col-span-7 p-6 sm:p-8 lg:p-9 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-purple-500/15 relative z-10">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold tracking-wide uppercase mb-3">
-                <span>✨</span>
-                <span>{graceStatus.isGracePeriod ? `${graceStatus.monthName.toUpperCase()} TRIAL ACTIVE` : "FULL MEMBERSHIP PASS"}</span>
+              {/* Status Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold tracking-wider uppercase mb-3">
+                <span className="text-amber-400">✦</span>
+                <span>{graceStatus.isGracePeriod ? `${graceStatus.monthName.toUpperCase()} TRIAL ACTIVE` : "30-DAY COHORT PASS"}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+
+              {/* Title & Subtitle */}
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
                 Unlock Unlimited Speech Practice &amp; AI Mentorship
               </h1>
-              <p className="text-sm sm:text-base text-slate-300 mt-2 leading-relaxed">
-                Elevate your English speaking confidence with daily AI video feedback, CEFR rubric scoring, live practice rooms, and mentor challenges.
+              <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
+                Elevate your English speaking fluency with daily video submissions, instant CEFR AI evaluations, and live practice rooms.
               </p>
-            </div>
 
-            {/* Plan Card */}
-            <div className="rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 via-slate-900/60 to-slate-950/80 p-6 sm:p-7 backdrop-blur-xl shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+              {/* Subscription Price Banner */}
+              <div className="my-5 p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900/60 to-purple-950/20 border border-purple-500/20 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400 block mb-1">
-                    Monthly Cohort Pass
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-300 block">
+                    Cohort Membership Fee
                   </span>
-                  <div className="text-xl font-bold text-white">
-                    30-Day Intensive Cycle
-                  </div>
                   <div className="text-xs text-slate-400 mt-0.5">
-                    Full access to daily challenges &amp; analysis
+                    Full 30-day practice cycle
                   </div>
                 </div>
-
-                <div className="sm:text-right bg-slate-900/80 sm:bg-transparent p-3 sm:p-0 rounded-xl border sm:border-0 border-slate-800">
-                  <div className="flex items-baseline gap-1.5 sm:justify-end">
-                    <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">₹{coursePrice}</span>
-                    <span className="text-sm font-semibold text-slate-400">/ 30 days</span>
+                <div className="text-right">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-white tracking-tight">₹{coursePrice}</span>
+                    <span className="text-xs font-semibold text-slate-400">/ 30 days</span>
                   </div>
-                  <div className="text-[11px] text-emerald-400 font-semibold mt-0.5">
-                    Zero auto-debit · Cancel anytime
+                  <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">
+                    Zero auto-debit · One-time fee
                   </div>
                 </div>
               </div>
 
-              {/* Features List */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+              {/* Core Included Features */}
+              <div className="space-y-3 my-5">
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
                     ✓
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">Daily Video AI Evaluation</div>
-                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                      Pronunciation, grammar, vocabulary, and 4-rubric CEFR scoring.
+                    <div className="text-xs sm:text-sm font-bold text-white">Daily AI Speech Analysis</div>
+                    <div className="text-xs text-slate-400 leading-relaxed mt-0.5">
+                      Grammar fixes, pronunciation scoring, vocabulary enhancement, and CEFR feedback.
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
                     ✓
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">Interactive Live Rooms</div>
-                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                      Practice live with peers and trainers in interactive video audio rooms.
+                    <div className="text-xs sm:text-sm font-bold text-white">Interactive Live Speaking Rooms</div>
+                    <div className="text-xs text-slate-400 leading-relaxed mt-0.5">
+                      Practice live conversations with peer students and trainers in real-time.
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
                     ✓
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">Streak Protection &amp; Shields</div>
-                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                      Earn streak freeze shields to protect your daily speaking consistency.
+                    <div className="text-xs sm:text-sm font-bold text-white">Streak Protection &amp; Freeze Tokens</div>
+                    <div className="text-xs text-slate-400 leading-relaxed mt-0.5">
+                      Protect your consistency streaks with streak freeze shields.
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
                     ✓
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">Official GST Invoices</div>
-                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    <div className="text-xs sm:text-sm font-bold text-white">Official Tax Invoice &amp; Certificates</div>
+                    <div className="text-xs text-slate-400 leading-relaxed mt-0.5">
                       Downloadable GST-compliant receipts and milestone performance certificates.
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Wallet Cash Value Notice (When user has wallet balance) */}
-            {walletBalance > 0 && (
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4 sm:p-5 flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xl shrink-0">
-                  👛
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="text-sm font-bold text-emerald-300">
-                      You have ₹{walletBalance} in Wallet Cash
-                    </span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      100% Tax-Free
-                    </span>
+              {/* Wallet Cash Highlight (Shown if user has balance) */}
+              {walletBalance > 0 && (
+                <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between gap-3 my-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">👛</span>
+                    <div>
+                      <div className="text-xs font-bold text-emerald-300">
+                        You have ₹{walletBalance} in Wallet Cash
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        Earned from referrals &amp; streaks. 100% Tax-Free when paying via wallet!
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    Your wallet balance is real cash earned from referrals and speaking streaks. When paying with wallet cash, tax (₹{taxAmount}) is completely waived — you only pay the course fee of ₹{coursePrice}.
-                  </p>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+                    0% TAX
+                  </span>
                 </div>
-              </div>
-            )}
-
-            {/* Trust Pillars */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
-                <div className="text-base mb-1">🛡️</div>
-                <div className="text-xs font-bold text-white">Zero Auto-Debit</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">One-time payment only</div>
-              </div>
-              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
-                <div className="text-base mb-1">⚡</div>
-                <div className="text-xs font-bold text-white">Instant Activation</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">Unlocked immediately</div>
-              </div>
-              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
-                <div className="text-base mb-1">📄</div>
-                <div className="text-xs font-bold text-white">Official Tax Invoice</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">Instant PDF download</div>
-              </div>
+              )}
             </div>
 
+            {/* Bottom Trust Indicators */}
+            <div className="pt-4 mt-2 border-t border-purple-500/15 flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <span className="text-purple-400">🛡️</span> Zero Recurring Auto-Debit
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <span className="text-amber-400">⚡</span> Instant Activation
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <span className="text-emerald-400">📄</span> Official GST Receipt
+              </span>
+            </div>
           </div>
 
-          {/* ════════ RIGHT COLUMN: Clean Sticky Checkout ════════ */}
-          <div className="lg:col-span-5 lg:sticky lg:top-6">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 backdrop-blur-xl p-6 sm:p-7 shadow-2xl space-y-5">
-              
+          {/* ════════ RIGHT COLUMN: Checkout & Payment Engine (5 cols) ════════ */}
+          <div className="lg:col-span-5 p-6 sm:p-8 lg:p-9 flex flex-col justify-between bg-gradient-to-b from-[#141026]/90 via-[#100D1C]/95 to-[#0b0817] relative z-10">
+            <div>
               {/* Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center justify-between pb-4 border-b border-purple-500/15">
                 <div>
                   <h2 className="text-lg font-bold text-white tracking-tight">Checkout</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Select your payment method</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Select payment method</p>
                 </div>
                 {walletBalance > 0 && (
                   <button
                     type="button"
                     onClick={() => setShowWalletHistoryModal(true)}
-                    className="text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 cursor-pointer transition-colors"
+                    className="text-xs text-purple-300 hover:text-white px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 cursor-pointer transition-colors shrink-0 whitespace-nowrap"
                   >
-                    Wallet Log ({walletHistory.length})
+                    Wallet History
                   </button>
                 )}
               </div>
 
               {/* Payment Methods */}
-              <div className="space-y-3">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+              <div className="my-5 space-y-3">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                   Select Payment Option
                 </span>
 
-                {/* Option 1: Pay with Wallet Cash (Shown if user has wallet balance) */}
+                {/* Option 1: Pay with Wallet Cash (if user has wallet balance) */}
                 {walletBalance > 0 && (
                   <div
                     onClick={() => setPaymentMethod("wallet")}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
+                    className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
                       paymentMethod === "wallet"
-                        ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
-                        : "border-slate-800 bg-slate-800/40 hover:border-slate-700"
+                        ? "border-emerald-500 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                        : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -743,7 +734,7 @@ export default function PaymentWall({ onSuccess }) {
                         <div className="text-base font-extrabold text-emerald-400">
                           ₹{coursePrice}
                         </div>
-                        <div className="text-[11px] text-slate-400">wallet cash</div>
+                        <div className="text-[10px] text-slate-400">wallet cash</div>
                       </div>
                     </div>
                   </div>
@@ -752,19 +743,19 @@ export default function PaymentWall({ onSuccess }) {
                 {/* Option 2: Pay via UPI / QR Code */}
                 <div
                   onClick={() => setPaymentMethod("upi")}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
                     paymentMethod === "upi"
-                      ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
-                      : "border-slate-800 bg-slate-800/40 hover:border-slate-700"
+                      ? "border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(139,92,246,0.15)]"
+                      : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        paymentMethod === "upi" ? "border-indigo-500" : "border-slate-600"
+                        paymentMethod === "upi" ? "border-purple-500" : "border-slate-600"
                       }`}>
                         {paymentMethod === "upi" && (
-                          <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                          <div className="w-2 h-2 rounded-full bg-purple-500" />
                         )}
                       </div>
                       <div>
@@ -778,27 +769,27 @@ export default function PaymentWall({ onSuccess }) {
                     </div>
 
                     <div className="text-right">
-                      <div className="text-base font-extrabold text-indigo-300">
+                      <div className="text-base font-extrabold text-purple-300">
                         ₹{totalAmount}
                       </div>
-                      <div className="text-[11px] text-slate-400">gateway</div>
+                      <div className="text-[10px] text-slate-400">gateway</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Order Summary */}
-              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-2.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Order Summary
+              <div className="p-4 rounded-2xl bg-black/30 border border-purple-500/15 space-y-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Order Breakdown
                 </span>
 
                 {paymentMethod === "wallet" && useWallet ? (
-                  /* WALLET SUMMARY */
+                  /* WALLET BREAKDOWN */
                   <>
                     <div className="flex justify-between text-xs sm:text-sm text-slate-300">
                       <span>Course Fee</span>
-                      <span className="font-semibold">₹{coursePrice}</span>
+                      <span className="font-semibold text-white">₹{coursePrice}</span>
                     </div>
                     <div className="flex justify-between text-xs sm:text-sm text-emerald-400 font-bold">
                       <span>Paid via Wallet Cash</span>
@@ -808,7 +799,7 @@ export default function PaymentWall({ onSuccess }) {
                       <span>Tax / GST</span>
                       <span className="text-emerald-400 font-semibold">Waived (₹0)</span>
                     </div>
-                    <div className="border-t border-slate-700/60 pt-2.5 mt-1 flex items-center justify-between">
+                    <div className="border-t border-purple-500/15 pt-2 mt-1 flex items-center justify-between">
                       <span className="text-sm font-bold text-white">Gateway Due (UPI)</span>
                       <span className="text-lg font-black text-emerald-400">
                         ₹{netPayable}
@@ -819,21 +810,21 @@ export default function PaymentWall({ onSuccess }) {
                     </div>
                   </>
                 ) : (
-                  /* UPI SUMMARY (Clean, zero wallet text) */
+                  /* UPI BREAKDOWN (Clean, zero wallet text) */
                   <>
                     <div className="flex justify-between text-xs sm:text-sm text-slate-300">
                       <span>Course Fee</span>
-                      <span className="font-semibold">₹{coursePrice}</span>
+                      <span className="font-semibold text-white">₹{coursePrice}</span>
                     </div>
                     {taxAmount > 0 && (
                       <div className="flex justify-between text-xs sm:text-sm text-slate-300">
                         <span>Tax / GST</span>
-                        <span className="font-semibold">₹{taxAmount}</span>
+                        <span className="font-semibold text-white">₹{taxAmount}</span>
                       </div>
                     )}
-                    <div className="border-t border-slate-700/60 pt-2.5 mt-1 flex items-center justify-between">
+                    <div className="border-t border-purple-500/15 pt-2 mt-1 flex items-center justify-between">
                       <span className="text-sm font-bold text-white">Total Payable via UPI</span>
-                      <span className="text-lg font-black text-indigo-300">
+                      <span className="text-lg font-black text-purple-300">
                         ₹{totalAmount}
                       </span>
                     </div>
@@ -843,49 +834,49 @@ export default function PaymentWall({ onSuccess }) {
 
               {/* Error Notice */}
               {error && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs leading-relaxed">
+                <div className="mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs leading-relaxed">
                   ⚠️ {error}
                 </div>
               )}
-
-              {/* Action Button */}
-              <div>
-                <button
-                  type="button"
-                  onClick={handlePay}
-                  disabled={loading}
-                  className={`w-full py-3.5 px-6 rounded-xl font-extrabold text-sm sm:text-base text-white cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-xl ${
-                    loading
-                      ? "opacity-60 cursor-not-allowed bg-slate-700"
-                      : paymentMethod === "wallet"
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/25 active:scale-[0.99]"
-                        : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/25 active:scale-[0.99]"
-                  }`}
-                >
-                  {loading ? (
-                    <span>Processing…</span>
-                  ) : paymentMethod === "wallet" ? (
-                    <span>⚡ Pay ₹{coursePrice} using Wallet Cash</span>
-                  ) : (
-                    <span>📲 Pay ₹{totalAmount} via UPI</span>
-                  )}
-                </button>
-
-                {/* Security info: Only show gateway text while payment option is UPI mode! */}
-                {paymentMethod === "upi" ? (
-                  <div className="flex items-center justify-center gap-2 text-xs text-slate-400 py-2.5 mt-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                    <span className="text-indigo-400">🔒</span>
-                    <span>256-Bit SSL Encrypted Checkout via Razorpay &amp; UPI</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2 text-xs text-emerald-400/90 py-2.5 mt-3 bg-emerald-950/20 rounded-xl border border-emerald-500/20">
-                    <span>⚡</span>
-                    <span>Instant wallet deduction · Zero gateway fees &amp; 100% tax-free</span>
-                  </div>
-                )}
-              </div>
-
             </div>
+
+            {/* Bottom Actions */}
+            <div className="mt-6 pt-2">
+              <button
+                type="button"
+                onClick={handlePay}
+                disabled={loading}
+                className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base text-white cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-xl ${
+                  loading
+                    ? "opacity-60 cursor-not-allowed bg-slate-700"
+                    : paymentMethod === "wallet"
+                      ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 shadow-[0_4px_24px_rgba(16,185,129,0.3)] active:scale-[0.99]"
+                      : "bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_4px_24px_rgba(139,92,246,0.3)] active:scale-[0.99]"
+                }`}
+              >
+                {loading ? (
+                  <span>Processing…</span>
+                ) : paymentMethod === "wallet" ? (
+                  <span>⚡ Pay ₹{coursePrice} using Wallet Cash</span>
+                ) : (
+                  <span>📲 Pay ₹{totalAmount} via UPI</span>
+                )}
+              </button>
+
+              {/* Security info: Only show gateway text while payment option is UPI mode! */}
+              {paymentMethod === "upi" ? (
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-400 py-2.5 mt-3 bg-purple-500/5 rounded-xl border border-purple-500/15">
+                  <span className="text-purple-400">🔒</span>
+                  <span>256-Bit SSL Encrypted Checkout via Razorpay &amp; UPI</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-xs text-emerald-400 py-2.5 mt-3 bg-emerald-500/5 rounded-xl border border-emerald-500/15">
+                  <span>⚡</span>
+                  <span>Instant wallet deduction · Zero gateway fees &amp; 100% tax-free</span>
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>
