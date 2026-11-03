@@ -90,40 +90,54 @@ export function startScheduler() {
         return;
       }
 
-      // ── 1. Publish daily question / send poster at posterSendTime ───────
+      // ── 1. Robust Daily Question & Poster Dispatch ───────────────────────
       const sendTime = s.posterSendTime || "08:00";
+      const [sh, sm] = sendTime.split(":").map(Number);
+      const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
+      const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
       const todayDate = getTodayIST();
-      if (nowTime === sendTime) {
-        if (!s.questionSentToday) {
-          console.log(`[Scheduler] ⏰ Time matched: ${nowTime} — publishing question & dispatching poster`);
-          const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
-          await publishFromService();
-        } else if (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate)) {
-          console.log(`[Scheduler] ⏰ Time matched: ${nowTime} — question already published, dispatching poster to WhatsApp group`);
+
+      const isPastSendTime = nowMins >= sendMins;
+      const isAlreadyPublishedToday = Boolean(s.questionSentToday && s.questionPublishedDate === todayDate && s.todayQuestion);
+
+      // A. If send time has arrived or passed and question is not yet published today
+      if (isPastSendTime && !isAlreadyPublishedToday) {
+        console.log(`[Scheduler] ⏰ Send time reached or passed (${nowTime} >= ${sendTime}) — publishing question & dispatching poster...`);
+        const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
+        await publishFromService();
+      } 
+      // B. If question is already published on the webapp, but WhatsApp poster delivery failed or is unsent
+      else if (isAlreadyPublishedToday && (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate))) {
+        // Retry every 2 minutes so Baileys has time to reconnect without spamming
+        const lastAttempt = s.lastPosterAttemptAt ? new Date(s.lastPosterAttemptAt).getTime() : 0;
+        const msSinceLast = Date.now() - lastAttempt;
+        if (msSinceLast >= 2 * 60 * 1000) {
+          console.log(`[Scheduler] 🔄 Poster delivery pending/failed for today (${s.lastPosterStatus || "unsent"}) — retrying WhatsApp dispatch now...`);
           try {
             const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
             await sendDailyPosterToGroup();
           } catch (posterErr) {
-            console.warn("[Scheduler] Poster dispatch failed:", posterErr.message);
+            console.warn("[Scheduler] ⚠️ Poster retry failed (will retry in 2 mins):", posterErr.message);
           }
         }
       }
 
-      // ── 2. Auto-generate questions at questionGenerateTime ───────────────
+      // ── 2. Background Question Bank Health Check & Refill ────────────────
       const genTime = s.questionGenerateTime || "07:00";
-      if (nowTime === genTime) {
-        const count = await Question.countDocuments();
-        if (count <= 14) {
-          console.log(`[Scheduler] 🤖 Auto-generate time (${genTime}) — bank has ${count} questions, generating 14 more…`);
+      const count = await Question.countDocuments({ isManualSetup: { $ne: true } });
+      const shouldRefill = (nowTime === genTime && count <= 14) || count < 7;
+      if (shouldRefill) {
+        const lastRefill = global._lastQuestionRefillAt || 0;
+        if (Date.now() - lastRefill >= 30 * 60 * 1000) {
+          global._lastQuestionRefillAt = Date.now();
+          console.log(`[Scheduler] 🤖 Question bank health check (bank count: ${count}) — generating 14 questions in background…`);
           generateAndInsertQuestions(14)
             .then(({ inserted, totalInDb }) =>
-              console.log(`[Scheduler] ✅ Auto-generated ${inserted.length} questions. Bank total: ${totalInDb}`)
+              console.log(`[Scheduler] ✅ Generated ${inserted.length} questions. Bank total: ${totalInDb}`)
             )
             .catch(err =>
               console.error("[Scheduler] ❌ Auto-generate failed:", err.message)
             );
-        } else {
-          console.log(`[Scheduler] ℹ️  Auto-generate time (${genTime}) — bank has ${count} questions, no refill needed`);
         }
       }
 
@@ -198,6 +212,7 @@ export function startScheduler() {
       const s = await Status.findOne().lean();
       if (!s) return;
 
+      const todayDate = getTodayIST();
       const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
       const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
 
@@ -212,17 +227,16 @@ export function startScheduler() {
       }
 
       // ── Catch-up: publish question if posterSendTime passed ──────────────
-      if (!s.questionSentToday) {
-        const sendTime = s.posterSendTime || "08:00";
-        const [sh, sm] = sendTime.split(":").map(Number);
-        const sendMins = sh * 60 + sm;
-        // If within 4-hour window after scheduled time
-        if (nowMins >= sendMins && nowMins <= sendMins + 240) {
-          console.log(`[Scheduler] Catch-up: ${sendTime} already passed, publishing now...`);
-          const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
-          await publishFromService();
-        }
-      } else if (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate)) {
+      const sendTime = s.posterSendTime || "08:00";
+      const [sh, sm] = sendTime.split(":").map(Number);
+      const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
+      const isAlreadyPublishedToday = Boolean(s.questionSentToday && s.questionPublishedDate === todayDate && s.todayQuestion);
+
+      if (nowMins >= sendMins && !isAlreadyPublishedToday) {
+        console.log(`[Scheduler] Catch-up: ${sendTime} already passed today, publishing challenge now...`);
+        const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
+        await publishFromService();
+      } else if (isAlreadyPublishedToday && (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate))) {
         console.log(`[Scheduler] Catch-up: Question already published for today, but poster dispatch is pending/failed (${s.lastPosterStatus || "pending"}). Retrying dispatch...`);
         try {
           const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
@@ -232,23 +246,17 @@ export function startScheduler() {
         }
       }
 
-      // ── Catch-up: auto-generate if questionGenerateTime passed and bank is low ──
-      const genTime = s.questionGenerateTime || "07:00";
-      const [gh, gm] = genTime.split(":").map(Number);
-      const genMins = gh * 60 + gm;
-      // If generate time passed today (within 12h window) and bank is low
-      if (nowMins >= genMins && nowMins <= genMins + 720) {
-        const count = await Question.countDocuments();
-        if (count <= 14) {
-          console.log(`[Scheduler] Catch-up: generate time ${genTime} passed, bank has ${count} — generating now…`);
-          generateAndInsertQuestions(14)
-            .then(({ inserted, totalInDb }) =>
-              console.log(`[Scheduler] ✅ Catch-up generated ${inserted.length} questions. Bank total: ${totalInDb}`)
-            )
-            .catch(err =>
-              console.error("[Scheduler] ❌ Catch-up generate failed:", err.message)
-            );
-        }
+      // ── Catch-up: auto-generate if question bank is low ──
+      const count = await Question.countDocuments({ isManualSetup: { $ne: true } });
+      if (count <= 14) {
+        console.log(`[Scheduler] Catch-up: question bank has ${count} questions — generating now…`);
+        generateAndInsertQuestions(14)
+          .then(({ inserted, totalInDb }) =>
+            console.log(`[Scheduler] ✅ Catch-up generated ${inserted.length} questions. Bank total: ${totalInDb}`)
+          )
+          .catch(err =>
+            console.error("[Scheduler] ❌ Catch-up generate failed:", err.message)
+          );
       }
     } catch (err) {
       console.log("[Scheduler] Catch-up error:", err.message);

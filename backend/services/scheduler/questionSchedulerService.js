@@ -64,6 +64,30 @@ export const MONTHLY_GOALS_CATEGORY = "Monthly Goals";
 export const STORY_SUMMARY_TOPIC = "Story Summary";
 export const STORY_SUMMARY_CATEGORY = "Listening Practice";
 
+// 🛡️ High-quality curated speaking prompts covering all 7 categories.
+// Used as emergency fallback if the question bank runs out and AI generation is unavailable.
+export const CURATED_FALLBACK_QUESTIONS = [
+  { category: "Daily Life", topic: "Evening Routine", question: "What do you usually do after work or class, and which part of your evening do you enjoy most?" },
+  { category: "Daily Life", topic: "Weekend Mornings", question: "How do your weekend mornings differ from weekday mornings? What makes them relaxing for you?" },
+  { category: "Daily Life", topic: "Favorite Home Meal", question: "Tell me about a meal you cooked or enjoyed recently. What did you like about it?" },
+  { category: "Daily Life", topic: "Daily Commute", question: "How do you usually travel each day? What do you think about or listen to on the way?" },
+  { category: "Opinion", topic: "Online vs Classroom Learning", question: "Do you prefer learning new skills online or in a physical classroom? What works best for you?" },
+  { category: "Opinion", topic: "Morning vs Night Productivity", question: "Are you more productive early in the morning or late at night? Why does that schedule suit you?" },
+  { category: "Opinion", topic: "City Life vs Countryside", question: "If you had a free month, would you rather stay in a busy city or a quiet village? Explain why." },
+  { category: "Personal Experience", topic: "A Memorable Journey", question: "Tell me about a memorable trip or journey you took in the past. What made it unforgettable?" },
+  { category: "Personal Experience", topic: "Helpful Life Advice", question: "What is one piece of advice someone gave you that genuinely helped you make a better choice?" },
+  { category: "Personal Experience", topic: "Overcoming a Challenge", question: "Describe a situation that felt difficult at first. How did you handle it and what did you learn?" },
+  { category: "English Growth", topic: "Speaking Confidence", question: "What helps you feel most confident when speaking English, and what area do you want to improve next?" },
+  { category: "English Growth", topic: "Daily Practice Routine", question: "What is your favorite everyday trick or habit to learn new vocabulary and speak more smoothly?" },
+  { category: "English Growth", topic: "A Memorable Conversation", question: "Describe a moment when you spoke English with someone outside your comfort zone. How did it feel?" },
+  { category: "Future Goals", topic: "Dream Skill", question: "What is one new skill or hobby you have always wanted to master, and how do you plan to get started?" },
+  { category: "Future Goals", topic: "One Year Vision", question: "Where do you see yourself one year from today in terms of personal growth and English communication?" },
+  { category: "Fun Topic", topic: "Favorite Celebration", question: "Which festival or celebration is your absolute favorite, and how do you usually celebrate it?" },
+  { category: "Fun Topic", topic: "Childhood Games", question: "What games did you love playing as a child with your friends, and what made them so special?" },
+  { category: "Free Talk", topic: "Simple Daily Joys", question: "What is one small, simple thing that brought a genuine smile to your face recently?" },
+  { category: "Free Talk", topic: "An Inspiring Person", question: "Talk about a person who inspires you to work harder, stay positive, or be kinder to others?" },
+];
+
 /**
  * Check if today is the last day of the month (IST)
  */
@@ -531,8 +555,7 @@ export async function publishDailyQuestion() {
         count = await Question.countDocuments({ isManualSetup: { $ne: true } });
         console.log(`[QuestionScheduler] Generated questions. Total regular: ${count}`);
       } catch (err) {
-        console.log("[QuestionScheduler] Auto-generate failed:", err.message);
-        throw new Error("Failed to generate questions");
+        console.warn("[QuestionScheduler] ⚠️ Auto-generate failed (will draw from curated fallback bank if needed):", err.message);
       }
     } else if (count <= 7) {
       // Refill in background
@@ -542,7 +565,7 @@ export async function publishDailyQuestion() {
           console.log(`[QuestionScheduler] Auto-refill: +${regularCount} regular questions`);
         })
         .catch(err => 
-          console.log("[QuestionScheduler] Background refill failed:", err.message)
+          console.warn("[QuestionScheduler] Background refill failed:", err.message)
         );
     }
 
@@ -568,7 +591,6 @@ export async function publishDailyQuestion() {
     
     if (!q || !q.length) {
       // All categories recently used — pick the least-recently-used one
-      // (oldest entry in recentCategories array, or fully random if array empty)
       const lruCategory = recentCategories.length > 0 ? recentCategories[0] : null;
       if (lruCategory) {
         const lruQ = await Question.aggregate([
@@ -586,8 +608,20 @@ export async function publishDailyQuestion() {
       ]);
     }
     
+    // 🛡️ High-reliability fallback: if question bank is still empty, draw from curated fallback pool
     if (!q || !q.length) {
-      throw new Error("No regular questions available");
+      console.warn("[QuestionScheduler] ⚠️ No regular questions in DB — drawing from curated fallback question pool");
+      const eligible = CURATED_FALLBACK_QUESTIONS.filter(f => !recentCategories.includes(f.category));
+      const pool = eligible.length > 0 ? eligible : CURATED_FALLBACK_QUESTIONS;
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+
+      // Seed the remaining fallback questions into the database in the background so future days have reserve
+      Question.insertMany(
+        CURATED_FALLBACK_QUESTIONS.filter(f => f.topic !== picked.topic),
+        { ordered: false }
+      ).catch(() => {});
+
+      q = [picked];
     }
 
     const question = q[0];
@@ -611,7 +645,9 @@ export async function publishDailyQuestion() {
       }
     }, { upsert: true });
 
-    await Question.findByIdAndDelete(question._id);
+    if (question._id) {
+      await Question.findByIdAndDelete(question._id);
+    }
     
     // Generate vocabulary words for today's question before poster dispatch
     await ensureTodayVocabulary().catch(err =>
@@ -646,13 +682,16 @@ export async function shouldPublishQuestion() {
     if (!status) return false;
 
     const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const nowTime = `${String(nowIST.getHours()).padStart(2, "0")}:${String(nowIST.getMinutes()).padStart(2, "0")}`;
+    const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
 
     const sendTime = status.posterSendTime || "08:00";
+    const [sh, sm] = sendTime.split(":").map(Number);
+    const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
+
     const todayIST = getTodayISTDate();
-    const alreadyPublished = Boolean(status.questionSentToday && (status.questionPublishedDate === todayIST || status.lastPosterSentDate === todayIST));
+    const alreadyPublished = Boolean(status.questionSentToday && status.questionPublishedDate === todayIST && status.todayQuestion);
     
-    return nowTime === sendTime && !alreadyPublished;
+    return nowMins >= sendMins && !alreadyPublished;
   } catch (err) {
     console.error("[QuestionScheduler] Check time error:", err.message);
     return false;
@@ -666,17 +705,18 @@ export async function catchUpPublishQuestion() {
   try {
     const status = await Status.findOne().lean();
     const todayIST = getTodayISTDate();
-    const alreadyPublished = Boolean(status?.questionSentToday && (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST));
+    const alreadyPublished = Boolean(status?.questionSentToday && status?.questionPublishedDate === todayIST && status?.todayQuestion);
     if (!status || alreadyPublished) return { catchUpNeeded: false };
 
     const sendTime = status.posterSendTime || "08:00";
     const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
     const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
     const [sh, sm] = sendTime.split(":").map(Number);
-    const sendMins = sh * 60 + sm;
+    const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
 
-    // If within 4-hour window after scheduled time
-    if (nowMins >= sendMins && nowMins <= sendMins + 240) {
+    // If scheduled time has arrived or passed today, catch up immediately
+    if (nowMins >= sendMins) {
+      console.log(`[QuestionScheduler] ⏰ Catch-up trigger: scheduled time ${sendTime} passed today, publishing challenge now...`);
       const result = await publishDailyQuestion();
       return { catchUpNeeded: true, ...result };
     }

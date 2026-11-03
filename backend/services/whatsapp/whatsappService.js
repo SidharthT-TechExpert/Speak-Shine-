@@ -225,7 +225,7 @@ export function startWhatsAppWatchdog() {
  * Ensures the WhatsApp bot is connected before dispatching messages.
  * If disconnected but credentials exist in MongoDB or local disk, it automatically initializes and waits for connection.
  */
-export async function ensureWhatsAppConnected(timeoutMs = 15000) {
+export async function ensureWhatsAppConnected(timeoutMs = 25000) {
   if (isConnected && sock) return sock;
 
   const hasCreds = hasSavedCredentials();
@@ -645,7 +645,7 @@ export async function sendDailyPosterToGroup(options = {}) {
     const targetGroup = formatGroupJid(rawTargetGroup);
 
     // Ensure WhatsApp socket is connected (auto-connects from MongoDB if needed)
-    await ensureWhatsAppConnected(15000);
+    await ensureWhatsAppConnected(25000);
 
     // Fetch full status from DB to inspect content type and attachments
     const status = await Status.findOne().lean();
@@ -715,14 +715,18 @@ export async function sendDailyPosterToGroup(options = {}) {
 
       // If picture download failed or no URL, generate dedicated picture poster
       if (!imageBuffer) {
-        imageBuffer = await generatePNGPosterBuffer({
-          topic,
-          question: status?.todayImageInstructions || question,
-          category: "Picture Description",
-          contentType: "picture_description",
-          vocabulary,
-          vocabRequiredCount: vocabReq,
-        });
+        try {
+          imageBuffer = await generatePNGPosterBuffer({
+            topic,
+            question: status?.todayImageInstructions || question,
+            category: "Picture Description",
+            contentType: "picture_description",
+            vocabulary,
+            vocabRequiredCount: vocabReq,
+          });
+        } catch (posterGenErr) {
+          console.warn("[WhatsApp] ⚠️ Picture poster generation failed, falling back to rich text dispatch:", posterGenErr.message);
+        }
       }
 
       const instructions = status?.todayImageInstructions || question || "Describe what you see in this picture in detail: people, setting, actions, emotions, and your perspective.";
@@ -740,12 +744,19 @@ export async function sendDailyPosterToGroup(options = {}) {
         `🚀 *Submit your video here:* ${frontendUrl}`,
       ].filter(Boolean).join("\n");
 
-      console.log(`[WhatsApp] 📤 Sending picture challenge to group: ${targetGroup}...`);
-      await sock.sendMessage(targetGroup, {
-        image: imageBuffer,
-        mimetype: "image/jpeg",
-        caption,
-      });
+      if (imageBuffer) {
+        console.log(`[WhatsApp] 📤 Sending picture challenge to group: ${targetGroup}...`);
+        await sock.sendMessage(targetGroup, {
+          image: imageBuffer,
+          mimetype: "image/jpeg",
+          caption,
+        });
+      } else {
+        console.log(`[WhatsApp] 📤 Sending rich-text picture challenge to group: ${targetGroup}...`);
+        await sock.sendMessage(targetGroup, {
+          text: caption,
+        });
+      }
 
       await recordSuccess();
       console.log(`[WhatsApp] ✅ Picture description challenge sent successfully!`);
@@ -754,14 +765,19 @@ export async function sendDailyPosterToGroup(options = {}) {
 
     // ── CASE 2: AUDIO STORY SUMMARY CHALLENGE ──────────────────────────────────
     if (isStory) {
-      const posterBuffer = await generatePNGPosterBuffer({
-        topic,
-        question: question || "Listen to the audio story and record a short video summary in your own words.",
-        category: "Story Summary",
-        contentType: "story_audio",
-        vocabulary,
-        vocabRequiredCount: vocabReq,
-      });
+      let posterBuffer = null;
+      try {
+        posterBuffer = await generatePNGPosterBuffer({
+          topic,
+          question: question || "Listen to the audio story and record a short video summary in your own words.",
+          category: "Story Summary",
+          contentType: "story_audio",
+          vocabulary,
+          vocabRequiredCount: vocabReq,
+        });
+      } catch (storyPosterErr) {
+        console.warn("[WhatsApp] ⚠️ Story poster buffer generation failed, falling back to rich text dispatch:", storyPosterErr.message);
+      }
 
       const caption = [
         `🎧 *SPEAK & SHINE — STORY SUMMARY CHALLENGE* 🎧`,
@@ -778,12 +794,19 @@ export async function sendDailyPosterToGroup(options = {}) {
         `🚀 *Listen & submit here:* ${frontendUrl}`,
       ].filter(Boolean).join("\n");
 
-      console.log(`[WhatsApp] 📤 Sending story poster to group: ${targetGroup}...`);
-      await sock.sendMessage(targetGroup, {
-        image: posterBuffer,
-        mimetype: "image/png",
-        caption,
-      });
+      if (posterBuffer) {
+        console.log(`[WhatsApp] 📤 Sending story poster to group: ${targetGroup}...`);
+        await sock.sendMessage(targetGroup, {
+          image: posterBuffer,
+          mimetype: "image/png",
+          caption,
+        });
+      } else {
+        console.log(`[WhatsApp] 📤 Sending rich-text story challenge to group: ${targetGroup}...`);
+        await sock.sendMessage(targetGroup, {
+          text: caption,
+        });
+      }
 
       // If audio URL is available, also send the audio file directly into the WhatsApp group!
       if (status?.todayAudioUrl) {
@@ -808,14 +831,19 @@ export async function sendDailyPosterToGroup(options = {}) {
 
     // ── CASE 3: REGULAR DAILY QUESTION CHALLENGE ─────────────────────────────────
     console.log(`[WhatsApp] 🎨 Generating updated HD poster for "${topic}" (${category})...`);
-    const pngBuffer = await generatePNGPosterBuffer({
-      topic,
-      question,
-      category,
-      contentType: "question",
-      vocabulary,
-      vocabRequiredCount: vocabReq,
-    });
+    let pngBuffer = null;
+    try {
+      pngBuffer = await generatePNGPosterBuffer({
+        topic,
+        question,
+        category,
+        contentType: "question",
+        vocabulary,
+        vocabRequiredCount: vocabReq,
+      });
+    } catch (posterErr) {
+      console.warn("[WhatsApp] ⚠️ Regular poster buffer generation failed, falling back to rich text dispatch:", posterErr.message);
+    }
 
     const isReflection = category?.toLowerCase().includes("reflection") || topic?.toLowerCase().includes("reflection") || status?.isMonthlyReflectionDay;
     const isGoals = category?.toLowerCase().includes("goal") || topic?.toLowerCase().includes("goal") || status?.isMonthlyGoalsDay;
@@ -852,12 +880,19 @@ export async function sendDailyPosterToGroup(options = {}) {
       `🚀 *Submit here:* ${frontendUrl}`,
     ].filter(Boolean).join("\n");
 
-    console.log(`[WhatsApp] 📤 Sending HD poster to group: ${targetGroup}...`);
-    await sock.sendMessage(targetGroup, {
-      image: pngBuffer,
-      mimetype: "image/png",
-      caption,
-    });
+    if (pngBuffer) {
+      console.log(`[WhatsApp] 📤 Sending HD poster to group: ${targetGroup}...`);
+      await sock.sendMessage(targetGroup, {
+        image: pngBuffer,
+        mimetype: "image/png",
+        caption,
+      });
+    } else {
+      console.log(`[WhatsApp] 📤 Sending rich-text challenge to group: ${targetGroup}...`);
+      await sock.sendMessage(targetGroup, {
+        text: caption,
+      });
+    }
 
     await recordSuccess();
     console.log(`[WhatsApp] ✅ Poster sent successfully to ${targetGroup}!`);

@@ -556,7 +556,26 @@ export async function generateAndInsertQuestions(totalCount = 14) {
     if (stillNeeded === 0) break;
   }
 
-  const totalInDb = await Question.countDocuments();
+  let totalInDb = await Question.countDocuments();
+
+  // If AI generation produced no questions and bank is low (< 7), seed from curated fallback pool
+  if (allInserted.length === 0 && totalInDb < 7) {
+    console.log(`[QuestionGen] ⚠️ AI generation produced 0 questions and bank has only ${totalInDb} questions. Seeding from curated fallback pool...`);
+    try {
+      const { CURATED_FALLBACK_QUESTIONS } = await import("../scheduler/questionSchedulerService.js");
+      const seedCandidates = CURATED_FALLBACK_QUESTIONS.filter(cf => 
+        !runningTopics.includes(cf.topic) && !runningQuestions.includes(cf.question)
+      );
+      if (seedCandidates.length > 0) {
+        await Question.insertMany(seedCandidates, { ordered: false });
+        allInserted.push(...seedCandidates);
+        totalInDb = await Question.countDocuments();
+        console.log(`[QuestionGen] 🛡️ Seeded ${seedCandidates.length} curated fallback questions into question bank. New total: ${totalInDb}`);
+      }
+    } catch (seedErr) {
+      console.warn("[QuestionGen] Curated seeding failed:", seedErr.message);
+    }
+  }
 
   // Final balance report
   const finalCounts = await Question.aggregate([
