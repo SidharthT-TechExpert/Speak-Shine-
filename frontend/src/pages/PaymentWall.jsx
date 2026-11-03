@@ -1,7 +1,7 @@
 /**
  * PaymentWall
  * Shown to unpaid users when they try to access a gated feature.
- * Handles Razorpay Standard Checkout flow end-to-end.
+ * Handles Razorpay Standard Checkout flow end-to-end and Wallet balance payments.
  * Features instant verification, success confirmation, and 1-click invoice download.
  */
 
@@ -26,7 +26,7 @@ function loadRazorpayScript() {
   });
 }
 
-const DEFAULT_PLAN_AMOUNT = 5; // INR
+const DEFAULT_PLAN_AMOUNT = 5; // INR fallback
 
 export default function PaymentWall({ onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -65,8 +65,13 @@ export default function PaymentWall({ onSuccess }) {
     api.get("/payments/wallet")
       .then(({ data }) => {
         if (data?.success) {
-          setWalletBalance(Number(data.walletBalance) || 0);
+          const bal = Number(data.walletBalance) || 0;
+          setWalletBalance(bal);
           setWalletHistory(data.walletHistory || []);
+          // Automatically pick UPI if wallet balance is zero
+          if (bal <= 0) {
+            setPaymentMethod("upi");
+          }
         }
       })
       .catch(() => {});
@@ -98,8 +103,8 @@ export default function PaymentWall({ onSuccess }) {
   // Step 1: User clicks main action button
   const handlePay = async () => {
     setError(null);
-    // If 100% wallet coverage: NEVER pay silently in the background!
-    // Require explicit confirmation dialog so user has full control.
+    // If using wallet balance: NEVER pay silently in the background!
+    // Require explicit confirmation dialog so user has full control of their cash.
     if (useWallet && isFullWalletCoverage) {
       setShowWalletConfirmModal(true);
       return;
@@ -108,7 +113,7 @@ export default function PaymentWall({ onSuccess }) {
     await executeOrder({ confirmWalletPayment: false });
   };
 
-  // Step 2: User explicitly clicked "Confirm & Activate" in modal
+  // Step 2: User explicitly clicked "Confirm & Pay" in confirmation modal
   const handleConfirmWalletPayment = async () => {
     setShowWalletConfirmModal(false);
     await executeOrder({ confirmWalletPayment: true });
@@ -139,7 +144,7 @@ export default function PaymentWall({ onSuccess }) {
         const txObj = {
           name: user?.name || user?.registeredName || "Student Member",
           phone: user?.phone,
-          amount: 0,
+          amount: coursePrice,
           totalFee: order.totalFee || coursePrice,
           coursePrice: order.coursePrice || coursePrice,
           taxAmount: 0,
@@ -177,7 +182,7 @@ export default function PaymentWall({ onSuccess }) {
         currency: order.currency,
         name: "Speak & Shine",
         description: order.walletDiscountApplied > 0
-          ? `Premium Membership (₹${order.walletDiscountApplied} Wallet Discount Applied)`
+          ? `Premium Membership (₹${order.walletDiscountApplied} Wallet Cash Applied)`
           : "Premium Membership",
         image: "/icons/icon-192.png",
         order_id: order.order_id,
@@ -287,48 +292,48 @@ export default function PaymentWall({ onSuccess }) {
     }
   };
 
+  // ── PAYMENT FAILED SCREEN ──────────────────────────────────────────────────
   if (failed) {
     return (
       <Layout title="Payment Failed">
-        <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", minHeight: "60vh", textAlign: "center",
-          padding: "2rem",
-        }}>
-          <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>❌</div>
-          <h2 style={{ color: "#f87171", fontSize: "1.5rem", fontWeight: 800, marginBottom: "0.5rem" }}>
-            Payment Failed
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 py-8 max-w-md mx-auto">
+          <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-3xl mb-4">
+            ✕
+          </div>
+          <h2 className="text-rose-400 text-2xl font-black mb-2">
+            Payment Unsuccessful
           </h2>
-          <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: "0.5rem", maxWidth: 340, lineHeight: 1.6 }}>
-            {error || "Something went wrong with your payment."}
+          <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+            {error || "Something went wrong while processing your transaction."}
           </p>
-          <p style={{ color: "var(--muted)", fontSize: "0.8rem", marginBottom: "2rem" }}>
-            No money was deducted. You can try again safely.
-          </p>
+          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 mb-6">
+            No money was deducted. You can retry with a different UPI app or wallet cash.
+          </div>
           <button
+            type="button"
             onClick={() => { setFailed(false); setError(null); }}
-            style={{
-              background: "linear-gradient(135deg, #7c6fff 0%, #6d5ce7 100%)",
-              color: "#fff", border: "none", borderRadius: 12,
-              padding: "0.9rem 2rem", fontSize: "1rem", fontWeight: 700,
-              cursor: "pointer", boxShadow: "0 6px 24px rgba(124,111,255,0.35)",
-              marginBottom: "1rem",
-            }}
+            className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm cursor-pointer shadow-lg shadow-purple-500/25 transition-all mb-3"
           >
             🔄 Try Again
           </button>
-          <p style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-            Contact your trainer if the problem persists.
-          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Return to Dashboard
+          </button>
         </div>
       </Layout>
     );
   }
 
+  // ── PAYMENT SUCCESSFUL SCREEN ──────────────────────────────────────────────
   if (paid) {
+    const isWallet = successTx?.isWalletCovered || successTx?.source === "wallet";
+
     return (
-      <Layout title="Payment Successful">
-        {/* Printable Official Invoice Modal */}
+      <Layout title="Access Unlocked">
         {showInvoiceModal && (
           <Suspense fallback={null}>
             <InvoiceModal
@@ -339,170 +344,132 @@ export default function PaymentWall({ onSuccess }) {
           </Suspense>
         )}
 
-        <div style={{ maxWidth: 560, margin: "2rem auto", padding: "0 1rem" }}>
-          {/* Main Celebration Card */}
-          <div style={{
-            background: "linear-gradient(135deg, #0d1e16 0%, #0a1711 100%)",
-            border: "1px solid rgba(74, 222, 128, 0.35)",
-            borderRadius: 24,
-            padding: "2.25rem 1.75rem",
-            textAlign: "center",
-            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(74, 222, 128, 0.12)",
-            position: "relative",
-            overflow: "hidden",
-            marginBottom: "1.25rem",
-          }}>
-            <div style={{ fontSize: "3.75rem", marginBottom: "0.85rem" }}>🎉</div>
-            <div style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              background: "rgba(74, 222, 128, 0.15)",
-              border: "1px solid rgba(74, 222, 128, 0.35)",
-              color: "#4ade80",
-              padding: "0.3rem 0.85rem",
-              borderRadius: 20,
-              fontSize: "0.82rem",
-              fontWeight: 800,
-              letterSpacing: "0.04em",
-              marginBottom: "0.75rem",
-            }}>
-              <span>✓</span> PAYMENT VERIFIED &amp; UNLOCKED
+        <div className="max-w-xl mx-auto my-6 sm:my-12 px-4">
+          <div className="relative rounded-3xl border border-emerald-500/30 bg-gradient-to-b from-[#0e1d16] via-[#09140f] to-[#060e0a] p-6 sm:p-9 shadow-2xl text-center overflow-hidden">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/20">
+              ✓
             </div>
 
-            <h1 style={{ fontSize: "1.6rem", fontWeight: 900, color: "#ffffff", marginBottom: "0.5rem" }}>
-              Welcome to Speak &amp; Shine!
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold tracking-wide uppercase mb-3">
+              <span>●</span> Membership Activated
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-black text-white mb-2">
+              Welcome to the Cohort!
             </h1>
-            <p style={{ color: "#94a3b8", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 440, margin: "0 auto 1.5rem" }}>
-              Your payment has been verified. Daily speaking challenges, AI speech analysis, and full mentorship are now active on your account!
+            <p className="text-slate-400 text-sm max-w-md mx-auto mb-6 leading-relaxed">
+              Your 30-day Speak &amp; Shine full pass is now active. Daily AI speech evaluation, live practice rooms, and fluency metrics are unlocked.
             </p>
 
-            {/* Quick Receipt Summary Box */}
-            <div style={{
-              background: "rgba(255, 255, 255, 0.03)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: 16,
-              padding: "1.1rem 1.25rem",
-              textAlign: "left",
-              marginBottom: "1.75rem",
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", paddingBottom: "0.6rem", marginBottom: "0.6rem" }}>
-                <span style={{ fontSize: "0.76rem", color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>AMOUNT PAID:</span>
-                <span style={{ fontSize: "1.2rem", fontWeight: 900, color: "#4ade80" }}>
-                  {successTx?.isWalletCovered || successTx?.amount === 0
-                    ? "₹0 (100% Covered by Wallet)"
-                    : `₹${successTx?.amount ?? netPayable}`}
+            {/* Receipt Summary Card */}
+            <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-4 sm:p-5 text-left mb-6 space-y-3">
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Payment Summary</span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                  {isWallet ? "Wallet Cash" : "UPI Gateway"}
                 </span>
               </div>
-              {successTx?.walletDiscountApplied > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", color: "#4ade80", marginBottom: "0.4rem" }}>
-                  <span style={{ color: "var(--muted)" }}>Wallet Discount:</span>
-                  <span style={{ fontWeight: 700 }}>-₹{successTx.walletDiscountApplied}</span>
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "0.4rem" }}>
-                <span style={{ color: "var(--muted)" }}>Plan:</span>
-                <span style={{ fontWeight: 600 }}>Speak &amp; Shine Full Membership</span>
+
+              <div className="flex justify-between items-center text-sm text-slate-300">
+                <span>Course Price</span>
+                <span className="font-bold text-white">₹{coursePrice}</span>
               </div>
+
+              {isWallet ? (
+                <>
+                  <div className="flex justify-between items-center text-sm text-emerald-400 font-semibold">
+                    <span>Paid using Wallet Cash</span>
+                    <span>-₹{coursePrice}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-slate-400">
+                    <span>Remaining Wallet Balance</span>
+                    <span className="font-bold text-white">₹{walletBalance}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {taxAmount > 0 && (
+                    <div className="flex justify-between items-center text-sm text-slate-400">
+                      <span>Tax / GST</span>
+                      <span>₹{taxAmount}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-sm text-white font-bold pt-1 border-t border-slate-800/80">
+                    <span>Total Paid</span>
+                    <span className="text-emerald-400 text-base">₹{successTx?.amount ?? totalAmount}</span>
+                  </div>
+                </>
+              )}
+
               {successTx?.razorpayPaymentId && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.76rem", color: "#cbd5e1", marginBottom: "0.4rem" }}>
-                  <span style={{ color: "var(--muted)" }}>Payment ID:</span>
-                  <span style={{ fontFamily: "monospace", color: "#a5b4fc" }}>{successTx.razorpayPaymentId}</span>
+                <div className="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <span>Reference ID</span>
+                  <span className="font-mono text-slate-300">{successTx.razorpayPaymentId}</span>
                 </div>
               )}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.76rem", color: "#cbd5e1" }}>
-                <span style={{ color: "var(--muted)" }}>Date &amp; Time:</span>
-                <span>{new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-              </div>
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={handleContinueToDashboard}
-                style={{
-                  width: "100%",
-                  background: "linear-gradient(135deg, #7c6fff 0%, #4f46e5 100%)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: 14,
-                  padding: "0.95rem 1.5rem",
-                  fontSize: "1rem",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                  boxShadow: "0 6px 20px rgba(124, 111, 255, 0.4)",
-                  transition: "all 0.15s ease",
-                }}
+                className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-sm cursor-pointer shadow-lg shadow-purple-500/30 transition-all flex items-center justify-center gap-2"
               >
-                <span>🚀</span> Start Speaking Challenges Now
+                <span>🚀</span> Start Speaking Challenges
               </button>
-
               <button
                 type="button"
                 onClick={() => setShowInvoiceModal(true)}
-                style={{
-                  width: "100%",
-                  background: "rgba(124, 111, 255, 0.12)",
-                  color: "#c4b5fd",
-                  border: "1px solid rgba(124, 111, 255, 0.35)",
-                  borderRadius: 14,
-                  padding: "0.85rem 1.5rem",
-                  fontSize: "0.92rem",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem",
-                  transition: "all 0.15s ease",
-                }}
+                className="py-3.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-sm cursor-pointer transition-colors flex items-center justify-center gap-2"
               >
-                <span>📄</span> View &amp; Download Official Invoice (PDF)
+                <span>📄</span> Official Invoice
               </button>
             </div>
           </div>
-
-          <p style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--muted)" }}>
-            A receipt has been saved to your account. You can view all past invoices anytime in <a href="/payment-history" style={{ color: "#a5b4fc", textDecoration: "underline" }}>Payment History</a>.
-          </p>
         </div>
       </Layout>
     );
   }
 
+  // ── MAIN CHECKOUT INTERFACE ────────────────────────────────────────────────
   return (
     <Layout title="Unlock Full Access">
-      {/* ── Wallet Deduction Confirmation Modal (Responsive, clean, no dollar sign) ── */}
+      {/* ── Wallet Deduction Confirmation Modal (Compact, responsive, centered, INR only) ── */}
       {showWalletConfirmModal && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="w-full max-w-sm rounded-2xl bg-slate-900 border border-emerald-500/40 p-6 shadow-2xl text-center animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-2xl">
               👛
             </div>
-            <h3 className="text-xl font-extrabold text-white mb-1.5">
+            <h3 className="text-lg font-bold text-white mb-1.5">
               Confirm Wallet Payment
             </h3>
-            <p className="text-sm text-slate-400 mb-4 leading-relaxed">
-              Pay <strong className="text-emerald-400 font-bold">₹{coursePrice}</strong> from your wallet balance to activate monthly cohort access?
+            <p className="text-xs sm:text-sm text-slate-300 mb-4 leading-relaxed">
+              Deduct <strong className="text-emerald-400 font-bold">₹{coursePrice}</strong> from your earned wallet cash to activate full 30-day cohort membership?
             </p>
 
-            <div className="flex items-center justify-between bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 mb-5 text-sm">
-              <span className="text-slate-400">Wallet: ₹{walletBalance}</span>
-              <span className="text-slate-500">→</span>
-              <span className="text-emerald-400 font-bold">₹{remainingWallet} remaining</span>
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3 mb-5 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-400">
+                <span>Current Wallet Balance:</span>
+                <span className="text-slate-200 font-bold">₹{walletBalance}</span>
+              </div>
+              <div className="flex justify-between text-emerald-400 font-semibold">
+                <span>Amount to Pay (Course Price):</span>
+                <span>-₹{coursePrice}</span>
+              </div>
+              <div className="flex justify-between text-slate-400 pt-1.5 border-t border-slate-700/60 font-semibold">
+                <span>Balance After Payment:</span>
+                <span className="text-emerald-400 font-bold">₹{remainingWallet} left</span>
+              </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-2.5">
               <button
                 type="button"
                 onClick={() => setShowWalletConfirmModal(false)}
                 disabled={loading}
-                className="flex-1 py-3 px-4 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-bold text-sm cursor-pointer transition-colors"
+                className="flex-1 py-2.5 px-3 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
               >
                 Cancel
               </button>
@@ -510,9 +477,9 @@ export default function PaymentWall({ onSuccess }) {
                 type="button"
                 onClick={handleConfirmWalletPayment}
                 disabled={loading}
-                className="flex-[1.4] py-3 px-4 rounded-xl border-none bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm cursor-pointer shadow-lg shadow-emerald-500/25 transition-all"
+                className="flex-[1.6] py-2.5 px-3 rounded-xl border-none bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs cursor-pointer shadow-lg shadow-emerald-500/25 transition-all"
               >
-                {loading ? "Activating…" : `Pay ₹${coursePrice} from Wallet`}
+                {loading ? "Activating…" : `Confirm & Pay ₹${coursePrice}`}
               </button>
             </div>
           </div>
@@ -522,11 +489,11 @@ export default function PaymentWall({ onSuccess }) {
       {/* ── Wallet Transaction History Modal ── */}
       {showWalletHistoryModal && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl overflow-y-auto">
+          <div className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-slate-900 border border-slate-700 p-5 sm:p-6 shadow-2xl flex flex-col">
             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">👛</span>
-                <h3 className="text-lg font-bold text-white">Wallet &amp; Referral History</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">👛</span>
+                <h3 className="text-base font-bold text-white">Wallet &amp; Referral History</h3>
               </div>
               <button
                 type="button"
@@ -537,24 +504,24 @@ export default function PaymentWall({ onSuccess }) {
               </button>
             </div>
 
-            {walletHistory.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-sm">
-                No wallet transactions recorded yet.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                {[...walletHistory].reverse().map((tx, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition-colors">
+            <div className="overflow-y-auto flex-1 pr-1 space-y-2">
+              {walletHistory.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-xs">
+                  No wallet transactions recorded yet.
+                </div>
+              ) : (
+                [...walletHistory].reverse().map((tx, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-800">
                     <div>
-                      <div className="text-sm font-semibold text-white">
+                      <div className="text-xs font-semibold text-white">
                         {tx.reason || "Wallet transaction"}
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
+                      <div className="text-[11px] text-slate-400 mt-0.5">
                         {new Date(tx.date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        {" · "}Balance after: ₹{tx.balanceAfter}
+                        {" · "}Balance: ₹{tx.balanceAfter}
                       </div>
                     </div>
-                    <div className={`text-sm font-bold px-2.5 py-1 rounded-lg border ${
+                    <div className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
                       tx.type === "credit"
                         ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
                         : "text-rose-400 bg-rose-500/10 border-rose-500/20"
@@ -562,250 +529,238 @@ export default function PaymentWall({ onSuccess }) {
                       {tx.type === "credit" ? `+₹${tx.amount}` : `-₹${tx.amount}`}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Main Responsive Container (Full Width & Balanced Grid) ── */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* ════════ LEFT COLUMN: Value Proposition & Feature Highlights (Fills Empty Space) ════════ */}
-          <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
+      {/* ── Main Responsive Content Container (Balanced 6xl container) ── */}
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        
+        {/* Main Grid: Left Value Proposition (col-span-7) + Right Sticky Checkout (col-span-5) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+
+          {/* ════════ LEFT COLUMN: Value Proposition & Membership Details ════════ */}
+          <div className="lg:col-span-7 space-y-6">
             
-            {/* Header / Hero Badge */}
+            {/* Header / Pill */}
             <div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold tracking-wide uppercase mb-3">
                 <span>✨</span>
-                <span>{graceStatus.isGracePeriod ? `${graceStatus.monthName.toUpperCase()} TRIAL WINDOW ACTIVE` : "PREMIUM AI COHORT"}</span>
+                <span>{graceStatus.isGracePeriod ? `${graceStatus.monthName.toUpperCase()} TRIAL ACTIVE` : "FULL MEMBERSHIP PASS"}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight mb-2">
-                {graceStatus.isGracePeriod
-                  ? `Unlock Full ${graceStatus.monthName} Membership`
-                  : "Master English Fluency With Daily AI Video Feedback"}
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+                Unlock Unlimited Speech Practice &amp; AI Mentorship
               </h1>
-              <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl">
-                {graceStatus.isGracePeriod
-                  ? `Day ${graceStatus.dayOfMonth} of 2 free practice is active. Complete your membership now for uninterrupted daily speech analysis all month.`
-                  : "Practice speaking every day on video, get instant CEFR pronunciation & grammar scores, and connect in live audio/video cohort practice rooms."}
+              <p className="text-sm sm:text-base text-slate-300 mt-2 leading-relaxed">
+                Elevate your English speaking confidence with daily AI video feedback, CEFR rubric scoring, live practice rooms, and mentor challenges.
               </p>
             </div>
 
-            {/* Plan Overview & Price Banner */}
-            <div className="rounded-2xl bg-slate-900/70 border border-slate-800 p-6 backdrop-blur-xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
-                  Included Cohort Tier
-                </span>
-                <h3 className="text-xl font-bold text-white mt-0.5">
-                  Full Access Monthly Speaking Pass
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Full 30-day cycle · Daily submissions · CEFR growth tracking
-                </p>
+            {/* Plan Card */}
+            <div className="rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 via-slate-900/60 to-slate-950/80 p-6 sm:p-7 backdrop-blur-xl shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400 block mb-1">
+                    Monthly Cohort Pass
+                  </span>
+                  <div className="text-xl font-bold text-white">
+                    30-Day Intensive Cycle
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    Full access to daily challenges &amp; analysis
+                  </div>
+                </div>
+
+                <div className="sm:text-right bg-slate-900/80 sm:bg-transparent p-3 sm:p-0 rounded-xl border sm:border-0 border-slate-800">
+                  <div className="flex items-baseline gap-1.5 sm:justify-end">
+                    <span className="text-3xl sm:text-4xl font-black text-white tracking-tight">₹{coursePrice}</span>
+                    <span className="text-sm font-semibold text-slate-400">/ 30 days</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                    Zero auto-debit · Cancel anytime
+                  </div>
+                </div>
               </div>
 
-              <div className="sm:text-right shrink-0">
-                <div className="text-3xl font-extrabold text-white tracking-tight">
-                  ₹{coursePrice}
-                  <span className="text-sm font-medium text-slate-400 ml-1">/month</span>
-                </div>
-                <div className="text-xs text-emerald-400 font-semibold mt-0.5">
-                  Pay with wallet cash or UPI
-                </div>
-              </div>
-            </div>
-
-            {/* 4 Rich Feature Cards (2x2 Grid utilizing left side space) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-slate-900/50 border border-slate-800/80 p-5 hover:border-slate-700 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl mb-3 text-indigo-400">
-                  🎙️
-                </div>
-                <h4 className="text-base font-bold text-white mb-1.5">
-                  Daily Speaking Video Practice
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  300s daily prompts with direct in-browser recording, acoustic pitch charts, and real-time speech-to-text.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-slate-900/50 border border-slate-800/80 p-5 hover:border-slate-700 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl mb-3 text-emerald-400">
-                  📊
-                </div>
-                <h4 className="text-base font-bold text-white mb-1.5">
-                  Instant AI Grammar &amp; Scores
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  Word-by-word grammar correction, CEFR proficiency levels (A1 to C2), and delivery fluency benchmarks.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-slate-900/50 border border-slate-800/80 p-5 hover:border-slate-700 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-xl mb-3 text-purple-400">
-                  👥
-                </div>
-                <h4 className="text-base font-bold text-white mb-1.5">
-                  Interactive Live Practice Rooms
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  Join live group speaking tables, debate topics with fellow students, and build conversational flow.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-slate-900/50 border border-slate-800/80 p-5 hover:border-slate-700 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl mb-3 text-amber-400">
-                  🛡️
-                </div>
-                <h4 className="text-base font-bold text-white mb-1.5">
-                  Streak Shields &amp; Rewards
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  Protect daily streaks with automated freeze shields, earn reward badges, and climb cohort leaderboards.
-                </p>
-              </div>
-            </div>
-
-            {/* Daily 3-Step Practice Cycle (Visual Workflow filling lower space) */}
-            <div className="rounded-2xl bg-slate-900/40 border border-slate-800/60 p-5 sm:p-6">
-              <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-4 flex items-center gap-2">
-                <span>⚡</span>
-                <span>Your Daily Routine in Speak &amp; Shine</span>
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs sm:text-sm">
-                <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-slate-800/30 border border-slate-800">
-                  <span className="font-extrabold text-indigo-400">Step 1 · 08:00 AM</span>
-                  <span className="font-bold text-white">Receive Daily Prompt</span>
-                  <span className="text-slate-400 text-xs">Fresh speaking topic delivered with vocabulary builder notes.</span>
+              {/* Features List */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    ✓
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">Daily Video AI Evaluation</div>
+                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Pronunciation, grammar, vocabulary, and 4-rubric CEFR scoring.
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-slate-800/30 border border-slate-800">
-                  <span className="font-extrabold text-emerald-400">Step 2 · 5 Minutes</span>
-                  <span className="font-bold text-white">Record &amp; Speak</span>
-                  <span className="text-slate-400 text-xs">Speak naturally on camera directly from your phone or laptop.</span>
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    ✓
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">Interactive Live Rooms</div>
+                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Practice live with peers and trainers in interactive video audio rooms.
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-slate-800/30 border border-slate-800">
-                  <span className="font-extrabold text-amber-400">Step 3 · Instant</span>
-                  <span className="font-bold text-white">Review AI Feedback</span>
-                  <span className="text-slate-400 text-xs">Check grammar corrections, fluency score, and maintain your streak.</span>
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    ✓
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">Streak Protection &amp; Shields</div>
+                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Earn streak freeze shields to protect your daily speaking consistency.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    ✓
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">Official GST Invoices</div>
+                    <div className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Downloadable GST-compliant receipts and milestone performance certificates.
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Member Transparency Badges */}
-            <div className="flex items-center justify-between flex-wrap gap-3 p-4 rounded-xl bg-slate-900/30 border border-slate-800/60 text-xs text-slate-400">
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>Zero Automatic Renewals</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>1:1 Real Cash Wallet Value</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>Instant Account Activation</span>
-              </span>
+            {/* Wallet Cash Value Notice (When user has wallet balance) */}
+            {walletBalance > 0 && (
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4 sm:p-5 flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xl shrink-0">
+                  👛
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-sm font-bold text-emerald-300">
+                      You have ₹{walletBalance} in Wallet Cash
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      100% Tax-Free
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    Your wallet balance is real cash earned from referrals and speaking streaks. When paying with wallet cash, tax (₹{taxAmount}) is completely waived — you only pay the course fee of ₹{coursePrice}.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Trust Pillars */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
+                <div className="text-base mb-1">🛡️</div>
+                <div className="text-xs font-bold text-white">Zero Auto-Debit</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">One-time payment only</div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
+                <div className="text-base mb-1">⚡</div>
+                <div className="text-xs font-bold text-white">Instant Activation</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Unlocked immediately</div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
+                <div className="text-base mb-1">📄</div>
+                <div className="text-xs font-bold text-white">Official Tax Invoice</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Instant PDF download</div>
+              </div>
             </div>
 
           </div>
 
-          {/* ════════ RIGHT COLUMN: Sticky Checkout Card (Tailwind Styled) ════════ */}
-          <div className="lg:col-span-5 xl:col-span-4 sticky top-6">
-            <div className="rounded-2xl bg-slate-900/90 border border-slate-700/80 p-6 sm:p-7 shadow-2xl backdrop-blur-2xl flex flex-col gap-5">
+          {/* ════════ RIGHT COLUMN: Clean Sticky Checkout ════════ */}
+          <div className="lg:col-span-5 lg:sticky lg:top-6">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 backdrop-blur-xl p-6 sm:p-7 shadow-2xl space-y-5">
               
               {/* Header */}
-              <div className="border-b border-slate-800 pb-4">
-                <h2 className="text-xl font-bold text-white tracking-tight">Checkout</h2>
-                <p className="text-xs text-slate-400 mt-1">Select your preferred payment method</p>
-              </div>
-
-              {/* Wallet Cash Balance Status Strip (If user has money in wallet) */}
-              {walletBalance > 0 && (
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">👛</span>
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block">
-                        Wallet Cash Available
-                      </span>
-                      <span className="text-lg font-extrabold text-white">
-                        ₹{walletBalance}
-                      </span>
-                    </div>
-                  </div>
-
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">Checkout</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Select your payment method</p>
+                </div>
+                {walletBalance > 0 && (
                   <button
                     type="button"
                     onClick={() => setShowWalletHistoryModal(true)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold cursor-pointer transition-colors"
+                    className="text-xs text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 cursor-pointer transition-colors"
                   >
-                    History {walletHistory.length > 0 ? `(${walletHistory.length})` : ""}
+                    Wallet Log ({walletHistory.length})
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* Payment Method Selector (Shown when user has wallet money) */}
-              {walletBalance > 0 && (
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Payment Method
-                  </span>
+              {/* Payment Methods */}
+              <div className="space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Select Payment Option
+                </span>
 
-                  {/* Option 1: Pay with Wallet (Gives wallet cash full value!) */}
+                {/* Option 1: Pay with Wallet Cash (Shown if user has wallet balance) */}
+                {walletBalance > 0 && (
                   <div
                     onClick={() => setPaymentMethod("wallet")}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
                       paymentMethod === "wallet"
                         ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
                         : "border-slate-800 bg-slate-800/40 hover:border-slate-700"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        paymentMethod === "wallet" ? "border-emerald-500" : "border-slate-600"
-                      }`}>
-                        {paymentMethod === "wallet" && (
-                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-white flex items-center gap-2">
-                          <span>Pay with Wallet Cash</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          paymentMethod === "wallet" ? "border-emerald-500" : "border-slate-600"
+                        }`}>
+                          {paymentMethod === "wallet" && (
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                          )}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          ₹{walletBalance} in balance
+                        <div>
+                          <div className="text-sm font-bold text-white flex items-center gap-2">
+                            <span>Wallet Cash</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                              0% Tax
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            ₹{walletBalance} cash available
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="text-right">
-                      <div className="text-base font-extrabold text-emerald-400">
-                        ₹{coursePrice}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        from wallet
+                      <div className="text-right">
+                        <div className="text-base font-extrabold text-emerald-400">
+                          ₹{coursePrice}
+                        </div>
+                        <div className="text-[11px] text-slate-400">wallet cash</div>
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Option 2: Pay via UPI / QR Code */}
-                  <div
-                    onClick={() => setPaymentMethod("upi")}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
-                      paymentMethod === "upi"
-                        ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
-                        : "border-slate-800 bg-slate-800/40 hover:border-slate-700"
-                    }`}
-                  >
+                {/* Option 2: Pay via UPI / QR Code */}
+                <div
+                  onClick={() => setPaymentMethod("upi")}
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 ${
+                    paymentMethod === "upi"
+                      ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10"
+                      : "border-slate-800 bg-slate-800/40 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                         paymentMethod === "upi" ? "border-indigo-500" : "border-slate-600"
                       }`}>
                         {paymentMethod === "upi" && (
@@ -814,10 +769,10 @@ export default function PaymentWall({ onSuccess }) {
                       </div>
                       <div>
                         <div className="text-sm font-bold text-white">
-                          Pay via UPI / QR Code
+                          UPI / QR Code
                         </div>
                         <div className="text-xs text-slate-400 mt-0.5">
-                          Google Pay, PhonePe, Paytm
+                          Google Pay, PhonePe, Paytm, BHIM
                         </div>
                       </div>
                     </div>
@@ -826,63 +781,59 @@ export default function PaymentWall({ onSuccess }) {
                       <div className="text-base font-extrabold text-indigo-300">
                         ₹{totalAmount}
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        direct gateway
-                      </div>
+                      <div className="text-[11px] text-slate-400">gateway</div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Payment Summary */}
-              <div className="rounded-xl bg-slate-800/40 border border-slate-800 p-4 flex flex-col gap-2.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Payment Summary
+              {/* Order Summary */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Order Summary
                 </span>
 
                 {paymentMethod === "wallet" && useWallet ? (
-                  /* WALLET SUMMARY: Celebrates the wallet cash value */
+                  /* WALLET SUMMARY */
                   <>
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Course Fee:</span>
-                      <span>₹{coursePrice}</span>
+                    <div className="flex justify-between text-xs sm:text-sm text-slate-300">
+                      <span>Course Fee</span>
+                      <span className="font-semibold">₹{coursePrice}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-emerald-400 font-bold">
-                      <span>Paid via Wallet Cash:</span>
+                    <div className="flex justify-between text-xs sm:text-sm text-emerald-400 font-bold">
+                      <span>Paid via Wallet Cash</span>
                       <span>-₹{isFullWalletCoverage ? coursePrice : walletDiscount}</span>
                     </div>
-                    {!isFullWalletCoverage && taxAmount > 0 && (
-                      <div className="flex justify-between text-sm text-slate-300">
-                        <span>Tax / GST:</span>
-                        <span>₹{taxAmount}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Tax / GST</span>
+                      <span className="text-emerald-400 font-semibold">Waived (₹0)</span>
+                    </div>
                     <div className="border-t border-slate-700/60 pt-2.5 mt-1 flex items-center justify-between">
-                      <span className="text-sm font-bold text-white">Net Gateway Due:</span>
-                      <span className="text-lg font-extrabold text-emerald-400">
+                      <span className="text-sm font-bold text-white">Gateway Due (UPI)</span>
+                      <span className="text-lg font-black text-emerald-400">
                         ₹{netPayable}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 text-right">
-                      Total ₹{coursePrice} deducted from your wallet
+                    <div className="text-[11px] text-slate-400 text-right pt-0.5">
+                      ₹{coursePrice} paid from wallet (₹{remainingWallet} cash balance left)
                     </div>
                   </>
                 ) : (
-                  /* UPI SUMMARY: Strictly zero wallet text */
+                  /* UPI SUMMARY (Clean, zero wallet text) */
                   <>
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Course Fee:</span>
-                      <span>₹{coursePrice}</span>
+                    <div className="flex justify-between text-xs sm:text-sm text-slate-300">
+                      <span>Course Fee</span>
+                      <span className="font-semibold">₹{coursePrice}</span>
                     </div>
                     {taxAmount > 0 && (
-                      <div className="flex justify-between text-sm text-slate-300">
-                        <span>Tax / GST:</span>
-                        <span>₹{taxAmount}</span>
+                      <div className="flex justify-between text-xs sm:text-sm text-slate-300">
+                        <span>Tax / GST</span>
+                        <span className="font-semibold">₹{taxAmount}</span>
                       </div>
                     )}
                     <div className="border-t border-slate-700/60 pt-2.5 mt-1 flex items-center justify-between">
-                      <span className="text-sm font-bold text-white">Total Due via UPI:</span>
-                      <span className="text-lg font-extrabold text-indigo-300">
+                      <span className="text-sm font-bold text-white">Total Payable via UPI</span>
+                      <span className="text-lg font-black text-indigo-300">
                         ₹{totalAmount}
                       </span>
                     </div>
@@ -897,45 +848,48 @@ export default function PaymentWall({ onSuccess }) {
                 </div>
               )}
 
-              {/* Primary Action Button */}
-              <button
-                type="button"
-                onClick={handlePay}
-                disabled={loading}
-                className={`w-full py-3.5 px-6 rounded-xl font-extrabold text-base text-white cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-xl ${
-                  loading
-                    ? "opacity-60 cursor-not-allowed bg-slate-700"
-                    : paymentMethod === "wallet"
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/25 active:scale-[0.99]"
-                      : "bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 shadow-indigo-500/25 active:scale-[0.99]"
-                }`}
-              >
-                {loading ? (
-                  <span>Processing…</span>
-                ) : paymentMethod === "wallet" ? (
-                  <span>⚡ Pay ₹{coursePrice} from Wallet</span>
-                ) : (
-                  <span>📲 Pay ₹{totalAmount} via UPI</span>
-                )}
-              </button>
+              {/* Action Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handlePay}
+                  disabled={loading}
+                  className={`w-full py-3.5 px-6 rounded-xl font-extrabold text-sm sm:text-base text-white cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-xl ${
+                    loading
+                      ? "opacity-60 cursor-not-allowed bg-slate-700"
+                      : paymentMethod === "wallet"
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/25 active:scale-[0.99]"
+                        : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/25 active:scale-[0.99]"
+                  }`}
+                >
+                  {loading ? (
+                    <span>Processing…</span>
+                  ) : paymentMethod === "wallet" ? (
+                    <span>⚡ Pay ₹{coursePrice} using Wallet Cash</span>
+                  ) : (
+                    <span>📲 Pay ₹{totalAmount} via UPI</span>
+                  )}
+                </button>
 
-              {/* Security info: Only show gateway text while payment option is UPI mode! */}
-              {paymentMethod === "upi" ? (
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-400 py-2 px-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
-                  <span className="text-indigo-400">🔒</span>
-                  <span>Secure 256-Bit SSL Checkout via Razorpay &amp; UPI</span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2 text-xs text-emerald-400/90 py-2 px-3 bg-emerald-950/20 rounded-xl border border-emerald-500/20">
-                  <span>⚡</span>
-                  <span>Instant wallet balance debit · Zero gateway redirects</span>
-                </div>
-              )}
+                {/* Security info: Only show gateway text while payment option is UPI mode! */}
+                {paymentMethod === "upi" ? (
+                  <div className="flex items-center justify-center gap-2 text-xs text-slate-400 py-2.5 mt-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
+                    <span className="text-indigo-400">🔒</span>
+                    <span>256-Bit SSL Encrypted Checkout via Razorpay &amp; UPI</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 text-xs text-emerald-400/90 py-2.5 mt-3 bg-emerald-950/20 rounded-xl border border-emerald-500/20">
+                    <span>⚡</span>
+                    <span>Instant wallet deduction · Zero gateway fees &amp; 100% tax-free</span>
+                  </div>
+                )}
+              </div>
 
             </div>
           </div>
 
         </div>
+
       </div>
     </Layout>
   );
