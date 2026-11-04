@@ -3061,85 +3061,6 @@ export default function ModernDashboardView({
                     </div>
                   )}
 
-                  {/* Primary Action Area: Record & Upload (Elevated for Immediate Focus) */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "0.85rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => navigate("/record#video-studio-container")}
-                      style={{
-                        width: "100%",
-                        background: "linear-gradient(135deg, #f97316 0%, #ea580c 50%, #d97706 100%)",
-                        color: "#ffffff",
-                        border: "none",
-                        borderRadius: 12,
-                        padding: "0.85rem 1rem",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "2px",
-                        boxShadow: "0 4px 20px rgba(249, 115, 22, 0.4)",
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 8px 24px rgba(249, 115, 22, 0.5)";
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 4px 20px rgba(249, 115, 22, 0.4)";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 700, fontSize: "0.95rem" }}>
-                        <span style={{ fontSize: "1.1rem" }}>🎥</span>
-                        <span>{questionConfig.recordButtonLabel}</span>
-                      </div>
-                      <span style={{ fontSize: "0.72rem", color: "rgba(255, 255, 255, 0.9)", fontWeight: 500 }}>
-                        Opens video studio · Preview anytime before submitting
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleFileUploadClick}
-                      className="speakshine-btn-secondary"
-                      style={{
-                        width: "100%",
-                        background: isDark ? "#181427" : "#f1f5f9",
-                        color: isDark ? "#cbd5e1" : "#1e293b",
-                        border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
-                        borderRadius: 12,
-                        padding: "0.65rem 1rem",
-                        cursor: "pointer",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "2px",
-                        transition: "background 0.15s ease",
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = isDark ? "#221c37" : "#e2e8f0"}
-                      onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontWeight: 600, fontSize: "0.86rem" }}>
-                        <span>📁</span>
-                        <span>{questionConfig.uploadButtonLabel}</span>
-                      </div>
-                      <span style={{ fontSize: "0.68rem", color: isDark ? "#94a3b8" : "#64748b" }}>
-                        Upload video or audio file (MP4, MOV, MP3, WAV)
-                      </span>
-                    </button>
-
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="video/*,audio/*"
-                      style={{ display: "none" }}
-                      onChange={handleFileChange}
-                    />
-                  </div>
-
                   {/* Unified Mission Guide: Checklist & Timing Sweet Spot merged */}
                   <div className="speakshine-rules-box" style={{
                     background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
@@ -3555,22 +3476,6 @@ export default function ModernDashboardView({
               </div>
             </div>
           )}
-
-          {/* Dynamic section bridge / scroll indicator */}
-          <div className="speakshine-hero-scroll-indicator hidden lg:flex">
-            <button
-              type="button"
-              onClick={() => {
-                const kpi = document.querySelector(".speakshine-kpi-bar");
-                if (kpi) kpi.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className="speakshine-next-section-pill"
-              title="Explore your streak stats and milestone roadmap"
-            >
-              <span>Explore monthly statistics &amp; streak roadmap</span>
-              <span style={{ fontSize: "0.82rem", animation: "bounceSubtle 2s infinite" }}>↓</span>
-            </button>
-          </div>
 
           {/* ── Section 2: 5 KPI Metrics Row (Screenshot 2) ── */}
           <div className="speakshine-kpi-bar" style={{

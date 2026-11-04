@@ -1860,72 +1860,6 @@ export default function VideoAnalysis() {
                   })()}
                 </div>
 
-                {/* Action Buttons: Record & Upload */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => scrollToStudio("record")}
-                    style={{
-                      width: "100%",
-                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 50%, #d97706 100%)",
-                      color: "#ffffff",
-                      border: "none",
-                      borderRadius: 12,
-                      padding: "0.85rem",
-                      fontWeight: 700,
-                      fontSize: "0.92rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                      boxShadow: "0 4px 22px rgba(249, 115, 22, 0.45)",
-                      transition: "all 0.15s ease",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 8px 28px rgba(249, 115, 22, 0.55)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 4px 22px rgba(249, 115, 22, 0.45)";
-                    }}
-                  >
-                    <span style={{ fontSize: "1.15rem" }}>🎥</span>
-                    <span>{qConfig.recordButtonLabel}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => scrollToStudio("upload")}
-                    className="speakshine-btn-secondary"
-                    style={{
-                      width: "100%",
-                      background: isDark ? "#181427" : "#f1f5f9",
-                      color: isDark ? "#cbd5e1" : "#1e293b",
-                      border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #cbd5e1",
-                      borderRadius: 12,
-                      padding: "0.75rem",
-                      fontWeight: 600,
-                      fontSize: "0.88rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "0.5rem",
-                      transition: "background 0.15s ease",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = isDark ? "#201b34" : "#e2e8f0"}
-                    onMouseLeave={e => e.currentTarget.style.background = isDark ? "#181427" : "#f1f5f9"}
-                  >
-                    <span>📁</span>
-                    <span>{qConfig.uploadButtonLabel}</span>
-                  </button>
-                </div>
-
-                {/* Daily Submission Rewards & Benefits Strip (Fills empty space with high-value perks) */}
-
-
                 {/* Privacy & Instant Grading Security Seal */}
                 <div style={{
                   display: "flex",
@@ -1944,22 +1878,6 @@ export default function VideoAnalysis() {
           </div>
           );
         })()}
-
-        {/* Dynamic section bridge / scroll indicator */}
-        <div className="speakshine-hero-scroll-indicator hidden lg:flex">
-          <button
-            type="button"
-            onClick={() => {
-              const studio = document.querySelector("#video-studio-container, .studio-container");
-              if (studio) studio.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-            className="speakshine-next-section-pill"
-            title="Proceed to Recording Studio & Analysis"
-          >
-            <span>Proceed to Recording Studio &amp; AI Analysis</span>
-            <span style={{ fontSize: "0.82rem", animation: "bounceSubtle 2s infinite" }}>↓</span>
-          </button>
-        </div>
 
         {/* Accomplishment celebration banner if today's task is already submitted */}
         {isTodaySubmitted && (
