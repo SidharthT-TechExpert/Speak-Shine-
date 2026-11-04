@@ -90,7 +90,7 @@ async function sendSmsOTP(phone, otp) {
   try {
     const { getStatus, sendAdminDirectMessage } = await import("../whatsapp/whatsappService.js");
     const waStatus = getStatus();
-    if (waStatus?.connected) {
+    if (waStatus?.isConnected) {
       const waMessage =
         `🔐 *Speak & Shine OTP*\n\n` +
         `Your verification code is:\n\n` +
