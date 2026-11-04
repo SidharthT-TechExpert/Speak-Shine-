@@ -486,7 +486,9 @@ export async function sendPasswordResetOTP(phone) {
 
   const auth = await Auth.findOne({ phone: { $in: [stripped, `91${stripped}`, phone] } });
   if (!auth) {
-    throw new Error("No account found with this phone number.");
+    // Silent success — don't leak whether number exists (security)
+    return { success: true, message: "If this number is registered, an OTP has been sent." };
+  }
   }
   if (!auth.isActive) {
     const error = new Error("This account has been disabled. Contact your admin.");
