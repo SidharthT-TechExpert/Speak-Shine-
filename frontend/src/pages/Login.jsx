@@ -338,20 +338,12 @@ export default function Login({ loginFor = "user" }) {
       <div className="speakshine-auth-card">
         {/* Brand Emblem Header */}
         <div className="speakshine-auth-brand">
-          <div className="speakshine-brand-emblem">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
-                fill="url(#goldStarGradLogin)"
-              />
-              <defs>
-                <linearGradient id="goldStarGradLogin" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#fbbf24" />
-                  <stop offset="1" stopColor="#f59e0b" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="Speak & Shine"
+            className="speakshine-brand-emblem-img"
+            style={{ width: 56, height: 56, borderRadius: 16, display: "block", marginBottom: "1rem" }}
+          />
           <h1 className="speakshine-auth-title">{meta.title}</h1>
           <p className="speakshine-auth-subtitle">{meta.sub}</p>
         </div>

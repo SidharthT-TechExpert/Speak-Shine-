@@ -1339,33 +1339,19 @@ export default function ModernDashboardView({
       {!isInsideShell && (
         <>
           <aside className="speakshine-sidebar">
-            {/* Brand Header with Gold Star Logo */}
+            {/* Brand Header with SVG Logo */}
             <Link to="/dashboard" className="speakshine-sidebar-brand">
-              <div style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: "linear-gradient(135deg, rgba(251, 191, 36, 0.16) 0%, rgba(245, 158, 11, 0.06) 100%)",
-                border: "1px solid rgba(251, 191, 36, 0.35)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                boxShadow: "0 0 14px rgba(251, 191, 36, 0.2)",
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
-                    fill="url(#goldStarGrad)"
-                  />
-                  <defs>
-                    <linearGradient id="goldStarGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#fbbf24" />
-                      <stop offset="1" stopColor="#f59e0b" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
+              <img
+                src="/favicon.svg"
+                alt="Speak & Shine"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  flexShrink: 0,
+                  display: "block",
+                }}
+              />
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <span className="brand-logo-text" style={{ fontSize: "1.08rem", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15 }}>
                   Speak &amp; Shine
@@ -1530,18 +1516,11 @@ export default function ModernDashboardView({
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
               <Link to="/dashboard" onClick={() => setMobileNavOpen(false)} className="speakshine-sidebar-brand">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M12 2L14.7 9.3L22 12L14.7 14.7L12 22L9.3 14.7L2 12L9.3 9.3L12 2Z"
-                    fill="url(#goldStarGradMobile)"
-                  />
-                  <defs>
-                    <linearGradient id="goldStarGradMobile" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#fbbf24" />
-                      <stop offset="1" stopColor="#f59e0b" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <img
+                  src="/favicon.svg"
+                  alt="Speak & Shine"
+                  style={{ width: 28, height: 28, borderRadius: 8, display: "block", flexShrink: 0 }}
+                />
                 <span className="brand-logo-text">Speak &amp; Shine</span>
               </Link>
               <button
