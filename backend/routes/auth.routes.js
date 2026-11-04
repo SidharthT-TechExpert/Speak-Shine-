@@ -35,7 +35,7 @@ const loginLimiter = rateLimit({
 });
 
 const otpLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, max: 5,
+  windowMs: 60 * 60 * 1000, max: 3, // 3 per IP per hour (per-phone handled in service)
   message: { error: "Too many OTP requests. Please try again in 1 hour." },
   standardHeaders: true, legacyHeaders: false,
   skip: (req) => isLocalRequest(req),

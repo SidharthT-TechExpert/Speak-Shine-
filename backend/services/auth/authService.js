@@ -76,8 +76,76 @@ async function deleteOTP(phone, purpose) {
   }
 }
 
+// ── Per-phone OTP rate limiting ──────────────────────────────────────────────
+// Max 3 OTPs per phone per hour — prevents targeted flooding
+async function checkPhoneOtpRateLimit(phone) {
+  const key = `otp:rate:${phone}`;
+  if (isRedisAvailable()) {
+    const redis = getRedisClient();
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, 3600); // 1 hour window
+    if (count > 3) {
+      const ttl = await redis.ttl(key);
+      const mins = Math.ceil(ttl / 60);
+      const error = new Error(`Too many OTP requests for this number. Try again in ${mins} minute${mins > 1 ? "s" : ""}.`);
+      error.statusCode = 429;
+      throw error;
+    }
+  } else {
+    // In-memory fallback
+    global._phoneOtpRate = global._phoneOtpRate || {};
+    const entry = global._phoneOtpRate[phone];
+    const now = Date.now();
+    if (!entry || entry.exp < now) {
+      global._phoneOtpRate[phone] = { count: 1, exp: now + 3600_000 };
+    } else {
+      entry.count++;
+      if (entry.count > 3) {
+        const mins = Math.ceil((entry.exp - now) / 60000);
+        const error = new Error(`Too many OTP requests for this number. Try again in ${mins} minute${mins > 1 ? "s" : ""}.`);
+        error.statusCode = 429;
+        throw error;
+      }
+    }
+  }
+}
+
+// ── WhatsApp daily cap — protect normal WA Business number from ban ───────────
+// Max 20 WA OTPs per day total across all users
+const WA_DAILY_CAP = 20;
+const WA_COOLDOWN_SECONDS = 30; // min gap between WA messages to same number
+
+async function checkWhatsAppOtpLimits(phone) {
+  if (!isRedisAvailable()) return true; // skip in dev without Redis
+
+  const redis = getRedisClient();
+  const todayKey = `wa:otp:daily:${new Date().toISOString().slice(0, 10)}`;
+  const cooldownKey = `wa:otp:cooldown:${phone}`;
+
+  // Check cooldown for this specific number
+  const onCooldown = await redis.get(cooldownKey);
+  if (onCooldown) {
+    const ttl = await redis.ttl(cooldownKey);
+    const error = new Error(`Please wait ${ttl}s before requesting another OTP.`);
+    error.statusCode = 429;
+    throw error;
+  }
+
+  // Check daily global cap
+  const dailyCount = await redis.incr(todayKey);
+  if (dailyCount === 1) await redis.expire(todayKey, 86400);
+  if (dailyCount > WA_DAILY_CAP) {
+    console.warn(`[OTP] ⚠️ WhatsApp daily cap reached (${dailyCount}). Falling back to SMS.`);
+    return false; // signal: skip WA, use SMS
+  }
+
+  // Set cooldown for this number
+  await redis.set(cooldownKey, "1", "EX", WA_COOLDOWN_SECONDS);
+  return true; // WA is allowed
+}
+
 async function sendSmsOTP(phone, otp) {
-  // Always display OTP in terminal during development so testing/registration is frictionless
+  // Always log OTP in dev/terminal for easy testing
   if (process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY) {
     console.log("\n=======================================================");
     console.log(`📱 [OTP] AUTH / REGISTRATION OTP`);
@@ -86,29 +154,33 @@ async function sendSmsOTP(phone, otp) {
     console.log("=======================================================\n");
   }
 
-  // ── Try WhatsApp first if connected ─────────────────────────────────────
+  // ── Try WhatsApp first if connected + within limits ──────────────────────
   try {
     const { getStatus, sendAdminDirectMessage } = await import("../whatsapp/whatsappService.js");
     const waStatus = getStatus();
     if (waStatus?.isConnected) {
-      const waMessage =
-        `🔐 *Speak & Shine OTP*\n\n` +
-        `Your verification code is:\n\n` +
-        `*${otp}*\n\n` +
-        `⏱ Valid for 5 minutes. Do not share this with anyone.`;
-      const result = await sendAdminDirectMessage(waMessage, { phone });
-      if (result?.success) {
-        console.log(`[OTP] ✅ Sent via WhatsApp to ${phone}`);
-        return true;
+      const waAllowed = await checkWhatsAppOtpLimits(phone).catch(() => false);
+      if (waAllowed) {
+        const waMessage =
+          `🔐 *Speak & Shine OTP*\n\n` +
+          `Your verification code is:\n\n` +
+          `*${otp}*\n\n` +
+          `⏱ Valid for 5 minutes. Do not share this with anyone.`;
+        const result = await sendAdminDirectMessage(waMessage, { phone });
+        if (result?.success) {
+          console.log(`[OTP] ✅ Sent via WhatsApp to ${phone}`);
+          return { sent: true, channel: "whatsapp" };
+        }
       }
-      console.warn(`[OTP] WhatsApp send failed, falling back to SMS`);
+      console.warn(`[OTP] WhatsApp unavailable/capped, falling back to SMS`);
     }
   } catch (waErr) {
-    console.warn(`[OTP] WhatsApp unavailable, falling back to SMS:`, waErr.message);
+    console.warn(`[OTP] WhatsApp error, falling back to SMS:`, waErr.message);
   }
 
+  // ── Fallback: 2Factor SMS ────────────────────────────────────────────────
   if (!TWO_FACTOR_KEY) {
-    return true;
+    return { sent: true, channel: "sms" }; // dev mode no key
   }
 
   try {
@@ -119,15 +191,14 @@ async function sendSmsOTP(phone, otp) {
     const data = await res.json();
     if (data.Status !== "Success") {
       console.warn(`[OTP] 2Factor SMS response:`, data);
-      // In development, do not fail registration if SMS gateway fails or lacks credits
-      if (process.env.NODE_ENV !== "production") return true;
-      return false;
+      if (process.env.NODE_ENV !== "production") return { sent: true, channel: "sms" };
+      return { sent: false, channel: "sms" };
     }
-    return true;
+    return { sent: true, channel: "sms" };
   } catch (err) {
     console.error(`[OTP] 2Factor SMS error:`, err.message);
-    if (process.env.NODE_ENV !== "production") return true;
-    return false;
+    if (process.env.NODE_ENV !== "production") return { sent: true, channel: "sms" };
+    return { sent: false, channel: "sms" };
   }
 }
 
@@ -484,11 +555,13 @@ export async function sendPasswordResetOTP(phone) {
     throw new Error("Enter a valid 10-digit Indian mobile number");
   }
 
+  // Per-phone rate limit: max 3 OTPs per hour per number
+  await checkPhoneOtpRateLimit(stripped);
+
   const auth = await Auth.findOne({ phone: { $in: [stripped, `91${stripped}`, phone] } });
   if (!auth) {
     // Silent success — don't leak whether number exists (security)
     return { success: true, message: "If this number is registered, an OTP has been sent." };
-  }
   }
   if (!auth.isActive) {
     const error = new Error("This account has been disabled. Contact your admin.");
@@ -667,6 +740,9 @@ export async function sendRegistrationOTP(phone) {
   if (!/^[6-9]\d{9}$/.test(stripped)) {
     throw new Error("Enter a valid 10-digit Indian mobile number");
   }
+
+  // Per-phone rate limit: max 3 OTPs per hour per number
+  await checkPhoneOtpRateLimit(stripped);
 
   // Block if already a full account
   const existing = await Auth.findOne({ phone: { $in: [stripped, `91${stripped}`] } });
