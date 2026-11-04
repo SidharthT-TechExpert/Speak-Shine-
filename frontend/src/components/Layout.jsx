@@ -352,19 +352,21 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
 
       {/* ── Left Sidebar Navigation (Matching Target UI) ── */}
       <aside className="speakshine-sidebar">
-        {/* Brand Header — full horizontal logo */}
-        <Link to="/dashboard" className="speakshine-sidebar-brand">
-          <img
-            src="/logo.svg"
-            alt="Speak & Shine – AI Fluency Lab"
-            style={{
-              width: 148,
-              height: "auto",
-              display: "block",
-              objectFit: "contain",
-            }}
-          />
-        </Link>
+        {/* Brand Header — full horizontal logo, plain button no hover effects */}
+        <div className="speakshine-sidebar-brand">
+          <div className="speakshine-sidebar-logo-wrap">
+            <img
+              src="/logo.svg"
+              alt="Speak & Shine – AI Fluency Lab"
+              className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--dark"
+            />
+            <img
+              src="/logo-light.svg"
+              alt="Speak & Shine – AI Fluency Lab"
+              className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--light"
+            />
+          </div>
+        </div>
 
         {/* Navigation Items */}
         <nav className="speakshine-sidebar-nav">
@@ -758,13 +760,20 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-              <Link to="/dashboard" onClick={() => setMenuOpen(false)} className="speakshine-sidebar-brand">
-                <img
-                  src="/logo.svg"
-                  alt="Speak & Shine – AI Fluency Lab"
-                  style={{ width: 130, height: "auto", display: "block", objectFit: "contain" }}
-                />
-              </Link>
+              <div className="speakshine-sidebar-brand">
+                <div className="speakshine-sidebar-logo-wrap">
+                  <img
+                    src="/logo.svg"
+                    alt="Speak & Shine – AI Fluency Lab"
+                    className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--dark"
+                  />
+                  <img
+                    src="/logo-light.svg"
+                    alt="Speak & Shine – AI Fluency Lab"
+                    className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--light"
+                  />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}

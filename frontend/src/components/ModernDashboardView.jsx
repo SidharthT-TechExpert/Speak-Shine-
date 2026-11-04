@@ -1339,19 +1339,21 @@ export default function ModernDashboardView({
       {!isInsideShell && (
         <>
           <aside className="speakshine-sidebar">
-            {/* Brand Header — full horizontal logo */}
-            <Link to="/dashboard" className="speakshine-sidebar-brand">
-              <img
-                src="/logo.svg"
-                alt="Speak & Shine – AI Fluency Lab"
-                style={{
-                  width: 148,
-                  height: "auto",
-                  display: "block",
-                  objectFit: "contain",
-                }}
-              />
-            </Link>
+            {/* Brand Header — full horizontal logo, no hover/active effects */}
+            <div className="speakshine-sidebar-brand">
+              <div className="speakshine-sidebar-logo-wrap">
+                <img
+                  src="/logo.svg"
+                  alt="Speak & Shine – AI Fluency Lab"
+                  className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--dark"
+                />
+                <img
+                  src="/logo-light.svg"
+                  alt="Speak & Shine – AI Fluency Lab"
+                  className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--light"
+                />
+              </div>
+            </div>
 
             {/* Navigation Items */}
             <nav className="speakshine-sidebar-nav">
@@ -1506,13 +1508,20 @@ export default function ModernDashboardView({
             style={{ transform: "translateX(-100%)", pointerEvents: "none" }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-              <Link to="/dashboard" onClick={() => setMobileNavOpen(false)} className="speakshine-sidebar-brand">
-                <img
-                  src="/logo.svg"
-                  alt="Speak & Shine – AI Fluency Lab"
-                  style={{ width: 130, height: "auto", display: "block", objectFit: "contain" }}
-                />
-              </Link>
+              <div className="speakshine-sidebar-brand">
+                <div className="speakshine-sidebar-logo-wrap">
+                  <img
+                    src="/logo.svg"
+                    alt="Speak & Shine – AI Fluency Lab"
+                    className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--dark"
+                  />
+                  <img
+                    src="/logo-light.svg"
+                    alt="Speak & Shine – AI Fluency Lab"
+                    className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--light"
+                  />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(false)}

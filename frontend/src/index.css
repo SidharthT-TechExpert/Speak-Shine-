@@ -4971,19 +4971,44 @@ audio { border-radius: 12px; }
 .speakshine-sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 0.25rem 0.5rem 0.85rem;
-  text-decoration: none;
-  transition: opacity 0.2s ease;
+  padding: 0 0 0.85rem;
   flex-shrink: 0;
 }
-.speakshine-sidebar-brand:hover {
-  opacity: 0.85;
+
+.speakshine-sidebar-logo-wrap {
+  background: transparent;
+  line-height: 0;
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0;
 }
-.speakshine-sidebar-brand img {
-  max-width: 100%;
+
+/* Light mode: give the wrapper a white bg so the light logo sits cleanly */
+[data-theme="light"] .speakshine-sidebar-logo-wrap,
+.light .speakshine-sidebar-logo-wrap {
+  background: #ffffff;
+}
+
+/* Dark mode: show dark logo only */
+.speakshine-sidebar-logo-img--dark  { display: block !important; }
+.speakshine-sidebar-logo-img--light { display: none  !important; }
+
+/* Light mode: show light logo only */
+[data-theme="light"] .speakshine-sidebar-logo-img--dark,
+.light .speakshine-sidebar-logo-img--dark  { display: none  !important; }
+[data-theme="light"] .speakshine-sidebar-logo-img--light,
+.light .speakshine-sidebar-logo-img--light { display: block !important; }
+
+.speakshine-sidebar-logo-img {
+  width: 100%;
+  max-width: 210px;
   height: auto;
+  display: block;
+  object-fit: contain;
 }
+
+
 
 .speakshine-sidebar-nav {
   display: flex;
@@ -6251,10 +6276,6 @@ audio { border-radius: 12px; }
   border-right: 1px solid #e2e8f0;
 }
 
-[data-theme="light"] .speakshine-sidebar-brand .brand-logo-text,
-.light .speakshine-sidebar-brand .brand-logo-text {
-  color: #0f172a;
-}
 
 [data-theme="light"] .speakshine-nav-item,
 .light .speakshine-nav-item {
@@ -8783,4 +8804,5 @@ audio { border-radius: 12px; }
   );
   background-size: 200% 100%;
 }
+
 
