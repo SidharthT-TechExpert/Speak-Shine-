@@ -358,12 +358,7 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
             <img
               src="/logo.svg"
               alt="Speak & Shine – AI Fluency Lab"
-              className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--dark"
-            />
-            <img
-              src="/logo-light.svg"
-              alt="Speak & Shine – AI Fluency Lab"
-              className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--light"
+              className="speakshine-sidebar-logo-img"
             />
           </div>
         </div>
@@ -521,6 +516,8 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                   border: "1px solid rgba(56, 189, 248, 0.3)",
                   padding: "1px 6px",
                   borderRadius: 99,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }}>
                   Streak Shield
                 </span>
@@ -575,9 +572,6 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                 </div>
               </div>
 
-              <div className="freeze-desc" style={{ fontSize: "0.72rem", color: "#7c7793", lineHeight: 1.35, marginBottom: "0.55rem" }}>
-                Earn shields by completing 7 continuous days of speaking practice.
-              </div>
 
               {isLoggedIn && (
                 <button
@@ -765,12 +759,7 @@ export default function Layout({ children, title, subtitle, isShellRoot = false 
                   <img
                     src="/logo.svg"
                     alt="Speak & Shine – AI Fluency Lab"
-                    className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--dark"
-                  />
-                  <img
-                    src="/logo-light.svg"
-                    alt="Speak & Shine – AI Fluency Lab"
-                    className="speakshine-sidebar-logo-img speakshine-sidebar-logo-img--light"
+                    className="speakshine-sidebar-logo-img"
                   />
                 </div>
               </div>

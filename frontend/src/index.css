@@ -4980,35 +4980,29 @@ audio { border-radius: 12px; }
   line-height: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
   width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 0;
+  padding: 0.5rem 0;
+  margin-bottom: 0.25rem;
 }
 
-/* Light mode: give the wrapper a white bg so the light logo sits cleanly */
-[data-theme="light"] .speakshine-sidebar-logo-wrap,
-.light .speakshine-sidebar-logo-wrap {
-  background: #ffffff;
-}
 
-/* Dark mode: show dark logo only */
-.speakshine-sidebar-logo-img--dark  { display: block !important; }
-.speakshine-sidebar-logo-img--light { display: none  !important; }
 
-/* Light mode: show light logo only */
-[data-theme="light"] .speakshine-sidebar-logo-img--dark,
-.light .speakshine-sidebar-logo-img--dark  { display: none  !important; }
-[data-theme="light"] .speakshine-sidebar-logo-img--light,
-.light .speakshine-sidebar-logo-img--light { display: block !important; }
-
+/* Dark mode: boost brightness so white text pops on dark sidebar */
 .speakshine-sidebar-logo-img {
+  display: block;
   width: 160px;
   max-width: 160px;
   height: auto;
-  aspect-ratio: 2048 / 682;
-  display: block;
   object-fit: contain;
+  object-position: left center;
+  filter: brightness(1.3) contrast(1.1);
+}
+
+/* Light mode: invert white text to dark, keep purple head colors */
+[data-theme="light"] .speakshine-sidebar-logo-img,
+.light .speakshine-sidebar-logo-img {
+  filter: invert(1) hue-rotate(180deg) saturate(1.8) brightness(0.85);
 }
 
 
