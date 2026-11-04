@@ -1339,27 +1339,18 @@ export default function ModernDashboardView({
       {!isInsideShell && (
         <>
           <aside className="speakshine-sidebar">
-            {/* Brand Header with SVG Logo */}
+            {/* Brand Header — full horizontal logo */}
             <Link to="/dashboard" className="speakshine-sidebar-brand">
               <img
-                src="/favicon.svg"
-                alt="Speak & Shine"
+                src="/logo.svg"
+                alt="Speak & Shine – AI Fluency Lab"
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 10,
-                  flexShrink: 0,
+                  width: 148,
+                  height: "auto",
                   display: "block",
+                  objectFit: "contain",
                 }}
               />
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span className="brand-logo-text" style={{ fontSize: "1.08rem", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15 }}>
-                  Speak &amp; Shine
-                </span>
-                <span style={{ fontSize: "0.64rem", color: "#a855f7", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  AI Fluency Lab
-                </span>
-              </div>
             </Link>
 
             {/* Navigation Items */}
@@ -1517,11 +1508,10 @@ export default function ModernDashboardView({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
               <Link to="/dashboard" onClick={() => setMobileNavOpen(false)} className="speakshine-sidebar-brand">
                 <img
-                  src="/favicon.svg"
-                  alt="Speak & Shine"
-                  style={{ width: 28, height: 28, borderRadius: 8, display: "block", flexShrink: 0 }}
+                  src="/logo.svg"
+                  alt="Speak & Shine – AI Fluency Lab"
+                  style={{ width: 130, height: "auto", display: "block", objectFit: "contain" }}
                 />
-                <span className="brand-logo-text">Speak &amp; Shine</span>
               </Link>
               <button
                 type="button"

@@ -339,10 +339,9 @@ export default function Login({ loginFor = "user" }) {
         {/* Brand Emblem Header */}
         <div className="speakshine-auth-brand">
           <img
-            src="/favicon.svg"
-            alt="Speak & Shine"
-            className="speakshine-brand-emblem-img"
-            style={{ width: 56, height: 56, borderRadius: 16, display: "block", marginBottom: "1rem" }}
+            src="/logo.svg"
+            alt="Speak & Shine – AI Fluency Lab"
+            style={{ width: 200, height: "auto", display: "block", marginBottom: "0.75rem", objectFit: "contain" }}
           />
           <h1 className="speakshine-auth-title">{meta.title}</h1>
           <p className="speakshine-auth-subtitle">{meta.sub}</p>
