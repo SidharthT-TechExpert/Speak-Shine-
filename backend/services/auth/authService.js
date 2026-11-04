@@ -86,6 +86,27 @@ async function sendSmsOTP(phone, otp) {
     console.log("=======================================================\n");
   }
 
+  // ── Try WhatsApp first if connected ─────────────────────────────────────
+  try {
+    const { getStatus, sendAdminDirectMessage } = await import("../whatsapp/whatsappService.js");
+    const waStatus = getStatus();
+    if (waStatus?.connected) {
+      const waMessage =
+        `🔐 *Speak & Shine OTP*\n\n` +
+        `Your verification code is:\n\n` +
+        `*${otp}*\n\n` +
+        `⏱ Valid for 5 minutes. Do not share this with anyone.`;
+      const result = await sendAdminDirectMessage(waMessage, { phone });
+      if (result?.success) {
+        console.log(`[OTP] ✅ Sent via WhatsApp to ${phone}`);
+        return true;
+      }
+      console.warn(`[OTP] WhatsApp send failed, falling back to SMS`);
+    }
+  } catch (waErr) {
+    console.warn(`[OTP] WhatsApp unavailable, falling back to SMS:`, waErr.message);
+  }
+
   if (!TWO_FACTOR_KEY) {
     return true;
   }
