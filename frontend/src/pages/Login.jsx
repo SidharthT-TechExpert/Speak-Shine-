@@ -343,7 +343,6 @@ export default function Login({ loginFor = "user" }) {
             alt="Speak & Shine – AI Fluency Lab"
             style={{ width: 200, height: "auto", display: "block", marginBottom: "0.75rem", objectFit: "contain" }}
           />
-          <h1 className="speakshine-auth-title">{meta.title}</h1>
           <p className="speakshine-auth-subtitle">{meta.sub}</p>
         </div>
 

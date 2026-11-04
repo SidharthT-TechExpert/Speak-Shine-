@@ -219,9 +219,9 @@ export default function Register() {
       <div className="auth-card">
         <div className="auth-logo">
           <img
-            src="/icons/icon-192.png"
-            alt="Speak & Shine"
-            style={{ width: 80, height: 80, borderRadius: 22, boxShadow: "0 8px 32px rgba(139,92,246,0.4)" }}
+            src="/logo.svg"
+            alt="Speak & Shine – AI Fluency Lab"
+            style={{ width: 200, height: "auto", display: "block", objectFit: "contain" }}
           />
         </div>
         <h1 className="auth-title">Create Account</h1>
