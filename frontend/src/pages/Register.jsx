@@ -45,6 +45,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [stepError, setStepError] = useState("");
+  const [otpChannel, setOtpChannel] = useState("sms"); // "whatsapp" | "sms"
   const otpRefs = useRef([]);
 
   // Auto-validate referral code if present
@@ -100,6 +101,7 @@ export default function Register() {
       setStepError("");
       setResendTimer(60);
       if (data?.devOtp) setDevOtp(data.devOtp);
+      if (data?.channel) setOtpChannel(data.channel);
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (err) {
       const msg = err.response?.data?.error || "Failed to send OTP";
@@ -272,9 +274,21 @@ export default function Register() {
         {step === 2 && (
           <form onSubmit={verifyOTP}>
             <p className="auth-sub" style={{ marginBottom: 4 }}>OTP sent to</p>
-            <p style={{ color: "#a78bfa", fontWeight: 600, marginBottom: 20, textAlign: "center" }}>
+            <p style={{ color: "#a78bfa", fontWeight: 600, marginBottom: 8, textAlign: "center" }}>
               +91 {phone.replace(/^(\+91|91)/, "")}
             </p>
+            {/* Channel indicator */}
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.4rem",
+              background: otpChannel === "whatsapp" ? "rgba(37,211,102,0.12)" : "rgba(99,102,241,0.12)",
+              border: `1px solid ${otpChannel === "whatsapp" ? "rgba(37,211,102,0.35)" : "rgba(99,102,241,0.35)"}`,
+              borderRadius: 99, padding: "3px 12px", marginBottom: 20,
+              fontSize: "0.78rem", fontWeight: 600,
+              color: otpChannel === "whatsapp" ? "#25d366" : "#818cf8",
+            }}>
+              <span>{otpChannel === "whatsapp" ? "💬" : "📱"}</span>
+              <span>{otpChannel === "whatsapp" ? "Sent via WhatsApp" : "Sent via SMS"}</span>
+            </div>
             <div className="otp-boxes">
               {otp.map((digit, i) => (
                 <input key={i} ref={(el) => (otpRefs.current[i] = el)}
