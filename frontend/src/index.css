@@ -4978,7 +4978,9 @@ audio { border-radius: 12px; }
 .speakshine-sidebar-logo-wrap {
   background: transparent;
   line-height: 0;
-  display: block;
+  display: flex;
+  justify-content: center;
+  width: 100%;
   border-radius: 8px;
   overflow: hidden;
   padding: 0;
@@ -5001,9 +5003,10 @@ audio { border-radius: 12px; }
 .light .speakshine-sidebar-logo-img--light { display: block !important; }
 
 .speakshine-sidebar-logo-img {
-  width: 100%;
-  max-width: 210px;
+  width: 160px;
+  max-width: 160px;
   height: auto;
+  aspect-ratio: 2048 / 682;
   display: block;
   object-fit: contain;
 }
