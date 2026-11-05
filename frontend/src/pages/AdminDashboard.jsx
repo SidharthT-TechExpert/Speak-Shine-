@@ -9671,6 +9671,37 @@ function ManualQuestionsPanel() {
             )}
             {form.setupType === "shadowing_video" && (
               <>
+                {/* 1-Click Fully Automated Podcast Fetcher & Slicer */}
+                <div style={{ marginBottom: "0.85rem", padding: "0.85rem 1rem", borderRadius: 12, background: "linear-gradient(135deg, rgba(236,72,153,0.12), rgba(168,85,247,0.08))", border: "1px solid rgba(236,72,153,0.35)" }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={generatingShadowing}
+                    onClick={handleGenerateShadowing}
+                    style={{
+                      width: "100%",
+                      marginBottom: "0.45rem",
+                      background: "linear-gradient(135deg, #ec4899, #8b5cf6)",
+                      border: "none",
+                      padding: "0.75rem 1rem",
+                      fontWeight: 800,
+                      fontSize: "0.92rem",
+                      borderRadius: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      boxShadow: "0 4px 15px rgba(236, 72, 153, 0.35)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {generatingShadowing ? "⚡ Ingesting Podcast & AI Slicing Native Audio…" : "⚡ 1-Click Auto-Ingest & Slice Native Podcast Audio"}
+                  </button>
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
+                    Fully automated: grabs latest Stanford/TED podcast episode, transcribes with Whisper, and slices optimal 60-180s continuous speech. Zero manual admin entry needed!
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: "0.85rem", padding: "0.85rem 1rem", borderRadius: 12, background: "rgba(236,72,153,0.08)", border: "1px solid rgba(236,72,153,0.3)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
                     <span style={{ fontSize: "1.2rem" }}>🎙️</span>

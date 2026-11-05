@@ -31,6 +31,8 @@ import { promisify } from "util";
 import { getTextKey, getTextModel, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 import { uploadBufferToR2 } from "../../config/storage.js";
 import { textToMp3Buffer, formatTextForHumanSpeech } from "./storyAudioService.js";
+import { fetchAutomatedNativePodcast } from "./podcastIngestionService.js";
+import { processPodcastIntoShadowingChallenge } from "./speechSlicerService.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -451,148 +453,37 @@ export async function burnSubtitlesOntoVideo(videoUrl, transcript, durationSecon
 }
 
 /**
- * Generate full Shadowing Task Challenge with Full HD 1080p & Burned-In Subtitles
+ * Generate full Shadowing Task Challenge
+ * Priority:
+ *  1. Fully automated Native Speaker Podcast Ingestion & AI Speech Slicing (100% authentic human speaker)
+ *  2. High-quality Curated Human Native Speaker speech bank (<180s)
  */
 export async function generateShadowingChallenge(options = {}) {
-  const targetDuration = Math.min(Math.max(Number(options?.targetDuration) || 75, 45), 180);
-  const metadata = await generateShadowingMetadata({
-    targetDuration,
-    topic: options?.topic,
-    difficulty: options?.difficulty || "B1-B2",
-  });
-
-  // Try to find a 1080p landscape speaker video on Pexels
-  const pexelsResult = await fetchPexelsVideo(metadata.videoQuery || "public speaker", metadata.targetDuration);
-
-  if (pexelsResult) {
-    const audioBuffer = await generateSpeechAudio(metadata.transcript);
-    let finalVideoUrl = pexelsResult.videoUrl;
-    let finalDuration = pexelsResult.videoDuration;
-
-    if (audioBuffer && process.env.R2_BUCKET_NAME) {
-      const tmpDir = os.tmpdir();
-      const id = Date.now();
-      const audioFileName = `shadow_audio_${id}.mp3`;
-      const audioPath = path.join(tmpDir, audioFileName);
-      const videoInFileName = `shadow_in_${id}.mp4`;
-      const videoInPath = path.join(tmpDir, videoInFileName);
-      const videoOutFileName = `shadow_out_${id}.mp4`;
-      const videoOutPath = path.join(tmpDir, videoOutFileName);
-      const srtFileName = `shadow_subs_${id}.srt`;
-      const srtPath = path.join(tmpDir, srtFileName);
-
-      try {
-        fs.writeFileSync(audioPath, audioBuffer);
-
-        const vidRes = await fetch(pexelsResult.videoUrl);
-        if (vidRes.ok) {
-          fs.writeFileSync(videoInPath, Buffer.from(await vidRes.arrayBuffer()));
-
-          // Estimate duration for subtitles
-          const subDuration = metadata.targetDuration || 75;
-          const srtContent = generateSrtFromTranscript(metadata.transcript, subDuration);
-          fs.writeFileSync(srtPath, srtContent, "utf-8");
-
-          // Merge video + audio with FFmpeg and burn subtitles in ONE pass:
-          //  -stream_loop -1 loops video smoothly to match audio length
-          //  -shortest stops when audio finishes
-          //  -vf subtitles burns crisp teleprompter captions
-          //  -c:v libx264 -preset medium -crf 18 ensures broadcast-quality visuals
-          //  -c:a aac -b:a 192k ensures crystal clear sound
-          //  -movflags +faststart optimizes for instant browser streaming
-          try {
-            await execFileAsync("ffmpeg", [
-              "-y",
-              "-stream_loop", "-1",
-              "-i", videoInFileName,
-              "-i", audioFileName,
-              "-shortest",
-              "-vf", `subtitles=${srtFileName}:force_style='FontSize=24,PrimaryColour=&H00FFFFFF,BackColour=&H80000000,BorderStyle=4,MarginV=42,Alignment=2'`,
-              "-c:v", "libx264",
-              "-preset", "medium",
-              "-crf", "18",
-              "-pix_fmt", "yuv420p",
-              "-c:a", "aac",
-              "-b:a", "192k",
-              "-ar", "44100",
-              "-movflags", "+faststart",
-              videoOutFileName
-            ], { cwd: tmpDir });
-          } catch (burnErr) {
-            console.warn("[ShadowingGen] Subtitle burn pass fallback to standard mux:", burnErr.message);
-            // Fallback without subtitles filter if libass error occurs
-            await execFileAsync("ffmpeg", [
-              "-y",
-              "-stream_loop", "-1",
-              "-i", videoInFileName,
-              "-i", audioFileName,
-              "-shortest",
-              "-c:v", "libx264",
-              "-preset", "medium",
-              "-crf", "18",
-              "-pix_fmt", "yuv420p",
-              "-c:a", "aac",
-              "-b:a", "192k",
-              "-ar", "44100",
-              "-movflags", "+faststart",
-              videoOutFileName
-            ], { cwd: tmpDir });
-          }
-
-          if (fs.existsSync(videoOutPath)) {
-            try {
-              const { stdout } = await execFileAsync("ffprobe", [
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                videoOutPath
-              ]);
-              const probed = parseFloat(stdout.trim());
-              if (!isNaN(probed) && probed > 0) {
-                finalDuration = Math.round(probed);
-              }
-            } catch {}
-
-            const outBuf = fs.readFileSync(videoOutPath);
-            const r2Key = `shadowing-videos/${id}.mp4`;
-            const uploadedUrl = await uploadBufferToR2(outBuf, r2Key, "video/mp4");
-            if (uploadedUrl) {
-              finalVideoUrl = uploadedUrl;
-            }
-          }
-        }
-      } catch (muxErr) {
-        console.warn("[ShadowingGen] Muxing error:", muxErr.message);
-      } finally {
-        try { if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath); } catch {}
-        try { if (fs.existsSync(videoInPath)) fs.unlinkSync(videoInPath); } catch {}
-        try { if (fs.existsSync(videoOutPath)) fs.unlinkSync(videoOutPath); } catch {}
-        try { if (fs.existsSync(srtPath)) fs.unlinkSync(srtPath); } catch {}
+  // Option 1: Fully automated native podcast ingestion & active speaking slicing
+  try {
+    console.log("[ShadowingGen] 🎙️ Starting fully automated native speaker podcast ingestion & slicing...");
+    const podcast = await fetchAutomatedNativePodcast();
+    if (podcast && podcast.audioUrl) {
+      const slicedChallenge = await processPodcastIntoShadowingChallenge(podcast);
+      if (slicedChallenge && slicedChallenge.audioUrl) {
+        console.log(`[ShadowingGen] ✅ Automated Native Podcast speech successfully extracted: "${slicedChallenge.title}" (${slicedChallenge.videoDuration}s)`);
+        return slicedChallenge;
       }
     }
-
-    return {
-      title: metadata.title,
-      topic: metadata.topic || "English Shadowing",
-      instructions: metadata.instructions || "Watch the video and practice shadowing by repeating every sentence simultaneously out loud with the speaker.",
-      videoUrl: finalVideoUrl,
-      videoDuration: Math.min(finalDuration || metadata.targetDuration || targetDuration, 180),
-      videoTranscript: metadata.transcript,
-      videoSource: pexelsResult.videoSource,
-      videoPageUrl: pexelsResult.videoPageUrl,
-      videoPhotographer: pexelsResult.videoPhotographer,
-    };
+  } catch (podcastErr) {
+    console.warn("[ShadowingGen] ⚠️ Automated podcast ingestion failed, falling back to curated native speaker library:", podcastErr.message);
   }
 
-  // Fallback to random item from curated 1080p real speaker list
+  // Option 2: Fallback to curated native human speaker library
   const fallback = CURATED_SHADOWING_VIDEOS[Math.floor(Math.random() * CURATED_SHADOWING_VIDEOS.length)];
   return {
-    title: metadata.title || fallback.title,
-    topic: metadata.topic || fallback.topic,
-    instructions: metadata.instructions || fallback.instructions,
+    title: fallback.title,
+    topic: fallback.topic,
+    instructions: fallback.instructions,
     videoUrl: fallback.videoUrl,
+    audioUrl: fallback.audioUrl,
     videoDuration: Math.min(fallback.videoDuration, 180),
-    videoTranscript: metadata.transcript || fallback.videoTranscript,
+    videoTranscript: fallback.videoTranscript,
     videoSource: fallback.videoSource,
     videoPageUrl: fallback.videoPageUrl,
     videoPhotographer: fallback.videoPhotographer,
