@@ -9,9 +9,10 @@ export const GATE_FRAME_IDEAL = 16;
 /** @typedef {"pass"|"warn"|"fail"} GateStatus */
 
 /**
- * @param {{ isMonthlyReflection?: boolean, isMonthlyGoals?: boolean, isStorySummary?: boolean, isPictureDescription?: boolean }} flags
+ * @param {{ isMonthlyReflection?: boolean, isMonthlyGoals?: boolean, isStorySummary?: boolean, isPictureDescription?: boolean, isShadowing?: boolean, challengeType?: string }} flags
  */
 export function getDurationLimits(flags = {}, settings = {}) {
+  const isShadowing = Boolean(flags.isShadowing || flags.challengeType === "shadowing_video");
   const maxSeconds = flags.isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : flags.isWeeklyReflection
@@ -22,6 +23,8 @@ export function getDurationLimits(flags = {}, settings = {}) {
     ? (settings.durationStoryMax ?? 180)
     : flags.isPictureDescription
     ? (settings.durationPictureMax ?? 180)
+    : isShadowing
+    ? (settings.durationShadowingMax ?? 180)
     : (settings.durationDefaultMax ?? 300);
 
   const fullScoreSeconds = flags.isMonthlyReflection
@@ -34,13 +37,15 @@ export function getDurationLimits(flags = {}, settings = {}) {
     ? (settings.durationStoryFull ?? 180)
     : flags.isPictureDescription
     ? (settings.durationPictureFull ?? 180)
+    : isShadowing
+    ? (settings.durationShadowingFull ?? 180)
     : (settings.durationDefaultFull ?? 300);
 
   return {
-    minSeconds: 60,
+    minSeconds: isShadowing ? 20 : 60,
     maxSeconds,
     fullScoreSeconds,
-    minLabel: "1 min",
+    minLabel: isShadowing ? "20 sec" : "1 min",
     maxLabel: formatMaxLabel(maxSeconds),
     fullScoreLabel: formatMaxLabel(fullScoreSeconds),
   };
@@ -312,10 +317,113 @@ export function calculateCompositeScore({
   analysis = {},
   isPictureDescription = false,
   isStorySummary = false,
+  isShadowing = false,
+  targetVideoDuration = null,
   userHistory = [],
 }) {
   const challengeType = analysis?.challengeType || null;
   const isStoryTask = Boolean(isStorySummary || challengeType === "story_summary");
+
+  // ── Shadowing Video: Effort-proportional duration matching + Speech delivery ──
+  // Duration Match (35 pts) | Communication, Rhythm & Fluency (50 pts) | Personal Growth (15 pts) = 100
+  // NO vocabulary requirement.
+  const isShadowingTask = Boolean(isShadowing || challengeType === "shadowing_video");
+  if (isShadowingTask) {
+    const statsObj = analysis._stats || analysis.stats || {};
+    const rawSpeechRatio = statsObj?.rhythm?.speechRatio;
+    const wpm = statsObj?.wpm;
+    const paceConsistency = statsObj?.rhythm?.paceConsistency;
+    const pauseCount = Number(statsObj?.pauses) || 0;
+    const fillerTotal = Number(statsObj?.fillerTotal) || 0;
+    const wordCount = Number(statsObj?.wordCount) || Math.round((Number(wpm) || 0) * (Number(durationSeconds) || 0) / 60);
+
+    // Target duration from the reference video (default 60s, max 180s)
+    const targetDur = Math.max(20, Math.min(180, Number(targetVideoDuration) || Number(maxDurationSeconds) || 60));
+    const actualDur = Math.max(0, Number(durationSeconds) || 0);
+
+    // 1. Duration / Effort Match (Max 35 points)
+    // Rule:
+    // - Ratio = actualDur / targetDur
+    // - If Ratio >= 0.90 (90%+): Full duration credit (35 pts).
+    // - If Ratio < 0.90: Proportional effort score: (Ratio / 0.90) * 35.
+    const durationRatio = targetDur > 0 ? actualDur / targetDur : 1.0;
+    const durationScore = durationRatio >= 0.90
+      ? 35
+      : Math.max(0, Math.min(35, (durationRatio / 0.90) * 35));
+
+    // 2. Speech continuity multiplier (student must actually be speaking, not just silent recording)
+    let speechMult = 1.0;
+    if (typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0) {
+      const r = rawSpeechRatio / 100;
+      speechMult = r >= 0.80 ? 1.0 : r <= 0 ? 0 : Math.min(1, r / 0.80);
+    } else if (typeof wpm === "number" && wpm > 0) {
+      speechMult = Math.min(1, wpm / 110);
+    }
+
+    const get = (field) => (typeof analysis[field] === "number" && !Number.isNaN(analysis[field]) ? analysis[field] : null);
+    const fluency    = get("fluency") ?? 5;
+    const grammar    = get("grammar") ?? 5;
+    const confidence = get("confidence") ?? 5;
+
+    const minutes = Math.max(actualDur / 60, 1 / 60);
+    const pausesPerMinute = pauseCount / minutes;
+    const pauseScore = pausesPerMinute <= 2 ? 10 : pausesPerMinute <= 4 ? 8 : pausesPerMinute <= 7 ? 6 : 4;
+    const paceScore = typeof wpm !== "number" || wpm <= 0
+      ? 5
+      : wpm >= 90 && wpm <= 165 ? 10
+      : wpm >= 70 && wpm <= 190 ? 8
+      : 5;
+    const rhythmPace = typeof paceConsistency === "number" ? paceConsistency : fluency;
+
+    // Communication, Rhythm & Pronunciation: Max 50 points
+    // 25 pts for rhythm, cadence & flow + 25 pts for speech delivery & confidence
+    const rhythmComponent = ((rhythmPace * 0.4 + pauseScore * 0.3 + paceScore * 0.3) / 10) * 25 * speechMult;
+    const deliveryComponent = ((fluency * 0.4 + confidence * 0.3 + grammar * 0.3) / 10) * 25 * speechMult;
+    const communicationScore = rhythmComponent + deliveryComponent;
+
+    // 3. Personal Growth: Max 15 points
+    const currentComm = (fluency + confidence + grammar) / 3;
+    const growthResult = calculateGrowthScore({
+      currentCommScore: currentComm,
+      history: userHistory,
+    });
+    const growthScore = growthResult.growthScore;
+
+    let total100 = Math.round((durationScore + communicationScore + growthScore) * 100) / 100;
+    total100 = Math.min(100, Math.max(0, total100));
+
+    const isNinetyPercent = durationRatio >= 0.90;
+    const matchPercent = Math.round(durationRatio * 100);
+
+    return {
+      score: total100,
+      breakdown: {
+        duration:         Math.round(durationScore * 100) / 100,
+        communication:    Math.round(communicationScore * 100) / 100,
+        vocabulary:       0,
+        growth:           Math.round(growthScore * 100) / 100,
+        maxDuration:      35,
+        maxCommunication: 50,
+        maxVocabulary:    0,
+        maxGrowth:        15,
+        targetDurationSeconds: targetDur,
+        actualDurationSeconds: Math.round(actualDur),
+        durationRatio:    matchPercent,
+        isNinetyPercentMatch: isNinetyPercent,
+        durationMessage: isNinetyPercent
+          ? `Full duration credit awarded (${matchPercent}% match of ${targetDur}s video — >=90% target achieved).`
+          : `Effort credit awarded (${matchPercent}% match of ${targetDur}s video — aim for 90%+ for maximum duration points).`,
+        speechMultiplier: Math.round(speechMult * 100),
+        growthDelta:      growthResult.growthDelta,
+        baselineComm:     growthResult.baselineComm,
+        isCalibration:    growthResult.isCalibration,
+        isShadowing:      true,
+        isPictureDescription: false,
+        isStorySummary:   false,
+        isSpecialDay:     false,
+      }
+    };
+  }
 
   // ── Picture Description: five-category weighted formula ──────────────────
   // Communication 20 | Content & Relevance 35 |

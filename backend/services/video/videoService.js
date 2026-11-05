@@ -54,6 +54,10 @@ function isActivePictureTask(status) {
     || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
 }
 
+function isActiveShadowingTask(status) {
+  return status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
+}
+
 /**
  * Sanitize filename to prevent path traversal
  */
@@ -608,13 +612,15 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     isMonthlyGoals: reportStatus?.isMonthlyGoalsDay || false,
     isStorySummary: isActiveStoryTask(reportStatus),
     isPictureDescription: isActivePictureTask(reportStatus),
+    isShadowing: isActiveShadowingTask(reportStatus),
   };
   const allowPrivateVideos = reportStatus?.allowPrivateVideos ?? true;
   const reportData = {
       userId,
       phone,
       videoFileName: path.basename(key),
-      challengeType: reportGateFlags.isMonthlyReflection ? "monthly_reflection"
+      challengeType: reportGateFlags.isShadowing ? "shadowing_video"
+        : reportGateFlags.isMonthlyReflection ? "monthly_reflection"
         : reportGateFlags.isPictureDescription ? "picture_description"
         : reportGateFlags.isStorySummary ? "story_summary"
         : reportGateFlags.isMonthlyGoals ? "monthly_goals"
@@ -797,7 +803,27 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       throw err;
     }
 
-    if (duration < 60) {
+    // Dynamic duration limits based on question type
+    const status = await Status.findOne().lean();
+    const isShadowing = isActiveShadowingTask(status);
+    const isPictureDescription = isActivePictureTask(status);
+    const isStorySummary = isActiveStoryTask(status);
+    const isMonthlyReflection = status?.isMonthlyReflectionDay || false;
+    const isMonthlyGoals = status?.isMonthlyGoalsDay || false;
+    const isWeeklyReflection = status?.isWeeklyReflectionDay || false;
+
+    const gateFlags = {
+      isMonthlyReflection,
+      isWeeklyReflection,
+      isMonthlyGoals,
+      isStorySummary,
+      isPictureDescription,
+      isShadowing,
+    };
+    
+    const { minSeconds, maxSeconds, minLabel, maxLabel } = getDurationLimits(gateFlags, status || {});
+
+    if (duration < minSeconds) {
       securityFlags.push('duration_invalid');
       await UploadAudit.logUpload({
         userId: authId, phone, uploadType: 'direct',
@@ -812,22 +838,10 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       });
       
       if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-      const error = new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
+      const error = new Error(`Video is too short (${duration}s). Minimum is ${minLabel}.`);
       error.statusCode = 400;
       throw error;
     }
-    
-    // Dynamic duration limits based on question type
-    const status = await Status.findOne().lean();
-    const gateFlags = {
-      isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-      isWeeklyReflection: status?.isWeeklyReflectionDay || false,
-      isMonthlyGoals: status?.isMonthlyGoalsDay || false,
-      isStorySummary: isActiveStoryTask(status),
-      isPictureDescription: isActivePictureTask(status),
-    };
-    
-    const { minSeconds, maxSeconds, minLabel, maxLabel } = getDurationLimits(gateFlags, status || {});
     const maxDurationWithTolerance = maxSeconds + 5;
     
     if (duration > maxDurationWithTolerance) {
@@ -890,7 +904,8 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       userId,
       phone,
       videoFileName: safeFilename,
-      challengeType: isMonthlyReflection ? "monthly_reflection"
+      challengeType: isShadowing ? "shadowing_video"
+        : isMonthlyReflection ? "monthly_reflection"
         : isPictureDescription ? "picture_description"
         : isStorySummary ? "story_summary"
         : isMonthlyGoals ? "monthly_goals"
@@ -1039,13 +1054,29 @@ async function prepareReportAnalysis(report) {
   const userHistory = user?.feedbackScores || [];
   const isPicTask = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
   const isStoryTask = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+  const isShadowTask = challengeType === "shadowing_video" || status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
 
   if (!challengeType && analysis) {
     if (isPicTask) {
       challengeType = "picture_description";
     } else if (isStoryTask) {
       challengeType = "story_summary";
+    } else if (isShadowTask) {
+      challengeType = "shadowing_video";
     }
+  }
+
+  if (analysis && isShadowTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isShadowing)) {
+    const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: report.videoDuration || 0,
+      maxDurationSeconds: status?.durationShadowingFull ?? 180,
+      analysis: source,
+      isShadowing: true,
+      targetVideoDuration: status?.todayVideoDuration || 60,
+      userHistory,
+    });
+    analysis = { ...source, compositeScore: score, scoreBreakdown: breakdown };
   }
 
   if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription)) {
@@ -1732,6 +1763,10 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
 
   const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
   const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+  const isShadow = challengeType === "shadowing_video" || status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
+  if (isShadow) {
+    challengeType = "shadowing_video";
+  }
   const configuredWordCount = isPic
     ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
     : isStory
@@ -1742,12 +1777,14 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     : isStory
     ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
     : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
-  const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
-  const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+  const effectiveTotalWords = isShadow ? 0 : (todayVocab.length > 0 ? todayVocab.length : configuredWordCount);
+  const effectiveRequiredWords = isShadow ? 0 : Math.min(configuredRequiredCount, effectiveTotalWords);
 
   const scoreGateFlags = {
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
+    isShadowing: isShadow || false,
+    challengeType: isShadow ? "shadowing_video" : challengeType,
     isMonthlyReflection: status?.isMonthlyReflectionDay || false,
     isWeeklyReflection: status?.isWeeklyReflectionDay || false,
     isMonthlyGoals: status?.isMonthlyGoalsDay || false,
@@ -1759,13 +1796,15 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   const { score, breakdown } = calculateCompositeScore({
     durationSeconds: report.videoDuration || 0,
     maxDurationSeconds: fullScoreSeconds,
-    vocabularyUsed: matchedWords,
+    vocabularyUsed: isShadow ? [] : matchedWords,
     totalVocabWords: effectiveTotalWords,
     requiredVocabWords: effectiveRequiredWords,
     topicRelevance: report.analysis.topicRelevance ?? null,
     analysis: report.analysis,
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
+    isShadowing: isShadow || false,
+    targetVideoDuration: status?.todayVideoDuration || 60,
     userHistory: user?.feedbackScores || [],
   });
 

@@ -8,10 +8,15 @@ const statusSchema = new mongoose.Schema({
   todayTopic: { type: String, default: null },
   todayQuestion: { type: String, default: null },
   todayCategory: { type: String, default: null },
-  todayContentType: { type: String, enum: ["question", "story_audio", "picture_description"], default: "question" },
+  todayContentType: { type: String, enum: ["question", "story_audio", "picture_description", "shadowing_video"], default: "question" },
   todayAudioUrl: { type: String, default: null },
   todayStoryTranscript: { type: String, default: null },
   todaySummaryGuide: { type: String, default: null },
+  // Shadowing Video fields — populated when isShadowingDay is true
+  todayVideoUrl: { type: String, default: null },
+  todayVideoDuration: { type: Number, default: null }, // seconds (<= 180s)
+  todayVideoTranscript: { type: String, default: null },
+  todayVideoTitle: { type: String, default: null },
   // Picture Description fields — populated when isPictureDescriptionDay is true
   todayImageUrl: { type: String, default: null },
   todayImageSource: { type: String, default: null },       // e.g. "Unsplash"
@@ -60,6 +65,9 @@ const statusSchema = new mongoose.Schema({
   // Which days of the week picture description runs (array of 0=Sun ... 6=Sat). Default: [4] (Thursday).
   pictureDescriptionDays: { type: [Number], default: [4] },
   pictureDescriptionDay: { type: Number, default: 4, min: -1, max: 6 },
+  // Which days of the week shadowing video runs (array of 0=Sun ... 6=Sat). Default: [2] (Tuesday).
+  shadowingDays: { type: [Number], default: [2] },
+  shadowingDay: { type: Number, default: 2, min: -1, max: 6 },
   // Payment & Referral settings (admin-configurable)
   coursePrice: { type: Number, default: 5, min: 1, max: 100000 },
   taxAmount: { type: Number, default: 0, min: 0, max: 50000 },
@@ -70,20 +78,22 @@ const statusSchema = new mongoose.Schema({
   durationDefaultFull: { type: Number, default: 300, min: 60, max: 1200 },
   durationStoryMax: { type: Number, default: 180, min: 60, max: 1200 },
   durationStoryFull: { type: Number, default: 180, min: 60, max: 1200 },
+  durationPictureMax:  { type: Number, default: 180, min: 60, max: 600 },
+  durationPictureFull: { type: Number, default: 180, min: 60, max: 600 },
+  durationShadowingMax:  { type: Number, default: 180, min: 30, max: 180 },
+  durationShadowingFull: { type: Number, default: 180, min: 30, max: 180 },
   durationWeeklyMax: { type: Number, default: 420, min: 60, max: 1200 },
   durationWeeklyFull: { type: Number, default: 300, min: 60, max: 1200 },
   durationMonthlyReflectionMax: { type: Number, default: 420, min: 60, max: 1200 },
   durationMonthlyReflectionFull: { type: Number, default: 420, min: 60, max: 1200 },
   durationMonthlyGoalsMax: { type: Number, default: 600, min: 60, max: 1200 },
   durationMonthlyGoalsFull: { type: Number, default: 420, min: 60, max: 1200 },
-  // Monthly reflection
+  // Task Day Flags
   isMonthlyReflectionDay: { type: Boolean, default: false },
   isMonthlyGoalsDay: { type: Boolean, default: false },
   isStorySummaryDay: { type: Boolean, default: false },
   isPictureDescriptionDay: { type: Boolean, default: false },
-  // Duration scoring — picture description (admin-configurable)
-  durationPictureMax:  { type: Number, default: 180, min: 60, max: 600 },
-  durationPictureFull: { type: Number, default: 180, min: 60, max: 600 },
+  isShadowingDay: { type: Boolean, default: false },
   // Daily report tracking
   dailyReportGenerated: { type: Boolean, default: false },
   reportExpiresAt: { type: Date, default: null },

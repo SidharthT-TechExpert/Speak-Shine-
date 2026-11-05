@@ -2,8 +2,14 @@
  * Client-side submit gate — mirrors backend submitGate.js for instant feedback.
  */
 
-export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription } = {}, settings = {}) {
-  const maxSeconds = isMonthlyReflection
+export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing } = {}, settings = {}) {
+  const isShadow = Boolean(isShadowing);
+  const minSeconds = isShadow ? 20 : 60;
+  const minLabel = isShadow ? "20 sec" : "1 min";
+
+  const maxSeconds = isShadow
+    ? (settings.durationShadowingMax ?? 180)
+    : isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : isWeeklyReflection
     ? (settings.durationWeeklyMax ?? 420)
@@ -15,7 +21,9 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
     ? (settings.durationPictureMax ?? 180)
     : (settings.durationDefaultMax ?? 300);
 
-  const fullScoreSeconds = isMonthlyReflection
+  const fullScoreSeconds = isShadow
+    ? (settings.durationShadowingFull ?? 180)
+    : isMonthlyReflection
     ? (settings.durationMonthlyReflectionFull ?? 420)
     : isWeeklyReflection
     ? (settings.durationWeeklyFull ?? 300)
@@ -37,7 +45,7 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
   };
   const maxLabel = formatDurationLabel(maxSeconds);
   const fullScoreLabel = formatDurationLabel(fullScoreSeconds);
-  return { minSeconds: 60, maxSeconds, fullScoreSeconds, minLabel: "1 min", maxLabel, fullScoreLabel };
+  return { minSeconds, maxSeconds, fullScoreSeconds, minLabel, maxLabel, fullScoreLabel };
 }
 
 function fmtDuration(sec) {

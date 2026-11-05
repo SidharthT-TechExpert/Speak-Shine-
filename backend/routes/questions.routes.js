@@ -28,6 +28,7 @@ router.post("/generate-story-audio", authMiddleware, requireRole("admin", "admin
 router.post("/analyze-story-voice", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.analyzeStoryVoiceController);
 router.get("/story-voices", authMiddleware, requireRole("admin", "admins", "trainer", "viewer"), questionsController.getStoryVoices);
 router.post("/generate-picture", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.generatePictureNow);
+router.post("/generate-shadowing-video", authMiddleware, requireRole("admin", "admins", "trainer"), questionsController.generateShadowingNow);
 router.post("/clean-generic",  authMiddleware, requireRole("admin", "admins"), questionsController.cleanGenericQuestions);
 router.post("/",               authMiddleware, requireRole("admin", "admins"), questionsController.addQuestion);
 router.delete("/:id",          authMiddleware, requireRole("admin", "admins"), questionsController.deleteQuestion);

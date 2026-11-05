@@ -99,7 +99,7 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     throw new Error("setupType, scheduledFor, category, topic and question are required");
   }
 
-  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description"];
+  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"];
   if (!validTypes.includes(setupType)) {
     throw new Error("Invalid setupType. Must be one of: " + validTypes.join(", "));
   }
@@ -110,6 +110,10 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
 
   if (setupType === "picture_description" && !story.imageUrl) {
     throw new Error("imageUrl is required for picture description questions");
+  }
+
+  if (setupType === "shadowing_video" && !story.videoUrl) {
+    throw new Error("videoUrl is required for shadowing video tasks");
   }
 
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -150,7 +154,7 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     question,
     isManualSetup: true,
     setupType,
-    contentType: setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : "question",
+    contentType: setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question",
     audioUrl: story.audioUrl || null,
     storyTranscript: story.storyTranscript || null,
     summaryGuide: story.summaryGuide || null,
@@ -163,6 +167,10 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     imageInstructions: story.imageInstructions || null,
     imageDifficulty: story.imageDifficulty || null,
     speakingDuration: story.speakingDuration || null,
+    videoUrl: story.videoUrl || null,
+    videoDuration: story.videoDuration || null,
+    videoTranscript: story.videoTranscript || null,
+    videoTitle: story.videoTitle || topic || null,
     scheduledFor: scheduleDate,
     scheduledTime: normalizedTime,
     createdBy,
@@ -237,9 +245,13 @@ export async function updateManualQuestion(questionId, data, userPhone) {
     imageInstructions,
     imageDifficulty,
     speakingDuration,
+    videoUrl,
+    videoDuration,
+    videoTranscript,
+    videoTitle,
   } = data;
 
-  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description"];
+  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"];
   const finalSetupType = setupType || question.setupType;
   if (!validTypes.includes(finalSetupType)) {
     const error = new Error("Invalid setupType. Must be one of: " + validTypes.join(", "));
@@ -255,6 +267,12 @@ export async function updateManualQuestion(questionId, data, userPhone) {
 
   if (finalSetupType === "picture_description" && !imageUrl && !question.imageUrl) {
     const error = new Error("imageUrl is required for picture description questions");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (finalSetupType === "shadowing_video" && !videoUrl && !question.videoUrl) {
+    const error = new Error("videoUrl is required for shadowing video tasks");
     error.statusCode = 400;
     throw error;
   }
@@ -310,7 +328,7 @@ export async function updateManualQuestion(questionId, data, userPhone) {
   if (topic) question.topic = topic;
   if (questionText) question.question = questionText;
   question.setupType = finalSetupType;
-  question.contentType = finalSetupType === "story_summary" ? "story_audio" : finalSetupType === "picture_description" ? "picture_description" : "question";
+  question.contentType = finalSetupType === "story_summary" ? "story_audio" : finalSetupType === "picture_description" ? "picture_description" : finalSetupType === "shadowing_video" ? "shadowing_video" : "question";
   question.scheduledFor = scheduleDate;
   question.scheduledTime = normalizedTime;
   if (audioUrl !== undefined) question.audioUrl = audioUrl || null;
@@ -325,6 +343,10 @@ export async function updateManualQuestion(questionId, data, userPhone) {
   if (imageInstructions !== undefined) question.imageInstructions = imageInstructions || null;
   if (imageDifficulty !== undefined) question.imageDifficulty = imageDifficulty || null;
   if (speakingDuration !== undefined) question.speakingDuration = speakingDuration || null;
+  if (videoUrl !== undefined) question.videoUrl = videoUrl || null;
+  if (videoDuration !== undefined) question.videoDuration = videoDuration || null;
+  if (videoTranscript !== undefined) question.videoTranscript = videoTranscript || null;
+  if (videoTitle !== undefined) question.videoTitle = videoTitle || null;
 
   await question.save();
 
@@ -334,6 +356,7 @@ export async function updateManualQuestion(questionId, data, userPhone) {
     if (status) {
       const isActiveType = (finalSetupType === "story_summary" && status.todayContentType === "story_audio")
         || (finalSetupType === "picture_description" && status.todayContentType === "picture_description")
+        || (finalSetupType === "shadowing_video" && status.todayContentType === "shadowing_video")
         || (finalSetupType === "monthly_reflection" && status.isMonthlyReflectionDay)
         || (finalSetupType === "monthly_goals" && status.isMonthlyGoalsDay);
 
@@ -350,6 +373,10 @@ export async function updateManualQuestion(questionId, data, userPhone) {
         if (imagePhotographer !== undefined) status.todayImagePhotographer = imagePhotographer || null;
         if (imagePhotographerUrl !== undefined) status.todayImagePhotographerUrl = imagePhotographerUrl || null;
         if (imageInstructions !== undefined) status.todayImageInstructions = imageInstructions || null;
+        if (videoUrl !== undefined) status.todayVideoUrl = videoUrl || null;
+        if (videoDuration !== undefined) status.todayVideoDuration = videoDuration || null;
+        if (videoTranscript !== undefined) status.todayVideoTranscript = videoTranscript || null;
+        if (videoTitle !== undefined) status.todayVideoTitle = videoTitle || null;
         await status.save();
       }
     }

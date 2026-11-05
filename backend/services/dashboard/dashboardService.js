@@ -20,6 +20,8 @@ const activeStoryTask = (status) => status?.todayContentType === "story_audio"
   || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
 const activePictureTask = (status) => status?.todayContentType === "picture_description"
   || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+const activeShadowingTask = (status) => status?.todayContentType === "shadowing_video"
+  || Boolean(status?.isShadowingDay);
 
 /**
  * Get poster image - use bot's stored PNG if available, else generate SVG fallback
@@ -89,6 +91,11 @@ export async function getTodayOverview() {
       audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
+      isShadowing: isQuestionSentToday && activeShadowingTask(status),
+      videoUrl: isQuestionSentToday ? (status?.todayVideoUrl || null) : null,
+      videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
+      videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
+      videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
       isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
       isWeeklyReflection: isQuestionSentToday && Boolean(status?.isWeeklyReflectionDay),
       isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
@@ -98,7 +105,7 @@ export async function getTodayOverview() {
       imagePhotographer: isQuestionSentToday ? (status?.todayImagePhotographer || null) : null,
       imageInstructions: isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
       posterImage: isQuestionSentToday ? getPosterImage(status) : null,
-      vocabulary: isQuestionSentToday
+      vocabulary: (isQuestionSentToday && !activeShadowingTask(status))
         ? (status?.todayVocabulary || []).slice(
             0,
             activePictureTask(status)
@@ -108,12 +115,16 @@ export async function getTodayOverview() {
               : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
           )
         : [],
-      vocabWordCount: activePictureTask(status)
+      vocabWordCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : activeStoryTask(status)
         ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
         : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
-      vocabRequiredCount: activePictureTask(status)
+      vocabRequiredCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : activeStoryTask(status)
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
@@ -420,6 +431,11 @@ export async function getUserProfile(phone) {
       isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
+      isShadowing: isQuestionSentToday && activeShadowingTask(status),
+      videoUrl: isQuestionSentToday ? (status?.todayVideoUrl || null) : null,
+      videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
+      videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
+      videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
       // Picture description image data (only populated on picture description days)
       imageUrl:             isQuestionSentToday ? (status?.todayImageUrl || null) : null,
       imageSource:          isQuestionSentToday ? (status?.todayImageSource || null) : null,
@@ -428,22 +444,28 @@ export async function getUserProfile(phone) {
       imagePhotographerUrl: isQuestionSentToday ? (status?.todayImagePhotographerUrl || null) : null,
       imageSearchQuery:     isQuestionSentToday ? (status?.todayImageSearchQuery || null) : null,
       imageInstructions:    isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
-      vocabulary: (await vocabularyPromise).slice(
-        0,
-        activePictureTask(status)
-          ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
-          : activeStoryTask(status)
-          ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
-          : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
-      ),
+      vocabulary: activeShadowingTask(status)
+        ? []
+        : (await vocabularyPromise).slice(
+            0,
+            activePictureTask(status)
+              ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+              : activeStoryTask(status)
+              ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+              : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
+          ),
       allowPrivateVideos: status?.allowPrivateVideos ?? true,
       enableBackgroundBlur: status?.enableBackgroundBlur ?? false,
-      vocabWordCount: activePictureTask(status)
+      vocabWordCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : activeStoryTask(status)
         ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
         : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
-      vocabRequiredCount: activePictureTask(status)
+      vocabRequiredCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : activeStoryTask(status)
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)

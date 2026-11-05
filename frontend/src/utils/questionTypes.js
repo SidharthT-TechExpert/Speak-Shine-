@@ -16,6 +16,7 @@ export const CATEGORY_THEMES = {
   "Personal Experience": { primary: "#fb7185", secondary: "#e11d48", badgeBg: "rgba(251,113,133,0.15)", border: "rgba(251,113,133,0.3)", gradient: "linear-gradient(135deg, rgba(251,113,133,0.15) 0%, rgba(251,113,133,0.03) 100%)" },
   "Picture Description": { primary: "#38bdf8", secondary: "#818cf8", badgeBg: "rgba(56,189,248,0.15)",  border: "rgba(56,189,248,0.35)", gradient: "linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(99,102,241,0.05) 100%)" },
   "Story Summary":       { primary: "#a78bfa", secondary: "#7c3aed", badgeBg: "rgba(167,139,250,0.15)", border: "rgba(167,139,250,0.3)", gradient: "linear-gradient(135deg, rgba(167,139,250,0.15) 0%, rgba(124,111,255,0.05) 100%)" },
+  "Shadowing Practice":  { primary: "#f472b6", secondary: "#c084fc", badgeBg: "rgba(244,114,182,0.15)", border: "rgba(244,114,182,0.35)", gradient: "linear-gradient(135deg, rgba(244,114,182,0.15) 0%, rgba(192,132,252,0.05) 100%)" },
   "Monthly Goals":       { primary: "#34d399", secondary: "#059669", badgeBg: "rgba(52,211,153,0.15)",  border: "rgba(52,211,153,0.3)",  gradient: "linear-gradient(135deg, rgba(52,211,153,0.15) 0%, rgba(5,150,105,0.05) 100%)" },
   "Monthly Reflection":  { primary: "#a78bfa", secondary: "#8b5cf6", badgeBg: "rgba(167,139,250,0.15)", border: "rgba(167,139,250,0.3)", gradient: "linear-gradient(135deg, rgba(167,139,250,0.15) 0%, rgba(139,92,246,0.05) 100%)" },
   "default":             { primary: "#c084fc", secondary: "#9333ea", badgeBg: "rgba(192,132,252,0.15)", border: "rgba(192,132,252,0.3)", gradient: "linear-gradient(135deg, rgba(192,132,252,0.15) 0%, rgba(147,51,234,0.05) 100%)" },
@@ -31,11 +32,13 @@ const KEYWORD_MAP = [
   { keywords: ["personal", "experience", "memory", "childhood"],      theme: "Personal Experience" },
   { keywords: ["picture", "image", "photo", "describe", "visual"],    theme: "Picture Description" },
   { keywords: ["story", "listen", "audio", "narrative", "retell"],    theme: "Story Summary" },
+  { keywords: ["shadow", "shadowing", "mimic", "mimicry", "replicate"], theme: "Shadowing Practice" },
   { keywords: ["reflection", "end of month", "review"],               theme: "Monthly Reflection" },
   { keywords: ["monthly goal", "goal setting", "targets"],            theme: "Monthly Goals" },
 ];
 
 export function getCategoryTheme(category, contentType) {
+  if (contentType === "shadowing_video") return CATEGORY_THEMES["Shadowing Practice"];
   if (contentType === "picture_description") return CATEGORY_THEMES["Picture Description"];
   if (contentType === "story_audio") return CATEGORY_THEMES["Story Summary"];
   if (!category) return CATEGORY_THEMES.default;
@@ -100,6 +103,9 @@ export function parseQuestionItems(rawText) {
  * Detect question type from today object / status
  */
 export function detectQuestionType(today = {}) {
+  if (today.isShadowing || today.contentType === "shadowing_video" || (today.videoUrl && !today.audioUrl && !today.imageUrl)) {
+    return "shadowing_video";
+  }
   if (today.isPictureDescription || today.contentType === "picture_description" || (today.imageUrl && !today.audioUrl)) {
     return "picture_description";
   }
@@ -159,9 +165,39 @@ export function getQuestionUIConfig(type, today = {}) {
     isMonthlyGoals: type === "monthly_goals" || Boolean(today?.isMonthlyGoals),
     isStorySummary: type === "story_audio" || Boolean(today?.isStorySummary),
     isPictureDescription: type === "picture_description" || Boolean(today?.isPictureDescription),
+    isShadowing: type === "shadowing_video" || Boolean(today?.isShadowing),
   }, today?.durationSettings || {});
 
   switch (type) {
+    case "shadowing_video":
+      return {
+        type,
+        theme,
+        reqCount: 0,
+        totalCount: 0,
+        vocabLevel: "None",
+        cefrInfo: null,
+        badgeLabel: today.category || "Shadowing Practice",
+        badgeSubtext: "Video Mimicry & Simultaneous Speech",
+        promptLabel: "🎬 Shadowing Activity Task",
+        promptSubtitle: "Play the reference video and speak simultaneously. Mirror the rhythm, speed, and pronunciation.",
+        recordButtonLabel: "Start Shadowing & Record",
+        uploadButtonLabel: "Upload Shadowing Video",
+        rules: [
+          { text: "Play the reference video and speak simultaneously to shadow the speaker", highlight: true },
+          { text: `Duration matching: ≥90% duration match awards full 35 duration points (max ${limits.maxLabel})` },
+          { text: "Vocabulary requirement is waived — scored on duration, rhythm, fluency, and expression" },
+        ],
+        hasAudio: false,
+        hasImage: false,
+        hasVideo: Boolean(today.videoUrl),
+        videoUrl: today.videoUrl,
+        videoDuration: today.videoDuration || 60,
+        videoTranscript: today.videoTranscript || "",
+        videoTitle: today.videoTitle || "",
+        tip: "Shadowing Tip: Speak at the exact same time as the video speaker to train muscle memory and pacing.",
+      };
+
     case "picture_description":
       return {
         type,

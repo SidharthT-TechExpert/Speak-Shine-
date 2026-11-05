@@ -163,11 +163,15 @@ export async function preCheckSubmit(req, res) {
     const isPicture = req.body?.isPictureDescription !== undefined
       ? !!req.body.isPictureDescription
       : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio"));
+    const isShadowing = req.body?.isShadowing !== undefined
+      ? !!req.body.isShadowing
+      : (status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay));
     const flags = {
       isMonthlyReflection: req.body?.isMonthlyReflection !== undefined ? !!req.body.isMonthlyReflection : (status?.isMonthlyReflectionDay || false),
       isMonthlyGoals: req.body?.isMonthlyGoals !== undefined ? !!req.body.isMonthlyGoals : (status?.isMonthlyGoalsDay || false),
       isStorySummary: isStory,
       isPictureDescription: isPicture,
+      isShadowing: isShadowing,
     };
     const gate = evaluateSubmitGate({
       durationSeconds: req.body?.durationSeconds ?? null,

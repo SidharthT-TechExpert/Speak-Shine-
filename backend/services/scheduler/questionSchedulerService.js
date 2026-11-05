@@ -172,6 +172,77 @@ async function isPictureDescriptionDay() {
   }
 }
 
+export const SHADOWING_CATEGORY = "Shadowing Practice";
+
+/**
+ * Check if today is the shadowing video day (IST).
+ * Uses shadowingDays from DB settings (fallback to shadowingDay, default [2] = Tuesday).
+ */
+export async function isShadowingDay() {
+  try {
+    const status = await Status.findOne().select("shadowingDays shadowingDay isShadowingDay todayContentType").lean();
+    if (status?.isShadowingDay || status?.todayContentType === "shadowing_video") return true;
+    let days = [];
+    if (Array.isArray(status?.shadowingDays) && status.shadowingDays.length > 0) {
+      days = status.shadowingDays;
+    } else if (status?.shadowingDay !== undefined && status?.shadowingDay !== null && status?.shadowingDay !== -1) {
+      days = [status.shadowingDay];
+    } else if (status?.shadowingDay === -1) {
+      days = [];
+    } else {
+      days = [2]; // default Tuesday
+    }
+    if (days.length === 0) return false;
+    const istDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    return days.includes(istDate.getDay());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Auto-generate and publish a Shadowing Video challenge.
+ */
+export async function publishAutoShadowingVideo() {
+  try {
+    const { generateShadowingChallenge } = await import("../ai/shadowingVideoGenerator.js");
+    console.log("[QuestionScheduler] 🎬 Auto-generating Shadowing Video challenge…");
+    const challenge = await generateShadowingChallenge();
+
+    await Status.updateOne({}, {
+      $set: {
+        questionSentToday: true,
+        questionPublishedDate: getTodayISTDate(),
+        isShadowingDay: true,
+        isPictureDescriptionDay: false,
+        isStorySummaryDay: false,
+        isMonthlyReflectionDay: false,
+        isMonthlyGoalsDay: false,
+        todayContentType: "shadowing_video",
+        todayTopic: challenge.title,
+        todayQuestion: challenge.instructions,
+        todayCategory: SHADOWING_CATEGORY,
+        todayVideoUrl: challenge.videoUrl,
+        todayVideoDuration: challenge.videoDuration,
+        todayVideoTranscript: challenge.videoTranscript,
+        todayVideoTitle: challenge.title,
+        todayAudioUrl: null,
+        todayStoryTranscript: null,
+        todaySummaryGuide: null,
+        todayImageUrl: null,
+        todayPosterImage: null,
+        todayVocabulary: [],
+      }
+    }, { upsert: true });
+
+    console.log(`[QuestionScheduler] ✅ Shadowing Video published: "${challenge.title}"`);
+    return { published: true, type: "shadowing_video", topic: challenge.title, source: "auto" };
+  } catch (err) {
+    console.error("[QuestionScheduler] Shadowing Video auto-publish failed:", err.message);
+    return { published: false, error: err.message };
+  }
+}
+
 /**
  * Auto-generate and publish a Picture Description challenge.
  * Skips with a non-fatal error if PEXELS_API_KEY is not set.
@@ -294,6 +365,7 @@ export async function publishManualQuestion(q) {
 
   const isStory = q.setupType === "story_summary";
   const isPicture = q.setupType === "picture_description";
+  const isShadowing = q.setupType === "shadowing_video";
   const isReflection = q.setupType === "monthly_reflection";
   const isGoals = q.setupType === "monthly_goals";
 
@@ -301,14 +373,15 @@ export async function publishManualQuestion(q) {
     $set: {
       questionSentToday: true,
       questionPublishedDate: getTodayISTDate(),
-      todayContentType: isStory ? "story_audio" : isPicture ? "picture_description" : "question",
+      todayContentType: isStory ? "story_audio" : isPicture ? "picture_description" : isShadowing ? "shadowing_video" : "question",
       isStorySummaryDay: isStory,
       isPictureDescriptionDay: isPicture,
+      isShadowingDay: isShadowing,
       isMonthlyReflectionDay: isReflection,
       isMonthlyGoalsDay: isGoals,
-      todayTopic: q.topic || (isStory ? STORY_SUMMARY_TOPIC : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isReflection ? MONTHLY_REFLECTION_TOPIC : isGoals ? MONTHLY_GOALS_TOPIC : "Daily Practice"),
+      todayTopic: q.topic || (isStory ? STORY_SUMMARY_TOPIC : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isShadowing ? SHADOWING_CATEGORY : isReflection ? MONTHLY_REFLECTION_TOPIC : isGoals ? MONTHLY_GOALS_TOPIC : "Daily Practice"),
       todayQuestion: q.question,
-      todayCategory: q.category || (isStory ? STORY_SUMMARY_CATEGORY : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isReflection ? MONTHLY_REFLECTION_CATEGORY : isGoals ? MONTHLY_GOALS_CATEGORY : "General"),
+      todayCategory: q.category || (isStory ? STORY_SUMMARY_CATEGORY : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isShadowing ? SHADOWING_CATEGORY : isReflection ? MONTHLY_REFLECTION_CATEGORY : isGoals ? MONTHLY_GOALS_CATEGORY : "General"),
       todayAudioUrl: q.audioUrl || null,
       todayStoryTranscript: q.storyTranscript || null,
       todaySummaryGuide: q.summaryGuide || null,
@@ -319,6 +392,10 @@ export async function publishManualQuestion(q) {
       todayImagePhotographerUrl: q.imagePhotographerUrl || null,
       todayImageSearchQuery: q.imageSearchQuery || null,
       todayImageInstructions: q.imageInstructions || null,
+      todayVideoUrl: q.videoUrl || null,
+      todayVideoDuration: q.videoDuration || null,
+      todayVideoTranscript: q.videoTranscript || null,
+      todayVideoTitle: q.videoTitle || q.topic || null,
       todayPosterImage: null,
       todayVocabulary: [],
     }
@@ -326,9 +403,11 @@ export async function publishManualQuestion(q) {
 
   await Question.findByIdAndUpdate(q._id, { isUsed: true });
 
-  await ensureTodayVocabulary().catch(err =>
-    console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
-  );
+  if (!isShadowing) {
+    await ensureTodayVocabulary().catch(err =>
+      console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
+    );
+  }
 
   await dispatchPosterToWhatsApp({
     topic: q.topic,
@@ -363,6 +442,12 @@ const PICTURE_DESCRIPTION_CATEGORY = "Picture Description";
 
 export async function publishDueManualPictureDescriptionQuestion(now = new Date()) {
   const q = await getDueManualQuestion("picture_description", now);
+  if (!q) return { published: false };
+  return publishManualQuestion(q);
+}
+
+export async function publishDueManualShadowingQuestion(now = new Date()) {
+  const q = await getDueManualQuestion("shadowing_video", now);
   if (!q) return { published: false };
   return publishManualQuestion(q);
 }
@@ -463,6 +548,10 @@ export async function publishDailyQuestion() {
     const duePicture = await publishDueManualPictureDescriptionQuestion();
     if (duePicture.published) return duePicture;
 
+    // ── 3b. Due Manual Shadowing Task ─────────────────────────────────────
+    const dueShadow = await publishDueManualShadowingQuestion();
+    if (dueShadow.published) return dueShadow;
+
     // ── 4. Story Summary Day → Auto Story Summary (e.g. Saturday) ────────
     if (await isStoryDay()) {
       const storyResult = await publishAutoSaturdayStory();
@@ -477,6 +566,13 @@ export async function publishDailyQuestion() {
       // If picture generation failed (e.g. no Pexels key), log and fall through
       // to next challenge so users still get a task today.
       console.warn("[QuestionScheduler] ⚠️  Picture Description failed — falling back to next task");
+    }
+
+    // ── 5b. Shadowing Video Day → Auto Shadowing (e.g. Tuesday) ──────────
+    if (await isShadowingDay()) {
+      const result = await publishAutoShadowingVideo();
+      if (result.published) return result;
+      console.warn("[QuestionScheduler] ⚠️  Shadowing Video auto-publish failed — falling back to next task");
     }
 
     // ── 6. 1st of month → Monthly Goal Setting (lower priority than story/picture) ──

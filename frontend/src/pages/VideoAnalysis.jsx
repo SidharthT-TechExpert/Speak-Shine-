@@ -218,6 +218,7 @@ export default function VideoAnalysis() {
   const [isMonthlyGoals, setIsMonthlyGoals] = useState(false);
   const [isStorySummary, setIsStorySummary] = useState(false);
   const [isPictureDescription, setIsPictureDescription] = useState(false);
+  const [isShadowing, setIsShadowing] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
   const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
@@ -551,7 +552,26 @@ export default function VideoAnalysis() {
       setStreak(userStreak);
       if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
       if (t?.question && active) {
-        setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions, durationSettings: t.durationSettings, isWeeklyReflection: t.isWeeklyReflection });
+        setTodayQuestion({
+          question: t.question,
+          topic: t.topic,
+          category: t.category,
+          audioUrl: t.audioUrl,
+          contentType: t.contentType,
+          imageUrl: t.imageUrl,
+          imageSource: t.imageSource,
+          imagePageUrl: t.imagePageUrl,
+          imagePhotographer: t.imagePhotographer,
+          imagePhotographerUrl: t.imagePhotographerUrl,
+          imageInstructions: t.imageInstructions,
+          videoUrl: t.videoUrl,
+          videoDuration: t.videoDuration,
+          videoTranscript: t.videoTranscript,
+          videoTitle: t.videoTitle,
+          durationSettings: t.durationSettings,
+          isWeeklyReflection: t.isWeeklyReflection,
+          isShadowing: t.isShadowing || t.contentType === "shadowing_video"
+        });
       } else {
         setTodayQuestion(null);
       }
@@ -560,6 +580,7 @@ export default function VideoAnalysis() {
       if (t?.isMonthlyGoals) setIsMonthlyGoals(true);
       if (t?.isStorySummary || t?.contentType === "story_audio") setIsStorySummary(true);
       if (t?.isPictureDescription || t?.contentType === "picture_description") setIsPictureDescription(true);
+      if (t?.isShadowing || t?.contentType === "shadowing_video") setIsShadowing(true);
       if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
       if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
       if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
@@ -817,15 +838,20 @@ export default function VideoAnalysis() {
             ...todayQuestion,
             isPictureDescription,
             isStorySummary,
+            isShadowing: Boolean(isShadowing || todayQuestion?.isShadowing || todayQuestion?.contentType === "shadowing_video"),
             isMonthlyGoals,
             isMonthlyReflection,
+            videoUrl: todayQuestion?.videoUrl,
+            videoDuration: todayQuestion?.videoDuration,
+            videoTranscript: todayQuestion?.videoTranscript,
+            videoTitle: todayQuestion?.videoTitle,
             vocabWordCount,
             vocabRequiredCount,
             vocabLevel,
             vocabulary: todayVocabulary,
-            category: todayQuestion?.category || (isStorySummary ? "Story Summary" : isPictureDescription ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
-            topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : "Daily Speaking Mission"),
-            question: todayQuestion?.question || "",
+            category: todayQuestion?.category || (isShadowing ? "Shadowing Practice" : isStorySummary ? "Story Summary" : isPictureDescription ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
+            topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : isShadowing ? (todayQuestion?.videoTitle || "Shadowing Practice") : "Daily Speaking Mission"),
+            question: todayQuestion?.question || (isShadowing ? "Play the reference video and speak simultaneously to practice rhythm and fluency." : ""),
             imageUrl: todayQuestion?.imageUrl,
             audioUrl: todayQuestion?.audioUrl,
           };
@@ -837,6 +863,7 @@ export default function VideoAnalysis() {
             isMonthlyGoals: Boolean(isMonthlyGoals || effectiveToday.isMonthlyGoals),
             isStorySummary: Boolean(isStorySummary || effectiveToday.isStorySummary || effectiveToday.contentType === "story_audio"),
             isPictureDescription: Boolean(isPictureDescription || effectiveToday.isPictureDescription || effectiveToday.contentType === "picture_description"),
+            isShadowing: Boolean(isShadowing || effectiveToday.isShadowing || effectiveToday.contentType === "shadowing_video"),
           }, durationSettings || todayQuestion?.durationSettings || {});
           effectiveToday.durationLimits = effectiveLimits;
           effectiveToday.durationSettings = durationSettings || todayQuestion?.durationSettings;
@@ -1010,6 +1037,43 @@ export default function VideoAnalysis() {
                       <div style={{ fontSize: "0.72rem", color: "#64748b", padding: "4px 8px", textAlign: "right" }}>
                         Photo by {todayQuestion.imagePhotographer}
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── 2b. Specialized Mode: Shadowing Reference Video Preview ── */}
+                {qType === "shadowing_video" && todayQuestion?.videoUrl && (
+                  <div style={{ marginBottom: "1.35rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: qConfig.theme.primary, textTransform: "uppercase" }}>
+                        🎬 REFERENCE SHADOWING VIDEO ({todayQuestion.videoDuration || 60}s)
+                      </span>
+                      <span style={{ fontSize: "0.74rem", color: "#f472b6", fontWeight: 600 }}>
+                        ⭐ ≥90% duration match = Full 35 pts
+                      </span>
+                    </div>
+                    <div style={{
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      border: `1px solid ${qConfig.theme.border || "rgba(244,114,182,0.35)"}`,
+                      background: "#000",
+                    }}>
+                      <video
+                        src={todayQuestion.videoUrl}
+                        controls
+                        playsInline
+                        style={{ width: "100%", maxHeight: 320, display: "block" }}
+                      />
+                    </div>
+                    {todayQuestion.videoTranscript && (
+                      <details style={{ marginTop: "0.6rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "0.5rem 0.85rem" }}>
+                        <summary style={{ cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: "#f472b6" }}>
+                          📜 View Spoken Script / Subtitles
+                        </summary>
+                        <div style={{ marginTop: "0.5rem", fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                          {todayQuestion.videoTranscript}
+                        </div>
+                      </details>
                     )}
                   </div>
                 )}
@@ -2157,9 +2221,9 @@ export default function VideoAnalysis() {
             </div>
           </div>
         ) : mode === "upload" ? (
-          <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isWeeklyReflection={isWeeklyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} durationSettings={durationSettings} allowPrivateVideos={allowPrivateVideos} />
+          <UploadCard onAnalysisStarted={onAnalysisStarted} isMonthlyReflection={isMonthlyReflection} isWeeklyReflection={isWeeklyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} isShadowing={isShadowing} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} durationSettings={durationSettings} allowPrivateVideos={allowPrivateVideos} />
         ) : (
-          <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isWeeklyReflection={isWeeklyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} durationSettings={durationSettings} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
+          <RecordCard  onAnalysisStarted={onAnalysisStarted} question={todayQuestion} isMonthlyReflection={isMonthlyReflection} isWeeklyReflection={isWeeklyReflection} isMonthlyGoals={isMonthlyGoals} isStorySummary={isStorySummary} isPictureDescription={isPictureDescription} isShadowing={isShadowing} vocabulary={todayVocabulary} vocabRequiredCount={vocabRequiredCount} vocabWordCount={vocabWordCount} isGuest={isGuest} durationLimits={durationLimits} durationSettings={durationSettings} allowPrivateVideos={allowPrivateVideos} enableBackgroundBlur={enableBackgroundBlur} />
         )}
 
         {/* Report Section */}
@@ -3255,7 +3319,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
 }
 
 // ── Upload Card (direct-to-R2 flow) ─────────────────────────────────────────
-function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true }) {
+function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, isShadowing = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true }) {
   const [file, setFile]           = useState(null);
   const [fileDuration, setFileDuration] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -3269,7 +3333,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
   const uploadStartRef = useRef(null);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
-  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription };
+  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing };
   const durationLimits = dbDurationLimits || getDurationLimits(gateFlags, durationSettings);
 
   const handleFileChange = (e) => {
@@ -3647,7 +3711,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
 // ── Record Card ──────────────────────────────────────────────────────────────
 // States: "setup" → "countdown" → "recording" → "preview" → "uploading"
 
-function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true, enableBackgroundBlur = false }) {
+function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, isShadowing = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true, enableBackgroundBlur = false }) {
   const navigate = useNavigate();
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
@@ -3673,6 +3737,13 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [isPublic, setIsPublic]     = useState(true);
   const [previewAspect, setPreviewAspect] = useState(null);
   const [draftRestored, setDraftRestored] = useState(false); // true when draft loaded from IndexedDB
+
+  // ── Shadowing Activity state & refs ──
+  const [shadowPlaybackSpeed, setShadowPlaybackSpeed] = useState(1);
+  const [showShadowScript, setShowShadowScript] = useState(false);
+  const [shadowVideoMuted, setShadowVideoMuted] = useState(false);
+  const shadowingRefVideo = useRef(null);
+  const shadowingPreviewVideo = useRef(null);
 
   // ── Background compression state ─────────────────────────────────────────
   // Compression starts automatically as soon as the preview step loads (if blob > threshold).
@@ -3720,7 +3791,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     return seconds;
   }, []);
 
-  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription };
+  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing };
   const durationLimits = dbDurationLimits || getDurationLimits(gateFlags, durationSettings);
   const MAX_SECONDS = durationLimits.maxSeconds;
 
@@ -4136,8 +4207,25 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     }, 1000);
   };
 
+  // Synchronized playback for Shadowing Activity reference video
+  useEffect(() => {
+    if (step === "recording" && isShadowing && shadowingRefVideo.current) {
+      try {
+        shadowingRefVideo.current.currentTime = 0;
+        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+        shadowingRefVideo.current.muted = shadowVideoMuted;
+        shadowingRefVideo.current.play().catch(e => console.warn("[Shadowing] Video play warning:", e));
+      } catch (err) {
+        console.warn("[Shadowing] Video autoplay err:", err);
+      }
+    }
+  }, [step, isShadowing, shadowPlaybackSpeed, shadowVideoMuted]);
+
   const stopRecording = () => {
     clearInterval(timerRef.current);
+    if (isShadowing && shadowingRefVideo.current) {
+      try { shadowingRefVideo.current.pause(); } catch {}
+    }
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       console.log(`[Recording] Stopping recorder in state: ${recorderRef.current.state}`);
       try {
@@ -4159,6 +4247,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       closeActiveRecordingSegment();
       recorderRef.current.pause();
       clearInterval(timerRef.current);
+
+      if (isShadowing && shadowingRefVideo.current) {
+        try { shadowingRefVideo.current.pause(); } catch {}
+      }
 
       // Disable camera & mic tracks during pause so camera enters standby
       if (rawStreamRef.current) {
@@ -4182,6 +4274,14 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         liveVideoRef.current.play().catch(() => {});
       }
 
+      if (isShadowing && shadowingRefVideo.current) {
+        try {
+          shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+          shadowingRefVideo.current.muted = shadowVideoMuted;
+          shadowingRefVideo.current.play().catch(() => {});
+        } catch {}
+      }
+
       recorderRef.current.resume();
       recordingStartedAtRef.current = Date.now();
       timerRef.current = setInterval(() => {
@@ -4192,7 +4292,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       }, 1000);
       setIsPaused(false);
     }
-  }, [closeActiveRecordingSegment, getWallClockElapsed, MAX_SECONDS, cleanup]);
+  }, [closeActiveRecordingSegment, getWallClockElapsed, MAX_SECONDS, cleanup, isShadowing, shadowPlaybackSpeed, shadowVideoMuted]);
 
   // Toggle blur during recording
   const handleBlurToggle = useCallback(() => {
@@ -4556,6 +4656,39 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
             </div>
           )}
 
+          {/* Shadowing activity reminder inside record card */}
+          {isShadowing && (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(236,72,153,0.12), rgba(168,85,247,0.08))",
+              border: "1px solid rgba(236,72,153,0.35)",
+              borderRadius: 14, padding: "1rem 1.15rem", marginBottom: "1.25rem",
+              fontSize: "0.86rem", color: "var(--text)", lineHeight: 1.6,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <span style={{ fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.78rem" }}>
+                  🎬 Shadowing Activity Mode
+                </span>
+                <span style={{ background: "rgba(52,211,153,0.15)", color: "#34d399", padding: "2px 8px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700 }}>
+                  ✨ Vocab Waived
+                </span>
+              </div>
+              <p style={{ margin: "0 0 0.5rem 0", color: "#f1f5f9" }}>
+                <strong>Simultaneous Speech:</strong> The reference video will play automatically when you start recording. Speak along with the speaker in real time!
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", fontSize: "0.78rem" }}>
+                <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  🎯 <strong>≥90% duration match</strong>: Full 35 duration pts
+                </span>
+                <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  ⏱️ <strong>Target</strong>: {question?.videoDuration || 60} seconds
+                </span>
+                <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  🎙️ <strong>Scored on</strong>: Rhythm, pacing & fluency
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Device selectors */}
           <div className="grid-cols-2" style={{ marginBottom: "1.25rem" }}>
             <div style={{ position: 'relative', zIndex: 10 }}>
@@ -4737,89 +4870,241 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       {/* ── RECORDING ── */}
       {step === "recording" && (
         <div>
-          {/* Video — 9:16 on mobile, 16:9 on desktop */}
-          <div style={{ position: "relative", marginBottom: "0.85rem" }}>
-            <video ref={liveVideoRef} autoPlay muted playsInline
-              onLoadedMetadata={syncPreviewAspect}
-              style={{
-                ...livePreviewStyle,
-                maxWidth: "100%",
-              }} />
-
-            {/* REC badge */}
-            <div style={{
-              position: "absolute", top: "12px", left: "12px",
-              background: isPaused ? "rgba(245,158,11,0.9)" : "rgba(248,113,113,0.9)",
-              color: "#fff", padding: "0.25rem 0.65rem", borderRadius: "99px",
-              fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem",
-              zIndex: 2,
-            }}>
-              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#fff",
-                animation: isPaused ? "none" : "blink 1s infinite" }} />
-              {isPaused ? "PAUSED" : "REC"}
-            </div>
-
-            {/* Background blur badge - only show if active */}
-            {backgroundBlur && blurStatus === "active" && (
+          {isShadowing && question?.videoUrl ? (
+            /* Dual-Screen View: Reference Video + Webcam */
+            <div style={{ marginBottom: "0.85rem" }}>
               <div style={{
-                position: "absolute", top: "12px", right: ncStatus === "active" ? "75px" : "12px",
-                background: "rgba(139,92,246,0.85)", color: "#fff",
-                padding: "0.2rem 0.55rem", borderRadius: "99px",
-                fontSize: "0.68rem", fontWeight: 700,
-                zIndex: 2,
-              }}>🌫️ AI BLUR</div>
-            )}
-
-            {/* NC badge */}
-            {ncStatus === "active" && (
-              <div style={{
-                position: "absolute", top: "12px", right: "12px",
-                background: "rgba(34,211,160,0.85)", color: "#fff",
-                padding: "0.2rem 0.55rem", borderRadius: "99px",
-                fontSize: "0.68rem", fontWeight: 700,
-                zIndex: 2,
-              }}>🎙️ AI NC</div>
-            )}
-
-            {/* Paused Overlay */}
-            {isPaused && (
-              <div style={{
-                position: "absolute",
-                inset: 0,
-                background: "rgba(0,0,0,0.65)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "12px",
-                zIndex: 1,
-                color: "#fff",
-                gap: "0.4rem",
-                padding: "1rem",
-                textAlign: "center"
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: "0.85rem",
+                alignItems: "stretch",
               }}>
-                <span style={{ fontSize: "2rem" }}>⏸</span>
-                <span style={{ fontWeight: 700, fontSize: "1rem", color: "#fbbf24" }}>Recording Paused</span>
-                <span style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>Camera and microphone on standby · Click Resume or press Space to continue</span>
-              </div>
-            )}
+                {/* 1. Reference Video Player */}
+                <div style={{
+                  position: "relative",
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  background: "#000",
+                  border: "2px solid rgba(236,72,153,0.5)",
+                  minHeight: "220px",
+                }}>
+                  <div style={{
+                    position: "absolute", top: "10px", left: "10px",
+                    background: "rgba(236,72,153,0.9)", color: "#fff",
+                    padding: "0.2rem 0.6rem", borderRadius: "99px",
+                    fontSize: "0.72rem", fontWeight: 700, zIndex: 3,
+                    display: "flex", alignItems: "center", gap: "0.3rem",
+                  }}>
+                    <span>🎬</span> Reference Video
+                  </div>
 
-            {/* Timer bar — color shifts green→yellow→red as time fills up */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: "rgba(255,255,255,0.15)", borderRadius: "0 0 12px 12px", zIndex: 2 }}>
-              <div style={{
-                height: "100%",
-                width: `${(elapsed / MAX_SECONDS) * 100}%`,
-                background: elapsed >= MAX_SECONDS * 0.8
-                  ? "var(--danger)"
-                  : elapsed >= MAX_SECONDS * 0.6
-                  ? "var(--warning)"
-                  : "var(--primary)",
-                borderRadius: "inherit",
-                transition: "width 1s linear, background 0.5s ease",
-              }} />
+                  <div style={{
+                    position: "absolute", top: "10px", right: "10px",
+                    display: "flex", gap: "0.4rem", zIndex: 3,
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const speeds = [0.8, 1, 1.2];
+                        const nextIdx = (speeds.indexOf(shadowPlaybackSpeed) + 1) % speeds.length;
+                        const nextSpeed = speeds[nextIdx];
+                        setShadowPlaybackSpeed(nextSpeed);
+                        if (shadowingRefVideo.current) shadowingRefVideo.current.playbackRate = nextSpeed;
+                      }}
+                      style={{
+                        background: "rgba(0,0,0,0.75)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)",
+                        padding: "0.15rem 0.5rem", borderRadius: 6, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+                      }}
+                      title="Playback speed"
+                    >
+                      ⚡ {shadowPlaybackSpeed}x
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextMuted = !shadowVideoMuted;
+                        setShadowVideoMuted(nextMuted);
+                        if (shadowingRefVideo.current) shadowingRefVideo.current.muted = nextMuted;
+                      }}
+                      style={{
+                        background: "rgba(0,0,0,0.75)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)",
+                        padding: "0.15rem 0.5rem", borderRadius: 6, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+                      }}
+                      title="Mute / Unmute"
+                    >
+                      {shadowVideoMuted ? "🔇" : "🔊"}
+                    </button>
+                  </div>
+
+                  <video
+                    ref={shadowingRefVideo}
+                    src={question.videoUrl}
+                    playsInline
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      minHeight: "220px",
+                      objectFit: "contain",
+                      background: "#000",
+                      display: "block",
+                    }}
+                  />
+                </div>
+
+                {/* 2. Webcam Recording Stream */}
+                <div style={{
+                  position: "relative",
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  background: "#000",
+                  border: "2px solid rgba(99,102,241,0.5)",
+                  minHeight: "220px",
+                }}>
+                  <video
+                    ref={liveVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    onLoadedMetadata={syncPreviewAspect}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      minHeight: "220px",
+                      objectFit: "contain",
+                      background: "#000",
+                      display: "block",
+                    }}
+                  />
+
+                  {/* REC badge */}
+                  <div style={{
+                    position: "absolute", top: "10px", left: "10px",
+                    background: isPaused ? "rgba(245,158,11,0.9)" : "rgba(248,113,113,0.9)",
+                    color: "#fff", padding: "0.2rem 0.6rem", borderRadius: "99px",
+                    fontSize: "0.72rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.3rem",
+                    zIndex: 2,
+                  }}>
+                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff", animation: isPaused ? "none" : "blink 1s infinite" }} />
+                    {isPaused ? "PAUSED" : "REC (YOU)"}
+                  </div>
+
+                  {backgroundBlur && blurStatus === "active" && (
+                    <div style={{
+                      position: "absolute", top: "10px", right: ncStatus === "active" ? "75px" : "10px",
+                      background: "rgba(139,92,246,0.85)", color: "#fff",
+                      padding: "0.15rem 0.45rem", borderRadius: "99px",
+                      fontSize: "0.65rem", fontWeight: 700, zIndex: 2,
+                    }}>🌫️ AI BLUR</div>
+                  )}
+
+                  {ncStatus === "active" && (
+                    <div style={{
+                      position: "absolute", top: "10px", right: "10px",
+                      background: "rgba(34,211,160,0.85)", color: "#fff",
+                      padding: "0.15rem 0.45rem", borderRadius: "99px",
+                      fontSize: "0.65rem", fontWeight: 700, zIndex: 2,
+                    }}>🎙️ AI NC</div>
+                  )}
+
+                  {isPaused && (
+                    <div style={{
+                      position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)",
+                      backdropFilter: "blur(4px)", display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", borderRadius: "12px",
+                      zIndex: 2, color: "#fff", gap: "0.4rem", padding: "1rem", textAlign: "center",
+                    }}>
+                      <span style={{ fontSize: "1.8rem" }}>⏸</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#fbbf24" }}>Recording Paused</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Video — 9:16 on mobile, 16:9 on desktop */
+            <div style={{ position: "relative", marginBottom: "0.85rem" }}>
+              <video ref={liveVideoRef} autoPlay muted playsInline
+                onLoadedMetadata={syncPreviewAspect}
+                style={{
+                  ...livePreviewStyle,
+                  maxWidth: "100%",
+                }} />
+
+              {/* REC badge */}
+              <div style={{
+                position: "absolute", top: "12px", left: "12px",
+                background: isPaused ? "rgba(245,158,11,0.9)" : "rgba(248,113,113,0.9)",
+                color: "#fff", padding: "0.25rem 0.65rem", borderRadius: "99px",
+                fontSize: "0.75rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem",
+                zIndex: 2,
+              }}>
+                <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#fff",
+                  animation: isPaused ? "none" : "blink 1s infinite" }} />
+                {isPaused ? "PAUSED" : "REC"}
+              </div>
+
+              {/* Background blur badge - only show if active */}
+              {backgroundBlur && blurStatus === "active" && (
+                <div style={{
+                  position: "absolute", top: "12px", right: ncStatus === "active" ? "75px" : "12px",
+                  background: "rgba(139,92,246,0.85)", color: "#fff",
+                  padding: "0.2rem 0.55rem", borderRadius: "99px",
+                  fontSize: "0.68rem", fontWeight: 700,
+                  zIndex: 2,
+                }}>🌫️ AI BLUR</div>
+              )}
+
+              {/* NC badge */}
+              {ncStatus === "active" && (
+                <div style={{
+                  position: "absolute", top: "12px", right: "12px",
+                  background: "rgba(34,211,160,0.85)", color: "#fff",
+                  padding: "0.2rem 0.55rem", borderRadius: "99px",
+                  fontSize: "0.68rem", fontWeight: 700,
+                  zIndex: 2,
+                }}>🎙️ AI NC</div>
+              )}
+
+              {/* Paused Overlay */}
+              {isPaused && (
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.65)",
+                  backdropFilter: "blur(4px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "12px",
+                  zIndex: 1,
+                  color: "#fff",
+                  gap: "0.4rem",
+                  padding: "1rem",
+                  textAlign: "center"
+                }}>
+                  <span style={{ fontSize: "2rem" }}>⏸</span>
+                  <span style={{ fontWeight: 700, fontSize: "1rem", color: "#fbbf24" }}>Recording Paused</span>
+                  <span style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>Camera and microphone on standby · Click Resume or press Space to continue</span>
+                </div>
+              )}
+
+              {/* Timer bar — color shifts green→yellow→red as time fills up */}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "4px", background: "rgba(255,255,255,0.15)", borderRadius: "0 0 12px 12px", zIndex: 2 }}>
+                <div style={{
+                  height: "100%",
+                  width: `${(elapsed / MAX_SECONDS) * 100}%`,
+                  background: elapsed >= MAX_SECONDS * 0.8
+                    ? "var(--danger)"
+                    : elapsed >= MAX_SECONDS * 0.6
+                    ? "var(--warning)"
+                    : "var(--primary)",
+                  borderRadius: "inherit",
+                  transition: "width 1s linear, background 0.5s ease",
+                }} />
+              </div>
+            </div>
+          )}
 
           {/* Controls below video */}
           <div style={{
@@ -4958,10 +5243,18 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
             </div>
 
             {/* Min time hint */}
-            {elapsed < 60 && (
-              <div style={{ fontSize: "0.78rem", color: "var(--muted)", textAlign: "center" }}>
-                ⏱️ Keep going — minimum 1 minute required ({60 - elapsed}s left)
-              </div>
+            {isShadowing ? (
+              elapsed < 20 && (
+                <div style={{ fontSize: "0.78rem", color: "var(--muted)", textAlign: "center" }}>
+                  ⏱️ Minimum 20 seconds required for shadowing ({20 - elapsed}s left)
+                </div>
+              )
+            ) : (
+              elapsed < 60 && (
+                <div style={{ fontSize: "0.78rem", color: "var(--muted)", textAlign: "center" }}>
+                  ⏱️ Keep going — minimum 1 minute required ({60 - elapsed}s left)
+                </div>
+              )
             )}
 
             {/* Spacebar hint */}
@@ -4969,8 +5262,46 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               Press <kbd style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "0.1rem 0.4rem", fontSize: "0.7rem", fontFamily: "monospace" }}>Space</kbd> to pause / resume
             </div>
 
+            {/* Shadowing info during recording */}
+            {isShadowing && (
+              <div style={{ borderTop: "1px solid var(--border2)", paddingTop: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+                <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
+                  ✨ Vocabulary requirement waived for Shadowing Activity
+                </span>
+                {question?.videoTranscript && (
+                  <button
+                    type="button"
+                    onClick={() => setShowShadowScript(p => !p)}
+                    style={{
+                      background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)",
+                      borderRadius: 8, padding: "3px 8px", fontSize: "0.72rem", color: "#f472b6",
+                      fontWeight: 700, cursor: "pointer",
+                    }}
+                  >
+                    📜 {showShadowScript ? "Hide Script" : "Show Script"}
+                  </button>
+                )}
+              </div>
+            )}
+            {isShadowing && showShadowScript && question?.videoTranscript && (
+              <div style={{
+                padding: "0.65rem 0.85rem",
+                borderRadius: 10,
+                background: "rgba(0,0,0,0.5)",
+                border: "1px solid rgba(236,72,153,0.3)",
+                fontSize: "0.82rem",
+                color: "#f8fafc",
+                lineHeight: 1.5,
+                maxHeight: "120px",
+                overflowY: "auto",
+                whiteSpace: "pre-line",
+              }}>
+                {question.videoTranscript}
+              </div>
+            )}
+
             {/* Vocabulary chips — visible during recording */}
-            {vocabulary.length > 0 && (
+            {!isShadowing && vocabulary.length > 0 && (
               <div style={{ borderTop: "1px solid var(--border2)", paddingTop: "0.75rem" }}>
                 <div style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(124,111,255,0.8)", marginBottom: "0.5rem" }}>
                   📚 Use at least {Math.min(vocabRequiredCount, vocabulary.length)} of {vocabWordCount || vocabulary.length} words
@@ -5024,8 +5355,43 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
           <p style={{ color: "var(--muted)", marginBottom: "1rem", fontSize: "0.9rem" }}>
             Review your recording before submitting for analysis.
-            {elapsed < 60 && <span style={{ color: "var(--danger)" }}> ⚠️ Too short ({fmtTime(elapsed)}) — minimum 1 minute.</span>}
+            {isShadowing ? (
+              elapsed < 20 && <span style={{ color: "var(--danger)" }}> ⚠️ Too short ({fmtTime(elapsed)}) — minimum 20 seconds.</span>
+            ) : (
+              elapsed < 60 && <span style={{ color: "var(--danger)" }}> ⚠️ Too short ({fmtTime(elapsed)}) — minimum 1 minute.</span>
+            )}
           </p>
+
+          {isShadowing && (
+            <div style={{
+              background: "rgba(236,72,153,0.1)",
+              border: "1px solid rgba(236,72,153,0.3)",
+              borderRadius: 10,
+              padding: "0.75rem 1rem",
+              marginBottom: "1rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "0.5rem"
+            }}>
+              <div>
+                <span style={{ fontWeight: 700, color: "#f472b6" }}>🎬 Shadowing Match: </span>
+                <span style={{ color: "var(--text)" }}>
+                  {fmtTime(elapsed)} of {fmtTime(question?.videoDuration || 60)} ({Math.min(100, Math.round((elapsed / (question?.videoDuration || 60)) * 100))}%)
+                </span>
+              </div>
+              <div style={{
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                color: (elapsed / (question?.videoDuration || 60)) >= 0.9 ? "#34d399" : "#f472b6"
+              }}>
+                {(elapsed / (question?.videoDuration || 60)) >= 0.9
+                  ? "⭐ ≥90% Duration Achieved (Full 35 Pts)"
+                  : `Effort Score: ${((Math.min(0.9, elapsed / (question?.videoDuration || 60)) / 0.9) * 35).toFixed(1)} / 35 Pts`}
+              </div>
+            </div>
+          )}
 
           
           {/* Recording info display */}
@@ -5305,6 +5671,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
   // Detect picture description from challengeType (new reports) OR bd flag (processed after scoring change)
   const isPictureBd = a.challengeType === "picture_description" || bd?.isPictureDescription === true;
   const isStoryBd = a.challengeType === "story_summary" || bd?.isStorySummary === true;
+  const isShadowBd = a.challengeType === "shadowing_video" || bd?.isShadowing === true;
 
   // Generate improvement tips based on what's missing from full score
   const improvementTips = [];
@@ -5317,7 +5684,36 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
         gap: 50,
       });
     }
-    if (isPictureBd) {
+    if (isShadowBd) {
+      const durGap = (bd.maxLength || 35) - (bd.length || 0);
+      const comGap = (bd.maxComm || 50) - (bd.comm || 0);
+      const groGap = (bd.maxGrowth || 15) - (bd.growth || 0);
+      if (durGap > 0.5) {
+        const targetSec = bd.targetDuration || 60;
+        improvementTips.push({
+          icon: "⏱️",
+          label: "Reach 90% duration match",
+          detail: `+${durGap.toFixed(1)} pts possible — speak for at least 90% of the reference video (${Math.round(targetSec * 0.9)}s) to earn full 35 duration points!`,
+          gap: durGap,
+        });
+      }
+      if (comGap > 2) {
+        improvementTips.push({
+          icon: "🗣️",
+          label: "Mirror rhythm & flow",
+          detail: `+${comGap.toFixed(1)} pts possible — shadow the speaker closely, matching pacing, pauses, and clear pronunciation.`,
+          gap: comGap,
+        });
+      }
+      if (groGap > 2) {
+        improvementTips.push({
+          icon: "🌱",
+          label: "Aim for personal growth",
+          detail: `+${groGap.toFixed(1)} pts possible — beat your communication baseline to earn full bonus points!`,
+          gap: groGap,
+        });
+      }
+    } else if (isPictureBd) {
       // Picture Description tips
       const comGap  = (bd.maxCommunication || 20) - (bd.communication || 0);
       const conGap  = (bd.maxContent       || 35) - (bd.content       || 0);
@@ -5611,7 +6007,34 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
           {/* Breakdown bars */}
           {bd && (
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-              {(isPictureBd ? [
+              {(isShadowBd ? [
+                {
+                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%)`,
+                  earned: bd.length || 0,
+                  max: bd.maxLength || 35,
+                  color: (bd.durationMatchRatio ?? 0) >= 0.9 ? "#10b981" : "#f472b6",
+                  subtext: (bd.durationMatchRatio ?? 0) >= 0.9 ? "≥90% Full Score" : "Effort Proportional",
+                },
+                {
+                  label: `🗣️ Delivery, Rhythm & Fluency`,
+                  earned: bd.comm || 0,
+                  max: bd.maxComm || 50,
+                  color: "#60a5fa",
+                },
+                ...(bd.growth != null || bd.maxGrowth != null ? [{
+                  label: "🌱 Personal Growth",
+                  earned: bd.growth || 0,
+                  max: bd.maxGrowth || 15,
+                  color: "#10b981",
+                  subtext: bd.isCalibration
+                    ? "First submissions — establishing baseline"
+                    : bd.growthDelta > 0
+                    ? `+${bd.growthDelta.toFixed(1)} vs baseline`
+                    : bd.growthDelta === 0
+                    ? "Matches baseline"
+                    : `${bd.growthDelta.toFixed(1)} vs baseline`,
+                }] : []),
+              ] : isPictureBd ? [
                 { label: `🗣️ Communication`, earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
                 { label: `🧠 Content & Relevance`,      earned: bd.content       || 0, max: bd.maxContent       || 35, color: "#a78bfa" },
                 { label: `📚 Vocabulary`,               earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 10, color: "#34d399" },
@@ -5669,7 +6092,22 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                 </div>
               ))}
 
-              {Array.isArray(a.vocabularyUsed) && a.vocabularyUsed.length > 0 && (
+              {isShadowBd && (
+                <div style={{
+                  marginTop: "0.25rem",
+                  padding: "0.45rem 0.75rem",
+                  borderRadius: 10,
+                  background: "rgba(244, 114, 182, 0.08)",
+                  border: "1px solid rgba(244, 114, 182, 0.25)",
+                  fontSize: "0.74rem",
+                  color: "#f472b6",
+                  lineHeight: 1.4,
+                }}>
+                  ✨ <strong>Shadowing Activity:</strong> Scored on duration matching (35 pts), delivery &amp; rhythm (50 pts), and growth (15 pts). Vocabulary measurement is waived.
+                </div>
+              )}
+
+              {!isShadowBd && Array.isArray(a.vocabularyUsed) && a.vocabularyUsed.length > 0 && (
                 <div style={{
                   marginTop: "0.25rem",
                   padding: "0.45rem 0.75rem",
