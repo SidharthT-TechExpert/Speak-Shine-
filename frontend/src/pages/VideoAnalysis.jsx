@@ -859,7 +859,7 @@ export default function VideoAnalysis() {
             vocabulary: todayVocabulary,
             category: todayQuestion?.category || (qType === "shadowing_video" ? "Shadowing Practice" : qType === "story_audio" ? "Story Summary" : qType === "picture_description" ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
             topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : qType === "shadowing_video" ? (todayQuestion?.videoTitle || "Shadowing Practice") : "Daily Speaking Mission"),
-            question: todayQuestion?.question || (qType === "shadowing_video" ? "Play the reference video and speak simultaneously to practice rhythm and fluency." : ""),
+            question: todayQuestion?.question || (qType === "shadowing_video" ? "Listen to the reference speech and speak simultaneously to practice rhythm and fluency." : ""),
             imageUrl: qType === "picture_description" ? todayQuestion?.imageUrl : null,
             audioUrl: qType === "story_audio" ? todayQuestion?.audioUrl : (qType === "shadowing_video" ? getCleanAudioUrl(todayQuestion?.audioUrl || todayQuestion?.videoUrl) : null),
           };
@@ -4819,7 +4819,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 </span>
               </div>
               <p style={{ margin: "0 0 0.5rem 0", color: "#f1f5f9" }}>
-                <strong>Simultaneous Speech:</strong> The reference video will play automatically when you start recording. Speak along with the speaker in real time!
+                <strong>Simultaneous Speech:</strong> The reference speech will play automatically through your earphones when you start recording. Speak along with the speaker in real time!
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", fontSize: "0.78rem" }}>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -5761,7 +5761,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
         improvementTips.push({
           icon: "⏱️",
           label: "Reach 90% duration match",
-          detail: `+${durGap.toFixed(1)} pts possible — speak for at least 90% of the reference video (${Math.round(targetSec * 0.9)}s) to earn full 35 duration points!`,
+          detail: `+${durGap.toFixed(1)} pts possible — speak for at least 90% of the reference speech (${Math.round(targetSec * 0.9)}s) to earn full 35 duration points!`,
           gap: durGap,
         });
       }

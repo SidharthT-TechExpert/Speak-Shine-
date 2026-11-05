@@ -8874,7 +8874,7 @@ function ManualQuestionsPanel() {
       audioUrl: "/shadowing/fluency-mindset.mp3",
       videoUrl: "/shadowing/fluency-mindset.mp3",
       videoTranscript: "Every language learner experiences that brief moment of hesitation right before speaking. Your mind searches for the perfect word, and fear whispers that you might make a mistake. The secret is simple: give yourself permission to speak imperfectly. Fluency begins when you value expressing your ideas over seeking mechanical perfection. Keep your vocal flow continuous, embrace small errors as stepping stones, and trust your practice.",
-      instructions: "Speak along with the video with zero hesitation. Keep your vocal flow continuous and smooth throughout."
+      instructions: "Speak along with the audio with zero hesitation. Keep your vocal flow continuous and smooth throughout."
     },
     {
       title: "How Great Speakers Use Intentional Pauses",
@@ -9738,7 +9738,7 @@ function ManualQuestionsPanel() {
                   />
                 </div>
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <label className="form-label">Reference Video URL * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(direct MP4 / WebM link, max 3 min)</span></label>
+                  <label className="form-label">Reference Audio / Video URL * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(direct MP3 / MP4 link, max 3 min)</span></label>
                   <input
                     className="form-input"
                     type="url"
