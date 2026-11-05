@@ -17,11 +17,11 @@ import { getMonthlyGracePeriodInfo } from "../../utils/gracePeriodUtils.js";
 
 const withBadgeData = (user, data = {}) => ({ ...data, ...serializeStreakBadges(user) });
 const activeStoryTask = (status) => status?.todayContentType === "story_audio"
-  || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+  || (!status?.todayContentType && Boolean(status?.isStorySummaryDay));
 const activePictureTask = (status) => status?.todayContentType === "picture_description"
-  || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+  || (!status?.todayContentType && Boolean(status?.isPictureDescriptionDay));
 const activeShadowingTask = (status) => status?.todayContentType === "shadowing_video"
-  || Boolean(status?.isShadowingDay);
+  || (!status?.todayContentType && Boolean(status?.isShadowingDay));
 
 export function resolvePlayableVideoUrl(rawUrl, statusId = null) {
   if (!rawUrl) return null;
@@ -112,7 +112,7 @@ export async function getTodayOverview() {
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
       isShadowing: isQuestionSentToday && activeShadowingTask(status),
-      videoUrl: isQuestionSentToday ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
+      videoUrl: (isQuestionSentToday && activeShadowingTask(status)) ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
       videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
       videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
       videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
@@ -452,7 +452,7 @@ export async function getUserProfile(phone) {
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
       isShadowing: isQuestionSentToday && activeShadowingTask(status),
-      videoUrl: isQuestionSentToday ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
+      videoUrl: (isQuestionSentToday && activeShadowingTask(status)) ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
       videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
       videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
       videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,

@@ -572,17 +572,18 @@ export default function VideoAnalysis() {
           videoTitle: t.videoTitle,
           durationSettings: t.durationSettings,
           isWeeklyReflection: t.isWeeklyReflection,
-          isShadowing: t.isShadowing || t.contentType === "shadowing_video"
+          isShadowing: detectQuestionType(t || {}) === "shadowing_video"
         });
       } else {
         setTodayQuestion(null);
       }
-      if (t?.isMonthlyReflection) setIsMonthlyReflection(true);
-      if (t?.isWeeklyReflection) setIsWeeklyReflection(true);
-      if (t?.isMonthlyGoals) setIsMonthlyGoals(true);
-      if (t?.isStorySummary || t?.contentType === "story_audio") setIsStorySummary(true);
-      if (t?.isPictureDescription || t?.contentType === "picture_description") setIsPictureDescription(true);
-      if (t?.isShadowing || t?.contentType === "shadowing_video") setIsShadowing(true);
+      const detectedTaskType = detectQuestionType(t || {});
+      setIsMonthlyReflection(detectedTaskType === "monthly_reflection" || Boolean(t?.isMonthlyReflection));
+      setIsWeeklyReflection(Boolean(t?.isWeeklyReflection));
+      setIsMonthlyGoals(detectedTaskType === "monthly_goals" || Boolean(t?.isMonthlyGoals));
+      setIsStorySummary(detectedTaskType === "story_audio");
+      setIsPictureDescription(detectedTaskType === "picture_description");
+      setIsShadowing(detectedTaskType === "shadowing_video");
       if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
       if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
       if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
@@ -836,36 +837,36 @@ export default function VideoAnalysis() {
 
         {/* ── Unified Daily Challenge / Question Card (Matching Dashboard Page) ── */}
         {(todayQuestion || isMonthlyGoals || isMonthlyReflection) && (() => {
+          const qType = detectQuestionType(todayQuestion || {});
           const effectiveToday = {
             ...todayQuestion,
-            isPictureDescription,
-            isStorySummary,
-            isShadowing: Boolean(isShadowing || todayQuestion?.isShadowing || todayQuestion?.contentType === "shadowing_video"),
-            isMonthlyGoals,
-            isMonthlyReflection,
-            videoUrl: todayQuestion?.videoUrl,
-            videoDuration: todayQuestion?.videoDuration,
-            videoTranscript: todayQuestion?.videoTranscript,
-            videoTitle: todayQuestion?.videoTitle,
+            isPictureDescription: qType === "picture_description",
+            isStorySummary: qType === "story_audio",
+            isShadowing: qType === "shadowing_video",
+            isMonthlyGoals: qType === "monthly_goals",
+            isMonthlyReflection: qType === "monthly_reflection",
+            videoUrl: qType === "shadowing_video" ? todayQuestion?.videoUrl : null,
+            videoDuration: qType === "shadowing_video" ? todayQuestion?.videoDuration : null,
+            videoTranscript: qType === "shadowing_video" ? todayQuestion?.videoTranscript : null,
+            videoTitle: qType === "shadowing_video" ? todayQuestion?.videoTitle : null,
             vocabWordCount,
             vocabRequiredCount,
             vocabLevel,
             vocabulary: todayVocabulary,
-            category: todayQuestion?.category || (isShadowing ? "Shadowing Practice" : isStorySummary ? "Story Summary" : isPictureDescription ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
-            topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : isShadowing ? (todayQuestion?.videoTitle || "Shadowing Practice") : "Daily Speaking Mission"),
-            question: todayQuestion?.question || (isShadowing ? "Play the reference video and speak simultaneously to practice rhythm and fluency." : ""),
-            imageUrl: todayQuestion?.imageUrl,
-            audioUrl: todayQuestion?.audioUrl,
+            category: todayQuestion?.category || (qType === "shadowing_video" ? "Shadowing Practice" : qType === "story_audio" ? "Story Summary" : qType === "picture_description" ? "Picture Description" : isMonthlyReflection ? "Monthly Reflection" : isMonthlyGoals ? "Monthly Goals" : "Daily Challenge"),
+            topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : qType === "shadowing_video" ? (todayQuestion?.videoTitle || "Shadowing Practice") : "Daily Speaking Mission"),
+            question: todayQuestion?.question || (qType === "shadowing_video" ? "Play the reference video and speak simultaneously to practice rhythm and fluency." : ""),
+            imageUrl: qType === "picture_description" ? todayQuestion?.imageUrl : null,
+            audioUrl: qType === "story_audio" ? todayQuestion?.audioUrl : null,
           };
 
-          const qType = detectQuestionType(effectiveToday);
           const effectiveLimits = durationLimits || getDurationLimits({
             isMonthlyReflection: Boolean(isMonthlyReflection || effectiveToday.isMonthlyReflection),
             isWeeklyReflection: Boolean(isWeeklyReflection || effectiveToday.isWeeklyReflection),
             isMonthlyGoals: Boolean(isMonthlyGoals || effectiveToday.isMonthlyGoals),
-            isStorySummary: Boolean(isStorySummary || effectiveToday.isStorySummary || effectiveToday.contentType === "story_audio"),
-            isPictureDescription: Boolean(isPictureDescription || effectiveToday.isPictureDescription || effectiveToday.contentType === "picture_description"),
-            isShadowing: Boolean(isShadowing || effectiveToday.isShadowing || effectiveToday.contentType === "shadowing_video"),
+            isStorySummary: Boolean(qType === "story_audio"),
+            isPictureDescription: Boolean(qType === "picture_description"),
+            isShadowing: Boolean(qType === "shadowing_video"),
           }, durationSettings || todayQuestion?.durationSettings || {});
           effectiveToday.durationLimits = effectiveLimits;
           effectiveToday.durationSettings = durationSettings || todayQuestion?.durationSettings;

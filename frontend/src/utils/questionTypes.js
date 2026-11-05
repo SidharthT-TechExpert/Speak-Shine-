@@ -103,21 +103,38 @@ export function parseQuestionItems(rawText) {
  * Detect question type from today object / status
  */
 export function detectQuestionType(today = {}) {
-  if (today.isShadowing || today.contentType === "shadowing_video" || (today.videoUrl && !today.audioUrl && !today.imageUrl)) {
+  // 1. Explicit contentType takes absolute precedence
+  if (today.contentType === "story_audio") return "story_audio";
+  if (today.contentType === "picture_description") return "picture_description";
+  if (today.contentType === "shadowing_video") return "shadowing_video";
+  if (today.contentType === "monthly_reflection") return "monthly_reflection";
+  if (today.contentType === "monthly_goals") return "monthly_goals";
+
+  // 2. Story Audio: has audioUrl and not videoUrl
+  if (today.audioUrl && !today.videoUrl) return "story_audio";
+  if (today.isStorySummary && !today.videoUrl) return "story_audio";
+  if (String(today.category || "").toLowerCase().includes("story")) return "story_audio";
+
+  // 3. Picture Description: has imageUrl and not audio/video
+  if (today.imageUrl && !today.videoUrl && !today.audioUrl) return "picture_description";
+  if (today.isPictureDescription && !today.videoUrl) return "picture_description";
+
+  // 4. Shadowing Video: explicit videoUrl or shadowing flag with videoUrl
+  if ((today.isShadowing || today.contentType === "shadowing_video") && today.videoUrl) {
     return "shadowing_video";
   }
-  if (today.isPictureDescription || today.contentType === "picture_description" || (today.imageUrl && !today.audioUrl)) {
-    return "picture_description";
+  if (today.videoUrl && !today.audioUrl && !today.imageUrl) {
+    return "shadowing_video";
   }
+
+  // 5. Monthly Goals / Reflection
   if (today.isMonthlyGoals || String(today.category || "").toLowerCase().includes("monthly goal") || String(today.setupType || "").includes("goal")) {
     return "monthly_goals";
   }
   if (today.isMonthlyReflection || String(today.category || "").toLowerCase().includes("reflection") || String(today.setupType || "").includes("reflection")) {
     return "monthly_reflection";
   }
-  if (today.isStorySummary || today.contentType === "story_audio" || String(today.category || "").toLowerCase().includes("story")) {
-    return "story_audio";
-  }
+
   return "standard_question";
 }
 

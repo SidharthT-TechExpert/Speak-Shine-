@@ -112,6 +112,9 @@ export function startScheduler() {
         const lastAttempt = s.lastPosterAttemptAt ? new Date(s.lastPosterAttemptAt).getTime() : 0;
         const msSinceLast = Date.now() - lastAttempt;
         if (msSinceLast >= 2 * 60 * 1000) {
+          const { getStatus, sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
+          const waStatus = typeof getStatus === "function" ? getStatus() : null;
+          if (waStatus && !waStatus.isConnected && !waStatus.hasSavedCredentials) return;
           console.log(`[Scheduler] 🔄 Poster delivery pending/failed for today (${s.lastPosterStatus || "unsent"}) — retrying WhatsApp dispatch now...`);
           try {
             const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
@@ -237,7 +240,13 @@ export function startScheduler() {
         const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
         await publishFromService();
       } else if (isAlreadyPublishedToday && (s.lastPosterStatus === "failed" || (s.lastPosterStatus !== "success" && s.lastPosterSentDate !== todayDate))) {
-        console.log(`[Scheduler] Catch-up: Question already published for today, but poster dispatch is pending/failed (${s.lastPosterStatus || "pending"}). Retrying dispatch...`);
+        const { getStatus, sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
+        const waStatus = typeof getStatus === "function" ? getStatus() : null;
+        if (!waStatus || waStatus.isConnected || waStatus.hasSavedCredentials) {
+          console.log(`[Scheduler] Catch-up: Question already published for today, but poster dispatch is pending/failed (${s.lastPosterStatus || "pending"}). Retrying dispatch...`);
+        } else {
+          return;
+        }
         try {
           const { sendDailyPosterToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
           await sendDailyPosterToGroup();
