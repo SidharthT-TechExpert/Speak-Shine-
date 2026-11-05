@@ -9194,7 +9194,7 @@ function ManualQuestionsPanel() {
     normal: "Normal Question (Daily Practice Prompt)",
     story_summary: "Story Summary (Listening Practice)",
     picture_description: "Picture Description Challenge",
-    shadowing_video: "Shadowing Activity (Video Mimicry Task)",
+    shadowing_video: "Shadowing Activity (Native Audio Shadowing)",
     monthly_reflection: "Monthly Reflection (Last day of month)",
     monthly_goals: "Monthly Goals (1st of month)"
   };
@@ -9671,26 +9671,23 @@ function ManualQuestionsPanel() {
             )}
             {form.setupType === "shadowing_video" && (
               <>
-                <div style={{ marginBottom: "0.75rem" }}>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={generatingShadowing}
-                    onClick={handleGenerateShadowing}
-                    style={{ width: "100%", marginBottom: "0.5rem", background: "linear-gradient(135deg,#ec4899,#8b5cf6)" }}
-                  >
-                    {generatingShadowing ? "🎬 Generating 1080p Shadowing Challenge with Subtitles…" : "🎬 AI Generate 1080p Shadowing Video (with Subtitles)"}
-                  </button>
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
-                    Generates inspiring speech, fetches 1080p Full HD video, aligns speech audio, and burns teleprompter subtitles.
+                <div style={{ marginBottom: "0.85rem", padding: "0.85rem 1rem", borderRadius: 12, background: "rgba(236,72,153,0.08)", border: "1px solid rgba(236,72,153,0.3)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                    <span style={{ fontSize: "1.2rem" }}>🎙️</span>
+                    <div>
+                      <strong style={{ fontSize: "0.88rem", color: "#f472b6" }}>Native Speaker Human Audio (No AI Generation)</strong>
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
+                        Pick from authentic real human speaker lessons below, or paste any external native speaker MP3 audio link with transcript.
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Curated 1080p Real-Speaker Speech Library Dropdown */}
                 <div style={{ marginBottom: "0.85rem", padding: "0.85rem", borderRadius: 10, background: "rgba(236,72,153,0.06)", border: "1px solid rgba(236,72,153,0.25)" }}>
                   <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#f472b6", marginBottom: "0.4rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>🏛️ Pick from Curated 1080p Real-Speaker Library</span>
-                    <span style={{ fontSize: "0.68rem", background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "0.1rem 0.4rem", borderRadius: 4, fontWeight: 700 }}>100% Free • Real Lip-Sync</span>
+                    <span>📻 Pick from Native Human Speaker Audio Bank</span>
+                    <span style={{ fontSize: "0.68rem", background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "0.1rem 0.4rem", borderRadius: 4, fontWeight: 700 }}>100% Human Native Voice</span>
                   </div>
                   <select
                     className="form-input"
@@ -9722,7 +9719,7 @@ function ManualQuestionsPanel() {
                     ))}
                   </select>
                   <div style={{ fontSize: "0.71rem", color: "var(--muted)", marginTop: "0.35rem" }}>
-                    Instant, zero-latency 1080p speech clips with real human lip-sync and aligned scripts. (You can customize topics and text anytime).
+                    Authentic human public speaking & communication audio clips with aligned scripts. No synthetic/robotic AI generation.
                   </div>
                 </div>
 
@@ -9738,7 +9735,7 @@ function ManualQuestionsPanel() {
                   />
                 </div>
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <label className="form-label">Reference Audio / Video URL * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(direct MP3 / MP4 link, max 3 min)</span></label>
+                  <label className="form-label">Native Speaker Audio URL (MP3) * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(direct human audio stream link, max 3 min)</span></label>
                   <input
                     className="form-input"
                     type="url"
@@ -9748,18 +9745,19 @@ function ManualQuestionsPanel() {
                     onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value }))}
                   />
                   {form.videoUrl && (
-                    <div style={{ marginTop: "0.5rem", borderRadius: 8, overflow: "hidden", border: "1px solid rgba(236,72,153,0.3)" }}>
-                      <video
+                    <div style={{ marginTop: "0.5rem", padding: "0.65rem 0.85rem", borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(236,72,153,0.3)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <span style={{ fontSize: "1.1rem" }}>🔊</span>
+                      <audio
                         src={form.videoUrl}
                         controls
-                        style={{ width: "100%", maxHeight: 220, background: "#000" }}
+                        style={{ flex: 1, height: 36 }}
                         onError={e => { e.target.style.display = "none"; }}
                       />
                     </div>
                   )}
                 </div>
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <label className="form-label">Video Duration (seconds) * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Maximum 180s / 3 minutes)</span></label>
+                  <label className="form-label">Speech Duration (seconds) * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Maximum 180s / 3 minutes)</span></label>
                   <input
                     className="form-input"
                     type="number"
