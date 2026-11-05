@@ -9781,7 +9781,7 @@ function ManualQuestionsPanel() {
                     onChange={e => setForm(f => ({ ...f, videoDuration: Math.min(180, Math.max(10, parseInt(e.target.value, 10) || 60)) }))}
                   />
                   <div style={{ fontSize: "0.72rem", color: "#f472b6", marginTop: "0.25rem" }}>
-                    ⭐ Student scoring: ≥90% duration match = 40/40 pts. Below 90% receives effort-proportional score. Delivery &amp; Rhythm = 60 pts.
+                    ⭐ Student scoring: ≥85% active spoken time = 40/40 pts. Below 85% receives effort-proportional score. Delivery &amp; Rhythm = 60 pts.
                   </div>
                 </div>
                 <div style={{ marginBottom: "0.85rem" }}>

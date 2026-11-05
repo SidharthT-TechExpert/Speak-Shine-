@@ -1102,7 +1102,7 @@ export default function VideoAnalysis() {
                         <span>🎙️</span> REFERENCE SHADOWING SPEECH ({duration || todayQuestion.videoDuration || 60}s)
                       </span>
                       <span style={{ fontSize: "0.74rem", color: "#34d399", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                        <span>⭐</span> ≥90% duration match = Full 40 pts
+                        <span>⭐</span> ≥85% active spoken time = Full 40 pts
                       </span>
                     </div>
 
@@ -5336,7 +5336,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               {/* Scoring breakdown badges */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", fontSize: "0.76rem" }}>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  🎯 <strong>≥90% duration match</strong>: Full 40 duration pts
+                  🎯 <strong>≥85% active spoken time</strong>: Full 40 duration pts
                 </span>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
                   ⏱️ <strong>Target</strong>: {question?.videoDuration || 60} seconds
@@ -6338,8 +6338,8 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
         const targetSec = bd.targetDuration || 60;
         improvementTips.push({
           icon: "⏱️",
-          label: "Reach 90% duration match",
-          detail: `+${durGap.toFixed(1)} pts possible — speak for at least 90% of the reference speech (${Math.round(targetSec * 0.9)}s) to earn full 40 duration points!`,
+          label: "Reach 85% active spoken time",
+          detail: `+${durGap.toFixed(1)} pts possible — speak actively for at least 85% of the reference speech (${Math.round(targetSec * 0.85)}s) to earn full 40 duration points!`,
           gap: durGap,
         });
       }
@@ -6647,11 +6647,11 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
-                  color: (bd.durationMatchRatio ?? 0) >= 0.9 ? "#10b981" : "#f472b6",
-                  subtext: (bd.durationMatchRatio ?? 0) >= 0.9 ? "≥90% Full Score" : "Effort Proportional",
+                  color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6",
+                  subtext: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "≥85% Full Score" : "Effort Proportional",
                 },
                 {
                   label: `🗣️ Delivery, Rhythm & Fluency`,

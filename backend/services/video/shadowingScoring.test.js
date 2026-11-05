@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { calculateCompositeScore } from "./submitGate.js";
 
 describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth / 0 Vocab)", () => {
-  it("awards full 40 duration points when actual duration is >= 90% of target video duration", () => {
+  it("awards full 40 duration points when actual spoken time is >= 85% of target active speech duration", () => {
     const { score, breakdown } = calculateCompositeScore({
-      durationSeconds: 72, // 72 / 80 = 90%
+      durationSeconds: 80,
       targetVideoDuration: 80,
       isShadowing: true,
       analysis: {
@@ -22,7 +22,8 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     expect(breakdown.maxDuration).toBe(40);
     expect(breakdown.maxLength).toBe(40);
     expect(breakdown.duration).toBe(40);
-    expect(breakdown.isNinetyPercentMatch).toBe(true);
+    expect(breakdown.isEightyFivePercentMatch).toBe(true);
+    expect(breakdown.spokenDurationSeconds).toBe(72); // 80s * 90% = 72s (>= 85% of 80s = 68s)
     expect(breakdown.maxGrowth).toBe(0);
     expect(breakdown.growth).toBe(0);
     expect(breakdown.maxVocabulary).toBe(0);
@@ -32,9 +33,12 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     expect(score).toBe(100);
   });
 
-  it("calculates proportional effort score when duration is below 90%", () => {
+  it("calculates proportional effort score when actual spoken time is below 85%", () => {
+    // Target 80s, 85% threshold is 68s.
+    // actualDur = 40s, speechRatio = 85% => spokenSeconds = 34s.
+    // 34 / 68 * 40 = 20 pts.
     const { breakdown } = calculateCompositeScore({
-      durationSeconds: 36, // 36 / 80 = 45% ratio. (45% / 90%) * 40 = 20 pts
+      durationSeconds: 40,
       targetVideoDuration: 80,
       isShadowing: true,
       analysis: {
@@ -50,8 +54,8 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     });
 
     expect(breakdown.duration).toBe(20);
-    expect(breakdown.isNinetyPercentMatch).toBe(false);
-    expect(breakdown.durationRatio).toBe(45);
+    expect(breakdown.isEightyFivePercentMatch).toBe(false);
+    expect(breakdown.spokenDurationSeconds).toBe(34);
     expect(breakdown.maxDuration).toBe(40);
     expect(breakdown.growth).toBe(0);
   });
@@ -81,30 +85,28 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     expect(breakdown.vocabulary).toBe(0);
   });
 
-  it("does not severely penalize natural shadowing pauses or realistic speech ratio (e.g. 47% speech ratio, 111s duration)", () => {
+  it("evaluates exact spoken time = video duration * speech ratio (e.g. 111s at 70% speech ratio)", () => {
     const { score, breakdown } = calculateCompositeScore({
       durationSeconds: 111,
       targetVideoDuration: 85,
       isShadowing: true,
       analysis: {
-        fluency: 6.5,
-        confidence: 6.5,
-        grammar: 7.0,
+        fluency: 7.0,
+        confidence: 7.0,
+        grammar: 7.5,
         stats: {
-          wpm: 65,
+          wpm: 95,
           pauses: 2,
-          rhythm: { speechRatio: 47, paceConsistency: 7.5 },
+          rhythm: { speechRatio: 70, paceConsistency: 8.0 },
         },
       },
     });
 
-    // Full 40 duration match (111 / 85 = 131% >= 90%)
+    // 111s * 70% = 77.7s spoken >= 85% of 85s (72.25s) => Full 40 pts
     expect(breakdown.duration).toBe(40);
-    expect(breakdown.isNinetyPercentMatch).toBe(true);
-    expect(breakdown.spokenDurationSeconds).toBe(52); // 111s * 47% = ~52s active speech
-
-    // Delivery must be rewarded with a fair score (>= 40 out of 60, not 14.4)
-    expect(breakdown.communication).toBeGreaterThanOrEqual(40);
-    expect(score).toBeGreaterThanOrEqual(80);
+    expect(breakdown.isEightyFivePercentMatch).toBe(true);
+    expect(breakdown.spokenDurationSeconds).toBe(78);
+    expect(breakdown.communication).toBeGreaterThanOrEqual(45);
+    expect(score).toBeGreaterThanOrEqual(85);
   });
 });

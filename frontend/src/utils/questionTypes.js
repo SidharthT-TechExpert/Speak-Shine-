@@ -234,7 +234,7 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload Shadowing Recording",
         rules: [
           { text: "Listen through earphones and speak at the same time to shadow the speaker", highlight: true },
-          { text: `Duration matching: ≥90% duration match awards full 40 duration points (max ${limits.maxLabel})` },
+          { text: `Duration matching: ≥85% active spoken time awards full 40 duration points (max ${limits.maxLabel})` },
           { text: "Delivery, Rhythm & Fluency: 60 points (Rhythm 30 pts + Delivery 30 pts)" },
           { text: "Vocabulary and personal growth requirements are waived for this activity" },
         ],
