@@ -6647,7 +6647,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%)`,
+                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
                   color: (bd.durationMatchRatio ?? 0) >= 0.9 ? "#10b981" : "#f472b6",
@@ -6846,14 +6846,31 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
         )}
         {s.fillerTotal > 0 && <span>🗣️ Filler words: <strong>{Object.entries(s.fillerWords || {}).map(([w, c]) => `"${w}" ×${c}`).join(", ")}</strong></span>}
         {s.pauses > 0 && <span>🔇 Long pauses: <strong>{s.pauses}</strong></span>}
-        {s.rhythm?.speechRatio != null && (
-          <span>
-            🎵 Speech ratio: <strong>{s.rhythm.speechRatio}%</strong>{" "}
-            {isShadowBd
-              ? (s.rhythm.speechRatio >= 40 ? "✅ Natural Cadence" : s.rhythm.speechRatio >= 25 ? "⚠️ Pauses with audio" : "❌ Too many silences")
-              : (s.rhythm.speechRatio >= 75 ? "✅ Good" : s.rhythm.speechRatio >= 55 ? "⚠️ Many pauses" : "❌ Too many silences")}
-          </span>
-        )}
+        {s.rhythm?.speechRatio != null && (() => {
+          let durSec = Number(s.durationSeconds) || 0;
+          if (!durSec && typeof s.duration === "string") {
+            const m = s.duration.match(/(?:(\d+)m\s*)?(\d+)s/);
+            if (m) durSec = (parseInt(m[1] || "0", 10) * 60) + parseInt(m[2] || "0", 10);
+          }
+          if (!durSec && typeof a.videoDuration === "number") durSec = a.videoDuration;
+          const spokenSec = s.activeSpeakingSeconds != null
+            ? s.activeSpeakingSeconds
+            : (durSec > 0 ? Math.round(durSec * (s.rhythm.speechRatio / 100)) : null);
+
+          return (
+            <span>
+              🎵 Speech ratio: <strong>{s.rhythm.speechRatio}%</strong>{" "}
+              {spokenSec !== null && spokenSec > 0 && (
+                <span style={{ color: "var(--muted)", fontWeight: 500 }}>
+                  (~{spokenSec}s spoken of {s.duration || `${durSec}s`})
+                </span>
+              )}{" "}
+              {isShadowBd
+                ? (s.rhythm.speechRatio >= 40 ? "✅ Natural Cadence" : s.rhythm.speechRatio >= 25 ? "⚠️ Pauses with audio" : "❌ Too many silences")
+                : (s.rhythm.speechRatio >= 75 ? "✅ Good" : s.rhythm.speechRatio >= 55 ? "⚠️ Many pauses" : "❌ Too many silences")}
+            </span>
+          );
+        })()}
       </div>
       {!isShadowBd && s.rhythm?.rushesAtStart && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Tends to rush at the start — slow down your opening.</p>}
       {!isShadowBd && s.rhythm?.rushesAtEnd   && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Speeds up toward the end — maintain steady pace throughout.</p>}

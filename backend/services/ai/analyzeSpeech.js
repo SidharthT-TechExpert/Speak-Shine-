@@ -887,6 +887,10 @@ RULES:
     // Attach computed stats so feedback.js can use them
     _stats: {
       duration: durationStr,
+      durationSeconds: Math.round(Number(durationSeconds) || 0),
+      activeSpeakingSeconds: typeof rhythm?.speechRatio === "number"
+        ? Math.round((Number(durationSeconds) || 0) * (rhythm.speechRatio / 100))
+        : null,
       wpm,
       fillerWords,
       fillerTotal,

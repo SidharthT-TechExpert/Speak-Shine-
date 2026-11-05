@@ -299,6 +299,7 @@ async function processJob(job) {
       const todayVocab = status?.todayVocabulary || [];
       const taskType = reportMeta?.challengeType || (
         status?.isMonthlyReflectionDay ? "monthly_reflection"
+        : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
         : (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
         : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
         : status?.isMonthlyGoalsDay ? "monthly_goals"
@@ -335,6 +336,7 @@ async function processJob(job) {
       ]);
       challengeType = challengeType || (
         status?.isMonthlyReflectionDay ? "monthly_reflection"
+        : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
         : (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
         : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
         : status?.isMonthlyGoalsDay ? "monthly_goals"
@@ -346,6 +348,7 @@ async function processJob(job) {
         isMonthlyGoals:      challengeType === "monthly_goals",
         isStorySummary:      challengeType === "story_summary",
         isPictureDescription: challengeType === "picture_description",
+        isShadowing:          challengeType === "shadowing_video",
       };
       const { fullScoreSeconds } = getDurationLimits(gateFlags, status || {});
       const todayVocab = status?.todayVocabulary || [];
@@ -359,25 +362,47 @@ async function processJob(job) {
         : gateFlags.isStorySummary
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
-      const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
-      const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+      const effectiveTotalWords = gateFlags.isShadowing ? 0 : (todayVocab.length > 0 ? todayVocab.length : configuredWordCount);
+      const effectiveRequiredWords = gateFlags.isShadowing ? 0 : Math.min(configuredRequiredCount, effectiveTotalWords);
 
       const { score, breakdown } = calculateCompositeScore({
         durationSeconds:    durationToSave || 0,
         maxDurationSeconds: fullScoreSeconds,
-        vocabularyUsed,
+        vocabularyUsed:     gateFlags.isShadowing ? [] : vocabularyUsed,
         totalVocabWords:    effectiveTotalWords,
         requiredVocabWords: effectiveRequiredWords,
         topicRelevance:     result.analysis?.topicRelevance ?? null,
         analysis:           result.analysis,
         isPictureDescription: gateFlags.isPictureDescription || false,
         isStorySummary:     gateFlags.isStorySummary || false,
+        isShadowing:        gateFlags.isShadowing || false,
+        targetVideoDuration: status?.todayVideoDuration || 60,
         userHistory:        userDoc?.feedbackScores || [],
       });
       compositeScore = score;
       // Attach breakdown + maxes to analysis so the report UI can show it
       result.analysis._compositeScore = score;
-      result.analysis._scoreBreakdown = breakdown.isPictureDescription ? {
+      result.analysis._scoreBreakdown = breakdown.isShadowing ? {
+        ...breakdown,
+        length: breakdown.duration ?? 0,
+        maxLength: 40,
+        maxDuration: 40,
+        comm: breakdown.communication ?? 0,
+        maxComm: 60,
+        maxCommunication: 60,
+        growth: 0,
+        maxGrowth: 0,
+        vocabulary: 0,
+        maxVocabulary: 0,
+        durationMatchPercent: breakdown.durationRatio ?? Math.round(((durationToSave || 0) / (status?.todayVideoDuration || 60)) * 100),
+        durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
+        targetDuration: status?.todayVideoDuration || 60,
+        userDuration: durationToSave || 0,
+        spokenDurationSeconds: breakdown.spokenDurationSeconds ?? null,
+        speechRatio: breakdown.speechRatio ?? null,
+        durationMessage: breakdown.durationMessage ?? null,
+        isShadowing: true,
+      } : breakdown.isPictureDescription ? {
         ...breakdown,
         // Picture Description category weights for UI (Option B)
         maxCommunication: 20,
@@ -403,6 +428,7 @@ async function processJob(job) {
       isMonthlyGoals:      challengeType === "monthly_goals",
       isStorySummary:      challengeType === "story_summary",
       isPictureDescription: challengeType === "picture_description",
+      isShadowing:          challengeType === "shadowing_video",
     };
 
     await VideoReport.findByIdAndUpdate(reportId, {
@@ -413,7 +439,8 @@ async function processJob(job) {
         vocabularyScore,
         compositeScore: result.analysis._compositeScore ?? null,
         scoreBreakdown: result.analysis._scoreBreakdown ?? null,
-        challengeType: gateFlags.isMonthlyReflection ? "monthly_reflection"
+        challengeType: gateFlags.isShadowing ? "shadowing_video"
+          : gateFlags.isMonthlyReflection ? "monthly_reflection"
           : gateFlags.isPictureDescription ? "picture_description"
           : gateFlags.isStorySummary ? "story_summary"
           : gateFlags.isMonthlyGoals ? "monthly_goals"

@@ -341,15 +341,27 @@ export function calculateCompositeScore({
     const targetDur = Math.max(20, Math.min(180, Number(targetVideoDuration) || Number(maxDurationSeconds) || 60));
     const actualDur = Math.max(0, Number(durationSeconds) || 0);
 
+    // Exact amount of time the student actually spoke on this video
+    // Spoken Seconds = Video Duration * (Speech Ratio / 100)
+    const spokenSeconds = typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0
+      ? Math.round((actualDur * (rawSpeechRatio / 100)) * 10) / 10
+      : actualDur;
+
+    // Expected active speech duration in reference audio (~50% to 70% of target video length)
+    const expectedSpokenSeconds = Math.max(12, Math.round(targetDur * 0.50));
+
     // 1. Duration / Effort Match (Max 40 points)
     // Rule:
-    // - Ratio = actualDur / targetDur
-    // - If Ratio >= 0.90 (90%+): Full duration credit (40 pts).
-    // - If Ratio < 0.90: Proportional effort score: (actualDur / (targetDur * 0.90)) * 40.
+    // - Video Ratio = actualDur / targetDur
+    // - Spoken Ratio = spokenSeconds / expectedSpokenSeconds
+    // - If Video Ratio >= 0.90 (90%+) and spoken time meets genuine shadowing threshold: Full 40 pts.
+    // - If Video Ratio < 0.90: Proportional effort score: (actualDur / (targetDur * 0.90)) * 40.
     const durationRatio = targetDur > 0 ? actualDur / targetDur : 1.0;
-    const durationScore = durationRatio >= 0.90
+    const spokenRatio = expectedSpokenSeconds > 0 ? spokenSeconds / expectedSpokenSeconds : 1.0;
+    const isNinetyPercent = durationRatio >= 0.90 && spokenRatio >= 0.65;
+    const durationScore = isNinetyPercent
       ? 40
-      : Math.max(0, Math.min(40, (durationRatio / 0.90) * 40));
+      : Math.max(0, Math.min(40, (durationRatio / 0.90) * 40 * Math.min(1.0, Math.max(0.65, spokenRatio / 0.65))));
 
     // 2. Speech continuity multiplier (student must actually be speaking, not just silent recording)
     // In shadowing, students speak in natural phrases and pause with the native speaker.
@@ -412,7 +424,6 @@ export function calculateCompositeScore({
     let total100 = Math.round((durationScore + communicationScore) * 100) / 100;
     total100 = Math.min(100, Math.max(0, total100));
 
-    const isNinetyPercent = durationRatio >= 0.90;
     const matchPercent = Math.round(durationRatio * 100);
 
     return {
@@ -432,11 +443,13 @@ export function calculateCompositeScore({
         maxGrowth:        0,
         targetDurationSeconds: targetDur,
         actualDurationSeconds: Math.round(actualDur),
-        durationRatio:    matchPercent,
-        isNinetyPercentMatch: isNinetyPercent,
+        spokenDurationSeconds: Math.round(spokenSeconds),
+        speechRatio:           typeof rawSpeechRatio === "number" ? Math.round(rawSpeechRatio) : null,
+        durationRatio:         matchPercent,
+        isNinetyPercentMatch:  isNinetyPercent,
         durationMessage: isNinetyPercent
-          ? `Full duration credit awarded (${matchPercent}% match of ${targetDur}s video — >=90% target achieved).`
-          : `Effort credit awarded (${matchPercent}% match of ${targetDur}s video — aim for 90%+ for maximum duration points).`,
+          ? `Full duration credit awarded (${matchPercent}% video match with ${Math.round(spokenSeconds)}s active speech).`
+          : `Effort credit awarded (${matchPercent}% video match with ${Math.round(spokenSeconds)}s active speech).`,
         speechMultiplier: Math.round(speechMult * 100),
         growthDelta:      null,
         baselineComm:     null,

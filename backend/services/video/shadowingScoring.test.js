@@ -101,6 +101,7 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     // Full 40 duration match (111 / 85 = 131% >= 90%)
     expect(breakdown.duration).toBe(40);
     expect(breakdown.isNinetyPercentMatch).toBe(true);
+    expect(breakdown.spokenDurationSeconds).toBe(52); // 111s * 47% = ~52s active speech
 
     // Delivery must be rewarded with a fair score (>= 40 out of 60, not 14.4)
     expect(breakdown.communication).toBeGreaterThanOrEqual(40);

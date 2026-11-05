@@ -1851,6 +1851,9 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
     targetDuration: status?.todayVideoDuration || 60,
     userDuration: report.videoDuration || 0,
+    spokenDurationSeconds: breakdown.spokenDurationSeconds ?? (typeof breakdown.speechRatio === "number" ? Math.round((report.videoDuration || 0) * (breakdown.speechRatio / 100)) : null),
+    speechRatio: breakdown.speechRatio ?? null,
+    durationMessage: breakdown.durationMessage ?? null,
     isShadowing: true,
   } : {
     ...breakdown,
