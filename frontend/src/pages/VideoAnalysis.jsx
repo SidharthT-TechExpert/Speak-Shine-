@@ -6836,13 +6836,27 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       )}
       <div style={{ background: "var(--bg-secondary)", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", gap: "1rem", fontSize: "0.95rem" }}>
         {s.duration && <span>⏱️ <strong>{s.duration}</strong></span>}
-        {s.wpm && <span>📊 <strong>{s.wpm} wpm</strong> {s.wpm < 100 ? "🐢 Slow" : s.wpm <= 150 ? "✅ Good" : "⚡ Fast"}</span>}
+        {s.wpm && (
+          <span>
+            📊 <strong>{s.wpm} wpm</strong>{" "}
+            {isShadowBd
+              ? (s.wpm < 50 ? "🐢 Slower Pace" : s.wpm <= 160 ? "✅ Natural Pace" : "⚡ Fast Pace")
+              : (s.wpm < 100 ? "🐢 Slow" : s.wpm <= 150 ? "✅ Good" : "⚡ Fast")}
+          </span>
+        )}
         {s.fillerTotal > 0 && <span>🗣️ Filler words: <strong>{Object.entries(s.fillerWords || {}).map(([w, c]) => `"${w}" ×${c}`).join(", ")}</strong></span>}
         {s.pauses > 0 && <span>🔇 Long pauses: <strong>{s.pauses}</strong></span>}
-        {s.rhythm?.speechRatio != null && <span>🎵 Speech ratio: <strong>{s.rhythm.speechRatio}%</strong> {s.rhythm.speechRatio >= 75 ? "✅ Good" : s.rhythm.speechRatio >= 55 ? "⚠️ Many pauses" : "❌ Too many silences"}</span>}
+        {s.rhythm?.speechRatio != null && (
+          <span>
+            🎵 Speech ratio: <strong>{s.rhythm.speechRatio}%</strong>{" "}
+            {isShadowBd
+              ? (s.rhythm.speechRatio >= 40 ? "✅ Natural Cadence" : s.rhythm.speechRatio >= 25 ? "⚠️ Pauses with audio" : "❌ Too many silences")
+              : (s.rhythm.speechRatio >= 75 ? "✅ Good" : s.rhythm.speechRatio >= 55 ? "⚠️ Many pauses" : "❌ Too many silences")}
+          </span>
+        )}
       </div>
-      {s.rhythm?.rushesAtStart && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Tends to rush at the start — slow down your opening.</p>}
-      {s.rhythm?.rushesAtEnd   && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Speeds up toward the end — maintain steady pace throughout.</p>}
+      {!isShadowBd && s.rhythm?.rushesAtStart && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Tends to rush at the start — slow down your opening.</p>}
+      {!isShadowBd && s.rhythm?.rushesAtEnd   && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>⚡ Speeds up toward the end — maintain steady pace throughout.</p>}
       {a.qualityWarning && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>🔈 {a.qualityWarning}</p>}
 
       <Section title="🗣️ Speech Scores">

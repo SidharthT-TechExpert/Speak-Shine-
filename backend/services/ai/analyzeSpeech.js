@@ -494,7 +494,9 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     else if (fillerTotal > 5) score -= 1;
     if (pauses.length > 5) score -= 1;
     else if (pauses.length === 0) score += 1;
-    if (wpm && (wpm < 80 || wpm > 180)) score -= 1;
+    if (challengeType !== "shadowing_video") {
+      if (wpm && (wpm < 80 || wpm > 180)) score -= 1;
+    }
     if (rhythm?.paceConsistency !== null && rhythm?.paceConsistency < 5) score -= 1;
     return Math.max(1, Math.min(10, score));
   })();
@@ -503,8 +505,10 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     let score = 7;
     if (fillerTotal > 8) score -= 1;
     if (pauses.length > 4) score -= 1;
-    if (wpm && wpm < 90) score -= 1; // very slow = hesitant
-    if (rhythm?.speechRatio !== null && rhythm.speechRatio < 55) score -= 1; // too much silence
+    if (challengeType !== "shadowing_video") {
+      if (wpm && wpm < 90) score -= 1; // very slow = hesitant
+      if (rhythm?.speechRatio !== null && rhythm.speechRatio < 55) score -= 1; // too much silence
+    }
     return Math.max(1, Math.min(10, score));
   })();
 

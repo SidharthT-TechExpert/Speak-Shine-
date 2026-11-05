@@ -352,34 +352,59 @@ export function calculateCompositeScore({
       : Math.max(0, Math.min(40, (durationRatio / 0.90) * 40));
 
     // 2. Speech continuity multiplier (student must actually be speaking, not just silent recording)
+    // In shadowing, students speak in natural phrases and pause with the native speaker.
+    // A speech ratio between 35% and 75% is healthy and expected.
     let speechMult = 1.0;
     if (typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0) {
       const r = rawSpeechRatio / 100;
-      speechMult = r >= 0.80 ? 1.0 : r <= 0 ? 0 : Math.min(1, r / 0.80);
+      if (r >= 0.35) {
+        speechMult = 1.0;
+      } else if (r >= 0.20) {
+        speechMult = 0.85 + ((r - 0.20) / (0.35 - 0.20)) * 0.15;
+      } else {
+        speechMult = Math.max(0.60, r / 0.20);
+      }
     } else if (typeof wpm === "number" && wpm > 0) {
-      speechMult = Math.min(1, wpm / 110);
+      speechMult = wpm >= 60 ? 1.0 : Math.max(0.75, wpm / 60);
+    }
+
+    // If duration match is >= 90%, student actively followed along for the full duration
+    if (durationRatio >= 0.90) {
+      speechMult = Math.max(0.85, speechMult);
     }
 
     const get = (field) => (typeof analysis[field] === "number" && !Number.isNaN(analysis[field]) ? analysis[field] : null);
-    const fluency    = get("fluency") ?? 5;
-    const grammar    = get("grammar") ?? 5;
-    const confidence = get("confidence") ?? 5;
+    const fluency    = get("fluency") ?? 6.5;
+    const grammar    = get("grammar") ?? 7.0;
+    const confidence = get("confidence") ?? 6.5;
 
     const minutes = Math.max(actualDur / 60, 1 / 60);
     const pausesPerMinute = pauseCount / minutes;
-    const pauseScore = pausesPerMinute <= 2 ? 10 : pausesPerMinute <= 4 ? 8 : pausesPerMinute <= 7 ? 6 : 4;
-    const paceScore = typeof wpm !== "number" || wpm <= 0
-      ? 5
-      : wpm >= 90 && wpm <= 165 ? 10
-      : wpm >= 70 && wpm <= 190 ? 8
-      : 5;
-    const rhythmPace = typeof paceConsistency === "number" ? paceConsistency : fluency;
+    const pauseScore = pausesPerMinute <= 2 ? 10 : pausesPerMinute <= 4 ? 8.5 : pausesPerMinute <= 7 ? 7 : 5.5;
+
+    // In shadowing, if duration was matched >= 90%, pace was locked to the reference video
+    const paceScore = durationRatio >= 0.90
+      ? (typeof wpm === "number" && wpm >= 60 ? 10 : 9)
+      : typeof wpm !== "number" || wpm <= 0
+        ? 6
+        : wpm >= 80 && wpm <= 165 ? 10
+        : wpm >= 60 && wpm <= 190 ? 8
+        : 6;
+
+    const rhythmPace = typeof paceConsistency === "number" && paceConsistency > 0 ? paceConsistency : (durationRatio >= 0.90 ? 7.5 : fluency);
 
     // Delivery, Rhythm & Fluency: Max 60 points
     // 30 pts for Rhythm, Cadence, & Flow + 30 pts for Delivery, Intonation & Clarity
-    const rhythmComponent = ((rhythmPace * 0.4 + pauseScore * 0.3 + paceScore * 0.3) / 10) * 30 * speechMult;
-    const deliveryComponent = ((fluency * 0.4 + confidence * 0.3 + grammar * 0.3) / 10) * 30 * speechMult;
-    const communicationScore = rhythmComponent + deliveryComponent;
+    let rhythmComponent = ((rhythmPace * 0.4 + pauseScore * 0.3 + paceScore * 0.3) / 10) * 30 * speechMult;
+    let deliveryComponent = ((fluency * 0.4 + confidence * 0.3 + grammar * 0.3) / 10) * 30 * speechMult;
+
+    // Fair baseline delivery floor for dedicated attempts:
+    // If student matched >= 90% duration, ensure delivery score rewards their sustained practice
+    if (durationRatio >= 0.90) {
+      rhythmComponent = Math.max(18.0, rhythmComponent);
+      deliveryComponent = Math.max(18.0, deliveryComponent);
+    }
+    const communicationScore = Math.min(60, Math.round((rhythmComponent + deliveryComponent) * 100) / 100);
 
     // 3. Personal Growth: 0 points (Waived for shadowing activity)
     const growthScore = 0;

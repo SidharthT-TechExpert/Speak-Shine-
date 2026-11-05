@@ -80,4 +80,30 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     expect(breakdown.growth).toBe(0);
     expect(breakdown.vocabulary).toBe(0);
   });
+
+  it("does not severely penalize natural shadowing pauses or realistic speech ratio (e.g. 47% speech ratio, 111s duration)", () => {
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: 111,
+      targetVideoDuration: 85,
+      isShadowing: true,
+      analysis: {
+        fluency: 6.5,
+        confidence: 6.5,
+        grammar: 7.0,
+        stats: {
+          wpm: 65,
+          pauses: 2,
+          rhythm: { speechRatio: 47, paceConsistency: 7.5 },
+        },
+      },
+    });
+
+    // Full 40 duration match (111 / 85 = 131% >= 90%)
+    expect(breakdown.duration).toBe(40);
+    expect(breakdown.isNinetyPercentMatch).toBe(true);
+
+    // Delivery must be rewarded with a fair score (>= 40 out of 60, not 14.4)
+    expect(breakdown.communication).toBeGreaterThanOrEqual(40);
+    expect(score).toBeGreaterThanOrEqual(80);
+  });
 });
