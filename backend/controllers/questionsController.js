@@ -420,8 +420,9 @@ export async function generatePictureNow(req, res) {
  */
 export async function generateShadowingNow(req, res) {
   try {
+    const { targetDuration, topic, difficulty } = req.body || {};
     const { generateShadowingChallenge } = await import("../services/ai/shadowingVideoGenerator.js");
-    const challenge = await generateShadowingChallenge();
+    const challenge = await generateShadowingChallenge({ targetDuration, topic, difficulty });
     res.json({ success: true, ...challenge });
   } catch (error) {
     console.error("[Questions] Shadowing generation error:", error.message);

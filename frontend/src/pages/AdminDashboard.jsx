@@ -8792,7 +8792,10 @@ function ManualQuestionsPanel() {
   const handleGenerateShadowing = async () => {
     setGeneratingShadowing(true);
     try {
-      const res = await api.post("/questions/generate-shadowing-video");
+      const res = await api.post("/questions/generate-shadowing-video", {
+        targetDuration: settings.durationShadowingFull || 75,
+        topic: form.topic?.trim() || undefined,
+      });
       const { title, topic, instructions, videoUrl, videoDuration, videoTranscript } = res.data;
       setForm(f => ({
         ...f,

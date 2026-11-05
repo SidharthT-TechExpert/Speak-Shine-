@@ -152,7 +152,7 @@ async function generateGoogleTtsBuffer(text) {
 /**
  * Convert text to an MP3 Buffer using ElevenLabs TTS (with Google TTS fallback).
  */
-async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSettings = null) {
+export async function textToMp3Buffer(text, voiceId = DEFAULT_VOICE_ID, customVoiceSettings = null) {
   let lastError = null;
 
   // Format text for natural human speech (breathing pauses, full words)
