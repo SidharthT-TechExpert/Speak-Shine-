@@ -512,96 +512,140 @@ export default function VideoAnalysis() {
     };
   }, [picturePreviewOpen]);
 
-  useEffect(() => {
-    if (isGuest) {
-      // Show sample question for guests from preview API
-      api.get("/guest/preview").then(r => {
-        const t = r.data?.today;
-        if (t?.question) {
-          setTodayQuestion({ question: t.question, topic: t.topic, category: t.category, audioUrl: t.audioUrl, contentType: t.contentType, imageUrl: t.imageUrl, imageSource: t.imageSource, imagePageUrl: t.imagePageUrl, imagePhotographer: t.imagePhotographer, imagePhotographerUrl: t.imagePhotographerUrl, imageInstructions: t.imageInstructions });
-          setIsQuestionActive(true);
-        }
-        if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
-        if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
-        if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
-        if (t?.vocabLevel) setVocabLevel(t.vocabLevel);
-        if (t?.durationLimits) setDurationLimits(t.durationLimits);
-        if (t?.durationSettings) setDurationSettings(t.durationSettings);
-      }).catch(() => {}).finally(() => {
-        setIsLoadingQuestion(false);
-      });
-      return;
-    }
-    loadMyReports();
-    // Fetch today's question for the top card
-    api.get("/dashboard/me?_duration_refresh=" + Date.now()).then(r => {
-      const t = r.data?.today;
-      const active = Boolean(
-        t?.isMonthlyReflection ||
-        t?.isWeeklyReflection ||
-        t?.isMonthlyGoals ||
-        (t?.questionSent && (t?.question || t?.topic))
-      );
-      setIsQuestionActive(active);
+  const applyTodayData = useCallback((t, profile = null, myStreakEntry = null) => {
+    if (!t) return;
+    const detectedTaskType = detectQuestionType(t || {});
+    const isShadowingDetected = detectedTaskType === "shadowing_video" || t?.contentType === "shadowing_video" || Boolean(t?.isShadowing);
+    const active = Boolean(
+      t?.isMonthlyReflection ||
+      t?.isWeeklyReflection ||
+      t?.isMonthlyGoals ||
+      isShadowingDetected ||
+      (t?.questionSent && (t?.question || t?.topic)) ||
+      (t?.question && (t?.audioUrl || t?.videoUrl || t?.contentType))
+    );
+    setIsQuestionActive(active);
+
+    if (profile) {
       const isSub = Boolean(
-        r.data?.profile?.completed ||
-        r.data?.profile?.completedToday ||
+        profile?.completed ||
+        profile?.completedToday ||
         t?.isSubmitted ||
         t?.submitted
       );
       setIsTodaySubmitted(isSub);
-      const userStreak = (r.data?.profile?.streak !== undefined && r.data?.profile?.streak !== null)
-        ? r.data.profile.streak
-        : (r.data?.myStreakEntry?.streak !== undefined && r.data?.myStreakEntry?.streak !== null)
-        ? r.data.myStreakEntry.streak
+      const userStreak = (profile?.streak !== undefined && profile?.streak !== null)
+        ? profile.streak
+        : (myStreakEntry?.streak !== undefined && myStreakEntry?.streak !== null)
+        ? myStreakEntry.streak
         : (user?.streak ?? 0);
       setStreak(userStreak);
-      if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
-      if (t?.question && active) {
-        setTodayQuestion({
-          question: t.question,
-          topic: t.topic,
-          category: t.category,
-          audioUrl: t.audioUrl,
-          contentType: t.contentType,
-          imageUrl: t.imageUrl,
-          imageSource: t.imageSource,
-          imagePageUrl: t.imagePageUrl,
-          imagePhotographer: t.imagePhotographer,
-          imagePhotographerUrl: t.imagePhotographerUrl,
-          imageInstructions: t.imageInstructions,
-          videoUrl: t.videoUrl,
-          videoDuration: t.videoDuration,
-          videoTranscript: t.videoTranscript,
-          videoTitle: t.videoTitle,
-          durationSettings: t.durationSettings,
-          isWeeklyReflection: t.isWeeklyReflection,
-          isShadowing: detectQuestionType(t || {}) === "shadowing_video"
-        });
-      } else {
-        setTodayQuestion(null);
+    } else if (t?.isSubmitted || t?.submitted) {
+      setIsTodaySubmitted(true);
+    }
+
+    if (t?.posterSendTime) setPosterSendTime(t.posterSendTime);
+    if (t?.question && active) {
+      setTodayQuestion({
+        question: t.question,
+        topic: t.topic,
+        category: t.category,
+        audioUrl: t.audioUrl,
+        contentType: t.contentType,
+        imageUrl: t.imageUrl,
+        imageSource: t.imageSource,
+        imagePageUrl: t.imagePageUrl,
+        imagePhotographer: t.imagePhotographer,
+        imagePhotographerUrl: t.imagePhotographerUrl,
+        imageInstructions: t.imageInstructions,
+        videoUrl: t.videoUrl,
+        videoDuration: t.videoDuration,
+        videoTranscript: t.videoTranscript,
+        videoTitle: t.videoTitle,
+        durationSettings: t.durationSettings,
+        isWeeklyReflection: t.isWeeklyReflection,
+        isShadowing: isShadowingDetected
+      });
+    } else {
+      setTodayQuestion(null);
+    }
+
+    setIsMonthlyReflection(detectedTaskType === "monthly_reflection" || Boolean(t?.isMonthlyReflection));
+    setIsWeeklyReflection(Boolean(t?.isWeeklyReflection));
+    setIsMonthlyGoals(detectedTaskType === "monthly_goals" || Boolean(t?.isMonthlyGoals));
+    setIsStorySummary(detectedTaskType === "story_audio");
+    setIsPictureDescription(detectedTaskType === "picture_description");
+    setIsShadowing(isShadowingDetected);
+    if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
+    if (t?.vocabWordCount !== undefined) setVocabWordCount(t.vocabWordCount);
+    if (t?.vocabRequiredCount !== undefined) setVocabRequiredCount(t.vocabRequiredCount);
+    if (t?.vocabLevel) setVocabLevel(t.vocabLevel);
+    if (t?.allowPrivateVideos !== undefined) setAllowPrivateVideos(t.allowPrivateVideos);
+    if (t?.enableBackgroundBlur !== undefined) setEnableBackgroundBlur(t.enableBackgroundBlur);
+    if (t?.durationLimits) setDurationLimits(t.durationLimits);
+    if (t?.durationSettings) setDurationSettings(t.durationSettings);
+  }, [user]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadQuestionData = async () => {
+      setIsLoadingQuestion(true);
+      if (isGuest) {
+        try {
+          const res = await api.get("/dashboard/today-question");
+          if (!isCancelled && res.data?.question) {
+            applyTodayData(res.data);
+            setIsLoadingQuestion(false);
+            return;
+          }
+        } catch {
+          // Fallback to guest preview mock
+        }
+        try {
+          const res = await api.get("/guest/preview");
+          if (!isCancelled && res.data?.today) {
+            applyTodayData(res.data.today, res.data.profile);
+          }
+        } catch {
+          if (!isCancelled) setIsQuestionActive(false);
+        } finally {
+          if (!isCancelled) setIsLoadingQuestion(false);
+        }
+        return;
       }
-      const detectedTaskType = detectQuestionType(t || {});
-      setIsMonthlyReflection(detectedTaskType === "monthly_reflection" || Boolean(t?.isMonthlyReflection));
-      setIsWeeklyReflection(Boolean(t?.isWeeklyReflection));
-      setIsMonthlyGoals(detectedTaskType === "monthly_goals" || Boolean(t?.isMonthlyGoals));
-      setIsStorySummary(detectedTaskType === "story_audio");
-      setIsPictureDescription(detectedTaskType === "picture_description");
-      setIsShadowing(detectedTaskType === "shadowing_video");
-      if (Array.isArray(t?.vocabulary) && t.vocabulary.length > 0) setTodayVocabulary(t.vocabulary);
-      if (t?.vocabWordCount) setVocabWordCount(t.vocabWordCount);
-      if (t?.vocabRequiredCount) setVocabRequiredCount(t.vocabRequiredCount);
-      if (t?.vocabLevel) setVocabLevel(t.vocabLevel);
-      if (r.data?.today?.allowPrivateVideos !== undefined) setAllowPrivateVideos(r.data.today.allowPrivateVideos);
-      if (r.data?.today?.enableBackgroundBlur !== undefined) setEnableBackgroundBlur(r.data.today.enableBackgroundBlur);
-      if (t?.durationLimits) setDurationLimits(t.durationLimits);
-      if (t?.durationSettings) setDurationSettings(t.durationSettings);
-    }).catch(() => {
-      setIsQuestionActive(false);
-    }).finally(() => {
-      setIsLoadingQuestion(false);
-    });
-  }, [isGuest]);
+
+      loadMyReports();
+      try {
+        const r = await api.get("/dashboard/me?_duration_refresh=" + Date.now());
+        if (!isCancelled && r.data?.today) {
+          applyTodayData(r.data.today, r.data.profile, r.data.myStreakEntry);
+          setIsLoadingQuestion(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("[VideoAnalysis] /dashboard/me failed, falling back to /dashboard/today-question", err);
+      }
+
+      // Fallback: fetch today-question directly
+      try {
+        const r = await api.get("/dashboard/today-question");
+        if (!isCancelled && r.data?.question) {
+          applyTodayData(r.data);
+          setIsLoadingQuestion(false);
+          return;
+        }
+        if (!isCancelled) setIsQuestionActive(false);
+      } catch {
+        if (!isCancelled) setIsQuestionActive(false);
+      } finally {
+        if (!isCancelled) setIsLoadingQuestion(false);
+      }
+    };
+
+    loadQuestionData();
+    return () => { isCancelled = true; };
+  }, [isGuest, applyTodayData]);
 
   // Auto-refresh reports table when there are processing reports
   useEffect(() => {
@@ -5051,7 +5095,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                     <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.72rem" }}>
-                      ⏱️ Match: {Math.min(100, Math.round((seconds / Math.max(1, question?.videoDuration || 60)) * 100))}%
+                      ⏱️ Match: {Math.min(100, Math.round((elapsed / Math.max(1, question?.videoDuration || 60)) * 100))}%
                     </span>
                     <button
                       type="button"
@@ -5091,7 +5135,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                     const phrases = fullText.split(/(?<=[.!?])\s+/).map(p => p.trim()).filter(Boolean);
                     if (!phrases.length) return fullText;
                     const refDur = question?.videoDuration || 60;
-                    const progress = Math.min(1, Math.max(0, seconds / refDur));
+                    const progress = Math.min(1, Math.max(0, elapsed / refDur));
                     const curIdx = Math.min(Math.floor(progress * phrases.length), phrases.length - 1);
                     return phrases[curIdx];
                   })()}

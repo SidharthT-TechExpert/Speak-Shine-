@@ -38,6 +38,14 @@ export async function getTodayQuestionOnly(req, res) {
       videoDuration: today.videoDuration || null,
       videoTranscript: today.videoTranscript || null,
       videoTitle: today.videoTitle || null,
+      vocabulary: today.vocabulary || [],
+      vocabWordCount: today.vocabWordCount ?? 0,
+      vocabRequiredCount: today.vocabRequiredCount ?? 0,
+      vocabLevel: today.vocabLevel || 'B2',
+      durationLimits: today.durationLimits || null,
+      durationSettings: today.durationSettings || null,
+      allowPrivateVideos: today.allowPrivateVideos ?? true,
+      enableBackgroundBlur: today.enableBackgroundBlur ?? false,
     });
   } catch (error) {
     console.error("[Dashboard] Get today question error:", error.message);
