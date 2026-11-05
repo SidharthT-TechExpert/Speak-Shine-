@@ -136,9 +136,9 @@ export function getCleanAudioUrl(url) {
  */
 export function detectQuestionType(today = {}) {
   // 1. Explicit contentType takes absolute precedence
+  if (today.contentType === "shadowing_video" || today.isShadowing || String(today.category || "").toLowerCase().includes("shadowing")) return "shadowing_video";
   if (today.contentType === "story_audio") return "story_audio";
   if (today.contentType === "picture_description") return "picture_description";
-  if (today.contentType === "shadowing_video") return "shadowing_video";
   if (today.contentType === "monthly_reflection") return "monthly_reflection";
   if (today.contentType === "monthly_goals") return "monthly_goals";
 

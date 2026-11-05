@@ -33,6 +33,11 @@ export async function getTodayQuestionOnly(req, res) {
       audioUrl: today.audioUrl || null,
       imageUrl: today.imageUrl || null,
       contentType: today.contentType || "question",
+      isShadowing: today.isShadowing ?? false,
+      videoUrl: today.videoUrl || null,
+      videoDuration: today.videoDuration || null,
+      videoTranscript: today.videoTranscript || null,
+      videoTitle: today.videoTitle || null,
     });
   } catch (error) {
     console.error("[Dashboard] Get today question error:", error.message);

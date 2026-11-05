@@ -5173,7 +5173,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 }} />
               </div>
             </div>
-          )}
 
           {/* Controls below video */}
           <div style={{

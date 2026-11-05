@@ -21,7 +21,7 @@ const activeStoryTask = (status) => status?.todayContentType === "story_audio"
 const activePictureTask = (status) => status?.todayContentType === "picture_description"
   || (!status?.todayContentType && Boolean(status?.isPictureDescriptionDay));
 const activeShadowingTask = (status) => status?.todayContentType === "shadowing_video"
-  || (!status?.todayContentType && Boolean(status?.isShadowingDay));
+  || (!status?.todayContentType && (Boolean(status?.isShadowingDay) || String(status?.todayCategory || "").toLowerCase().includes("shadowing")));
 
 export function resolvePlayableAudioUrl(rawUrl, statusId = null) {
   if (!rawUrl) return "/shadowing/fluency-mindset.mp3";
