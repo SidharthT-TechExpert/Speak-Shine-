@@ -125,5 +125,6 @@ router.delete("/comment/:reportId/:commentId",     authMiddleware, videoControll
 
 // ── Vocabulary Pronunciation Audio ──────────────────────────────────────────
 router.get("/tts", videoController.getTtsAudio);
+router.get("/proxy", videoController.streamVideoProxy);
 
 export default router;

@@ -22,6 +22,11 @@ export async function getRandomQuestion(category) {
   const skip = Math.floor(Math.random() * count);
   const question = await Question.findOne(filter).skip(skip).lean();
   
+  if (question?.videoUrl) {
+    const { resolvePlayableVideoUrl } = await import("../dashboard/dashboardService.js");
+    question.videoUrl = resolvePlayableVideoUrl(question.videoUrl);
+  }
+
   return question;
 }
 
@@ -38,6 +43,10 @@ export async function listQuestions(category, limit = 50, page = 1) {
     .lean();
   
   const total = await Question.countDocuments(filter);
+  const { resolvePlayableVideoUrl } = await import("../dashboard/dashboardService.js");
+  for (const q of questions) {
+    if (q.videoUrl) q.videoUrl = resolvePlayableVideoUrl(q.videoUrl);
+  }
   
   return {
     questions,
@@ -204,6 +213,11 @@ export async function listManualQuestions(setupType, upcomingOnly = false) {
   const questions = await Question.find(filter)
     .sort({ scheduledFor: 1 })
     .lean();
+
+  const { resolvePlayableVideoUrl } = await import("../dashboard/dashboardService.js");
+  for (const q of questions) {
+    if (q.videoUrl) q.videoUrl = resolvePlayableVideoUrl(q.videoUrl);
+  }
 
   return questions;
 }

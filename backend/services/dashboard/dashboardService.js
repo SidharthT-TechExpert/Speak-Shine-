@@ -23,6 +23,26 @@ const activePictureTask = (status) => status?.todayContentType === "picture_desc
 const activeShadowingTask = (status) => status?.todayContentType === "shadowing_video"
   || Boolean(status?.isShadowingDay);
 
+export function resolvePlayableVideoUrl(rawUrl, statusId = null) {
+  if (!rawUrl) return null;
+  let fixedUrl = rawUrl;
+  if (rawUrl.includes("commondatastorage.googleapis.com") || rawUrl.includes("gtv-videos-bucket")) {
+    if (rawUrl.includes("ForBiggerBlazes")) fixedUrl = "https://videos.pexels.com/video-files/3209828/3209828-hd_1920_1080_25fps.mp4";
+    else if (rawUrl.includes("ForBiggerEscapes")) fixedUrl = "https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4";
+    else if (rawUrl.includes("ForBiggerFun")) fixedUrl = "https://videos.pexels.com/video-files/3191572/3191572-hd_1920_1080_25fps.mp4";
+    else if (rawUrl.includes("ForBiggerJoyBlazes")) fixedUrl = "https://videos.pexels.com/video-files/3196061/3196061-hd_1920_1080_25fps.mp4";
+    else if (rawUrl.includes("WeAreGoingOnBullrun")) fixedUrl = "https://videos.pexels.com/video-files/3205626/3205626-hd_1920_1080_25fps.mp4";
+    else fixedUrl = "https://videos.pexels.com/video-files/856973/856973-hd_1920_1080_25fps.mp4";
+
+    if (statusId) {
+      import("../../../models/statusSchema.js").then(({ default: Status }) => {
+        Status.updateOne({ _id: statusId }, { todayVideoUrl: fixedUrl }).catch(() => {});
+      }).catch(() => {});
+    }
+  }
+  return fixedUrl;
+}
+
 /**
  * Get poster image - use bot's stored PNG if available, else generate SVG fallback
  */
@@ -92,7 +112,7 @@ export async function getTodayOverview() {
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
       isShadowing: isQuestionSentToday && activeShadowingTask(status),
-      videoUrl: isQuestionSentToday ? (status?.todayVideoUrl || null) : null,
+      videoUrl: isQuestionSentToday ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
       videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
       videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
       videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
@@ -432,7 +452,7 @@ export async function getUserProfile(phone) {
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
       isShadowing: isQuestionSentToday && activeShadowingTask(status),
-      videoUrl: isQuestionSentToday ? (status?.todayVideoUrl || null) : null,
+      videoUrl: isQuestionSentToday ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
       videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
       videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
       videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,

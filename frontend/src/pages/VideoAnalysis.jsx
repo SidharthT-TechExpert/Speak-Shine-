@@ -219,6 +219,8 @@ export default function VideoAnalysis() {
   const [isStorySummary, setIsStorySummary] = useState(false);
   const [isPictureDescription, setIsPictureDescription] = useState(false);
   const [isShadowing, setIsShadowing] = useState(false);
+  const [shadowVideoSrcOverride, setShadowVideoSrcOverride] = useState("");
+  const [shadowingVideoFailed, setShadowingVideoFailed] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
   const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
   const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
@@ -1059,12 +1061,56 @@ export default function VideoAnalysis() {
                       background: "#000",
                     }}>
                       <video
-                        src={todayQuestion.videoUrl}
+                        src={shadowVideoSrcOverride || todayQuestion.videoUrl}
                         controls
                         playsInline
+                        crossOrigin="anonymous"
+                        onError={() => {
+                          if (!shadowVideoSrcOverride && todayQuestion?.videoUrl) {
+                            console.warn("[VideoAnalysis] Direct video stream failed, switching to /api/video/proxy...");
+                            setShadowVideoSrcOverride(`/api/video/proxy?url=${encodeURIComponent(todayQuestion.videoUrl)}`);
+                          } else {
+                            setShadowingVideoFailed(true);
+                          }
+                        }}
                         style={{ width: "100%", maxHeight: 320, display: "block" }}
                       />
                     </div>
+                    {shadowingVideoFailed && (
+                      <div style={{
+                        padding: "0.6rem 0.85rem",
+                        background: "rgba(239,68,68,0.12)",
+                        border: "1px solid rgba(239,68,68,0.35)",
+                        borderRadius: 8,
+                        marginTop: "0.5rem",
+                        fontSize: "0.78rem",
+                        color: "#fca5a5",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between"
+                      }}>
+                        <span>⚠️ Direct video stream was blocked by host/browser.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShadowingVideoFailed(false);
+                            setShadowVideoSrcOverride(`/api/video/proxy?url=${encodeURIComponent(todayQuestion.videoUrl)}&t=${Date.now()}`);
+                          }}
+                          style={{
+                            background: "#ef4444",
+                            color: "#fff",
+                            border: "none",
+                            padding: "0.25rem 0.65rem",
+                            borderRadius: 4,
+                            cursor: "pointer",
+                            fontWeight: 700,
+                            fontSize: "0.74rem"
+                          }}
+                        >
+                          ⚡ Retry via Proxy
+                        </button>
+                      </div>
+                    )}
                     {todayQuestion.videoTranscript && (
                       <details style={{ marginTop: "0.6rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "0.5rem 0.85rem" }}>
                         <summary style={{ cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: "#f472b6" }}>
@@ -4940,6 +4986,13 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                     ref={shadowingRefVideo}
                     src={question.videoUrl}
                     playsInline
+                    crossOrigin="anonymous"
+                    onError={() => {
+                      if (question?.videoUrl && !question.videoUrl.startsWith("/api/video/proxy")) {
+                        const proxySrc = `/api/video/proxy?url=${encodeURIComponent(question.videoUrl)}`;
+                        if (shadowingRefVideo.current) shadowingRefVideo.current.src = proxySrc;
+                      }
+                    }}
                     style={{
                       width: "100%",
                       height: "100%",

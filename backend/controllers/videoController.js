@@ -738,3 +738,50 @@ export async function getTtsAudio(req, res) {
     if (!res.headersSent) res.status(500).send("Internal server error");
   }
 }
+
+/**
+ * GET /api/video/proxy
+ * Streams external video (e.g. Pexels, R2, CDN) with Range headers & CORS headers so videos can play anywhere.
+ */
+export async function streamVideoProxy(req, res) {
+  try {
+    let targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send("Missing url query param");
+
+    // Auto-rewrite deprecated 403 google sample URLs to live 1080p Pexels clips
+    if (targetUrl.includes("commondatastorage.googleapis.com") || targetUrl.includes("gtv-videos-bucket")) {
+      targetUrl = "https://videos.pexels.com/video-files/856973/856973-hd_1920_1080_25fps.mp4";
+    }
+
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+    if (req.headers.range) {
+      headers.range = req.headers.range;
+    }
+
+    const fetchRes = await fetch(targetUrl, { headers });
+    res.status(fetchRes.status);
+
+    for (const [k, v] of fetchRes.headers.entries()) {
+      const lower = k.toLowerCase();
+      if (["content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"].includes(lower)) {
+        res.setHeader(k, v);
+      }
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Range");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+
+    if (fetchRes.body) {
+      const { Readable } = await import("stream");
+      Readable.fromWeb(fetchRes.body).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (err) {
+    console.error("[VideoProxy] Stream error:", err.message);
+    if (!res.headersSent) res.status(502).send("Failed to stream video");
+  }
+}
