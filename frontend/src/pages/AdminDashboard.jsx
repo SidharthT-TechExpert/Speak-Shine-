@@ -7098,11 +7098,19 @@ export default function AdminDashboard() {
               <form onSubmit={e => saveSettings(e, "vocab")}>
                 
                 {/* Vocabulary Word Count Targets Grid */}
+                <div style={{ marginBottom: "0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--text)" }}>
+                    🎯 Target Vocabulary Words Required in Student Speech:
+                  </span>
+                  <span style={{ fontSize: "0.75rem", background: "rgba(99,102,241,0.12)", color: "#818cf8", padding: "0.2rem 0.55rem", borderRadius: 6, fontWeight: 600 }}>
+                    💡 Challenge topics are managed in Manual Questions &amp; Question Bank
+                  </span>
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
                   {[
-                    { key: "Normal", label: "🗣️ Normal Daily Topics", words: "vocabNormalWordCount", required: "vocabNormalRequiredCount" },
-                    { key: "Story", label: "📖 Story Summary Day", words: "vocabStoryWordCount", required: "vocabStoryRequiredCount" },
-                    { key: "Picture", label: "🖼️ Picture Description Day", words: "vocabPictureWordCount", required: "vocabPictureRequiredCount" },
+                    { key: "Normal", label: "🗣️ Normal Daily Practice", words: "vocabNormalWordCount", required: "vocabNormalRequiredCount" },
+                    { key: "Story", label: "📖 Story Summary Task", words: "vocabStoryWordCount", required: "vocabStoryRequiredCount" },
+                    { key: "Picture", label: "🖼️ Picture Description Task", words: "vocabPictureWordCount", required: "vocabPictureRequiredCount" },
                   ].map(({ key, label, words, required }) => (
                     <div key={key} style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-secondary)" }}>
                       <div style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.6rem" }}>{label}</div>
@@ -7130,18 +7138,18 @@ export default function AdminDashboard() {
                         <span>🎬 Shadowing Activity Day</span>
                         <span style={{ fontSize: "0.68rem", background: "rgba(52,211,153,0.15)", color: "#34d399", padding: "1px 6px", borderRadius: 8, fontWeight: 700 }}>Waived</span>
                       </div>
-                      <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem" }}>
-                        No vocabulary words required or penalized. Scored on rhythm, fluency, and duration matching.
+                      <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem", lineHeight: 1.4 }}>
+                        <strong>Vocabulary Scoring Waived:</strong> Students mimic the video speech directly. No vocab targets are scored. <em>(Admin can set, edit, or customize any Topic in Question Bank).</em>
                       </p>
                     </div>
                     <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", opacity: 0.9 }}>
                       <div style={{ flex: 1, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 8, padding: "0.35rem" }}>
-                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Shown</span>
-                        <strong style={{ fontSize: "0.88rem", color: "#34d399" }}>0 (Waived)</strong>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Words Shown</span>
+                        <strong style={{ fontSize: "0.85rem", color: "#34d399" }}>0 (Waived)</strong>
                       </div>
                       <div style={{ flex: 1, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 8, padding: "0.35rem" }}>
-                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Required</span>
-                        <strong style={{ fontSize: "0.88rem", color: "#34d399" }}>0 (Waived)</strong>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Words Required</span>
+                        <strong style={{ fontSize: "0.85rem", color: "#34d399" }}>0 (Waived)</strong>
                       </div>
                     </div>
                   </div>
@@ -8815,6 +8823,82 @@ function ManualQuestionsPanel() {
     }
   };
 
+  const [burningSubtitles, setBurningSubtitles] = useState(false);
+
+  const handleBurnSubtitles = async () => {
+    if (!form.videoUrl || !form.videoTranscript) {
+      notify("Please provide both a Video URL and Transcript first", "error");
+      return;
+    }
+    setBurningSubtitles(true);
+    try {
+      const res = await api.post("/questions/burn-shadowing-subtitles", {
+        videoUrl: form.videoUrl,
+        transcript: form.videoTranscript,
+        duration: form.videoDuration || 75
+      });
+      if (res.data.videoUrl) {
+        setForm(f => ({ ...f, videoUrl: res.data.videoUrl, videoDuration: res.data.duration || f.videoDuration }));
+        notify("🔥 Teleprompter subtitles burned directly onto video successfully!");
+      }
+    } catch (err) {
+      notify(err.response?.data?.error || "Failed to burn subtitles onto video", "error");
+    } finally {
+      setBurningSubtitles(false);
+    }
+  };
+
+  const CURATED_SHADOWING_LESSONS = [
+    {
+      title: "Mastering Confident English Introductions",
+      topic: "Public Speaking & First Impressions",
+      videoDuration: 72,
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+      videoTranscript: "Confidence is not something you are born with; it is an active habit you build every single day. When you introduce yourself in English, stand tall, make warm eye contact, and speak with a steady, relaxed breath. You don't need complex vocabulary or rapid speech to make a powerful first impression. Clear pronunciation, a friendly smile, and genuine enthusiasm will speak louder than flawless grammar. Focus on connecting with your listener, one clear phrase at a time.",
+      instructions: "Listen to the speaker and shadow along at the exact same rhythm and speed. Focus on breath control, pauses, and confident intonation."
+    },
+    {
+      title: "The Art of Active Listening & Executive Presence",
+      topic: "Effective Communication & Presence",
+      videoDuration: 78,
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+      videoTranscript: "Great conversationalists are rarely the loudest voices in the room. They are the ones who listen attentively and respond with purpose. In English conversations, active listening means nodding, summarizing key points, and asking thoughtful follow-up questions. When you shadow this exercise, observe how natural pauses allow you to process thoughts before speaking. Speaking well begins with listening deeply and pacing your delivery with calm authority.",
+      instructions: "Shadow each phrase out loud without stopping. Match the speaker's natural pauses and emphasize key thought groups."
+    },
+    {
+      title: "Overcoming Hesitation & Fear of Making Mistakes",
+      topic: "Fluency & Mindset",
+      videoDuration: 84,
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+      videoTranscript: "Every language learner experiences that brief moment of hesitation right before speaking. Your mind searches for the perfect word, and fear whispers that you might make a mistake. The secret is simple: give yourself permission to speak imperfectly. Fluency begins when you value expressing your ideas over seeking mechanical perfection. Keep your vocal flow continuous, embrace small errors as stepping stones, and trust your practice.",
+      instructions: "Speak along with the video with zero hesitation. Keep your vocal flow continuous and smooth throughout."
+    },
+    {
+      title: "How Great Speakers Use Intentional Pauses",
+      topic: "Vocal Pacing & Public Speaking",
+      videoDuration: 68,
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
+      videoTranscript: "Novice speakers rush because they fear silence, but master speakers know that silence is where true authority lives. When you deliver an important idea, pause for two beats. Give your audience space to absorb your meaning. Breathing between sentences lowers your heart rate and steadies your pitch. Practice this rhythm: speak a complete thought, pause calmly, and begin the next phrase with clear intention.",
+      instructions: "Shadow each thought group. Notice how each sentence finishes with a relaxed, measured pause."
+    },
+    {
+      title: "The Compounding Power of Daily Speaking Habits",
+      topic: "Personal Growth & Consistency",
+      videoDuration: 75,
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
+      videoTranscript: "Small consistent daily habits always beat sporadic bursts of extreme effort. Spending five focused minutes shadowing English speech every day rewires your speech muscles and builds effortless muscle memory. You do not need hours of study each night; all you need is relentless consistency. Celebrate every small win, remain curious, and trust the compounding power of daily progress.",
+      instructions: "Shadow each phrase as you hear it. Mimic the speaker's vocal energy, rhythm, and cadence."
+    },
+    {
+      title: "Turning Nervous Energy into Charismatic Presence",
+      topic: "Stage Presence & Communication",
+      videoDuration: 80,
+      videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4",
+      videoTranscript: "Stage fright and excitement produce the exact same physiological reaction: rapid heartbeat and heightened adrenaline. The only difference is your mental label. Instead of telling yourself you are nervous, tell yourself you are energized to share a message. Ground your feet into the floor, release tension in your shoulders, and channel that surge of energy into vocal warmth and conviction.",
+      instructions: "Mimic the speaker's grounded energy and vocal projection. Project each syllable with clarity."
+    }
+  ];
+
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -9589,12 +9673,53 @@ function ManualQuestionsPanel() {
                     onClick={handleGenerateShadowing}
                     style={{ width: "100%", marginBottom: "0.5rem", background: "linear-gradient(135deg,#ec4899,#8b5cf6)" }}
                   >
-                    {generatingShadowing ? "🎬 Generating Shadowing Video Challenge…" : "🎬 AI Generate Shadowing Video Challenge"}
+                    {generatingShadowing ? "🎬 Generating 1080p Shadowing Challenge with Subtitles…" : "🎬 AI Generate 1080p Shadowing Video (with Subtitles)"}
                   </button>
                   <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
-                    Generates speech topic, picks/muxes reference video & audio (≤3 min), and extracts script automatically.
+                    Generates inspiring speech, fetches 1080p Full HD video, aligns speech audio, and burns teleprompter subtitles.
                   </div>
                 </div>
+
+                {/* Curated 1080p Real-Speaker Speech Library Dropdown */}
+                <div style={{ marginBottom: "0.85rem", padding: "0.85rem", borderRadius: 10, background: "rgba(236,72,153,0.06)", border: "1px solid rgba(236,72,153,0.25)" }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#f472b6", marginBottom: "0.4rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>🏛️ Pick from Curated 1080p Real-Speaker Library</span>
+                    <span style={{ fontSize: "0.68rem", background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "0.1rem 0.4rem", borderRadius: 4, fontWeight: 700 }}>100% Free • Real Lip-Sync</span>
+                  </div>
+                  <select
+                    className="form-input"
+                    style={{ fontSize: "0.82rem" }}
+                    onChange={e => {
+                      const idx = parseInt(e.target.value, 10);
+                      if (!isNaN(idx) && CURATED_SHADOWING_LESSONS[idx]) {
+                        const item = CURATED_SHADOWING_LESSONS[idx];
+                        setForm(f => ({
+                          ...f,
+                          videoTitle: item.title,
+                          topic: item.topic,
+                          question: item.instructions,
+                          videoUrl: item.videoUrl,
+                          videoDuration: item.videoDuration,
+                          videoTranscript: item.videoTranscript,
+                          category: "Shadowing Practice"
+                        }));
+                        notify(`Loaded curated lesson: "${item.title}"`);
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select a curated TED-style public speaking lesson...</option>
+                    {CURATED_SHADOWING_LESSONS.map((item, idx) => (
+                      <option key={idx} value={idx}>
+                        {item.title} ({item.videoDuration}s) — {item.topic}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: "0.71rem", color: "var(--muted)", marginTop: "0.35rem" }}>
+                    Instant, zero-latency 1080p speech clips with real human lip-sync and aligned scripts. (You can customize topics and text anytime).
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: "0.75rem" }}>
                   <label className="form-label">Video Title / Topic *</label>
                   <input
@@ -9643,7 +9768,7 @@ function ManualQuestionsPanel() {
                     ⭐ Student scoring: ≥90% duration match = 35/35 pts. Below 90% receives effort-proportional score.
                   </div>
                 </div>
-                <div style={{ marginBottom: "1rem" }}>
+                <div style={{ marginBottom: "0.85rem" }}>
                   <label className="form-label">Video Transcript / Spoken Script <span style={{ color: "var(--muted)", fontWeight: 400 }}>(subtitles for student to shadow)</span></label>
                   <textarea
                     className="form-input"
@@ -9653,6 +9778,37 @@ function ManualQuestionsPanel() {
                     onChange={e => setForm(f => ({ ...f, videoTranscript: e.target.value }))}
                   />
                 </div>
+
+                {/* Subtitle Burn Button */}
+                {form.videoUrl && form.videoTranscript && (
+                  <div style={{ marginBottom: "1rem" }}>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      disabled={burningSubtitles}
+                      onClick={handleBurnSubtitles}
+                      style={{
+                        width: "100%",
+                        border: "1px solid rgba(236,72,153,0.5)",
+                        color: "#f472b6",
+                        background: "rgba(236,72,153,0.08)",
+                        fontWeight: 700,
+                        padding: "0.6rem 1rem",
+                        borderRadius: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.5rem",
+                        cursor: burningSubtitles ? "not-allowed" : "pointer"
+                      }}
+                    >
+                      {burningSubtitles ? "🔥 Burning Teleprompter Subtitles into Video…" : "🔥 Burn Teleprompter Subtitles into Video"}
+                    </button>
+                    <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center", marginTop: "0.3rem" }}>
+                      Engraves high-contrast, semi-transparent black-box captions on the lower third for easy reading while shadowing.
+                    </div>
+                  </div>
+                )}
               </>
             )}
             <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>

@@ -429,3 +429,21 @@ export async function generateShadowingNow(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
+/**
+ * POST /api/questions/burn-shadowing-subtitles - Burn subtitles onto a shadowing video
+ */
+export async function burnShadowingSubtitlesController(req, res) {
+  try {
+    const { videoUrl, transcript, duration } = req.body || {};
+    if (!videoUrl || !transcript) {
+      return res.status(400).json({ error: "videoUrl and transcript are required" });
+    }
+    const { burnSubtitlesOntoVideo } = await import("../services/ai/shadowingVideoGenerator.js");
+    const result = await burnSubtitlesOntoVideo(videoUrl, transcript, duration);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("[Questions] Subtitle burn error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}

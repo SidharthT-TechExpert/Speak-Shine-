@@ -492,6 +492,11 @@ export async function getQuestionTemplates() {
       "Describe what you see in the image. Mention the people, setting, and actions. Share what you think might be happening.",
       "Look at the image carefully. Describe the scene in detail, then explain what you think is happening and how it makes you feel.",
       "Describe the image from foreground to background. What stands out most? What story does this picture tell?"
+    ],
+    shadowing_video: [
+      "Watch the speaker carefully and shadow every word out loud with identical pacing, emotion, and pauses.",
+      "Listen and mimic the speaker's vocal projection, intonation, and rhythm in real time without stopping.",
+      "Shadow this executive communication speech. Match the speaker's breathing cadence and emphasis on key words."
     ]
   };
 
