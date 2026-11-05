@@ -1538,9 +1538,7 @@ export async function getUserReports(authId) {
   // Find the auth record by ID (JWT contains auth._id as 'id')
   const auth = await Auth.findById(authId);
   if (!auth) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
+    return { reports: [] };
   }
   
   // Find the user by phone to get the actual User._id
@@ -1548,9 +1546,7 @@ export async function getUserReports(authId) {
   const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
   
   if (!user) {
-    const error = new Error("User not found");
-    error.statusCode = 404;
-    throw error;
+    return { reports: [] };
   }
 
   const reports = await VideoReport.find({

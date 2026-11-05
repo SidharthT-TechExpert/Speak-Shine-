@@ -1184,7 +1184,7 @@ export default function VideoAnalysis() {
                       {/* Time & Speed */}
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
                         <span style={{ fontSize: "0.78rem", color: "#e2e8f0", fontFamily: "monospace", fontWeight: 600 }}>
-                          {formatTime(currentTime)} / {formatTime(duration)}
+                          {fmtTime(currentTime)} / {fmtTime(duration)}
                         </span>
                         <div style={{ display: "flex", gap: "2px", background: "rgba(0,0,0,0.35)", padding: "2px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
                           {[0.8, 1.0, 1.2].map((spd) => (
