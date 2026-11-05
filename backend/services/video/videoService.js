@@ -1076,7 +1076,26 @@ async function prepareReportAnalysis(report) {
       targetVideoDuration: status?.todayVideoDuration || 60,
       userHistory,
     });
-    analysis = { ...source, compositeScore: score, scoreBreakdown: breakdown };
+    const shadowBreakdown = {
+      ...breakdown,
+      duration: breakdown.duration ?? 0,
+      length: breakdown.duration ?? 0,
+      maxLength: 35,
+      maxDuration: 35,
+      comm: breakdown.communication ?? 0,
+      maxComm: 50,
+      maxCommunication: 50,
+      growth: breakdown.growth ?? 0,
+      maxGrowth: 15,
+      vocabulary: 0,
+      maxVocabulary: 0,
+      durationMatchPercent: breakdown.durationRatio ?? Math.round(((report.videoDuration || 0) / (status?.todayVideoDuration || 60)) * 100),
+      durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
+      targetDuration: status?.todayVideoDuration || 60,
+      userDuration: report.videoDuration || 0,
+      isShadowing: true,
+    };
+    analysis = { ...source, compositeScore: score, scoreBreakdown: shadowBreakdown };
   }
 
   if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription)) {
@@ -1819,6 +1838,24 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     maxVocabulary: 10,
     maxDuration: 20,
     maxGrowth: 15,
+  } : isShadow ? {
+    ...breakdown,
+    duration: breakdown.duration ?? 0,
+    length: breakdown.duration ?? 0,
+    maxLength: 35,
+    maxDuration: 35,
+    comm: breakdown.communication ?? 0,
+    maxComm: 50,
+    maxCommunication: 50,
+    growth: breakdown.growth ?? 0,
+    maxGrowth: 15,
+    vocabulary: 0,
+    maxVocabulary: 0,
+    durationMatchPercent: breakdown.durationRatio ?? Math.round(((report.videoDuration || 0) / (status?.todayVideoDuration || 60)) * 100),
+    durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
+    targetDuration: status?.todayVideoDuration || 60,
+    userDuration: report.videoDuration || 0,
+    isShadowing: true,
   } : {
     ...breakdown,
     maxLength: 30,
