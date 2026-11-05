@@ -116,6 +116,22 @@ export function getCleanVideoUrl(url) {
 }
 
 /**
+ * Clean & resolve shadowing speech audio URL
+ */
+export function getCleanAudioUrl(url) {
+  if (!url) return "/shadowing/fluency-mindset.mp3";
+  const s = String(url);
+  if (s.includes("3191572") || s.includes("ForBiggerFun") || s.includes("fluency-mindset")) return "/shadowing/fluency-mindset.mp3";
+  if (s.includes("3195394") || s.includes("ForBiggerEscapes") || s.includes("active-listening")) return "/shadowing/active-listening.mp3";
+  if (s.includes("3209828") || s.includes("ForBiggerBlazes") || s.includes("stage-presence")) return "/shadowing/stage-presence.mp3";
+  if (s.includes("3196061") || s.includes("ForBiggerJoyBlazes") || s.includes("intentional-pauses")) return "/shadowing/intentional-pauses.mp3";
+  if (s.includes("3205626") || s.includes("WeAreGoingOnBullrun") || s.includes("speaking-habits")) return "/shadowing/speaking-habits.mp3";
+  if (s.includes("856973") || s.includes("charismatic-presence")) return "/shadowing/charismatic-presence.mp3";
+  if (s.endsWith(".mp4")) return s.replace(/\.mp4$/, ".mp3");
+  return url;
+}
+
+/**
  * Detect question type from today object / status
  */
 export function detectQuestionType(today = {}) {
@@ -211,24 +227,25 @@ export function getQuestionUIConfig(type, today = {}) {
         vocabLevel: "None",
         cefrInfo: null,
         badgeLabel: today.category || "Shadowing Practice",
-        badgeSubtext: "Video Mimicry & Simultaneous Speech",
-        promptLabel: "🎬 Shadowing Activity Task",
-        promptSubtitle: "Play the reference video and speak simultaneously. Mirror the rhythm, speed, and pronunciation.",
+        badgeSubtext: "Speech Mimicry & Simultaneous Voice Practice",
+        promptLabel: "🎙️ Shadowing Speech Mission",
+        promptSubtitle: "Listen to the audio through earphones and speak simultaneously. Mirror the rhythm, speed, and pronunciation.",
         recordButtonLabel: "Start Shadowing & Record",
-        uploadButtonLabel: "Upload Shadowing Video",
+        uploadButtonLabel: "Upload Shadowing Recording",
         rules: [
-          { text: "Play the reference video and speak simultaneously to shadow the speaker", highlight: true },
+          { text: "Listen through earphones and speak at the same time to shadow the speaker", highlight: true },
           { text: `Duration matching: ≥90% duration match awards full 35 duration points (max ${limits.maxLabel})` },
           { text: "Vocabulary requirement is waived — scored on duration, rhythm, fluency, and expression" },
         ],
-        hasAudio: false,
+        hasAudio: true,
+        audioUrl: getCleanAudioUrl(today.audioUrl || today.videoUrl),
         hasImage: false,
-        hasVideo: Boolean(today.videoUrl),
-        videoUrl: getCleanVideoUrl(today.videoUrl),
+        hasVideo: false,
+        videoUrl: null,
         videoDuration: today.videoDuration || 60,
-        videoTranscript: today.videoTranscript || "",
-        videoTitle: today.videoTitle || "",
-        tip: "Shadowing Tip: Speak at the exact same time as the video speaker to train muscle memory and pacing.",
+        videoTranscript: today.videoTranscript || today.question || "",
+        videoTitle: today.videoTitle || today.topic || "",
+        tip: "Shadowing Tip: Keep earphones on. Speak aloud at the exact same moment as the speaker to build natural muscle memory.",
       };
 
     case "picture_description":

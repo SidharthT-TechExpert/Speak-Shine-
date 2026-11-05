@@ -23,6 +23,33 @@ const activePictureTask = (status) => status?.todayContentType === "picture_desc
 const activeShadowingTask = (status) => status?.todayContentType === "shadowing_video"
   || (!status?.todayContentType && Boolean(status?.isShadowingDay));
 
+export function resolvePlayableAudioUrl(rawUrl, statusId = null) {
+  if (!rawUrl) return "/shadowing/fluency-mindset.mp3";
+  let fixedUrl = rawUrl;
+  if (rawUrl.includes("3191572") || rawUrl.includes("ForBiggerFun") || rawUrl.includes("fluency-mindset")) {
+    fixedUrl = "/shadowing/fluency-mindset.mp3";
+  } else if (rawUrl.includes("3195394") || rawUrl.includes("ForBiggerEscapes") || rawUrl.includes("active-listening")) {
+    fixedUrl = "/shadowing/active-listening.mp3";
+  } else if (rawUrl.includes("3209828") || rawUrl.includes("ForBiggerBlazes") || rawUrl.includes("stage-presence")) {
+    fixedUrl = "/shadowing/stage-presence.mp3";
+  } else if (rawUrl.includes("3196061") || rawUrl.includes("ForBiggerJoyBlazes") || rawUrl.includes("intentional-pauses")) {
+    fixedUrl = "/shadowing/intentional-pauses.mp3";
+  } else if (rawUrl.includes("3205626") || rawUrl.includes("WeAreGoingOnBullrun") || rawUrl.includes("speaking-habits")) {
+    fixedUrl = "/shadowing/speaking-habits.mp3";
+  } else if (rawUrl.includes("856973") || rawUrl.includes("charismatic-presence")) {
+    fixedUrl = "/shadowing/charismatic-presence.mp3";
+  } else if (rawUrl.endsWith(".mp4")) {
+    fixedUrl = rawUrl.replace(/\.mp4$/, ".mp3");
+  }
+
+  if (fixedUrl !== rawUrl && statusId) {
+    import("../../models/statusSchema.js").then(({ default: Status }) => {
+      Status.updateOne({ _id: statusId }, { todayAudioUrl: fixedUrl }).catch(() => {});
+    }).catch(() => {});
+  }
+  return fixedUrl;
+}
+
 export function resolvePlayableVideoUrl(rawUrl, statusId = null) {
   if (!rawUrl) return null;
   let fixedUrl = rawUrl;
@@ -117,7 +144,11 @@ export async function getTodayOverview() {
       question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
       category: isQuestionSentToday ? (status?.todayCategory || null) : null,
       contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
-      audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
+      audioUrl: isQuestionSentToday
+        ? (activeShadowingTask(status)
+            ? resolvePlayableAudioUrl(status?.todayAudioUrl || status?.todayVideoUrl, status?._id)
+            : (status?.todayAudioUrl || null))
+        : null,
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
       isShadowing: isQuestionSentToday && activeShadowingTask(status),
@@ -454,7 +485,11 @@ export async function getUserProfile(phone) {
       question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
       category: isQuestionSentToday ? (status?.todayCategory || null) : null,
       contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
-      audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
+      audioUrl: isQuestionSentToday
+        ? (activeShadowingTask(status)
+            ? resolvePlayableAudioUrl(status?.todayAudioUrl || status?.todayVideoUrl, status?._id)
+            : (status?.todayAudioUrl || null))
+        : null,
       posterImage: isQuestionSentToday ? getPosterImage(status) : null,
       isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
       isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),

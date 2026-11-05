@@ -18,6 +18,7 @@ import MonthlyGraceCountdown from "../components/MonthlyGraceCountdown.jsx";
 import {
   detectQuestionType,
   getCleanVideoUrl,
+  getCleanAudioUrl,
   getQuestionUIConfig,
   parseQuestionItems,
   getCefrInfo,
@@ -273,7 +274,9 @@ export default function VideoAnalysis() {
     };
   }, [showSpeedMenu]);
 
-  const audioSrc = todayQuestion?.audioUrl || "";
+  const audioSrc = (todayQuestion?.contentType === "shadowing_video" || isShadowing)
+    ? getCleanAudioUrl(todayQuestion?.audioUrl || todayQuestion?.videoUrl)
+    : (todayQuestion?.audioUrl || "");
 
   // Speech synthesis fallback so audio ALWAYS works
   const playVoiceFallback = () => {
@@ -858,7 +861,7 @@ export default function VideoAnalysis() {
             topic: todayQuestion?.topic || (isMonthlyGoals ? "New Month New Goals" : isMonthlyReflection ? "End of Month Reflection" : qType === "shadowing_video" ? (todayQuestion?.videoTitle || "Shadowing Practice") : "Daily Speaking Mission"),
             question: todayQuestion?.question || (qType === "shadowing_video" ? "Play the reference video and speak simultaneously to practice rhythm and fluency." : ""),
             imageUrl: qType === "picture_description" ? todayQuestion?.imageUrl : null,
-            audioUrl: qType === "story_audio" ? todayQuestion?.audioUrl : null,
+            audioUrl: qType === "story_audio" ? todayQuestion?.audioUrl : (qType === "shadowing_video" ? getCleanAudioUrl(todayQuestion?.audioUrl || todayQuestion?.videoUrl) : null),
           };
 
           const effectiveLimits = durationLimits || getDurationLimits({
@@ -1045,84 +1048,179 @@ export default function VideoAnalysis() {
                   </div>
                 )}
 
-                {/* ── 2b. Specialized Mode: Shadowing Reference Video Preview ── */}
-                {qType === "shadowing_video" && todayQuestion?.videoUrl && (
+                {/* ── 2b. Specialized Mode: Interactive Audio Shadowing Suite ── */}
+                {qType === "shadowing_video" && (
                   <div style={{ marginBottom: "1.35rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: qConfig.theme.primary, textTransform: "uppercase" }}>
-                        🎬 REFERENCE SHADOWING VIDEO ({todayQuestion.videoDuration || 60}s)
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.55rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", color: "#f472b6", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        <span>🎙️</span> REFERENCE SHADOWING SPEECH ({duration || todayQuestion.videoDuration || 60}s)
                       </span>
-                      <span style={{ fontSize: "0.74rem", color: "#f472b6", fontWeight: 600 }}>
-                        ⭐ ≥90% duration match = Full 35 pts
+                      <span style={{ fontSize: "0.74rem", color: "#34d399", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                        <span>⭐</span> ≥90% duration match = Full 35 pts
                       </span>
                     </div>
+
+                    {/* Glowing Waveform Audio Bar */}
                     <div style={{
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      border: `1px solid ${qConfig.theme.border || "rgba(244,114,182,0.35)"}`,
-                      background: "#000",
+                      borderRadius: 14,
+                      padding: "0.9rem 1.25rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "1.1rem",
+                      background: "linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(168, 85, 247, 0.04))",
+                      border: "1px solid rgba(236, 72, 153, 0.35)",
+                      boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
                     }}>
-                      <video
-                        src={shadowVideoSrcOverride || getCleanVideoUrl(todayQuestion.videoUrl)}
-                        controls
-                        playsInline
-                        crossOrigin="anonymous"
-                        onError={() => {
-                          if (!shadowVideoSrcOverride && todayQuestion?.videoUrl) {
-                            console.warn("[VideoAnalysis] Direct video stream failed, switching to /api/video/proxy...");
-                            setShadowVideoSrcOverride(`/api/video/proxy?url=${encodeURIComponent(todayQuestion.videoUrl)}`);
-                          } else {
-                            setShadowingVideoFailed(true);
+                      <button
+                        type="button"
+                        onClick={togglePlay}
+                        title={isPlaying ? "Pause speech" : "Play speech"}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                          background: "linear-gradient(135deg, #ec4899, #a855f7)",
+                          color: "#fff",
+                          border: "none",
+                          boxShadow: isPlaying ? "0 0 20px rgba(236, 72, 153, 0.6)" : "0 4px 12px rgba(236, 72, 153, 0.3)",
+                          transition: "all 0.2s ease",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.06)"}
+                        onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                      >
+                        {isPlaying ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16" />
+                            <rect x="14" y="4" width="4" height="16" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Interactive Waveform Bars */}
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "36px", cursor: "pointer" }}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clickRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                          const targetTime = clickRatio * (duration || 60);
+                          if (audioRef.current && !isNaN(audioRef.current.duration)) {
+                            audioRef.current.currentTime = targetTime;
+                            setCurrentTime(targetTime);
                           }
                         }}
-                        style={{ width: "100%", maxHeight: 320, display: "block" }}
-                      />
-                    </div>
-                    {shadowingVideoFailed && (
-                      <div style={{
-                        padding: "0.6rem 0.85rem",
-                        background: "rgba(239,68,68,0.12)",
-                        border: "1px solid rgba(239,68,68,0.35)",
-                        borderRadius: 8,
-                        marginTop: "0.5rem",
-                        fontSize: "0.78rem",
-                        color: "#fca5a5",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between"
-                      }}>
-                        <span>⚠️ Direct video stream was blocked by host/browser.</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShadowingVideoFailed(false);
-                            setShadowVideoSrcOverride(`/api/video/proxy?url=${encodeURIComponent(todayQuestion.videoUrl)}&t=${Date.now()}`);
-                          }}
-                          style={{
-                            background: "#ef4444",
-                            color: "#fff",
-                            border: "none",
-                            padding: "0.25rem 0.65rem",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            fontWeight: 700,
-                            fontSize: "0.74rem"
-                          }}
-                        >
-                          ⚡ Retry via Proxy
-                        </button>
+                      >
+                        {WAVE_PATTERN.map((height, i) => {
+                          const isPassed = i <= activeWaveIndex;
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                flex: 1,
+                                minWidth: "3px",
+                                height: `${height}px`,
+                                borderRadius: "3px",
+                                background: isPassed ? "linear-gradient(180deg, #ec4899, #a855f7)" : "rgba(255,255,255,0.12)",
+                                boxShadow: (isPassed && isPlaying) ? "0 0 8px rgba(236,72,153,0.5)" : "none",
+                                transition: "all 0.15s ease",
+                              }}
+                            />
+                          );
+                        })}
                       </div>
-                    )}
-                    {todayQuestion.videoTranscript && (
-                      <details style={{ marginTop: "0.6rem", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "0.5rem 0.85rem" }}>
-                        <summary style={{ cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, color: "#f472b6" }}>
-                          📜 View Spoken Script / Subtitles
-                        </summary>
-                        <div style={{ marginTop: "0.5rem", fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.6, whiteSpace: "pre-line" }}>
-                          {todayQuestion.videoTranscript}
+
+                      {/* Time & Speed */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.78rem", color: "#e2e8f0", fontFamily: "monospace", fontWeight: 600 }}>
+                          {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                        <div style={{ display: "flex", gap: "2px", background: "rgba(0,0,0,0.35)", padding: "2px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                          {[0.8, 1.0, 1.2].map((spd) => (
+                            <button
+                              key={spd}
+                              type="button"
+                              onClick={() => changeSpeed(spd)}
+                              style={{
+                                background: playbackSpeed === spd ? "linear-gradient(135deg, #ec4899, #a855f7)" : "transparent",
+                                color: playbackSpeed === spd ? "#fff" : "#94a3b8",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "2px 6px",
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {spd}x
+                            </button>
+                          ))}
                         </div>
-                      </details>
-                    )}
+                      </div>
+                    </div>
+
+                    {/* Synced Karaōke Teleprompter */}
+                    {(todayQuestion.videoTranscript || todayQuestion.question) && (() => {
+                      const textToSplit = todayQuestion.videoTranscript || todayQuestion.question || "";
+                      const phrases = textToSplit
+                        .split(/(?<=[.!?])\s+/)
+                        .map(p => p.trim())
+                        .filter(Boolean);
+                      const progressRatio = duration > 0 ? (currentTime / duration) : 0;
+                      const activeIdx = Math.min(Math.floor(progressRatio * phrases.length), phrases.length - 1);
+
+                      return (
+                        <div style={{
+                          marginTop: "0.85rem",
+                          background: "rgba(13, 10, 24, 0.65)",
+                          border: "1px solid rgba(236, 72, 153, 0.25)",
+                          borderRadius: 14,
+                          padding: "1rem 1.15rem",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+                            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                              <span>📜</span> Spoken Script & Teleprompter
+                            </span>
+                            <span style={{ fontSize: "0.7rem", color: "#a855f7", fontWeight: 600 }}>
+                              🎧 Read & shadow simultaneously
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                            {phrases.map((phrase, idx) => {
+                              const isActive = idx === activeIdx && isPlaying;
+                              const isPast = idx < activeIdx;
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    padding: "0.45rem 0.75rem",
+                                    borderRadius: "8px",
+                                    fontSize: "0.86rem",
+                                    lineHeight: 1.5,
+                                    transition: "all 0.25s ease",
+                                    background: isActive ? "rgba(236, 72, 153, 0.16)" : "transparent",
+                                    border: isActive ? "1px solid rgba(244, 114, 182, 0.45)" : "1px solid transparent",
+                                    color: isActive ? "#ffffff" : isPast ? "#94a3b8" : "#cbd5e1",
+                                    fontWeight: isActive ? 700 : 400,
+                                    boxShadow: isActive ? "0 2px 12px rgba(236, 72, 153, 0.25)" : "none",
+                                  }}
+                                >
+                                  {isActive && <span style={{ marginRight: "0.4rem", color: "#f472b6" }}>▶</span>}
+                                  {phrase}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -4918,52 +5016,55 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       {/* ── RECORDING ── */}
       {step === "recording" && (
         <div>
-          {isShadowing && question?.videoUrl ? (
-            /* Dual-Screen View: Reference Video + Webcam */
-            <div style={{ marginBottom: "0.85rem" }}>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "0.85rem",
-                alignItems: "stretch",
-              }}>
-                {/* 1. Reference Video Player */}
-                <div style={{
-                  position: "relative",
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                  background: "#000",
-                  border: "2px solid rgba(236,72,153,0.5)",
-                  minHeight: "220px",
-                }}>
-                  <div style={{
-                    position: "absolute", top: "10px", left: "10px",
-                    background: "rgba(236,72,153,0.9)", color: "#fff",
-                    padding: "0.2rem 0.6rem", borderRadius: "99px",
-                    fontSize: "0.72rem", fontWeight: 700, zIndex: 3,
-                    display: "flex", alignItems: "center", gap: "0.3rem",
-                  }}>
-                    <span>🎬</span> Reference Video
-                  </div>
+          {/* Audio stream for in-ear shadowing playback */}
+          {isShadowing && (
+            <audio
+              ref={shadowingRefVideo}
+              src={getCleanAudioUrl(question?.audioUrl || question?.videoUrl)}
+              preload="auto"
+            />
+          )}
 
-                  <div style={{
-                    position: "absolute", top: "10px", right: "10px",
-                    display: "flex", gap: "0.4rem", zIndex: 3,
-                  }}>
+          {/* Unified Camera Recording View */}
+          <div style={{ position: "relative", marginBottom: "0.85rem" }}>
+            <video ref={liveVideoRef} autoPlay muted playsInline
+              onLoadedMetadata={syncPreviewAspect}
+              style={{
+                ...livePreviewStyle,
+                maxWidth: "100%",
+              }} />
+
+            {/* Floating Teleprompter banner for shadowing */}
+            {isShadowing && (
+              <div style={{
+                position: "absolute", top: "12px", left: "12px", right: "12px",
+                background: "rgba(13, 10, 24, 0.9)",
+                border: "1px solid rgba(236, 72, 153, 0.5)",
+                backdropFilter: "blur(10px)",
+                borderRadius: 12, padding: "0.65rem 0.95rem",
+                zIndex: 3, display: "flex", flexDirection: "column", gap: "0.35rem",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ color: "#f472b6", fontWeight: 800, fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>🎙️</span> Shadowing Prompter (In-Ear Audio)
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                    <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.72rem" }}>
+                      ⏱️ Match: {Math.min(100, Math.round((seconds / Math.max(1, question?.videoDuration || 60)) * 100))}%
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
                         const speeds = [0.8, 1, 1.2];
-                        const nextIdx = (speeds.indexOf(shadowPlaybackSpeed) + 1) % speeds.length;
-                        const nextSpeed = speeds[nextIdx];
+                        const nextSpeed = speeds[(speeds.indexOf(shadowPlaybackSpeed) + 1) % speeds.length];
                         setShadowPlaybackSpeed(nextSpeed);
                         if (shadowingRefVideo.current) shadowingRefVideo.current.playbackRate = nextSpeed;
                       }}
                       style={{
-                        background: "rgba(0,0,0,0.75)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)",
-                        padding: "0.15rem 0.5rem", borderRadius: 6, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
                       }}
-                      title="Playback speed"
                     >
                       ⚡ {shadowPlaybackSpeed}x
                     </button>
@@ -4975,115 +5076,28 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                         if (shadowingRefVideo.current) shadowingRefVideo.current.muted = nextMuted;
                       }}
                       style={{
-                        background: "rgba(0,0,0,0.75)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)",
-                        padding: "0.15rem 0.5rem", borderRadius: 6, fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
                       }}
-                      title="Mute / Unmute"
+                      title="Earphones Mute/Unmute"
                     >
                       {shadowVideoMuted ? "🔇" : "🔊"}
                     </button>
                   </div>
-
-                  <video
-                    ref={shadowingRefVideo}
-                    src={getCleanVideoUrl(question?.videoUrl)}
-                    playsInline
-                    crossOrigin="anonymous"
-                    onError={() => {
-                      if (question?.videoUrl && !question.videoUrl.startsWith("/api/video/proxy")) {
-                        const proxySrc = `/api/video/proxy?url=${encodeURIComponent(question.videoUrl)}`;
-                        if (shadowingRefVideo.current) shadowingRefVideo.current.src = proxySrc;
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      minHeight: "220px",
-                      objectFit: "contain",
-                      background: "#000",
-                      display: "block",
-                    }}
-                  />
                 </div>
-
-                {/* 2. Webcam Recording Stream */}
-                <div style={{
-                  position: "relative",
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                  background: "#000",
-                  border: "2px solid rgba(99,102,241,0.5)",
-                  minHeight: "220px",
-                }}>
-                  <video
-                    ref={liveVideoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    onLoadedMetadata={syncPreviewAspect}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      minHeight: "220px",
-                      objectFit: "contain",
-                      background: "#000",
-                      display: "block",
-                    }}
-                  />
-
-                  {/* REC badge */}
-                  <div style={{
-                    position: "absolute", top: "10px", left: "10px",
-                    background: isPaused ? "rgba(245,158,11,0.9)" : "rgba(248,113,113,0.9)",
-                    color: "#fff", padding: "0.2rem 0.6rem", borderRadius: "99px",
-                    fontSize: "0.72rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.3rem",
-                    zIndex: 2,
-                  }}>
-                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff", animation: isPaused ? "none" : "blink 1s infinite" }} />
-                    {isPaused ? "PAUSED" : "REC (YOU)"}
-                  </div>
-
-                  {backgroundBlur && blurStatus === "active" && (
-                    <div style={{
-                      position: "absolute", top: "10px", right: ncStatus === "active" ? "75px" : "10px",
-                      background: "rgba(139,92,246,0.85)", color: "#fff",
-                      padding: "0.15rem 0.45rem", borderRadius: "99px",
-                      fontSize: "0.65rem", fontWeight: 700, zIndex: 2,
-                    }}>🌫️ AI BLUR</div>
-                  )}
-
-                  {ncStatus === "active" && (
-                    <div style={{
-                      position: "absolute", top: "10px", right: "10px",
-                      background: "rgba(34,211,160,0.85)", color: "#fff",
-                      padding: "0.15rem 0.45rem", borderRadius: "99px",
-                      fontSize: "0.65rem", fontWeight: 700, zIndex: 2,
-                    }}>🎙️ AI NC</div>
-                  )}
-
-                  {isPaused && (
-                    <div style={{
-                      position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)",
-                      backdropFilter: "blur(4px)", display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", borderRadius: "12px",
-                      zIndex: 2, color: "#fff", gap: "0.4rem", padding: "1rem", textAlign: "center",
-                    }}>
-                      <span style={{ fontSize: "1.8rem" }}>⏸</span>
-                      <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#fbbf24" }}>Recording Paused</span>
-                    </div>
-                  )}
+                <div style={{ fontSize: "0.88rem", color: "#ffffff", fontWeight: 600, lineHeight: 1.45 }}>
+                  {(() => {
+                    const fullText = question?.videoTranscript || question?.question || "";
+                    const phrases = fullText.split(/(?<=[.!?])\s+/).map(p => p.trim()).filter(Boolean);
+                    if (!phrases.length) return fullText;
+                    const refDur = question?.videoDuration || 60;
+                    const progress = Math.min(1, Math.max(0, seconds / refDur));
+                    const curIdx = Math.min(Math.floor(progress * phrases.length), phrases.length - 1);
+                    return phrases[curIdx];
+                  })()}
                 </div>
               </div>
-            </div>
-          ) : (
-            /* Video — 9:16 on mobile, 16:9 on desktop */
-            <div style={{ position: "relative", marginBottom: "0.85rem" }}>
-              <video ref={liveVideoRef} autoPlay muted playsInline
-                onLoadedMetadata={syncPreviewAspect}
-                style={{
-                  ...livePreviewStyle,
-                  maxWidth: "100%",
-                }} />
+            )}
 
               {/* REC badge */}
               <div style={{
