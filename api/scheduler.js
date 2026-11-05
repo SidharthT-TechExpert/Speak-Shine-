@@ -219,7 +219,7 @@ export function startScheduler() {
       const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
       const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
 
-      const { publishDueManualStoryQuestion, publishDueManualPictureDescriptionQuestion } = await import("../backend/services/scheduler/questionSchedulerService.js");
+      const { publishDueManualStoryQuestion, publishDueManualPictureDescriptionQuestion, publishDueManualShadowingQuestion } = await import("../backend/services/scheduler/questionSchedulerService.js");
       const storyResult = await publishDueManualStoryQuestion();
       if (storyResult?.published) {
         console.log(`[Scheduler] Catch-up: story summary published: ${storyResult.topic}`);
@@ -227,6 +227,10 @@ export function startScheduler() {
       const pictureResult = await publishDueManualPictureDescriptionQuestion();
       if (pictureResult?.published) {
         console.log(`[Scheduler] Catch-up: picture description published: ${pictureResult.topic}`);
+      }
+      const shadowResult = await publishDueManualShadowingQuestion();
+      if (shadowResult?.published) {
+        console.log(`[Scheduler] Catch-up: shadowing video published: ${shadowResult.topic}`);
       }
 
       // ── Catch-up: publish question if posterSendTime passed ──────────────

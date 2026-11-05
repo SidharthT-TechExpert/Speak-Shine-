@@ -660,6 +660,11 @@ export async function setTodayQuestion(topic, question, category) {
       todaySummaryGuide: null,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       todayImageUrl: null,
       todayImageSource: null,
       todayImagePageUrl: null,
@@ -1426,6 +1431,11 @@ export async function enableMonthlyReflection() {
       isMonthlyGoalsDay: false,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       todayContentType: "question",
       todayAudioUrl: null,
       todayStoryTranscript: null,
@@ -1469,6 +1479,11 @@ export async function enableMonthlyGoals() {
       isMonthlyReflectionDay: false,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       todayContentType: "question",
       todayAudioUrl: null,
       todayStoryTranscript: null,
@@ -1514,6 +1529,20 @@ export async function enableStorySummaryDemo() {
 }
 
 /**
+ * Force shadowing challenge mode ON (admin only, for testing)
+ */
+export async function enableShadowingDemo() {
+  const { publishAutoShadowingVideo } = await import("../scheduler/questionSchedulerService.js");
+  const result = await publishAutoShadowingVideo();
+  if (!result.published) {
+    const error = new Error(result.error || "Failed to generate shadowing challenge");
+    error.statusCode = 500;
+    throw error;
+  }
+  return { success: true, message: `Shadowing challenge activated: "${result.topic}" — refresh the app to see it` };
+}
+
+/**
  * Turn off all special modes (admin only)
  */
 export async function disableSpecialModes() {
@@ -1523,6 +1552,11 @@ export async function disableSpecialModes() {
       isMonthlyGoalsDay: false,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       questionSentToday: false,
       todayTopic: null,
       todayQuestion: null,

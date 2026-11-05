@@ -32,6 +32,14 @@ describe("getDurationLimits", () => {
     expect(limits.maxSeconds).toBe(600);
     expect(limits.fullScoreSeconds).toBe(420);
   });
+
+  it("returns correct limits for shadowing activity", () => {
+    const limits = getDurationLimits({ isShadowing: true });
+    expect(limits.maxSeconds).toBe(180);
+    expect(limits.fullScoreSeconds).toBe(180);
+    expect(limits.minSeconds).toBe(20);
+    expect(limits.minLabel).toBe("20 sec");
+  });
 });
 
 describe("Scheduler Priority Hierarchy Simulation", () => {
@@ -42,8 +50,10 @@ describe("Scheduler Priority Hierarchy Simulation", () => {
     isLastDayOfMonth = false,
     hasDueManualStory = false,
     hasDueManualPicture = false,
+    hasDueManualShadowing = false,
     isStoryDay = false,
     isPictureDescriptionDay = false,
+    isShadowingDay = false,
     isFirstDayOfMonth = false,
     dayOfWeek = 0, // 0 = Sunday
   }) {
@@ -59,6 +69,10 @@ describe("Scheduler Priority Hierarchy Simulation", () => {
     if (hasDueManualPicture) {
       return "picture_description";
     }
+    // 3b. Due manual shadowing
+    if (hasDueManualShadowing) {
+      return "shadowing_video";
+    }
     // 4. Configured story day
     if (isStoryDay) {
       return "story_summary";
@@ -66,6 +80,10 @@ describe("Scheduler Priority Hierarchy Simulation", () => {
     // 5. Configured picture day
     if (isPictureDescriptionDay) {
       return "picture_description";
+    }
+    // 5b. Configured shadowing day (e.g. Tuesday / Friday)
+    if (isShadowingDay) {
+      return "shadowing_video";
     }
     // 6. 1st of month → Monthly Goals (lower priority than story/picture)
     if (isFirstDayOfMonth) {
@@ -130,10 +148,26 @@ describe("Scheduler Priority Hierarchy Simulation", () => {
     });
     expect(result).toBe("regular");
   });
+  it("prioritizes Due Manual Shadowing over auto Shadowing Day", () => {
+    const result = determineTaskType({
+      hasDueManualShadowing: true,
+      isShadowingDay: true,
+      dayOfWeek: 2, // Tuesday
+    });
+    expect(result).toBe("shadowing_video");
+  });
+
+  it("selects Shadowing Video on configured Shadowing Day (e.g. Tuesday or Friday)", () => {
+    const result = determineTaskType({
+      isShadowingDay: true,
+      dayOfWeek: 2, // Tuesday
+    });
+    expect(result).toBe("shadowing_video");
+  });
 });
 
 describe("Manual Question Edit Validation", () => {
-  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description"];
+  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"];
 
   it("validates setupType against allowed types", () => {
     expect(validTypes.includes("normal")).toBe(true);
@@ -142,6 +176,7 @@ describe("Manual Question Edit Validation", () => {
     expect(validTypes.includes("monthly_goals")).toBe(true);
     expect(validTypes.includes("story_summary")).toBe(true);
     expect(validTypes.includes("picture_description")).toBe(true);
+    expect(validTypes.includes("shadowing_video")).toBe(true);
     expect(validTypes.includes("weekly_reflection")).toBe(false);
   });
 
