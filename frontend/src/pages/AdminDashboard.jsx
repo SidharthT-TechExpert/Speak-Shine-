@@ -8803,6 +8803,8 @@ function ManualQuestionsPanel() {
       const res = await api.post("/questions/generate-shadowing-video", {
         targetDuration: settings.durationShadowingFull || 75,
         topic: form.topic?.trim() || undefined,
+      }, {
+        timeout: 120000 // 2 minutes timeout for audio download, whisper transcribing, and slicing
       });
       const { title, topic, instructions, videoUrl, audioUrl, videoDuration, videoTranscript } = res.data;
       const finalAudio = audioUrl || videoUrl || "";
@@ -8819,7 +8821,9 @@ function ManualQuestionsPanel() {
       }));
       notify("🎙️ Native podcast speech ingested & sliced! All fields populated.");
     } catch (err) {
-      notify(err.response?.data?.error || "Shadowing generation failed", "error");
+      console.error("[AdminDashboard] Shadowing generate error:", err);
+      const errMsg = err.response?.data?.error || (err.code === "ECONNABORTED" ? "Request timed out while downloading and processing podcast audio. Please try again." : err.message) || "Shadowing generation failed";
+      notify(errMsg, "error");
     } finally {
       setGeneratingShadowing(false);
     }

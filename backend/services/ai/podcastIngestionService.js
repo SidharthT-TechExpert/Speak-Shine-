@@ -13,24 +13,19 @@ import fetch from "node-fetch";
 // Top verified public native English communication & public speaking podcast RSS feeds
 export const PODCAST_FEEDS = [
   {
-    name: "Stanford Think Fast, Talk Smart",
-    category: "Effective Communication & Presence",
-    url: "https://feeds.simplecast.com/71jC94vR", // Official Stanford GSB podcast RSS
-  },
-  {
     name: "TED Talks Daily",
     category: "Stage Presence & Public Speaking",
     url: "https://feeds.feedburner.com/tedtalks_audio",
   },
   {
-    name: "NPR Life Kit (Communication & Mindset)",
-    category: "Everyday Fluency & Mindset",
-    url: "https://feeds.npr.org/510338/podcast.xml",
-  },
-  {
     name: "BBC 6 Minute English (Native Dialogue)",
     category: "Pronunciation & Rhythm",
     url: "https://podcasts.files.bbci.co.uk/p02pc9tn.rss",
+  },
+  {
+    name: "NPR Life Kit (Communication & Mindset)",
+    category: "Everyday Fluency & Mindset",
+    url: "https://feeds.npr.org/510338/podcast.xml",
   }
 ];
 
