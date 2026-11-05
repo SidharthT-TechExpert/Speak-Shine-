@@ -494,7 +494,9 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     else if (fillerTotal > 5) score -= 1;
     if (pauses.length > 5) score -= 1;
     else if (pauses.length === 0) score += 1;
-    if (wpm && (wpm < 80 || wpm > 180)) score -= 1;
+    if (challengeType !== "shadowing_video") {
+      if (wpm && (wpm < 80 || wpm > 180)) score -= 1;
+    }
     if (rhythm?.paceConsistency !== null && rhythm?.paceConsistency < 5) score -= 1;
     return Math.max(1, Math.min(10, score));
   })();
@@ -503,8 +505,10 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
     let score = 7;
     if (fillerTotal > 8) score -= 1;
     if (pauses.length > 4) score -= 1;
-    if (wpm && wpm < 90) score -= 1; // very slow = hesitant
-    if (rhythm?.speechRatio !== null && rhythm.speechRatio < 55) score -= 1; // too much silence
+    if (challengeType !== "shadowing_video") {
+      if (wpm && wpm < 90) score -= 1; // very slow = hesitant
+      if (rhythm?.speechRatio !== null && rhythm.speechRatio < 55) score -= 1; // too much silence
+    }
     return Math.max(1, Math.min(10, score));
   })();
 
@@ -550,6 +554,20 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
       2-3 = minimal relevance; barely refers to the story, mostly filler or unrelated commentary
       1 = does not attempt to summarize the story at all or completely off-topic
 - topicFeedback: 1-2 sentences explaining specifically which story plot points/characters the student summarized well and which key story events or details they missed or could have explained more clearly.`
+    : challengeType === "shadowing_video"
+    ? `- topicRelevance & isOffTopic: evaluate whether the speaker was engaged in shadowing/repeating the reference video dialogue or speech.
+    STRICT SECURITY CHECK: If the speaker is completely silent or reciting unrelated text:
+      → You MUST set isOffTopic: true
+      → You MUST set topicRelevance: 1 or 2
+      → topicFeedback: explain that the student did not follow along with the reference video.
+    If the speaker genuinely attempts to shadow the video:
+      10 = speech closely mirrors the words, intonation, and phrasing of the reference speech
+      8-9 = successfully shadowed the majority of phrases with natural rhythm
+      6-7 = shadowed parts of the passage with occasional pauses or lag behind the speaker
+      4-5 = fragmented shadowing, struggled to keep up with the audio
+      2-3 = very minimal shadowing attempt
+      1 = did not attempt to shadow
+- topicFeedback: 1-2 sentences on how closely the student shadowed the video phrases and paced their speech.`
     : challengeType === "picture_description"
     ? `- topicRelevance & isOffTopic: how thoroughly the speaker described the image and followed the task instructions.
     STRICT SECURITY CHECK: If the speaker does not describe the assigned picture (e.g. speaks about yesterday's question or an unrelated topic):
@@ -593,6 +611,13 @@ The student listened to an audio story and was asked to record a summary in thei
 • Fluency and confidence in recounting a story
 When writing suggestions, provide concrete storytelling/summary tips (e.g. "Include the resolution/moral of the story", "Use time transitions like 'meanwhile' and 'eventually'").
 When writing overallComment, mention their story comprehension and summarization ability alongside speaking fluency.\n`
+      : challengeType === "shadowing_video"
+      ? `\nCHALLENGE TYPE: Shadowing Activity (Speech Mimicry & Cadence Practice)
+The student watched a short video and practiced shadowing (speaking aloud concurrently with the speaker).
+CRITICAL RULES FOR SHADOWING EVALUATION:
+• DO NOT evaluate or deduct points for advanced vocabulary — this is an imitation/shadowing drill, not an essay.
+• Focus on: Rhythm, pronunciation imitation, cadence, fluid pacing, and speaking confidence.
+• When writing suggestions, give tips on breath control, mirroring sentence stress, and connecting speech smoothly.\n`
       : challengeType === "picture_description"
       ? `\nCHALLENGE TYPE: Picture Description
 The student was shown an image and asked to describe it. This is a spontaneous speaking task — prioritise evaluation of:
@@ -862,6 +887,10 @@ RULES:
     // Attach computed stats so feedback.js can use them
     _stats: {
       duration: durationStr,
+      durationSeconds: Math.round(Number(durationSeconds) || 0),
+      activeSpeakingSeconds: typeof rhythm?.speechRatio === "number"
+        ? Math.round((Number(durationSeconds) || 0) * (rhythm.speechRatio / 100))
+        : null,
       wpm,
       fillerWords,
       fillerTotal,

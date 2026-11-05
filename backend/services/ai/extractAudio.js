@@ -1,6 +1,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import fs from "fs";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,11 +63,37 @@ export async function extractAudio(videoPath, id) {
     console.log(`🔊 Audio quality: mean=${meanVolume}dB max=${maxVolume}dB`);
   }
 
+  // Automatic amplification / normalization for quiet recordings
+  // If maxVolume is quiet (below -6dB) or meanVolume is below -32dB, boost gain so Whisper transcribes accurately
+  if (maxVolume !== null && maxVolume < -6) {
+    const boostDb = Math.min(26, Math.max(3, -2 - maxVolume));
+    console.log(`🔊 Low audio level detected (${maxVolume}dB max, ${meanVolume}dB mean). Amplifying by +${boostDb.toFixed(1)}dB for Whisper...`);
+    const boostedPath = path.resolve(`./tmp/audio_${id}_norm.wav`);
+    try {
+      await execFileAsync("ffmpeg", [
+        "-i", audioPath,
+        "-af", `volume=${boostDb.toFixed(1)}dB`,
+        "-ar", "16000",
+        "-ac", "1",
+        "-acodec", "pcm_s16le",
+        boostedPath,
+        "-y",
+      ], { timeout: 30000 });
+      if (fs.existsSync(boostedPath)) {
+        if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+        fs.renameSync(boostedPath, audioPath);
+        console.log(`✅ Audio amplified by +${boostDb.toFixed(1)}dB for high-accuracy Whisper transcription`);
+      }
+    } catch (normErr) {
+      console.warn("Audio normalization warning:", normErr.message);
+    }
+  }
+
   if (meanVolume !== null && meanVolume < MIN_VOLUME_DB) {
     console.log(`⚠️ Audio too quiet (${meanVolume}dB) — transcription may be inaccurate`);
     return {
       audioPath,
-      qualityWarning: `Audio is very quiet (${meanVolume}dB). For better feedback, record in a quieter environment and speak closer to the microphone.`,
+      qualityWarning: `Audio is quiet (${meanVolume}dB). For best clarity, record in a quieter environment and speak closer to your microphone.`,
       meanVolume,
     };
   }

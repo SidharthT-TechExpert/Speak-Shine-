@@ -9,17 +9,22 @@ const questionSchema = new mongoose.Schema(
     isManualSetup: { type: Boolean, default: false },
     setupType: { 
       type: String, 
-      enum: ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description"],
+      enum: ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"],
       default: "normal"
     },
     contentType: {
       type: String,
-      enum: ["question", "story_audio", "picture_description"],
+      enum: ["question", "story_audio", "picture_description", "shadowing_video"],
       default: "question",
     },
     audioUrl: { type: String, default: null },
     storyTranscript: { type: String, default: null },
     summaryGuide: { type: String, default: null },
+    // Shadowing Video fields
+    videoUrl:             { type: String, default: null },
+    videoDuration:        { type: Number, default: null }, // seconds (<= 180s)
+    videoTranscript:      { type: String, default: null },
+    videoTitle:           { type: String, default: null },
     // Picture Description fields
     imageUrl:             { type: String, default: null },
     imageSource:          { type: String, default: null },
@@ -38,8 +43,14 @@ const questionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Enforce uniqueness at DB level — prevents duplicates even from concurrent inserts
-questionSchema.index({ topic: 1 },    { unique: true, sparse: true });
-questionSchema.index({ question: 1 }, { unique: true, sparse: true });
+// Enforce uniqueness only for automated question bank, not manual activity setups
+questionSchema.index(
+  { topic: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { isManualSetup: false } }
+);
+questionSchema.index(
+  { question: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { isManualSetup: false } }
+);
 
 export default mongoose.model("Question", questionSchema);

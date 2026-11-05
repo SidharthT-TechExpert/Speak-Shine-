@@ -163,11 +163,15 @@ export async function preCheckSubmit(req, res) {
     const isPicture = req.body?.isPictureDescription !== undefined
       ? !!req.body.isPictureDescription
       : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio"));
+    const isShadowing = req.body?.isShadowing !== undefined
+      ? !!req.body.isShadowing
+      : (status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay));
     const flags = {
       isMonthlyReflection: req.body?.isMonthlyReflection !== undefined ? !!req.body.isMonthlyReflection : (status?.isMonthlyReflectionDay || false),
       isMonthlyGoals: req.body?.isMonthlyGoals !== undefined ? !!req.body.isMonthlyGoals : (status?.isMonthlyGoalsDay || false),
       isStorySummary: isStory,
       isPictureDescription: isPicture,
+      isShadowing: isShadowing,
     };
     const gate = evaluateSubmitGate({
       durationSeconds: req.body?.durationSeconds ?? null,
@@ -732,5 +736,70 @@ export async function getTtsAudio(req, res) {
   } catch (err) {
     console.error("[TTS Proxy] Controller error:", err.message);
     if (!res.headersSent) res.status(500).send("Internal server error");
+  }
+}
+
+/**
+ * GET /api/video/proxy
+ * Streams external video (e.g. Pexels, R2, CDN) with Range headers & CORS headers so videos can play anywhere.
+ */
+export async function streamVideoProxy(req, res) {
+  try {
+    let targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send("Missing url query param");
+
+    // Redirect any known shadowing video to local voiced MP4 with audio
+    if (targetUrl.includes("3191572") || targetUrl.includes("ForBiggerFun") || targetUrl.includes("fluency-mindset")) {
+      return res.redirect(302, "/shadowing/fluency-mindset.mp4");
+    }
+    if (targetUrl.includes("3195394") || targetUrl.includes("ForBiggerEscapes") || targetUrl.includes("active-listening")) {
+      return res.redirect(302, "/shadowing/active-listening.mp4");
+    }
+    if (targetUrl.includes("3209828") || targetUrl.includes("ForBiggerBlazes") || targetUrl.includes("stage-presence")) {
+      return res.redirect(302, "/shadowing/stage-presence.mp4");
+    }
+    if (targetUrl.includes("3196061") || targetUrl.includes("ForBiggerJoyBlazes") || targetUrl.includes("intentional-pauses")) {
+      return res.redirect(302, "/shadowing/intentional-pauses.mp4");
+    }
+    if (targetUrl.includes("3205626") || targetUrl.includes("WeAreGoingOnBullrun") || targetUrl.includes("speaking-habits")) {
+      return res.redirect(302, "/shadowing/speaking-habits.mp4");
+    }
+    if (targetUrl.includes("856973") || targetUrl.includes("charismatic-presence")) {
+      return res.redirect(302, "/shadowing/charismatic-presence.mp4");
+    }
+    if (targetUrl.includes("commondatastorage.googleapis.com") || targetUrl.includes("gtv-videos-bucket")) {
+      return res.redirect(302, "/shadowing/stage-presence.mp4");
+    }
+
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+    if (req.headers.range) {
+      headers.range = req.headers.range;
+    }
+
+    const fetchRes = await fetch(targetUrl, { headers });
+    res.status(fetchRes.status);
+
+    for (const [k, v] of fetchRes.headers.entries()) {
+      const lower = k.toLowerCase();
+      if (["content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"].includes(lower)) {
+        res.setHeader(k, v);
+      }
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Range");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+
+    if (fetchRes.body) {
+      const { Readable } = await import("stream");
+      Readable.fromWeb(fetchRes.body).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (err) {
+    console.error("[VideoProxy] Stream error:", err.message);
+    if (!res.headersSent) res.status(502).send("Failed to stream video");
   }
 }

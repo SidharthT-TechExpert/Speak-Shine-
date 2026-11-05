@@ -10,7 +10,7 @@ import { randomInt } from "crypto";
 import User from "../../../models/userSchema.js";
 import Auth from "../../../models/authSchema.js";
 import Status from "../../../models/statusSchema.js";
-import { ensureUserReferralCode, getReferralRewardAmount } from "../referral/referralService.js";
+import { ensureUserReferralCode, generateUniqueReferralCode, getReferralRewardAmount } from "../referral/referralService.js";
 import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { escapeRegex, findUserByPhone } from "../../utils/phoneUtils.js";
 import { validatePassword } from "../../utils/validationUtils.js";

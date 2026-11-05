@@ -16,6 +16,7 @@ export const CATEGORY_THEMES = {
   "Personal Experience": { primary: "#fb7185", secondary: "#e11d48", badgeBg: "rgba(251,113,133,0.15)", border: "rgba(251,113,133,0.3)", gradient: "linear-gradient(135deg, rgba(251,113,133,0.15) 0%, rgba(251,113,133,0.03) 100%)" },
   "Picture Description": { primary: "#38bdf8", secondary: "#818cf8", badgeBg: "rgba(56,189,248,0.15)",  border: "rgba(56,189,248,0.35)", gradient: "linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(99,102,241,0.05) 100%)" },
   "Story Summary":       { primary: "#a78bfa", secondary: "#7c3aed", badgeBg: "rgba(167,139,250,0.15)", border: "rgba(167,139,250,0.3)", gradient: "linear-gradient(135deg, rgba(167,139,250,0.15) 0%, rgba(124,111,255,0.05) 100%)" },
+  "Shadowing Practice":  { primary: "#f472b6", secondary: "#c084fc", badgeBg: "rgba(244,114,182,0.15)", border: "rgba(244,114,182,0.35)", gradient: "linear-gradient(135deg, rgba(244,114,182,0.15) 0%, rgba(192,132,252,0.05) 100%)" },
   "Monthly Goals":       { primary: "#34d399", secondary: "#059669", badgeBg: "rgba(52,211,153,0.15)",  border: "rgba(52,211,153,0.3)",  gradient: "linear-gradient(135deg, rgba(52,211,153,0.15) 0%, rgba(5,150,105,0.05) 100%)" },
   "Monthly Reflection":  { primary: "#a78bfa", secondary: "#8b5cf6", badgeBg: "rgba(167,139,250,0.15)", border: "rgba(167,139,250,0.3)", gradient: "linear-gradient(135deg, rgba(167,139,250,0.15) 0%, rgba(139,92,246,0.05) 100%)" },
   "default":             { primary: "#c084fc", secondary: "#9333ea", badgeBg: "rgba(192,132,252,0.15)", border: "rgba(192,132,252,0.3)", gradient: "linear-gradient(135deg, rgba(192,132,252,0.15) 0%, rgba(147,51,234,0.05) 100%)" },
@@ -31,11 +32,13 @@ const KEYWORD_MAP = [
   { keywords: ["personal", "experience", "memory", "childhood"],      theme: "Personal Experience" },
   { keywords: ["picture", "image", "photo", "describe", "visual"],    theme: "Picture Description" },
   { keywords: ["story", "listen", "audio", "narrative", "retell"],    theme: "Story Summary" },
+  { keywords: ["shadow", "shadowing", "mimic", "mimicry", "replicate"], theme: "Shadowing Practice" },
   { keywords: ["reflection", "end of month", "review"],               theme: "Monthly Reflection" },
   { keywords: ["monthly goal", "goal setting", "targets"],            theme: "Monthly Goals" },
 ];
 
 export function getCategoryTheme(category, contentType) {
+  if (contentType === "shadowing_video") return CATEGORY_THEMES["Shadowing Practice"];
   if (contentType === "picture_description") return CATEGORY_THEMES["Picture Description"];
   if (contentType === "story_audio") return CATEGORY_THEMES["Story Summary"];
   if (!category) return CATEGORY_THEMES.default;
@@ -97,21 +100,73 @@ export function parseQuestionItems(rawText) {
 }
 
 /**
+ * Clean & resolve video URL with verified audio track
+ */
+export function getCleanVideoUrl(url) {
+  if (!url) return "";
+  const s = String(url);
+  if (s.includes("3191572") || s.includes("ForBiggerFun") || s.includes("fluency-mindset")) return "/shadowing/fluency-mindset.mp4";
+  if (s.includes("3195394") || s.includes("ForBiggerEscapes") || s.includes("active-listening")) return "/shadowing/active-listening.mp4";
+  if (s.includes("3209828") || s.includes("ForBiggerBlazes") || s.includes("stage-presence")) return "/shadowing/stage-presence.mp4";
+  if (s.includes("3196061") || s.includes("ForBiggerJoyBlazes") || s.includes("intentional-pauses")) return "/shadowing/intentional-pauses.mp4";
+  if (s.includes("3205626") || s.includes("WeAreGoingOnBullrun") || s.includes("speaking-habits")) return "/shadowing/speaking-habits.mp4";
+  if (s.includes("856973") || s.includes("charismatic-presence")) return "/shadowing/charismatic-presence.mp4";
+  if (s.includes("commondatastorage.googleapis.com") || s.includes("gtv-videos-bucket")) return "/shadowing/stage-presence.mp4";
+  return url;
+}
+
+/**
+ * Clean & resolve shadowing speech audio URL
+ */
+export function getCleanAudioUrl(url) {
+  if (!url) return "/shadowing/fluency-mindset.mp3";
+  const s = String(url);
+  if (s.includes("3191572") || s.includes("ForBiggerFun") || s.includes("fluency-mindset")) return "/shadowing/fluency-mindset.mp3";
+  if (s.includes("3195394") || s.includes("ForBiggerEscapes") || s.includes("active-listening")) return "/shadowing/active-listening.mp3";
+  if (s.includes("3209828") || s.includes("ForBiggerBlazes") || s.includes("stage-presence")) return "/shadowing/stage-presence.mp3";
+  if (s.includes("3196061") || s.includes("ForBiggerJoyBlazes") || s.includes("intentional-pauses")) return "/shadowing/intentional-pauses.mp3";
+  if (s.includes("3205626") || s.includes("WeAreGoingOnBullrun") || s.includes("speaking-habits")) return "/shadowing/speaking-habits.mp3";
+  if (s.includes("856973") || s.includes("charismatic-presence")) return "/shadowing/charismatic-presence.mp3";
+  if (s.endsWith(".mp4")) return s.replace(/\.mp4$/, ".mp3");
+  return url;
+}
+
+/**
  * Detect question type from today object / status
  */
 export function detectQuestionType(today = {}) {
-  if (today.isPictureDescription || today.contentType === "picture_description" || (today.imageUrl && !today.audioUrl)) {
-    return "picture_description";
+  // 1. Explicit contentType takes absolute precedence
+  if (today.contentType === "shadowing_video" || today.isShadowing || String(today.category || "").toLowerCase().includes("shadowing")) return "shadowing_video";
+  if (today.contentType === "story_audio") return "story_audio";
+  if (today.contentType === "picture_description") return "picture_description";
+  if (today.contentType === "monthly_reflection") return "monthly_reflection";
+  if (today.contentType === "monthly_goals") return "monthly_goals";
+
+  // 2. Story Audio: has audioUrl and not videoUrl
+  if (today.audioUrl && !today.videoUrl) return "story_audio";
+  if (today.isStorySummary && !today.videoUrl) return "story_audio";
+  if (String(today.category || "").toLowerCase().includes("story")) return "story_audio";
+
+  // 3. Picture Description: has imageUrl and not audio/video
+  if (today.imageUrl && !today.videoUrl && !today.audioUrl) return "picture_description";
+  if (today.isPictureDescription && !today.videoUrl) return "picture_description";
+
+  // 4. Shadowing Video: explicit videoUrl or shadowing flag with videoUrl
+  if ((today.isShadowing || today.contentType === "shadowing_video") && today.videoUrl) {
+    return "shadowing_video";
   }
+  if (today.videoUrl && !today.audioUrl && !today.imageUrl) {
+    return "shadowing_video";
+  }
+
+  // 5. Monthly Goals / Reflection
   if (today.isMonthlyGoals || String(today.category || "").toLowerCase().includes("monthly goal") || String(today.setupType || "").includes("goal")) {
     return "monthly_goals";
   }
   if (today.isMonthlyReflection || String(today.category || "").toLowerCase().includes("reflection") || String(today.setupType || "").includes("reflection")) {
     return "monthly_reflection";
   }
-  if (today.isStorySummary || today.contentType === "story_audio" || String(today.category || "").toLowerCase().includes("story")) {
-    return "story_audio";
-  }
+
   return "standard_question";
 }
 
@@ -159,9 +214,41 @@ export function getQuestionUIConfig(type, today = {}) {
     isMonthlyGoals: type === "monthly_goals" || Boolean(today?.isMonthlyGoals),
     isStorySummary: type === "story_audio" || Boolean(today?.isStorySummary),
     isPictureDescription: type === "picture_description" || Boolean(today?.isPictureDescription),
+    isShadowing: type === "shadowing_video" || Boolean(today?.isShadowing),
   }, today?.durationSettings || {});
 
   switch (type) {
+    case "shadowing_video":
+      return {
+        type,
+        theme,
+        reqCount: 0,
+        totalCount: 0,
+        vocabLevel: "None",
+        cefrInfo: null,
+        badgeLabel: today.category || "Shadowing Practice",
+        badgeSubtext: "Speech Mimicry & Simultaneous Voice Practice",
+        promptLabel: "🎙️ Shadowing Speech Mission",
+        promptSubtitle: "Listen to the audio through earphones and speak simultaneously. Mirror the rhythm, speed, and pronunciation.",
+        recordButtonLabel: "Start Shadowing & Record",
+        uploadButtonLabel: "Upload Shadowing Recording",
+        rules: [
+          { text: "Listen through earphones and speak at the same time to shadow the speaker", highlight: true },
+          { text: `Duration matching: ≥85% active spoken time awards full 40 duration points (max ${limits.maxLabel})` },
+          { text: "Delivery, Rhythm & Fluency: 60 points (Rhythm 30 pts + Delivery 30 pts)" },
+          { text: "Vocabulary and personal growth requirements are waived for this activity" },
+        ],
+        hasAudio: true,
+        audioUrl: getCleanAudioUrl(today.audioUrl || today.videoUrl),
+        hasImage: false,
+        hasVideo: false,
+        videoUrl: null,
+        videoDuration: today.videoDuration || 60,
+        videoTranscript: today.videoTranscript || today.question || "",
+        videoTitle: today.videoTitle || today.topic || "",
+        tip: "Shadowing Tip: Keep earphones on. Speak aloud at the exact same moment as the speaker to build natural muscle memory.",
+      };
+
     case "picture_description":
       return {
         type,
@@ -283,4 +370,56 @@ export function getQuestionUIConfig(type, today = {}) {
         tip: "Organize your response with an opening answer, a personal reason or example, and a takeaway.",
       };
   }
+}
+
+/**
+ * Splits a transcript into proportional 3–6 second spoken phrases with word-weighted timestamps.
+ */
+export function buildTeleprompterCues(transcript, totalDuration = 60) {
+  if (!transcript || typeof transcript !== "string") return [];
+  const validDuration = Number(totalDuration) > 0 ? Number(totalDuration) : 60;
+
+  // Split on sentence boundaries (. ! ?)
+  const rawSentences = transcript
+    .replace(/\r?\n+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // Divide sentences longer than 13 words into natural ~4-6 second chunks
+  const phrases = [];
+  for (const s of rawSentences) {
+    const words = s.split(/\s+/).filter(Boolean);
+    if (words.length > 13) {
+      const clauses = s.split(/(?<=[,;:])\s+/).map(c => c.trim()).filter(Boolean);
+      if (clauses.length > 1 && clauses.every(c => c.length > 0)) {
+        phrases.push(...clauses);
+      } else {
+        const mid = Math.ceil(words.length / 2);
+        phrases.push(words.slice(0, mid).join(" "));
+        phrases.push(words.slice(mid).join(" "));
+      }
+    } else {
+      phrases.push(s);
+    }
+  }
+
+  const totalWords = phrases.reduce((sum, p) => sum + Math.max(1, p.split(/\s+/).length), 0);
+  let accTime = 0;
+  return phrases.map((text, idx) => {
+    const wordCount = Math.max(1, text.split(/\s+/).length);
+    const cueDur = (wordCount / totalWords) * validDuration;
+    const start = accTime;
+    const end = Math.min(validDuration, accTime + cueDur);
+    accTime = end;
+    return {
+      id: idx,
+      text,
+      start,
+      end,
+      duration: cueDur,
+      startFormatted: `${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
+      endFormatted: `${Math.floor(end / 60)}:${String(Math.floor(end % 60)).padStart(2, "0")}`,
+    };
+  });
 }

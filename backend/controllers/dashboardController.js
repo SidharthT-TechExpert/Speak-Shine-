@@ -33,6 +33,19 @@ export async function getTodayQuestionOnly(req, res) {
       audioUrl: today.audioUrl || null,
       imageUrl: today.imageUrl || null,
       contentType: today.contentType || "question",
+      isShadowing: today.isShadowing ?? false,
+      videoUrl: today.videoUrl || null,
+      videoDuration: today.videoDuration || null,
+      videoTranscript: today.videoTranscript || null,
+      videoTitle: today.videoTitle || null,
+      vocabulary: today.vocabulary || [],
+      vocabWordCount: today.vocabWordCount ?? 0,
+      vocabRequiredCount: today.vocabRequiredCount ?? 0,
+      vocabLevel: today.vocabLevel || 'B2',
+      durationLimits: today.durationLimits || null,
+      durationSettings: today.durationSettings || null,
+      allowPrivateVideos: today.allowPrivateVideos ?? true,
+      enableBackgroundBlur: today.enableBackgroundBlur ?? false,
     });
   } catch (error) {
     console.error("[Dashboard] Get today question error:", error.message);
@@ -262,6 +275,22 @@ export async function enableStorySummaryDemo(req, res) {
       return res.status(error.statusCode).json({ error: error.message });
     }
     console.error("[Dashboard] Enable story summary demo error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/dashboard/demo-shadowing - Force shadowing activity mode (admin)
+ */
+export async function enableShadowingDemo(req, res) {
+  try {
+    const result = await dashboardService.enableShadowingDemo();
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error("[Dashboard] Enable shadowing demo error:", error.message);
     res.status(500).json({ error: error.message });
   }
 }

@@ -218,7 +218,10 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
         "'self'",
-        process.env.R2_PUBLIC_URL || "https:",
+        "https:",
+        "http:",
+        process.env.R2_PUBLIC_URL,
+        "https://videos.pexels.com",
         `https://${(process.env.R2_ENDPOINT || "").replace(/^https?:\/\//, "")}`,
         "https://*.r2.cloudflarestorage.com",
         "https://*.r2.dev",
@@ -238,7 +241,10 @@ app.use(helmet({
         "'self'",
         "blob:",
         "data:",
-        process.env.R2_PUBLIC_URL || "https:",
+        "https:",
+        "http:",
+        process.env.R2_PUBLIC_URL,
+        "https://videos.pexels.com",
         `https://${(process.env.R2_ENDPOINT || "").replace(/^https?:\/\//, "")}`,
         "https://*.r2.cloudflarestorage.com",
         "https://*.r2.dev"

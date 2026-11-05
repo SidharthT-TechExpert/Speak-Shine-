@@ -9,9 +9,10 @@ export const GATE_FRAME_IDEAL = 16;
 /** @typedef {"pass"|"warn"|"fail"} GateStatus */
 
 /**
- * @param {{ isMonthlyReflection?: boolean, isMonthlyGoals?: boolean, isStorySummary?: boolean, isPictureDescription?: boolean }} flags
+ * @param {{ isMonthlyReflection?: boolean, isMonthlyGoals?: boolean, isStorySummary?: boolean, isPictureDescription?: boolean, isShadowing?: boolean, challengeType?: string }} flags
  */
 export function getDurationLimits(flags = {}, settings = {}) {
+  const isShadowing = Boolean(flags.isShadowing || flags.challengeType === "shadowing_video");
   const maxSeconds = flags.isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : flags.isWeeklyReflection
@@ -22,6 +23,8 @@ export function getDurationLimits(flags = {}, settings = {}) {
     ? (settings.durationStoryMax ?? 180)
     : flags.isPictureDescription
     ? (settings.durationPictureMax ?? 180)
+    : isShadowing
+    ? (settings.durationShadowingMax ?? 180)
     : (settings.durationDefaultMax ?? 300);
 
   const fullScoreSeconds = flags.isMonthlyReflection
@@ -34,13 +37,15 @@ export function getDurationLimits(flags = {}, settings = {}) {
     ? (settings.durationStoryFull ?? 180)
     : flags.isPictureDescription
     ? (settings.durationPictureFull ?? 180)
+    : isShadowing
+    ? (settings.durationShadowingFull ?? 180)
     : (settings.durationDefaultFull ?? 300);
 
   return {
-    minSeconds: 60,
+    minSeconds: isShadowing ? 20 : 60,
     maxSeconds,
     fullScoreSeconds,
-    minLabel: "1 min",
+    minLabel: isShadowing ? "20 sec" : "1 min",
     maxLabel: formatMaxLabel(maxSeconds),
     fullScoreLabel: formatMaxLabel(fullScoreSeconds),
   };
@@ -312,10 +317,150 @@ export function calculateCompositeScore({
   analysis = {},
   isPictureDescription = false,
   isStorySummary = false,
+  isShadowing = false,
+  targetVideoDuration = null,
   userHistory = [],
 }) {
   const challengeType = analysis?.challengeType || null;
   const isStoryTask = Boolean(isStorySummary || challengeType === "story_summary");
+
+  // ── Shadowing Video: Effort-proportional duration matching + Speech delivery ──
+  // Duration Match (40 pts) | Delivery, Rhythm & Fluency (60 pts) | Personal Growth (0 pts) = 100
+  // NO vocabulary requirement.
+  const isShadowingTask = Boolean(isShadowing || challengeType === "shadowing_video");
+  if (isShadowingTask) {
+    const statsObj = analysis._stats || analysis.stats || {};
+    const rawSpeechRatio = statsObj?.rhythm?.speechRatio;
+    const wpm = statsObj?.wpm;
+    const paceConsistency = statsObj?.rhythm?.paceConsistency;
+    const pauseCount = Number(statsObj?.pauses) || 0;
+    const fillerTotal = Number(statsObj?.fillerTotal) || 0;
+    const wordCount = Number(statsObj?.wordCount) || Math.round((Number(wpm) || 0) * (Number(durationSeconds) || 0) / 60);
+
+    // Target duration from the reference video (default 60s, max 180s)
+    const targetDur = Math.max(20, Math.min(180, Number(targetVideoDuration) || Number(maxDurationSeconds) || 60));
+    const actualDur = Math.max(0, Number(durationSeconds) || 0);
+
+    // Exact amount of time the student actually spoke on this video
+    // Spoken Seconds = Video Duration * (Speech Ratio / 100)
+    const spokenSeconds = typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0
+      ? Math.round((actualDur * (rawSpeechRatio / 100)) * 10) / 10
+      : actualDur;
+
+    // Target active speech time from reference audio
+    const targetActiveSpeechTime = targetDur;
+
+    // 1. Duration / Effort Match (Max 40 points)
+    // Rule:
+    // - Actual spoken time (actualDur * speechRatio / 100) must be >= 85% of target active speech time => Full 40 pts.
+    // - If below 85%: Proportional effort score: (spokenSeconds / (targetActiveSpeechTime * 0.85)) * 40.
+    const spokenRatio = targetActiveSpeechTime > 0 ? spokenSeconds / targetActiveSpeechTime : 1.0;
+    const isEightyFivePercent = spokenRatio >= 0.85;
+    const durationScore = isEightyFivePercent
+      ? 40
+      : Math.max(0, Math.min(40, (spokenRatio / 0.85) * 40));
+
+    // 2. Speech continuity multiplier (student must actually be speaking, not just silent recording)
+    // In shadowing, students speak in natural phrases and pause with the native speaker.
+    // A speech ratio between 35% and 75% is healthy and expected.
+    let speechMult = 1.0;
+    if (typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0) {
+      const r = rawSpeechRatio / 100;
+      if (r >= 0.35) {
+        speechMult = 1.0;
+      } else if (r >= 0.20) {
+        speechMult = 0.85 + ((r - 0.20) / (0.35 - 0.20)) * 0.15;
+      } else {
+        speechMult = Math.max(0.60, r / 0.20);
+      }
+    } else if (typeof wpm === "number" && wpm > 0) {
+      speechMult = wpm >= 60 ? 1.0 : Math.max(0.75, wpm / 60);
+    }
+
+    // If target active speech match is >= 85%, student actively followed along for the full duration
+    if (isEightyFivePercent) {
+      speechMult = Math.max(0.85, speechMult);
+    }
+
+    const get = (field) => (typeof analysis[field] === "number" && !Number.isNaN(analysis[field]) ? analysis[field] : null);
+    const fluency    = get("fluency") ?? 6.5;
+    const grammar    = get("grammar") ?? 7.0;
+    const confidence = get("confidence") ?? 6.5;
+
+    const minutes = Math.max(actualDur / 60, 1 / 60);
+    const pausesPerMinute = pauseCount / minutes;
+    const pauseScore = pausesPerMinute <= 2 ? 10 : pausesPerMinute <= 4 ? 8.5 : pausesPerMinute <= 7 ? 7 : 5.5;
+
+    // In shadowing, if target active speech was matched >= 85%, pace was locked to the reference video
+    const paceScore = isEightyFivePercent
+      ? (typeof wpm === "number" && wpm >= 60 ? 10 : 9)
+      : typeof wpm !== "number" || wpm <= 0
+        ? 6
+        : wpm >= 80 && wpm <= 165 ? 10
+        : wpm >= 60 && wpm <= 190 ? 8
+        : 6;
+
+    const rhythmPace = typeof paceConsistency === "number" && paceConsistency > 0 ? paceConsistency : (isEightyFivePercent ? 7.5 : fluency);
+
+    // Delivery, Rhythm & Fluency: Max 60 points
+    // 30 pts for Rhythm, Cadence, & Flow + 30 pts for Delivery, Intonation & Clarity
+    let rhythmComponent = ((rhythmPace * 0.4 + pauseScore * 0.3 + paceScore * 0.3) / 10) * 30 * speechMult;
+    let deliveryComponent = ((fluency * 0.4 + confidence * 0.3 + grammar * 0.3) / 10) * 30 * speechMult;
+
+    // Fair baseline delivery floor for dedicated attempts:
+    // If student matched >= 85% target active speech, ensure delivery score rewards their sustained practice
+    if (isEightyFivePercent) {
+      rhythmComponent = Math.max(18.0, rhythmComponent);
+      deliveryComponent = Math.max(18.0, deliveryComponent);
+    }
+    const communicationScore = Math.min(60, Math.round((rhythmComponent + deliveryComponent) * 100) / 100);
+
+    // 3. Personal Growth: 0 points (Waived for shadowing activity)
+    const growthScore = 0;
+
+    let total100 = Math.round((durationScore + communicationScore) * 100) / 100;
+    total100 = Math.min(100, Math.max(0, total100));
+
+    const matchPercent = Math.round(spokenRatio * 100);
+
+    return {
+      score: total100,
+      breakdown: {
+        duration:         Math.round(durationScore * 100) / 100,
+        length:           Math.round(durationScore * 100) / 100,
+        communication:    Math.round(communicationScore * 100) / 100,
+        comm:             Math.round(communicationScore * 100) / 100,
+        vocabulary:       0,
+        growth:           0,
+        maxDuration:      40,
+        maxLength:        40,
+        maxCommunication: 60,
+        maxComm:          60,
+        maxVocabulary:    0,
+        maxGrowth:        0,
+        targetDurationSeconds: targetDur,
+        targetActiveSpeechSeconds: targetActiveSpeechTime,
+        actualDurationSeconds: Math.round(actualDur),
+        spokenDurationSeconds: Math.round(spokenSeconds),
+        speechRatio:           typeof rawSpeechRatio === "number" ? Math.round(rawSpeechRatio) : null,
+        durationRatio:         matchPercent,
+        durationMatchRatio:    spokenRatio,
+        isEightyFivePercentMatch: isEightyFivePercent,
+        isNinetyPercentMatch:  isEightyFivePercent,
+        durationMessage: isEightyFivePercent
+          ? `Full duration credit awarded (${matchPercent}% active spoken time vs ${targetActiveSpeechTime}s target speech — >=85% target achieved).`
+          : `Effort credit awarded (${Math.round(spokenSeconds)}s active spoken time vs ${targetActiveSpeechTime}s target speech — aim for >=85% for full duration points).`,
+        speechMultiplier: Math.round(speechMult * 100),
+        growthDelta:      null,
+        baselineComm:     null,
+        isCalibration:    false,
+        isShadowing:      true,
+        isPictureDescription: false,
+        isStorySummary:   false,
+        isSpecialDay:     false,
+      }
+    };
+  }
 
   // ── Picture Description: five-category weighted formula ──────────────────
   // Communication 20 | Content & Relevance 35 |

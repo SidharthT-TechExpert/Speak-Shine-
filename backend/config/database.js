@@ -14,12 +14,32 @@ export const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI, MONGO_OPTIONS);
     console.log("✅ MongoDB Connected");
+    await dropLegacyQuestionIndexes();
   } catch (err) {
     console.log("❌ DB initial connection error:", err.message);
     // Retry after 5 seconds
     setTimeout(connectDB, 5000);
   }
 };
+
+/**
+ * Drops legacy global unique indexes on question text/topic if they lack partialFilterExpression,
+ * allowing manual challenge setups (shadowing, story, picture) to reuse standard prompt text.
+ */
+async function dropLegacyQuestionIndexes() {
+  try {
+    const coll = mongoose.connection.collection("questions");
+    const indexes = await coll.indexes();
+    for (const idx of indexes) {
+      if ((idx.name === "question_1" || idx.name === "topic_1") && !idx.partialFilterExpression) {
+        console.log(`[DB] Dropping legacy global unique index on questions: ${idx.name}`);
+        await coll.dropIndex(idx.name);
+      }
+    }
+  } catch (err) {
+    // Non-critical, ignore if collection does not exist yet or index already dropped
+  }
+}
 
 // Mongoose handles reconnection automatically — just log events, don't call connectDB() again
 // as that creates duplicate connections and causes the connect/disconnect loop.

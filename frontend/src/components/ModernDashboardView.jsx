@@ -326,7 +326,7 @@ export default function ModernDashboardView({
   );
 
   // Audio source: only valid if question type has audio and today.audioUrl is present
-  const audioSrc = (questionConfig.hasAudio && today.audioUrl) ? today.audioUrl : "";
+  const audioSrc = (questionConfig.hasAudio && (today?.audioUrl || questionConfig?.audioUrl)) ? (questionConfig?.audioUrl || today?.audioUrl) : "";
 
   // Quick TTS read-aloud for question/prompt
   const handleSpeakPrompt = (textToSpeak) => {
@@ -2301,14 +2301,14 @@ export default function ModernDashboardView({
               )}
 
               {/* ── 2. STORY AUDIO / AUDIO PLAYER MODE ── */}
-              {questionType === "story_audio" && questionConfig.hasAudio && audioSrc && (
+              {(questionType === "story_audio" || questionType === "shadowing_video") && questionConfig.hasAudio && audioSrc && (
                 <div style={{ marginBottom: "1.35rem" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
                     <span style={{ fontSize: "0.74rem", fontWeight: 700, letterSpacing: "0.03em", color: questionConfig.theme.primary }}>
-                      🎧 Listen to the Story
+                      {questionType === "shadowing_video" ? "🎙️ Listen to Reference Speech" : "🎧 Listen to the Story"}
                     </span>
                     <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
-                      Listen once before recording summary
+                      {questionType === "shadowing_video" ? "Listen through earphones and shadow along" : "Listen once before recording summary"}
                     </span>
                   </div>
                   <div className="speakshine-audio-bar" style={{

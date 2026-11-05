@@ -68,7 +68,7 @@ export async function deleteQuestion(req, res) {
  */
 export async function setupManualQuestion(req, res) {
   try {
-    const { setupType, scheduledFor, scheduledTime, category, topic, question, audioUrl, storyTranscript, summaryGuide, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery, imageInstructions, imageDifficulty, speakingDuration, publishNow } = req.body;
+    const { setupType, scheduledFor, scheduledTime, category, topic, question, audioUrl, storyTranscript, summaryGuide, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery, imageInstructions, imageDifficulty, speakingDuration, videoUrl, videoDuration, videoTranscript, videoTitle, publishNow } = req.body;
     const createdBy = req.user.phone;
     
     const result = await questionsService.setupManualQuestion(
@@ -79,7 +79,7 @@ export async function setupManualQuestion(req, res) {
       topic, 
       question, 
       createdBy,
-      { audioUrl, storyTranscript, summaryGuide, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery, imageInstructions, imageDifficulty, speakingDuration },
+      { audioUrl, storyTranscript, summaryGuide, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery, imageInstructions, imageDifficulty, speakingDuration, videoUrl, videoDuration, videoTranscript, videoTitle },
       publishNow === true
     );
     try {
@@ -411,6 +411,39 @@ export async function generatePictureNow(req, res) {
     res.json({ success: true, ...challenge });
   } catch (error) {
     console.error("[Questions] Picture generation error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/questions/generate-shadowing-video - AI-generate an English shadowing challenge (admin/trainer)
+ */
+export async function generateShadowingNow(req, res) {
+  try {
+    const { targetDuration, topic, difficulty } = req.body || {};
+    const { generateShadowingChallenge } = await import("../services/ai/shadowingVideoGenerator.js");
+    const challenge = await generateShadowingChallenge({ targetDuration, topic, difficulty });
+    res.json({ success: true, ...challenge });
+  } catch (error) {
+    console.error("[Questions] Shadowing generation error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/questions/burn-shadowing-subtitles - Burn subtitles onto a shadowing video
+ */
+export async function burnShadowingSubtitlesController(req, res) {
+  try {
+    const { videoUrl, transcript, duration } = req.body || {};
+    if (!videoUrl || !transcript) {
+      return res.status(400).json({ error: "videoUrl and transcript are required" });
+    }
+    const { burnSubtitlesOntoVideo } = await import("../services/ai/shadowingVideoGenerator.js");
+    const result = await burnSubtitlesOntoVideo(videoUrl, transcript, duration);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("[Questions] Subtitle burn error:", error.message);
     res.status(500).json({ error: error.message });
   }
 }

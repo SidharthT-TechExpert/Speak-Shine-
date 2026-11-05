@@ -17,9 +17,67 @@ import { getMonthlyGracePeriodInfo } from "../../utils/gracePeriodUtils.js";
 
 const withBadgeData = (user, data = {}) => ({ ...data, ...serializeStreakBadges(user) });
 const activeStoryTask = (status) => status?.todayContentType === "story_audio"
-  || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+  || (!status?.todayContentType && Boolean(status?.isStorySummaryDay));
 const activePictureTask = (status) => status?.todayContentType === "picture_description"
-  || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+  || (!status?.todayContentType && Boolean(status?.isPictureDescriptionDay));
+const activeShadowingTask = (status) => status?.todayContentType === "shadowing_video"
+  || (!status?.todayContentType && (Boolean(status?.isShadowingDay) || String(status?.todayCategory || "").toLowerCase().includes("shadowing")));
+
+export function resolvePlayableAudioUrl(rawUrl, statusId = null) {
+  if (!rawUrl) return "/shadowing/fluency-mindset.mp3";
+  let fixedUrl = rawUrl;
+  if (rawUrl.includes("3191572") || rawUrl.includes("ForBiggerFun") || rawUrl.includes("fluency-mindset")) {
+    fixedUrl = "/shadowing/fluency-mindset.mp3";
+  } else if (rawUrl.includes("3195394") || rawUrl.includes("ForBiggerEscapes") || rawUrl.includes("active-listening")) {
+    fixedUrl = "/shadowing/active-listening.mp3";
+  } else if (rawUrl.includes("3209828") || rawUrl.includes("ForBiggerBlazes") || rawUrl.includes("stage-presence")) {
+    fixedUrl = "/shadowing/stage-presence.mp3";
+  } else if (rawUrl.includes("3196061") || rawUrl.includes("ForBiggerJoyBlazes") || rawUrl.includes("intentional-pauses")) {
+    fixedUrl = "/shadowing/intentional-pauses.mp3";
+  } else if (rawUrl.includes("3205626") || rawUrl.includes("WeAreGoingOnBullrun") || rawUrl.includes("speaking-habits")) {
+    fixedUrl = "/shadowing/speaking-habits.mp3";
+  } else if (rawUrl.includes("856973") || rawUrl.includes("charismatic-presence")) {
+    fixedUrl = "/shadowing/charismatic-presence.mp3";
+  } else if (rawUrl.endsWith(".mp4")) {
+    fixedUrl = rawUrl.replace(/\.mp4$/, ".mp3");
+  }
+
+  if (fixedUrl !== rawUrl && statusId) {
+    import("../../models/statusSchema.js").then(({ default: Status }) => {
+      Status.updateOne({ _id: statusId }, { todayAudioUrl: fixedUrl }).catch(() => {});
+    }).catch(() => {});
+  }
+  return fixedUrl;
+}
+
+export function resolvePlayableVideoUrl(rawUrl, statusId = null) {
+  if (!rawUrl) return null;
+  let fixedUrl = rawUrl;
+
+  // Map silent stock or deprecated sample URLs to 1080p audio-voiced video streams
+  if (rawUrl.includes("3191572") || rawUrl.includes("ForBiggerFun")) {
+    fixedUrl = "/shadowing/fluency-mindset.mp4";
+  } else if (rawUrl.includes("3195394") || rawUrl.includes("ForBiggerEscapes")) {
+    fixedUrl = "/shadowing/active-listening.mp4";
+  } else if (rawUrl.includes("3209828") || rawUrl.includes("ForBiggerBlazes")) {
+    fixedUrl = "/shadowing/stage-presence.mp4";
+  } else if (rawUrl.includes("3196061") || rawUrl.includes("ForBiggerJoyBlazes")) {
+    fixedUrl = "/shadowing/intentional-pauses.mp4";
+  } else if (rawUrl.includes("3205626") || rawUrl.includes("WeAreGoingOnBullrun")) {
+    fixedUrl = "/shadowing/speaking-habits.mp4";
+  } else if (rawUrl.includes("856973")) {
+    fixedUrl = "/shadowing/charismatic-presence.mp4";
+  } else if (rawUrl.includes("commondatastorage.googleapis.com") || rawUrl.includes("gtv-videos-bucket")) {
+    fixedUrl = "/shadowing/stage-presence.mp4";
+  }
+
+  if (fixedUrl !== rawUrl && statusId) {
+    import("../../models/statusSchema.js").then(({ default: Status }) => {
+      Status.updateOne({ _id: statusId }, { todayVideoUrl: fixedUrl }).catch(() => {});
+    }).catch(() => {});
+  }
+  return fixedUrl;
+}
 
 /**
  * Get poster image - use bot's stored PNG if available, else generate SVG fallback
@@ -86,9 +144,18 @@ export async function getTodayOverview() {
       question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
       category: isQuestionSentToday ? (status?.todayCategory || null) : null,
       contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
-      audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
+      audioUrl: isQuestionSentToday
+        ? (activeShadowingTask(status)
+            ? resolvePlayableAudioUrl(status?.todayAudioUrl || status?.todayVideoUrl, status?._id)
+            : (status?.todayAudioUrl || null))
+        : null,
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
+      isShadowing: isQuestionSentToday && activeShadowingTask(status),
+      videoUrl: (isQuestionSentToday && activeShadowingTask(status)) ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
+      videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
+      videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
+      videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
       isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
       isWeeklyReflection: isQuestionSentToday && Boolean(status?.isWeeklyReflectionDay),
       isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
@@ -98,7 +165,7 @@ export async function getTodayOverview() {
       imagePhotographer: isQuestionSentToday ? (status?.todayImagePhotographer || null) : null,
       imageInstructions: isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
       posterImage: isQuestionSentToday ? getPosterImage(status) : null,
-      vocabulary: isQuestionSentToday
+      vocabulary: (isQuestionSentToday && !activeShadowingTask(status))
         ? (status?.todayVocabulary || []).slice(
             0,
             activePictureTask(status)
@@ -108,12 +175,16 @@ export async function getTodayOverview() {
               : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
           )
         : [],
-      vocabWordCount: activePictureTask(status)
+      vocabWordCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : activeStoryTask(status)
         ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
         : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
-      vocabRequiredCount: activePictureTask(status)
+      vocabRequiredCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : activeStoryTask(status)
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
@@ -125,18 +196,22 @@ export async function getTodayOverview() {
         isMonthlyGoals: Boolean(status?.isMonthlyGoalsDay),
         isStorySummary: activeStoryTask(status),
         isPictureDescription: activePictureTask(status),
+        isShadowing: activeShadowingTask(status),
+        challengeType: activeShadowingTask(status) ? "shadowing_video" : undefined,
       }, status || {}),
       durationSettings: {
         durationDefaultMax: status?.durationDefaultMax ?? 300,
         durationDefaultFull: status?.durationDefaultFull ?? 300,
         durationStoryMax: status?.durationStoryMax ?? 180,
         durationStoryFull: status?.durationStoryFull ?? 180,
+        durationShadowingMax: status?.durationShadowingMax ?? 180,
+        durationShadowingFull: status?.durationShadowingFull ?? 180,
         durationWeeklyMax: status?.durationWeeklyMax ?? 420,
         durationWeeklyFull: status?.durationWeeklyFull ?? 300,
         durationMonthlyReflectionMax: status?.durationMonthlyReflectionMax ?? 420,
         durationMonthlyReflectionFull: status?.durationMonthlyReflectionFull ?? 420,
         durationMonthlyGoalsMax: status?.durationMonthlyGoalsMax ?? 600,
-        durationMonthlyGoalsFull: status?.durationMonthlyGoalsFull ?? 420,
+        durationMonthlyGoalsFull: status?.durationMonthlyGoalsFull ?? 600,
         durationPictureMax: status?.durationPictureMax ?? 180,
         durationPictureFull: status?.durationPictureFull ?? 180,
       },
@@ -414,12 +489,21 @@ export async function getUserProfile(phone) {
       question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
       category: isQuestionSentToday ? (status?.todayCategory || null) : null,
       contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
-      audioUrl: isQuestionSentToday ? (status?.todayAudioUrl || null) : null,
+      audioUrl: isQuestionSentToday
+        ? (activeShadowingTask(status)
+            ? resolvePlayableAudioUrl(status?.todayAudioUrl || status?.todayVideoUrl, status?._id)
+            : (status?.todayAudioUrl || null))
+        : null,
       posterImage: isQuestionSentToday ? getPosterImage(status) : null,
       isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
       isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
       isStorySummary: isQuestionSentToday && activeStoryTask(status),
       isPictureDescription: isQuestionSentToday && activePictureTask(status),
+      isShadowing: isQuestionSentToday && activeShadowingTask(status),
+      videoUrl: (isQuestionSentToday && activeShadowingTask(status)) ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
+      videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
+      videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
+      videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
       // Picture description image data (only populated on picture description days)
       imageUrl:             isQuestionSentToday ? (status?.todayImageUrl || null) : null,
       imageSource:          isQuestionSentToday ? (status?.todayImageSource || null) : null,
@@ -428,22 +512,28 @@ export async function getUserProfile(phone) {
       imagePhotographerUrl: isQuestionSentToday ? (status?.todayImagePhotographerUrl || null) : null,
       imageSearchQuery:     isQuestionSentToday ? (status?.todayImageSearchQuery || null) : null,
       imageInstructions:    isQuestionSentToday ? (status?.todayImageInstructions || null) : null,
-      vocabulary: (await vocabularyPromise).slice(
-        0,
-        activePictureTask(status)
-          ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
-          : activeStoryTask(status)
-          ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
-          : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
-      ),
+      vocabulary: activeShadowingTask(status)
+        ? []
+        : (await vocabularyPromise).slice(
+            0,
+            activePictureTask(status)
+              ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+              : activeStoryTask(status)
+              ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+              : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
+          ),
       allowPrivateVideos: status?.allowPrivateVideos ?? true,
       enableBackgroundBlur: status?.enableBackgroundBlur ?? false,
-      vocabWordCount: activePictureTask(status)
+      vocabWordCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : activeStoryTask(status)
         ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
         : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
-      vocabRequiredCount: activePictureTask(status)
+      vocabRequiredCount: activeShadowingTask(status)
+        ? 0
+        : activePictureTask(status)
         ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : activeStoryTask(status)
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
@@ -461,18 +551,22 @@ export async function getUserProfile(phone) {
         isMonthlyGoals: Boolean(status?.isMonthlyGoalsDay),
         isStorySummary: activeStoryTask(status),
         isPictureDescription: activePictureTask(status),
+        isShadowing: activeShadowingTask(status),
+        challengeType: activeShadowingTask(status) ? "shadowing_video" : undefined,
       }, status || {}),
       durationSettings: {
         durationDefaultMax: status?.durationDefaultMax ?? 300,
         durationDefaultFull: status?.durationDefaultFull ?? 300,
         durationStoryMax: status?.durationStoryMax ?? 180,
         durationStoryFull: status?.durationStoryFull ?? 180,
+        durationShadowingMax: status?.durationShadowingMax ?? 180,
+        durationShadowingFull: status?.durationShadowingFull ?? 180,
         durationWeeklyMax: status?.durationWeeklyMax ?? 420,
         durationWeeklyFull: status?.durationWeeklyFull ?? 300,
         durationMonthlyReflectionMax: status?.durationMonthlyReflectionMax ?? 420,
         durationMonthlyReflectionFull: status?.durationMonthlyReflectionFull ?? 420,
         durationMonthlyGoalsMax: status?.durationMonthlyGoalsMax ?? 600,
-        durationMonthlyGoalsFull: status?.durationMonthlyGoalsFull ?? 420,
+        durationMonthlyGoalsFull: status?.durationMonthlyGoalsFull ?? 600,
         durationPictureMax: status?.durationPictureMax ?? 180,
         durationPictureFull: status?.durationPictureFull ?? 180,
       },
@@ -566,6 +660,11 @@ export async function setTodayQuestion(topic, question, category) {
       todaySummaryGuide: null,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       todayImageUrl: null,
       todayImageSource: null,
       todayImagePageUrl: null,
@@ -692,6 +791,12 @@ export async function getSettings() {
           ? [status.pictureDescriptionDay]
           : (status.pictureDescriptionDay === -1 ? [] : [4])),
     pictureDescriptionDay: status.pictureDescriptionDay ?? (Array.isArray(status.pictureDescriptionDays) && status.pictureDescriptionDays.length > 0 ? status.pictureDescriptionDays[0] : -1),
+    shadowingDays: Array.isArray(status.shadowingDays)
+      ? status.shadowingDays
+      : (status.shadowingDay !== undefined && status.shadowingDay !== null && status.shadowingDay !== -1
+          ? [status.shadowingDay]
+          : (status.shadowingDay === -1 ? [] : [2])),
+    shadowingDay: status.shadowingDay ?? (Array.isArray(status.shadowingDays) && status.shadowingDays.length > 0 ? status.shadowingDays[0] : 2),
     coursePrice: status.coursePrice ?? status.paymentAmount ?? 5,
     taxAmount: status.taxAmount ?? 0,
     paymentAmount: status.paymentAmount ?? 5,
@@ -708,6 +813,8 @@ export async function getSettings() {
     durationMonthlyGoalsFull: status.durationMonthlyGoalsFull ?? 420,
     durationPictureMax: status.durationPictureMax ?? 180,
     durationPictureFull: status.durationPictureFull ?? 180,
+    durationShadowingMax: status.durationShadowingMax ?? 180,
+    durationShadowingFull: status.durationShadowingFull ?? 180,
     adminNotifyPhone: status.adminNotifyPhone || process.env.ADMIN_NOTIFY_PHONE || null,
     deploymentNotifyEnabled: status.deploymentNotifyEnabled !== false,
     prizeWinnerCount: status.prizeWinnerCount ?? 3,
@@ -755,7 +862,11 @@ export async function updateSettings(input, ...rest) {
       adminNotifyPhone,
       deploymentNotifyEnabled,
       storyDays,
-      pictureDescriptionDays
+      pictureDescriptionDays,
+      shadowingDays,
+      shadowingDay,
+      durationShadowingMax,
+      durationShadowingFull
     ] = [input, ...rest];
     params = {
       posterSendTime, questionGenerateTime, vocabWordCount, vocabRequiredCount, vocabLevel, storyWordCount, storyLevel, storyDay, storyDays,
@@ -769,6 +880,8 @@ export async function updateSettings(input, ...rest) {
       allowPrivateVideos,
       pictureDescriptionDay, pictureDescriptionDays,
       durationPictureMax, durationPictureFull,
+      shadowingDays, shadowingDay,
+      durationShadowingMax, durationShadowingFull,
       vocabNormalWordCount, vocabNormalRequiredCount,
       vocabStoryWordCount, vocabStoryRequiredCount,
       vocabPictureWordCount, vocabPictureRequiredCount,
@@ -799,6 +912,8 @@ export async function updateSettings(input, ...rest) {
     allowPrivateVideos,
     pictureDescriptionDay, pictureDescriptionDays,
     durationPictureMax, durationPictureFull,
+    shadowingDays, shadowingDay,
+    durationShadowingMax, durationShadowingFull,
     vocabNormalWordCount, vocabNormalRequiredCount,
     vocabStoryWordCount, vocabStoryRequiredCount,
     vocabPictureWordCount, vocabPictureRequiredCount,
@@ -1081,6 +1196,32 @@ export async function updateSettings(input, ...rest) {
     updates.pictureDescriptionDays = day === -1 ? [] : [day];
   }
 
+  if (shadowingDays !== undefined) {
+    if (!Array.isArray(shadowingDays)) {
+      const error = new Error("shadowingDays must be an array of day numbers (0-6)");
+      error.statusCode = 400;
+      throw error;
+    }
+    const parsed = shadowingDays.map(d => parseInt(d, 10));
+    if (parsed.some(d => isNaN(d) || d < 0 || d > 6)) {
+      const error = new Error("All days in shadowingDays must be numbers between 0 (Sunday) and 6 (Saturday)");
+      error.statusCode = 400;
+      throw error;
+    }
+    const uniqueDays = [...new Set(parsed)].sort((a, b) => a - b);
+    updates.shadowingDays = uniqueDays;
+    updates.shadowingDay = uniqueDays.length > 0 ? uniqueDays[0] : 2;
+  } else if (shadowingDay !== undefined) {
+    const day = parseInt(shadowingDay, 10);
+    if (isNaN(day) || day < -1 || day > 6) {
+      const error = new Error("shadowingDay must be -1 (disabled) or 0 (Sunday) through 6 (Saturday)");
+      error.statusCode = 400;
+      throw error;
+    }
+    updates.shadowingDay = day;
+    updates.shadowingDays = day === -1 ? [] : [day];
+  }
+
   if (coursePrice !== undefined || taxAmount !== undefined || paymentAmount !== undefined) {
     const currentStatus = await Status.findOne().select("coursePrice taxAmount paymentAmount").lean();
     let finalCp = coursePrice !== undefined
@@ -1130,6 +1271,8 @@ export async function updateSettings(input, ...rest) {
     { name: "durationMonthlyGoalsFull", label: "Monthly Goals Full Score Duration" },
     { name: "durationPictureMax", label: "Picture Description Max Duration" },
     { name: "durationPictureFull", label: "Picture Description Full Score Duration" },
+    { name: "durationShadowingMax", label: "Shadowing Activity Max Duration", minVal: 20, maxVal: 180 },
+    { name: "durationShadowingFull", label: "Shadowing Activity Full Score Duration", minVal: 20, maxVal: 180 },
   ];
 
   const durationArgs = {
@@ -1139,14 +1282,15 @@ export async function updateSettings(input, ...rest) {
     durationMonthlyReflectionMax, durationMonthlyReflectionFull,
     durationMonthlyGoalsMax, durationMonthlyGoalsFull,
     durationPictureMax, durationPictureFull,
+    durationShadowingMax, durationShadowingFull,
   };
 
-  for (const { name, label } of durationFields) {
+  for (const { name, label, minVal = 60, maxVal = 1200 } of durationFields) {
     const rawVal = durationArgs[name];
     if (rawVal !== undefined) {
       const val = parseInt(rawVal, 10);
-      if (isNaN(val) || val < 60 || val > 1200) {
-        const error = new Error(`${label} must be between 60 and 1200 seconds`);
+      if (isNaN(val) || val < minVal || val > maxVal) {
+        const error = new Error(`${label} must be between ${minVal} and ${maxVal} seconds`);
         error.statusCode = 400;
         throw error;
       }
@@ -1174,6 +1318,7 @@ export async function updateSettings(input, ...rest) {
   checkRelation("Monthly Reflection", "durationMonthlyReflectionMax", "durationMonthlyReflectionFull", 420, 420);
   checkRelation("Monthly Goals", "durationMonthlyGoalsMax", "durationMonthlyGoalsFull", 600, 420);
   checkRelation("Picture Description", "durationPictureMax", "durationPictureFull", 180, 180);
+  checkRelation("Shadowing Activity", "durationShadowingMax", "durationShadowingFull", 180, 180);
 
   if (allowPrivateVideos !== undefined) {
     updates.allowPrivateVideos = allowPrivateVideos === true || allowPrivateVideos === "true";
@@ -1286,6 +1431,11 @@ export async function enableMonthlyReflection() {
       isMonthlyGoalsDay: false,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       todayContentType: "question",
       todayAudioUrl: null,
       todayStoryTranscript: null,
@@ -1329,6 +1479,11 @@ export async function enableMonthlyGoals() {
       isMonthlyReflectionDay: false,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       todayContentType: "question",
       todayAudioUrl: null,
       todayStoryTranscript: null,
@@ -1374,6 +1529,20 @@ export async function enableStorySummaryDemo() {
 }
 
 /**
+ * Force shadowing challenge mode ON (admin only, for testing)
+ */
+export async function enableShadowingDemo() {
+  const { publishAutoShadowingVideo } = await import("../scheduler/questionSchedulerService.js");
+  const result = await publishAutoShadowingVideo();
+  if (!result.published) {
+    const error = new Error(result.error || "Failed to generate shadowing challenge");
+    error.statusCode = 500;
+    throw error;
+  }
+  return { success: true, message: `Shadowing challenge activated: "${result.topic}" — refresh the app to see it` };
+}
+
+/**
  * Turn off all special modes (admin only)
  */
 export async function disableSpecialModes() {
@@ -1383,6 +1552,11 @@ export async function disableSpecialModes() {
       isMonthlyGoalsDay: false,
       isStorySummaryDay: false,
       isPictureDescriptionDay: false,
+      isShadowingDay: false,
+      todayVideoUrl: null,
+      todayVideoDuration: null,
+      todayVideoTranscript: null,
+      todayVideoTitle: null,
       questionSentToday: false,
       todayTopic: null,
       todayQuestion: null,

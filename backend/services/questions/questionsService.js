@@ -22,6 +22,11 @@ export async function getRandomQuestion(category) {
   const skip = Math.floor(Math.random() * count);
   const question = await Question.findOne(filter).skip(skip).lean();
   
+  if (question?.videoUrl) {
+    const { resolvePlayableVideoUrl } = await import("../dashboard/dashboardService.js");
+    question.videoUrl = resolvePlayableVideoUrl(question.videoUrl);
+  }
+
   return question;
 }
 
@@ -38,6 +43,10 @@ export async function listQuestions(category, limit = 50, page = 1) {
     .lean();
   
   const total = await Question.countDocuments(filter);
+  const { resolvePlayableVideoUrl } = await import("../dashboard/dashboardService.js");
+  for (const q of questions) {
+    if (q.videoUrl) q.videoUrl = resolvePlayableVideoUrl(q.videoUrl);
+  }
   
   return {
     questions,
@@ -99,7 +108,7 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     throw new Error("setupType, scheduledFor, category, topic and question are required");
   }
 
-  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description"];
+  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"];
   if (!validTypes.includes(setupType)) {
     throw new Error("Invalid setupType. Must be one of: " + validTypes.join(", "));
   }
@@ -110,6 +119,10 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
 
   if (setupType === "picture_description" && !story.imageUrl) {
     throw new Error("imageUrl is required for picture description questions");
+  }
+
+  if (setupType === "shadowing_video" && !story.videoUrl) {
+    throw new Error("videoUrl is required for shadowing video tasks");
   }
 
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -144,30 +157,78 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     }
   }
 
-  const manualQuestion = await Question.create({
-    category,
-    topic,
-    question,
-    isManualSetup: true,
-    setupType,
-    contentType: setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : "question",
-    audioUrl: story.audioUrl || null,
-    storyTranscript: story.storyTranscript || null,
-    summaryGuide: story.summaryGuide || null,
-    imageUrl: story.imageUrl || null,
-    imageSource: story.imageSource || null,
-    imagePageUrl: story.imagePageUrl || null,
-    imagePhotographer: story.imagePhotographer || null,
-    imagePhotographerUrl: story.imagePhotographerUrl || null,
-    imageSearchQuery: story.imageSearchQuery || null,
-    imageInstructions: story.imageInstructions || null,
-    imageDifficulty: story.imageDifficulty || null,
-    speakingDuration: story.speakingDuration || null,
-    scheduledFor: scheduleDate,
-    scheduledTime: normalizedTime,
-    createdBy,
-    isUsed: publishNow ? true : false
-  });
+  let manualQuestion;
+  try {
+    manualQuestion = await Question.create({
+      category,
+      topic,
+      question,
+      isManualSetup: true,
+      setupType,
+      contentType: setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question",
+      audioUrl: story.audioUrl || null,
+      storyTranscript: story.storyTranscript || null,
+      summaryGuide: story.summaryGuide || null,
+      imageUrl: story.imageUrl || null,
+      imageSource: story.imageSource || null,
+      imagePageUrl: story.imagePageUrl || null,
+      imagePhotographer: story.imagePhotographer || null,
+      imagePhotographerUrl: story.imagePhotographerUrl || null,
+      imageSearchQuery: story.imageSearchQuery || null,
+      imageInstructions: story.imageInstructions || null,
+      imageDifficulty: story.imageDifficulty || null,
+      speakingDuration: story.speakingDuration || null,
+      videoUrl: story.videoUrl || null,
+      videoDuration: story.videoDuration || null,
+      videoTranscript: story.videoTranscript || null,
+      videoTitle: story.videoTitle || topic || null,
+      scheduledFor: scheduleDate,
+      scheduledTime: normalizedTime,
+      createdBy,
+      isUsed: publishNow ? true : false
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      // Duplicate key: find the colliding document and update it with the new setup
+      const existing = await Question.findOne({
+        $or: [{ question }, { topic }]
+      });
+      if (existing) {
+        existing.category = category;
+        existing.topic = topic;
+        existing.question = question;
+        existing.isManualSetup = true;
+        existing.setupType = setupType;
+        existing.contentType = setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question";
+        existing.audioUrl = story.audioUrl || existing.audioUrl || null;
+        existing.storyTranscript = story.storyTranscript || existing.storyTranscript || null;
+        existing.summaryGuide = story.summaryGuide || existing.summaryGuide || null;
+        existing.imageUrl = story.imageUrl || existing.imageUrl || null;
+        existing.imageSource = story.imageSource || existing.imageSource || null;
+        existing.imagePageUrl = story.imagePageUrl || existing.imagePageUrl || null;
+        existing.imagePhotographer = story.imagePhotographer || existing.imagePhotographer || null;
+        existing.imagePhotographerUrl = story.imagePhotographerUrl || existing.imagePhotographerUrl || null;
+        existing.imageSearchQuery = story.imageSearchQuery || existing.imageSearchQuery || null;
+        existing.imageInstructions = story.imageInstructions || existing.imageInstructions || null;
+        existing.imageDifficulty = story.imageDifficulty || existing.imageDifficulty || null;
+        existing.speakingDuration = story.speakingDuration || existing.speakingDuration || null;
+        existing.videoUrl = story.videoUrl || existing.videoUrl || null;
+        existing.videoDuration = story.videoDuration || existing.videoDuration || null;
+        existing.videoTranscript = story.videoTranscript || existing.videoTranscript || null;
+        existing.videoTitle = story.videoTitle || topic || existing.videoTitle || null;
+        existing.scheduledFor = scheduleDate;
+        existing.scheduledTime = normalizedTime;
+        existing.createdBy = createdBy || existing.createdBy;
+        existing.isUsed = publishNow ? true : existing.isUsed;
+        await existing.save();
+        manualQuestion = existing;
+      } else {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   if (publishNow) {
     const { publishManualQuestion } = await import("../scheduler/questionSchedulerService.js");
@@ -196,6 +257,11 @@ export async function listManualQuestions(setupType, upcomingOnly = false) {
   const questions = await Question.find(filter)
     .sort({ scheduledFor: 1 })
     .lean();
+
+  const { resolvePlayableVideoUrl } = await import("../dashboard/dashboardService.js");
+  for (const q of questions) {
+    if (q.videoUrl) q.videoUrl = resolvePlayableVideoUrl(q.videoUrl);
+  }
 
   return questions;
 }
@@ -237,9 +303,13 @@ export async function updateManualQuestion(questionId, data, userPhone) {
     imageInstructions,
     imageDifficulty,
     speakingDuration,
+    videoUrl,
+    videoDuration,
+    videoTranscript,
+    videoTitle,
   } = data;
 
-  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description"];
+  const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"];
   const finalSetupType = setupType || question.setupType;
   if (!validTypes.includes(finalSetupType)) {
     const error = new Error("Invalid setupType. Must be one of: " + validTypes.join(", "));
@@ -255,6 +325,12 @@ export async function updateManualQuestion(questionId, data, userPhone) {
 
   if (finalSetupType === "picture_description" && !imageUrl && !question.imageUrl) {
     const error = new Error("imageUrl is required for picture description questions");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (finalSetupType === "shadowing_video" && !videoUrl && !question.videoUrl) {
+    const error = new Error("videoUrl is required for shadowing video tasks");
     error.statusCode = 400;
     throw error;
   }
@@ -310,7 +386,7 @@ export async function updateManualQuestion(questionId, data, userPhone) {
   if (topic) question.topic = topic;
   if (questionText) question.question = questionText;
   question.setupType = finalSetupType;
-  question.contentType = finalSetupType === "story_summary" ? "story_audio" : finalSetupType === "picture_description" ? "picture_description" : "question";
+  question.contentType = finalSetupType === "story_summary" ? "story_audio" : finalSetupType === "picture_description" ? "picture_description" : finalSetupType === "shadowing_video" ? "shadowing_video" : "question";
   question.scheduledFor = scheduleDate;
   question.scheduledTime = normalizedTime;
   if (audioUrl !== undefined) question.audioUrl = audioUrl || null;
@@ -325,6 +401,10 @@ export async function updateManualQuestion(questionId, data, userPhone) {
   if (imageInstructions !== undefined) question.imageInstructions = imageInstructions || null;
   if (imageDifficulty !== undefined) question.imageDifficulty = imageDifficulty || null;
   if (speakingDuration !== undefined) question.speakingDuration = speakingDuration || null;
+  if (videoUrl !== undefined) question.videoUrl = videoUrl || null;
+  if (videoDuration !== undefined) question.videoDuration = videoDuration || null;
+  if (videoTranscript !== undefined) question.videoTranscript = videoTranscript || null;
+  if (videoTitle !== undefined) question.videoTitle = videoTitle || null;
 
   await question.save();
 
@@ -334,6 +414,7 @@ export async function updateManualQuestion(questionId, data, userPhone) {
     if (status) {
       const isActiveType = (finalSetupType === "story_summary" && status.todayContentType === "story_audio")
         || (finalSetupType === "picture_description" && status.todayContentType === "picture_description")
+        || (finalSetupType === "shadowing_video" && status.todayContentType === "shadowing_video")
         || (finalSetupType === "monthly_reflection" && status.isMonthlyReflectionDay)
         || (finalSetupType === "monthly_goals" && status.isMonthlyGoalsDay);
 
@@ -350,6 +431,10 @@ export async function updateManualQuestion(questionId, data, userPhone) {
         if (imagePhotographer !== undefined) status.todayImagePhotographer = imagePhotographer || null;
         if (imagePhotographerUrl !== undefined) status.todayImagePhotographerUrl = imagePhotographerUrl || null;
         if (imageInstructions !== undefined) status.todayImageInstructions = imageInstructions || null;
+        if (videoUrl !== undefined) status.todayVideoUrl = videoUrl || null;
+        if (videoDuration !== undefined) status.todayVideoDuration = videoDuration || null;
+        if (videoTranscript !== undefined) status.todayVideoTranscript = videoTranscript || null;
+        if (videoTitle !== undefined) status.todayVideoTitle = videoTitle || null;
         await status.save();
       }
     }
@@ -465,6 +550,11 @@ export async function getQuestionTemplates() {
       "Describe what you see in the image. Mention the people, setting, and actions. Share what you think might be happening.",
       "Look at the image carefully. Describe the scene in detail, then explain what you think is happening and how it makes you feel.",
       "Describe the image from foreground to background. What stands out most? What story does this picture tell?"
+    ],
+    shadowing_video: [
+      "Watch the speaker carefully and shadow every word out loud with identical pacing, emotion, and pauses.",
+      "Listen and mimic the speaker's vocal projection, intonation, and rhythm in real time without stopping.",
+      "Shadow this executive communication speech. Match the speaker's breathing cadence and emphasis on key words."
     ]
   };
 

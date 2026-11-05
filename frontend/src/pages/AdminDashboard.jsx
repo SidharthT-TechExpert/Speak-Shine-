@@ -436,6 +436,8 @@ export default function AdminDashboard() {
     storyDay: 6,
     pictureDescriptionDays: [4],
     pictureDescriptionDay: 4,
+    shadowingDays: [2],
+    shadowingDay: 2,
     coursePrice: 5,
     taxAmount: 0,
     paymentAmount: 5,
@@ -452,6 +454,8 @@ export default function AdminDashboard() {
     durationMonthlyGoalsFull: 420,
     durationPictureMax: 180,
     durationPictureFull: 180,
+    durationShadowingMax: 180,
+    durationShadowingFull: 180,
     adminNotifyPhone: "",
     deploymentNotifyEnabled: true,
   });
@@ -940,6 +944,10 @@ export default function AdminDashboard() {
           ? s.data.pictureDescriptionDays
           : (s.data.pictureDescriptionDay !== undefined && s.data.pictureDescriptionDay !== -1 ? [s.data.pictureDescriptionDay] : [4]),
         pictureDescriptionDay: s.data.pictureDescriptionDay ?? (Array.isArray(s.data.pictureDescriptionDays) && s.data.pictureDescriptionDays.length > 0 ? s.data.pictureDescriptionDays[0] : -1),
+        shadowingDays: Array.isArray(s.data.shadowingDays)
+          ? s.data.shadowingDays
+          : (s.data.shadowingDay !== undefined && s.data.shadowingDay !== -1 ? [s.data.shadowingDay] : [2]),
+        shadowingDay: s.data.shadowingDay ?? (Array.isArray(s.data.shadowingDays) && s.data.shadowingDays.length > 0 ? s.data.shadowingDays[0] : 2),
         coursePrice: s.data.coursePrice ?? s.data.paymentAmount ?? 5,
         taxAmount: s.data.taxAmount ?? 0,
         paymentAmount: s.data.paymentAmount ?? ((s.data.coursePrice ?? 5) + (s.data.taxAmount ?? 0)),
@@ -956,6 +964,8 @@ export default function AdminDashboard() {
         durationMonthlyGoalsFull: s.data.durationMonthlyGoalsFull ?? 420,
         durationPictureMax:  s.data.durationPictureMax  ?? 180,
         durationPictureFull: s.data.durationPictureFull ?? 180,
+        durationShadowingMax:  s.data.durationShadowingMax  ?? 180,
+        durationShadowingFull: s.data.durationShadowingFull ?? 180,
         adminNotifyPhone: s.data.adminNotifyPhone || "",
         deploymentNotifyEnabled: s.data.deploymentNotifyEnabled !== false,
         prizeWinnerCount: s.data.prizeWinnerCount ?? 3,
@@ -1456,6 +1466,10 @@ export default function AdminDashboard() {
           ? fresh.data.pictureDescriptionDays
           : (fresh.data.pictureDescriptionDay !== undefined && fresh.data.pictureDescriptionDay !== -1 ? [fresh.data.pictureDescriptionDay] : [4]),
         pictureDescriptionDay: fresh.data.pictureDescriptionDay ?? -1,
+        shadowingDays: Array.isArray(fresh.data.shadowingDays)
+          ? fresh.data.shadowingDays
+          : (fresh.data.shadowingDay !== undefined && fresh.data.shadowingDay !== -1 ? [fresh.data.shadowingDay] : [2]),
+        shadowingDay: fresh.data.shadowingDay ?? 2,
         coursePrice: fresh.data.coursePrice ?? fresh.data.paymentAmount ?? 5,
         taxAmount: fresh.data.taxAmount ?? 0,
         paymentAmount: fresh.data.paymentAmount ?? ((fresh.data.coursePrice ?? 5) + (fresh.data.taxAmount ?? 0)),
@@ -1472,6 +1486,8 @@ export default function AdminDashboard() {
         durationMonthlyGoalsFull: fresh.data.durationMonthlyGoalsFull ?? 420,
         durationPictureMax:  fresh.data.durationPictureMax  ?? 180,
         durationPictureFull: fresh.data.durationPictureFull ?? 180,
+        durationShadowingMax:  fresh.data.durationShadowingMax  ?? 180,
+        durationShadowingFull: fresh.data.durationShadowingFull ?? 180,
         adminNotifyPhone: fresh.data.adminNotifyPhone || "",
         deploymentNotifyEnabled: fresh.data.deploymentNotifyEnabled !== false,
       }));
@@ -6992,6 +7008,7 @@ export default function AdminDashboard() {
                     { id: "monthly", icon: "💬", title: "Monthly Reflection Day", full: "durationMonthlyReflectionFull", max: "durationMonthlyReflectionMax", color: "#60a5fa" },
                     { id: "goals", icon: "🎯", title: "Monthly Goals Day", full: "durationMonthlyGoalsFull", max: "durationMonthlyGoalsMax", color: "#f472b6" },
                     { id: "picture", icon: "🖼️", title: "Picture Description Day", full: "durationPictureFull", max: "durationPictureMax", color: "#38bdf8" },
+                    { id: "shadowing", icon: "🎙️", title: "Shadowing Activity Day", full: "durationShadowingFull", max: "durationShadowingMax", color: "#ec4899", minVal: 20, maxLimit: 180, hint: "Audio must be ≤ 3 min (180s)" },
                   ].map(item => (
                     <div
                       key={item.id}
@@ -7017,9 +7034,9 @@ export default function AdminDashboard() {
                           <input
                             className="form-input"
                             type="number"
-                            min={60} max={1200}
+                            min={item.minVal || 60} max={item.maxLimit || 1200}
                             value={settings[item.full]}
-                            onChange={e => setSettings(s => ({ ...s, [item.full]: parseInt(e.target.value) || 60 }))}
+                            onChange={e => setSettings(s => ({ ...s, [item.full]: Math.min(item.maxLimit || 1200, Math.max(item.minVal || 60, parseInt(e.target.value) || (item.minVal || 60))) }))}
                             required
                             style={{ textAlign: "center", padding: "0.4rem", fontSize: "0.95rem" }}
                           />
@@ -7035,9 +7052,9 @@ export default function AdminDashboard() {
                           <input
                             className="form-input"
                             type="number"
-                            min={60} max={1200}
+                            min={item.minVal || 60} max={item.maxLimit || 1200}
                             value={settings[item.max]}
-                            onChange={e => setSettings(s => ({ ...s, [item.max]: parseInt(e.target.value) || 60 }))}
+                            onChange={e => setSettings(s => ({ ...s, [item.max]: Math.min(item.maxLimit || 1200, Math.max(item.minVal || 60, parseInt(e.target.value) || (item.minVal || 60))) }))}
                             required
                             style={{ textAlign: "center", padding: "0.4rem", fontSize: "0.95rem" }}
                           />
@@ -7046,6 +7063,12 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </div>
+
+                      {item.hint && (
+                        <div style={{ fontSize: "0.72rem", color: item.color, textAlign: "center", fontWeight: 600 }}>
+                          {item.hint}
+                        </div>
+                      )}
                     </div>
                   ))}
 
@@ -7075,11 +7098,19 @@ export default function AdminDashboard() {
               <form onSubmit={e => saveSettings(e, "vocab")}>
                 
                 {/* Vocabulary Word Count Targets Grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
+                <div style={{ marginBottom: "0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--text)" }}>
+                    🎯 Target Vocabulary Words Required in Student Speech:
+                  </span>
+                  <span style={{ fontSize: "0.75rem", background: "rgba(99,102,241,0.12)", color: "#818cf8", padding: "0.2rem 0.55rem", borderRadius: 6, fontWeight: 600 }}>
+                    💡 Challenge topics are managed in Manual Questions &amp; Question Bank
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
                   {[
-                    { key: "Normal", label: "🗣️ Normal Daily Topics", words: "vocabNormalWordCount", required: "vocabNormalRequiredCount" },
-                    { key: "Story", label: "📖 Story Summary Day", words: "vocabStoryWordCount", required: "vocabStoryRequiredCount" },
-                    { key: "Picture", label: "🖼️ Picture Description Day", words: "vocabPictureWordCount", required: "vocabPictureRequiredCount" },
+                    { key: "Normal", label: "🗣️ Normal Daily Practice", words: "vocabNormalWordCount", required: "vocabNormalRequiredCount" },
+                    { key: "Story", label: "📖 Story Summary Task", words: "vocabStoryWordCount", required: "vocabStoryRequiredCount" },
+                    { key: "Picture", label: "🖼️ Picture Description Task", words: "vocabPictureWordCount", required: "vocabPictureRequiredCount" },
                   ].map(({ key, label, words, required }) => (
                     <div key={key} style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg-secondary)" }}>
                       <div style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.6rem" }}>{label}</div>
@@ -7099,6 +7130,29 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Shadowing Activity Vocabulary Waived Card */}
+                  <div style={{ padding: "1rem", border: "1px solid rgba(236,72,153,0.35)", borderRadius: 12, background: "rgba(236,72,153,0.06)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.35rem", color: "#ec4899", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>🎬 Shadowing Activity Day</span>
+                        <span style={{ fontSize: "0.68rem", background: "rgba(52,211,153,0.15)", color: "#34d399", padding: "1px 6px", borderRadius: 8, fontWeight: 700 }}>Waived</span>
+                      </div>
+                      <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem", lineHeight: 1.4 }}>
+                        <strong>Vocabulary Scoring Waived:</strong> Students mimic the video speech directly. No vocab targets are scored. <em>(Admin can set, edit, or customize any Topic in Question Bank).</em>
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", opacity: 0.9 }}>
+                      <div style={{ flex: 1, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 8, padding: "0.35rem" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Words Shown</span>
+                        <strong style={{ fontSize: "0.85rem", color: "#34d399" }}>0 (Waived)</strong>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 8, padding: "0.35rem" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Words Required</span>
+                        <strong style={{ fontSize: "0.85rem", color: "#34d399" }}>0 (Waived)</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* CEFR Level Selector */}
@@ -7365,6 +7419,100 @@ export default function AdminDashboard() {
                         <div style={{ fontSize: "0.76rem", color: "var(--muted)" }}>
                           Runs on: {currentDays.length > 0 ? (
                             <strong style={{ color: "#38bdf8" }}>
+                              {currentDays.map(d => dayNames[d]).join(", ")}
+                            </strong>
+                          ) : (
+                            <span style={{ color: "var(--muted)", fontStyle: "italic" }}>Disabled (No days selected)</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Shadowing Activity Days (Multi-select) */}
+                  <div style={{ padding: "1rem 1.15rem", borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", flexWrap: "wrap", gap: "0.3rem" }}>
+                      <div>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: "0.86rem", margin: 0, color: "#ec4899" }}>
+                          🎙️ Shadowing Activity Days
+                        </label>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}> (default: Tuesday, audio ≤ 3 min)</span>
+                      </div>
+                      <div style={{ display: "flex", gap: "0.3rem" }}>
+                        <button
+                          type="button"
+                          onClick={() => setSettings(s => ({ ...s, shadowingDays: [0,1,2,3,4,5,6], shadowingDay: 0 }))}
+                          style={{ background: "none", border: "none", color: "#ec4899", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem", fontWeight: 600 }}
+                        >
+                          All
+                        </button>
+                        <span style={{ color: "var(--muted)", fontSize: "0.72rem" }}>|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSettings(s => ({ ...s, shadowingDays: [2], shadowingDay: 2 }))}
+                          style={{ background: "none", border: "none", color: "#ec4899", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem", fontWeight: 600 }}
+                        >
+                          Tue Only
+                        </button>
+                        <span style={{ color: "var(--muted)", fontSize: "0.72rem" }}>|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSettings(s => ({ ...s, shadowingDays: [], shadowingDay: -1 }))}
+                          style={{ background: "none", border: "none", color: "var(--muted)", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem" }}
+                        >
+                          Clear / Off
+                        </button>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem" }}>
+                      Select which days of the week to automatically generate and publish native human speaker audio shadowing challenges.
+                    </p>
+                    <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.6rem" }}>
+                      {[
+                        { d: 0, label: "Sun" }, { d: 1, label: "Mon" }, { d: 2, label: "Tue" },
+                        { d: 3, label: "Wed" }, { d: 4, label: "Thu" }, { d: 5, label: "Fri" }, { d: 6, label: "Sat" }
+                      ].map(({ d, label }) => {
+                        const currentDays = Array.isArray(settings.shadowingDays)
+                          ? settings.shadowingDays
+                          : (settings.shadowingDay !== undefined && settings.shadowingDay !== -1 ? [settings.shadowingDay] : [2]);
+                        const isSelected = currentDays.includes(d);
+                        return (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => {
+                              const updated = isSelected
+                                ? currentDays.filter(day => day !== d)
+                                : [...currentDays, d].sort((a, b) => a - b);
+                              setSettings(s => ({ ...s, shadowingDays: updated, shadowingDay: updated[0] ?? -1 }));
+                            }}
+                            style={{
+                              padding: "0.35rem 0.65rem", borderRadius: 14, fontSize: "0.78rem", fontWeight: 700,
+                              border: isSelected ? "2px solid #ec4899" : "1px solid var(--border)",
+                              background: isSelected ? "rgba(236,72,153,0.22)" : "rgba(255,255,255,0.03)",
+                              color: isSelected ? "#ec4899" : "var(--muted)",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.25rem",
+                            }}
+                          >
+                            {isSelected && <span style={{ fontSize: "0.7rem" }}>✓</span>}
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const currentDays = Array.isArray(settings.shadowingDays)
+                        ? settings.shadowingDays
+                        : (settings.shadowingDay !== undefined && settings.shadowingDay !== -1 ? [settings.shadowingDay] : [2]);
+                      const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+                      return (
+                        <div style={{ fontSize: "0.76rem", color: "var(--muted)" }}>
+                          Runs on: {currentDays.length > 0 ? (
+                            <strong style={{ color: "#ec4899" }}>
                               {currentDays.map(d => dayNames[d]).join(", ")}
                             </strong>
                           ) : (
@@ -8631,18 +8779,112 @@ function ManualQuestionsPanel() {
     imagePageUrl: "",
     imagePhotographer: "",
     imagePhotographerUrl: "",
-    imageInstructions: ""
+    imageInstructions: "",
+    videoUrl: "",
+    videoDuration: 60,
+    videoTranscript: "",
+    videoTitle: ""
   });
   const [saving, setSaving] = useState(false);
   const [generatingStory, setGeneratingStory] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [generatingPicture, setGeneratingPicture] = useState(false);
+  const [generatingShadowing, setGeneratingShadowing] = useState(false);
   const [voiceRecommendation, setVoiceRecommendation] = useState(null);
   const [selectedVoiceId, setSelectedVoiceId] = useState("21m00Tcm4TlvDq8ikWAM");
   const [analyzingVoice, setAnalyzingVoice] = useState(false);
   const [busy, setBusy] = useState({});
   const [toast, setToast] = useState(null);
   const [selectedTemplate, setSelectedTemplate] = useState("");
+
+  const handleGenerateShadowing = async () => {
+    setGeneratingShadowing(true);
+    try {
+      const res = await api.post("/questions/generate-shadowing-video", {
+        targetDuration: form.videoDuration || 75,
+        topic: form.topic?.trim() || undefined,
+      }, {
+        timeout: 120000 // 2 minutes timeout for audio download, whisper transcribing, and slicing
+      });
+      const { title, topic, instructions, videoUrl, audioUrl, videoDuration, videoTranscript } = res.data;
+      const finalAudio = audioUrl || videoUrl || "";
+      setForm(f => ({
+        ...f,
+        topic: topic || title || f.topic,
+        question: instructions || f.question,
+        videoUrl: finalAudio,
+        audioUrl: finalAudio,
+        videoDuration: videoDuration || 60,
+        videoTranscript: videoTranscript || "",
+        videoTitle: title || topic || "",
+        category: "Shadowing Practice",
+      }));
+      notify("🎙️ Native podcast speech ingested & sliced! All fields populated.");
+    } catch (err) {
+      console.error("[AdminDashboard] Shadowing generate error:", err);
+      const errMsg = err.response?.data?.error || (err.code === "ECONNABORTED" ? "Request timed out while downloading and processing podcast audio. Please try again." : err.message) || "Shadowing generation failed";
+      notify(errMsg, "error");
+    } finally {
+      setGeneratingShadowing(false);
+    }
+  };
+
+  const CURATED_SHADOWING_LESSONS = [
+    {
+      title: "Mastering Confident English Introductions",
+      topic: "Public Speaking & First Impressions",
+      videoDuration: 72,
+      audioUrl: "/shadowing/stage-presence.mp3",
+      videoUrl: "/shadowing/stage-presence.mp3",
+      videoTranscript: "Confidence is not something you are born with; it is an active habit you build every single day. When you introduce yourself in English, stand tall, make warm eye contact, and speak with a steady, relaxed breath. You don't need complex vocabulary or rapid speech to make a powerful first impression. Clear pronunciation, a friendly smile, and genuine enthusiasm will speak louder than flawless grammar. Focus on connecting with your listener, one clear phrase at a time.",
+      instructions: "Listen to the speaker and shadow along at the exact same rhythm and speed. Focus on breath control, pauses, and confident intonation."
+    },
+    {
+      title: "The Art of Active Listening & Executive Presence",
+      topic: "Effective Communication & Presence",
+      videoDuration: 78,
+      audioUrl: "/shadowing/active-listening.mp3",
+      videoUrl: "/shadowing/active-listening.mp3",
+      videoTranscript: "Great conversationalists are rarely the loudest voices in the room. They are the ones who listen attentively and respond with purpose. In English conversations, active listening means nodding, summarizing key points, and asking thoughtful follow-up questions. When you shadow this exercise, observe how natural pauses allow you to process thoughts before speaking. Speaking well begins with listening deeply and pacing your delivery with calm authority.",
+      instructions: "Shadow each phrase out loud without stopping. Match the speaker's natural pauses and emphasize key thought groups."
+    },
+    {
+      title: "Overcoming Hesitation & Fear of Making Mistakes",
+      topic: "Fluency & Mindset",
+      videoDuration: 84,
+      audioUrl: "/shadowing/fluency-mindset.mp3",
+      videoUrl: "/shadowing/fluency-mindset.mp3",
+      videoTranscript: "Every language learner experiences that brief moment of hesitation right before speaking. Your mind searches for the perfect word, and fear whispers that you might make a mistake. The secret is simple: give yourself permission to speak imperfectly. Fluency begins when you value expressing your ideas over seeking mechanical perfection. Keep your vocal flow continuous, embrace small errors as stepping stones, and trust your practice.",
+      instructions: "Speak along with the audio with zero hesitation. Keep your vocal flow continuous and smooth throughout."
+    },
+    {
+      title: "How Great Speakers Use Intentional Pauses",
+      topic: "Vocal Pacing & Public Speaking",
+      videoDuration: 68,
+      audioUrl: "/shadowing/intentional-pauses.mp3",
+      videoUrl: "/shadowing/intentional-pauses.mp3",
+      videoTranscript: "Novice speakers rush because they fear silence, but master speakers know that silence is where true authority lives. When you deliver an important idea, pause for two beats. Give your audience space to absorb your meaning. Breathing between sentences lowers your heart rate and steadies your pitch. Practice this rhythm: speak a complete thought, pause calmly, and begin the next phrase with clear intention.",
+      instructions: "Shadow each thought group. Notice how each sentence finishes with a relaxed, measured pause."
+    },
+    {
+      title: "The Compounding Power of Daily Speaking Habits",
+      topic: "Personal Growth & Consistency",
+      videoDuration: 75,
+      audioUrl: "/shadowing/speaking-habits.mp3",
+      videoUrl: "/shadowing/speaking-habits.mp3",
+      videoTranscript: "Small consistent daily habits always beat sporadic bursts of extreme effort. Spending five focused minutes shadowing English speech every day rewires your speech muscles and builds effortless muscle memory. You do not need hours of study each night; all you need is relentless consistency. Celebrate every small win, remain curious, and trust the compounding power of daily progress.",
+      instructions: "Shadow each phrase as you hear it. Mimic the speaker's vocal energy, rhythm, and cadence."
+    },
+    {
+      title: "Turning Nervous Energy into Charismatic Presence",
+      topic: "Stage Presence & Communication",
+      videoDuration: 80,
+      audioUrl: "/shadowing/charismatic-presence.mp3",
+      videoUrl: "/shadowing/charismatic-presence.mp3",
+      videoTranscript: "Stage fright and excitement produce the exact same physiological reaction: rapid heartbeat and heightened adrenaline. The only difference is your mental label. Instead of telling yourself you are nervous, tell yourself you are energized to share a message. Ground your feet into the floor, release tension in your shoulders, and channel that surge of energy into vocal warmth and conviction.",
+      instructions: "Mimic the speaker's grounded energy and vocal projection. Project each syllable with clarity."
+    }
+  ];
 
   const notify = (msg, type = "success") => {
     setToast({ msg, type });
@@ -8816,7 +9058,11 @@ function ManualQuestionsPanel() {
       imagePageUrl: "",
       imagePhotographer: "",
       imagePhotographerUrl: "",
-      imageInstructions: ""
+      imageInstructions: "",
+      videoUrl: "",
+      videoDuration: 60,
+      videoTranscript: "",
+      videoTitle: ""
     });
     setSelectedTemplate("");
     setShowForm(false);
@@ -8842,7 +9088,11 @@ function ManualQuestionsPanel() {
       imagePageUrl: q.imagePageUrl || "",
       imagePhotographer: q.imagePhotographer || "",
       imagePhotographerUrl: q.imagePhotographerUrl || "",
-      imageInstructions: q.imageInstructions || ""
+      imageInstructions: q.imageInstructions || "",
+      videoUrl: q.videoUrl || "",
+      videoDuration: q.videoDuration || 60,
+      videoTranscript: q.videoTranscript || "",
+      videoTitle: q.videoTitle || ""
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -8850,6 +9100,16 @@ function ManualQuestionsPanel() {
 
   const setupQuestion = async (e) => {
     e.preventDefault();
+    if (form.setupType === "shadowing_video") {
+      if (!form.videoUrl) {
+        notify("Please enter a Video URL or use AI Generate Shadowing Video", "error");
+        return;
+      }
+      if (Number(form.videoDuration) > 180) {
+        notify("Video length must be 3 minutes (180 seconds) or less for Shadowing Activity", "error");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const payload = {
@@ -8915,6 +9175,7 @@ function ManualQuestionsPanel() {
     normal: "Normal Question (Daily Practice Prompt)",
     story_summary: "Story Summary (Listening Practice)",
     picture_description: "Picture Description Challenge",
+    shadowing_video: "Shadowing Activity (Native Audio Shadowing)",
     monthly_reflection: "Monthly Reflection (Last day of month)",
     monthly_goals: "Monthly Goals (1st of month)"
   };
@@ -8923,6 +9184,7 @@ function ManualQuestionsPanel() {
     normal: manualQuestions.filter(q => q.setupType === "normal" || q.setupType === "regular"),
     story_summary: manualQuestions.filter(q => q.setupType === "story_summary"),
     picture_description: manualQuestions.filter(q => q.setupType === "picture_description"),
+    shadowing_video: manualQuestions.filter(q => q.setupType === "shadowing_video"),
     monthly_reflection: manualQuestions.filter(q => q.setupType === "monthly_reflection"),
     monthly_goals: manualQuestions.filter(q => q.setupType === "monthly_goals"),
   };
@@ -9068,10 +9330,10 @@ function ManualQuestionsPanel() {
                       ...f, 
                       setupType: newType,
                       scheduledFor: getDefaultDate(newType),
-                      scheduledTime: (newType === "story_summary" || newType === "picture_description") ? getCurrentTime() : f.scheduledTime,
-                      category: newType === "normal" ? (f.category && f.category !== "Monthly Reflection" && f.category !== "Monthly Goals" ? f.category : "General") : newType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                      topic: newType === "normal" ? f.topic : newType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                      question: newType === "story_summary" ? "Listen to the story audio and record a short video summary in your own words." : newType === "picture_description" ? "Describe what you see in the image. Mention the people, setting, and actions. Share what you think might be happening." : f.question
+                      scheduledTime: (newType === "story_summary" || newType === "picture_description" || newType === "shadowing_video") ? getCurrentTime() : f.scheduledTime,
+                      category: newType === "normal" ? (f.category && f.category !== "Monthly Reflection" && f.category !== "Monthly Goals" ? f.category : "General") : newType === "shadowing_video" ? "Shadowing Practice" : newType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                      topic: newType === "normal" ? f.topic : newType === "shadowing_video" ? (f.topic || "Daily Shadowing Challenge") : newType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                      question: newType === "story_summary" ? "Listen to the story audio and record a short video summary in your own words." : newType === "picture_description" ? "Describe what you see in the image. Mention the people, setting, and actions. Share what you think might be happening." : newType === "shadowing_video" ? "Watch the video and practice shadowing by repeating every sentence simultaneously with the speaker." : f.question
                     }));
                     setSelectedTemplate("");
                   }}
@@ -9095,11 +9357,11 @@ function ManualQuestionsPanel() {
                     />
                   </div>
                   <div style={{ marginTop: "0.75rem" }}>
-                    <label className="form-label">Scheduled Time {form.setupType === "story_summary" || form.setupType === "picture_description" ? "*" : "(optional)"}</label>
+                    <label className="form-label">Scheduled Time {form.setupType === "story_summary" || form.setupType === "picture_description" || form.setupType === "shadowing_video" ? "*" : "(optional)"}</label>
                     <input
                       className="form-input"
                       type="time"
-                      required={form.setupType === "story_summary" || form.setupType === "picture_description"}
+                      required={form.setupType === "story_summary" || form.setupType === "picture_description" || form.setupType === "shadowing_video"}
                       value={form.scheduledTime}
                       onChange={e => setForm(f => ({ ...f, scheduledTime: e.target.value }))}
                     />
@@ -9388,6 +9650,152 @@ function ManualQuestionsPanel() {
                 </div>
               </>
             )}
+            {form.setupType === "shadowing_video" && (
+              <>
+                {/* 1-Click Fully Automated Podcast Fetcher & Slicer */}
+                <div style={{ marginBottom: "0.85rem", padding: "0.85rem 1rem", borderRadius: 12, background: "linear-gradient(135deg, rgba(236,72,153,0.12), rgba(168,85,247,0.08))", border: "1px solid rgba(236,72,153,0.35)" }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={generatingShadowing}
+                    onClick={handleGenerateShadowing}
+                    style={{
+                      width: "100%",
+                      marginBottom: "0.45rem",
+                      background: "linear-gradient(135deg, #ec4899, #8b5cf6)",
+                      border: "none",
+                      padding: "0.75rem 1rem",
+                      fontWeight: 800,
+                      fontSize: "0.92rem",
+                      borderRadius: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      boxShadow: "0 4px 15px rgba(236, 72, 153, 0.35)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {generatingShadowing ? "⚡ Ingesting Podcast & AI Slicing Native Audio…" : "⚡ 1-Click Auto-Ingest & Slice Native Podcast Audio"}
+                  </button>
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
+                    Fully automated: grabs latest Stanford/TED podcast episode, transcribes with Whisper, and slices optimal 60-180s continuous speech. Zero manual admin entry needed!
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "0.85rem", padding: "0.85rem 1rem", borderRadius: 12, background: "rgba(236,72,153,0.08)", border: "1px solid rgba(236,72,153,0.3)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                    <span style={{ fontSize: "1.2rem" }}>🎙️</span>
+                    <div>
+                      <strong style={{ fontSize: "0.88rem", color: "#f472b6" }}>Native Speaker Human Audio (No AI Generation)</strong>
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
+                        Pick from authentic real human speaker lessons below, or paste any external native speaker MP3 audio link with transcript.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Curated 1080p Real-Speaker Speech Library Dropdown */}
+                <div style={{ marginBottom: "0.85rem", padding: "0.85rem", borderRadius: 10, background: "rgba(236,72,153,0.06)", border: "1px solid rgba(236,72,153,0.25)" }}>
+                  <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#f472b6", marginBottom: "0.4rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>📻 Pick from Native Human Speaker Audio Bank</span>
+                    <span style={{ fontSize: "0.68rem", background: "rgba(34,197,94,0.15)", color: "#22c55e", padding: "0.1rem 0.4rem", borderRadius: 4, fontWeight: 700 }}>100% Human Native Voice</span>
+                  </div>
+                  <select
+                    className="form-input"
+                    style={{ fontSize: "0.82rem" }}
+                    onChange={e => {
+                      const idx = parseInt(e.target.value, 10);
+                      if (!isNaN(idx) && CURATED_SHADOWING_LESSONS[idx]) {
+                        const item = CURATED_SHADOWING_LESSONS[idx];
+                        setForm(f => ({
+                          ...f,
+                          videoTitle: item.title,
+                          topic: item.topic,
+                          question: item.instructions,
+                          videoUrl: item.videoUrl,
+                          videoDuration: item.videoDuration,
+                          videoTranscript: item.videoTranscript,
+                          category: "Shadowing Practice"
+                        }));
+                        notify(`Loaded curated lesson: "${item.title}"`);
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select a curated TED-style public speaking lesson...</option>
+                    {CURATED_SHADOWING_LESSONS.map((item, idx) => (
+                      <option key={idx} value={idx}>
+                        {item.title} ({item.videoDuration}s) — {item.topic}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: "0.71rem", color: "var(--muted)", marginTop: "0.35rem" }}>
+                    Authentic human public speaking & communication audio clips with aligned scripts. No synthetic/robotic AI generation.
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <label className="form-label">Video Title / Topic *</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="e.g. Master the Art of Public Speaking"
+                    required
+                    value={form.videoTitle}
+                    onChange={e => setForm(f => ({ ...f, videoTitle: e.target.value, topic: e.target.value || f.topic }))}
+                  />
+                </div>
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <label className="form-label">Native Speaker Audio URL (MP3) * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(direct human audio stream link, max 3 min)</span></label>
+                  <input
+                    className="form-input"
+                    type="url"
+                    placeholder="https://.../video.mp4"
+                    required
+                    value={form.videoUrl}
+                    onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value }))}
+                  />
+                  {form.videoUrl && (
+                    <div style={{ marginTop: "0.5rem", padding: "0.65rem 0.85rem", borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(236,72,153,0.3)", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <span style={{ fontSize: "1.1rem" }}>🔊</span>
+                      <audio
+                        src={form.videoUrl}
+                        controls
+                        style={{ flex: 1, height: 36 }}
+                        onError={e => { e.target.style.display = "none"; }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <label className="form-label">Speech Duration (seconds) * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Maximum 180s / 3 minutes)</span></label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="10"
+                    max="180"
+                    placeholder="e.g. 60"
+                    required
+                    value={form.videoDuration}
+                    onChange={e => setForm(f => ({ ...f, videoDuration: Math.min(180, Math.max(10, parseInt(e.target.value, 10) || 60)) }))}
+                  />
+                  <div style={{ fontSize: "0.72rem", color: "#f472b6", marginTop: "0.25rem" }}>
+                    ⭐ Student scoring: ≥85% active spoken time = 40/40 pts. Below 85% receives effort-proportional score. Delivery &amp; Rhythm = 60 pts.
+                  </div>
+                </div>
+                <div style={{ marginBottom: "0.85rem" }}>
+                  <label className="form-label">Video Transcript / Spoken Script <span style={{ color: "var(--muted)", fontWeight: 400 }}>(subtitles for student to shadow)</span></label>
+                  <textarea
+                    className="form-input"
+                    rows={4}
+                    placeholder="Exact text or speech spoken in the video so students can read along while shadowing..."
+                    value={form.videoTranscript}
+                    onChange={e => setForm(f => ({ ...f, videoTranscript: e.target.value }))}
+                  />
+                </div>
+              </>
+            )}
             <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
               <button 
                 type="submit" 
@@ -9464,6 +9872,11 @@ function ManualQuestionsPanel() {
                         {q.imageUrl && (
                           <div style={{ fontSize: "0.78rem", color: "#90cdf4", marginBottom: "0.4rem", wordBreak: "break-all" }}>
                             🖼️ {q.imageUrl}
+                          </div>
+                        )}
+                        {q.videoUrl && (
+                          <div style={{ fontSize: "0.78rem", color: "#f472b6", marginBottom: "0.4rem", wordBreak: "break-all" }}>
+                            🎬 Video: {q.videoTitle ? `"${q.videoTitle}" ` : ""}({q.videoDuration || 60}s) — {q.videoUrl}
                           </div>
                         )}
 

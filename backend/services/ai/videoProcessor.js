@@ -51,6 +51,21 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
       || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
     const isPicture = status?.todayContentType === "picture_description"
       || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+    const isShadowing = status?.todayContentType === "shadowing_video"
+      || Boolean(status?.isShadowingDay);
+
+    if (isShadowing) {
+      if (!questionTopic) questionTopic = status?.todayTopic || "Shadowing Practice";
+      const shadowingContext = [
+        "This is an English Shadowing Activity task. The student watched a short video and practiced shadowing (speaking simultaneously with the speaker).",
+        status?.todayTopic ? `Video Topic: ${status.todayTopic}` : null,
+        status?.todayVideoTranscript ? `Original Spoken Transcript: ${status.todayVideoTranscript}` : null,
+        status?.todayVideoDuration ? `Target Reference Duration: ${status.todayVideoDuration} seconds` : null,
+        "DO NOT deduct points for vocabulary requirements (vocabulary measurement is NOT required for shadowing).",
+        "Judge the student primarily on rhythm, cadence, speech pace matching the original speaker, pronunciation clarity, and continuous speaking effort."
+      ].filter(Boolean).join("\n\n");
+      questionText = [questionText, shadowingContext].filter(Boolean).join("\n\n");
+    }
 
     if (isStory) {
       if (!questionTopic) questionTopic = status?.todayTopic || "Story Summary";
@@ -161,7 +176,9 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
           || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
         const isPictureActive = status?.todayContentType === "picture_description"
           || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-        const challengeType = isPictureActive ? "picture_description" : isStoryActive ? "story_summary" : null;
+        const isShadowingActive = status?.todayContentType === "shadowing_video"
+          || Boolean(status?.isShadowingDay);
+        const challengeType = isPictureActive ? "picture_description" : isStoryActive ? "story_summary" : isShadowingActive ? "shadowing_video" : null;
 
         try {
           speechResult = await withTimeout(
