@@ -4181,8 +4181,38 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [shadowPlaybackSpeed, setShadowPlaybackSpeed] = useState(1);
   const [showShadowScript, setShowShadowScript] = useState(false);
   const [shadowVideoMuted, setShadowVideoMuted] = useState(false);
+  const [shadowAudioTime, setShadowAudioTime] = useState(0);
+  const [shadowAudioPlaying, setShadowAudioPlaying] = useState(false);
+  const [shadowAudioBlocked, setShadowAudioBlocked] = useState(false);
+  const [shadowVolume, setShadowVolume] = useState(0.85);
+  const [testInEarPlaying, setTestInEarPlaying] = useState(false);
   const shadowingRefVideo = useRef(null);
   const shadowingPreviewVideo = useRef(null);
+
+  const handleVolumeChange = (newVol) => {
+    setShadowVolume(newVol);
+    if (shadowingRefVideo.current) {
+      shadowingRefVideo.current.volume = newVol;
+      if (newVol > 0 && shadowVideoMuted) {
+        shadowingRefVideo.current.muted = false;
+        setShadowVideoMuted(false);
+      }
+    }
+  };
+
+  const handleManualPlayAudio = () => {
+    if (shadowingRefVideo.current) {
+      shadowingRefVideo.current.muted = false;
+      setShadowVideoMuted(false);
+      shadowingRefVideo.current.volume = shadowVolume;
+      shadowingRefVideo.current.play()
+        .then(() => {
+          setShadowAudioBlocked(false);
+          setShadowAudioPlaying(true);
+        })
+        .catch(e => console.warn("[Shadowing] Manual play failed:", e));
+    }
+  };
 
   // ── Background compression state ─────────────────────────────────────────
   // Compression starts automatically as soon as the preview step loads (if blob > threshold).
@@ -4438,6 +4468,27 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       setError("Your browser doesn't support video recording. Please use the upload option or try a different browser.");
       return;
     }
+
+    // Prime in-ear shadowing audio playback in direct response to user gesture
+    if (isShadowing && shadowingRefVideo.current) {
+      try {
+        shadowingRefVideo.current.currentTime = 0;
+        shadowingRefVideo.current.volume = shadowVolume;
+        shadowingRefVideo.current.muted = shadowVideoMuted;
+        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+        const unlock = shadowingRefVideo.current.play();
+        if (unlock !== undefined) {
+          unlock.then(() => {
+            if (shadowingRefVideo.current) {
+              shadowingRefVideo.current.pause();
+              shadowingRefVideo.current.currentTime = 0;
+            }
+          }).catch(e => {
+            console.warn("[Shadowing] Pre-warm audio unlock caught:", e);
+          });
+        }
+      } catch (err) {}
+    }
     
     try {
       const rawStream = await openRecordingStream(camId, micId);
@@ -4646,24 +4697,46 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     }, 1000);
   };
 
-  // Synchronized playback for Shadowing Activity reference video
+  // Synchronized playback for Shadowing Activity reference speech
   useEffect(() => {
     if (step === "recording" && isShadowing && shadowingRefVideo.current) {
       try {
         shadowingRefVideo.current.currentTime = 0;
         shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
         shadowingRefVideo.current.muted = shadowVideoMuted;
-        shadowingRefVideo.current.play().catch(e => console.warn("[Shadowing] Video play warning:", e));
+        shadowingRefVideo.current.volume = shadowVolume;
+        const playPromise = shadowingRefVideo.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setShadowAudioBlocked(false);
+              setShadowAudioPlaying(true);
+            })
+            .catch(e => {
+              console.warn("[Shadowing] Audio play warning:", e);
+              setShadowAudioBlocked(true);
+            });
+        }
       } catch (err) {
-        console.warn("[Shadowing] Video autoplay err:", err);
+        console.warn("[Shadowing] Audio autoplay err:", err);
+        setShadowAudioBlocked(true);
       }
+    } else if (step !== "recording" && shadowingRefVideo.current) {
+      try {
+        shadowingRefVideo.current.pause();
+        setShadowAudioPlaying(false);
+      } catch {}
     }
-  }, [step, isShadowing, shadowPlaybackSpeed, shadowVideoMuted]);
+  }, [step, isShadowing, shadowPlaybackSpeed, shadowVideoMuted, shadowVolume]);
 
   const stopRecording = () => {
     clearInterval(timerRef.current);
     if (isShadowing && shadowingRefVideo.current) {
-      try { shadowingRefVideo.current.pause(); } catch {}
+      try {
+        shadowingRefVideo.current.pause();
+        shadowingRefVideo.current.currentTime = 0;
+        setShadowAudioPlaying(false);
+      } catch {}
     }
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       console.log(`[Recording] Stopping recorder in state: ${recorderRef.current.state}`);
@@ -4688,7 +4761,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       clearInterval(timerRef.current);
 
       if (isShadowing && shadowingRefVideo.current) {
-        try { shadowingRefVideo.current.pause(); } catch {}
+        try {
+          shadowingRefVideo.current.pause();
+          setShadowAudioPlaying(false);
+        } catch {}
       }
 
       // Disable camera & mic tracks during pause so camera enters standby
@@ -4717,7 +4793,13 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         try {
           shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
           shadowingRefVideo.current.muted = shadowVideoMuted;
-          shadowingRefVideo.current.play().catch(() => {});
+          shadowingRefVideo.current.volume = shadowVolume;
+          shadowingRefVideo.current.play()
+            .then(() => {
+              setShadowAudioBlocked(false);
+              setShadowAudioPlaying(true);
+            })
+            .catch(() => setShadowAudioBlocked(true));
         } catch {}
       }
 
@@ -4731,7 +4813,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       }, 1000);
       setIsPaused(false);
     }
-  }, [closeActiveRecordingSegment, getWallClockElapsed, MAX_SECONDS, cleanup, isShadowing, shadowPlaybackSpeed, shadowVideoMuted]);
+  }, [closeActiveRecordingSegment, getWallClockElapsed, MAX_SECONDS, cleanup, isShadowing, shadowPlaybackSpeed, shadowVideoMuted, shadowVolume]);
 
   // Toggle blur during recording
   const handleBlurToggle = useCallback(() => {
@@ -5006,6 +5088,35 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   return (
     <div className="card">
+      {/* ── Preloaded In-Ear Reference Audio for Shadowing ── */}
+      {isShadowing && (
+        <audio
+          ref={shadowingRefVideo}
+          src={getCleanAudioUrl(question?.audioUrl || question?.videoUrl)}
+          preload="auto"
+          playsInline
+          onTimeUpdate={() => {
+            if (shadowingRefVideo.current) {
+              setShadowAudioTime(shadowingRefVideo.current.currentTime);
+            }
+          }}
+          onPlay={() => {
+            setShadowAudioPlaying(true);
+            setShadowAudioBlocked(false);
+          }}
+          onPause={() => {
+            setShadowAudioPlaying(false);
+          }}
+          onEnded={() => {
+            setShadowAudioPlaying(false);
+          }}
+          onError={(e) => {
+            console.warn("[Shadowing] Audio preload/playback error:", e);
+          }}
+          style={{ display: "none" }}
+        />
+      )}
+
       <div className="section-title">🎥 Record Video for Analysis</div>
 
       {/* ── SETUP ── */}
@@ -5100,21 +5211,130 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
             <div style={{
               background: "linear-gradient(135deg, rgba(236,72,153,0.12), rgba(168,85,247,0.08))",
               border: "1px solid rgba(236,72,153,0.35)",
-              borderRadius: 14, padding: "1rem 1.15rem", marginBottom: "1.25rem",
+              borderRadius: 14, padding: "1.1rem 1.25rem", marginBottom: "1.25rem",
               fontSize: "0.86rem", color: "var(--text)", lineHeight: 1.6,
+              boxShadow: "0 6px 20px rgba(236,72,153,0.08)",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                <span style={{ fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.78rem" }}>
-                  🎬 Shadowing Activity Mode
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.55rem" }}>
+                <span style={{ fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <span>🎧</span> In-Ear Shadowing Mode Ready
                 </span>
                 <span style={{ background: "rgba(52,211,153,0.15)", color: "#34d399", padding: "2px 8px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700 }}>
                   ✨ Vocab Waived
                 </span>
               </div>
-              <p style={{ margin: "0 0 0.5rem 0", color: "#f1f5f9" }}>
-                <strong>Simultaneous Speech:</strong> The reference speech will play automatically through your earphones when you start recording. Speak along with the speaker in real time!
+              <p style={{ margin: "0 0 0.65rem 0", color: "#f1f5f9" }}>
+                <strong>Simultaneous Speech:</strong> The native reference audio will play continuously into your earphones while your camera and microphone record your speech. Speak along with the speaker in real time!
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", fontSize: "0.78rem" }}>
+
+              {/* Headphone Advice Banner */}
+              <div style={{
+                background: "rgba(0,0,0,0.35)",
+                border: "1px solid rgba(236,72,153,0.25)",
+                borderRadius: 10,
+                padding: "0.6rem 0.8rem",
+                marginBottom: "0.75rem",
+                fontSize: "0.78rem",
+                color: "#e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+              }}>
+                <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>🎧</span>
+                <div>
+                  <strong style={{ color: "#f472b6" }}>Please wear earphones or headphones:</strong>
+                  <div style={{ color: "rgba(255,255,255,0.75)", marginTop: "0.1rem" }}>
+                    This lets you clearly hear the speaker in real time without audio echoing into your microphone!
+                  </div>
+                </div>
+              </div>
+
+              {/* Audio Pre-check & Volume Control */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "0.6rem",
+                background: "rgba(255,255,255,0.04)",
+                padding: "0.55rem 0.75rem",
+                borderRadius: 8,
+                marginBottom: "0.75rem",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                  <span style={{ fontSize: "0.76rem", color: "#cbd5e1", fontWeight: 600 }}>In-Ear Volume:</span>
+                  <div style={{ display: "flex", gap: "3px" }}>
+                    {[0.5, 0.8, 1.0].map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => handleVolumeChange(v)}
+                        style={{
+                          background: shadowVolume === v ? "linear-gradient(135deg, #ec4899, #8b5cf6)" : "rgba(255,255,255,0.08)",
+                          border: shadowVolume === v ? "none" : "1px solid rgba(255,255,255,0.15)",
+                          color: "#fff",
+                          borderRadius: 5,
+                          padding: "2px 7px",
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {v === 0.5 ? "Soft" : v === 0.8 ? "Balanced" : "Max"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Test Sound Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!shadowingRefVideo.current) return;
+                    if (testInEarPlaying) {
+                      shadowingRefVideo.current.pause();
+                      shadowingRefVideo.current.currentTime = 0;
+                      setTestInEarPlaying(false);
+                    } else {
+                      shadowingRefVideo.current.currentTime = 0;
+                      shadowingRefVideo.current.volume = shadowVolume;
+                      shadowingRefVideo.current.muted = false;
+                      shadowingRefVideo.current.play()
+                        .then(() => {
+                          setTestInEarPlaying(true);
+                          setTimeout(() => {
+                            if (shadowingRefVideo.current) {
+                              shadowingRefVideo.current.pause();
+                              shadowingRefVideo.current.currentTime = 0;
+                            }
+                            setTestInEarPlaying(false);
+                          }, 4000);
+                        })
+                        .catch(err => {
+                          console.warn("[Shadowing] Test audio warning:", err);
+                        });
+                    }
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.3rem",
+                    background: testInEarPlaying ? "rgba(236,72,153,0.35)" : "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(236,72,153,0.4)",
+                    color: "#fff",
+                    borderRadius: 6,
+                    padding: "3px 9px",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {testInEarPlaying ? "⏹️ Stop Test" : "▶ Test Sound (4s)"}
+                </button>
+              </div>
+
+              {/* Scoring breakdown badges */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", fontSize: "0.76rem" }}>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
                   🎯 <strong>≥90% duration match</strong>: Full 40 duration pts
                 </span>
@@ -5309,15 +5529,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       {/* ── RECORDING ── */}
       {step === "recording" && (
         <div>
-          {/* Audio stream for in-ear shadowing playback */}
-          {isShadowing && (
-            <audio
-              ref={shadowingRefVideo}
-              src={getCleanAudioUrl(question?.audioUrl || question?.videoUrl)}
-              preload="auto"
-            />
-          )}
-
           {/* Unified Camera Recording View */}
           <div style={{ position: "relative", marginBottom: "0.85rem" }}>
             <video ref={liveVideoRef} autoPlay muted playsInline
@@ -5330,22 +5541,46 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
             {/* Floating Teleprompter banner for shadowing */}
             {isShadowing && (
               <div style={{
-                position: "absolute", top: "12px", left: "12px", right: "12px",
-                background: "rgba(13, 10, 24, 0.9)",
+                position: "absolute", top: "10px", left: "10px", right: "10px",
+                background: "rgba(13, 10, 24, 0.94)",
                 border: "1px solid rgba(236, 72, 153, 0.5)",
-                backdropFilter: "blur(10px)",
-                borderRadius: 12, padding: "0.65rem 0.95rem",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                borderRadius: 14, padding: "0.65rem 0.95rem",
                 zIndex: 3, display: "flex", flexDirection: "column", gap: "0.35rem",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
+                boxShadow: "0 8px 30px rgba(0,0,0,0.75)",
               }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ color: "#f472b6", fontWeight: 800, fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                    <span>🎙️</span> Shadowing Prompter (In-Ear Audio)
-                  </span>
+                {/* Header: Integrated REC badge + Audio Status + Controls */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.4rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                    <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.72rem" }}>
-                      ⏱️ Match: {Math.min(100, Math.round((elapsed / Math.max(1, question?.videoDuration || 60)) * 100))}%
+                    <div style={{
+                      background: isPaused ? "rgba(245,158,11,0.95)" : "rgba(239,68,68,0.95)",
+                      color: "#fff", padding: "0.2rem 0.55rem", borderRadius: 99,
+                      fontSize: "0.68rem", fontWeight: 800, display: "flex", alignItems: "center", gap: "0.35rem"
+                    }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fff", animation: isPaused ? "none" : "blink 1s infinite" }} />
+                      {isPaused ? "PAUSED" : "REC"} {fmtTime(elapsed)}
+                    </div>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                      fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 99,
+                      background: shadowAudioPlaying ? "rgba(34, 197, 94, 0.18)" : "rgba(245, 158, 11, 0.2)",
+                      color: shadowAudioPlaying ? "#4ade80" : "#fbbf24",
+                      border: shadowAudioPlaying ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(245, 158, 11, 0.35)",
+                    }}>
+                      {shadowAudioPlaying ? "🎧 In-Ear Playing" : (isPaused ? "⏸️ Audio Paused" : "⚠️ Audio Muted/Off")}
                     </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <span style={{
+                      fontSize: "0.68rem", fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                      background: "rgba(52, 211, 153, 0.15)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.3)",
+                    }}>
+                      ⭐ {Math.min(100, Math.round((elapsed / Math.max(1, question?.videoDuration || 60)) * 100))}% (40 pts)
+                    </span>
+
+                    {/* Speed Toggle */}
                     <button
                       type="button"
                       onClick={() => {
@@ -5358,48 +5593,74 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                         background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
                         padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
                       }}
+                      title="Playback Speed"
                     >
                       ⚡ {shadowPlaybackSpeed}x
                     </button>
+
+                    {/* Volume Mute/Unmute */}
                     <button
                       type="button"
                       onClick={() => {
                         const nextMuted = !shadowVideoMuted;
                         setShadowVideoMuted(nextMuted);
-                        if (shadowingRefVideo.current) shadowingRefVideo.current.muted = nextMuted;
+                        if (shadowingRefVideo.current) {
+                          shadowingRefVideo.current.muted = nextMuted;
+                          if (!nextMuted) shadowingRefVideo.current.volume = shadowVolume;
+                        }
                       }}
                       style={{
-                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        background: shadowVideoMuted ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.12)",
+                        color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
                         padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
                       }}
-                      title="Earphones Mute/Unmute"
+                      title={shadowVideoMuted ? "Unmute Earphones" : "Mute Earphones"}
                     >
                       {shadowVideoMuted ? "🔇" : "🔊"}
                     </button>
+
+                    {/* Unblock/Force Play Button if browser blocked */}
+                    {shadowAudioBlocked && (
+                      <button
+                        type="button"
+                        onClick={handleManualPlayAudio}
+                        style={{
+                          background: "linear-gradient(135deg, #ec4899, #8b5cf6)", color: "#fff", border: "none",
+                          padding: "2px 8px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 800, cursor: "pointer",
+                        }}
+                      >
+                        ▶ Play Sound
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* 5-Second Phrase Window */}
                 {(() => {
                   const fullText = question?.videoTranscript || question?.question || "";
-                  const cues = buildTeleprompterCues(fullText, question?.videoDuration || 60);
-                  if (!cues.length) return <div style={{ fontSize: "0.88rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
-                  const activeIdx = cues.findIndex(c => elapsed >= c.start && elapsed < c.end);
-                  const safeIdx = activeIdx !== -1 ? activeIdx : (elapsed >= (question?.videoDuration || 60) ? cues.length - 1 : 0);
+                  const audioDuration = question?.videoDuration || durationLimits.fullScoreSeconds || 60;
+                  const cues = buildTeleprompterCues(fullText, audioDuration);
+                  if (!cues.length) return <div style={{ fontSize: "0.92rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
+
+                  const refTime = shadowAudioPlaying ? shadowAudioTime : elapsed;
+                  const activeIdx = cues.findIndex(c => refTime >= c.start && refTime < c.end);
+                  const safeIdx = activeIdx !== -1 ? activeIdx : (refTime >= audioDuration ? cues.length - 1 : 0);
                   const curCue = cues[safeIdx] || cues[0];
                   const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
                   const cueProgress = curCue && curCue.duration > 0
-                    ? Math.min(1, Math.max(0, (elapsed - curCue.start) / curCue.duration))
+                    ? Math.min(1, Math.max(0, (refTime - curCue.start) / curCue.duration))
                     : 0;
 
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                      <div style={{ fontSize: "1.05rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.7)" }}>
+                      <div style={{ fontSize: "1.06rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.85)" }}>
                         {curCue.text}
                       </div>
-                      <div style={{ height: 2, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.15s linear" }} />
+                      <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.12s linear" }} />
                       </div>
                       {nextCue && (
-                        <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           <span style={{ color: "#ec4899", fontWeight: 700 }}>Next: </span>{nextCue.text}
                         </div>
                       )}
@@ -5409,7 +5670,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               </div>
             )}
 
-              {/* REC badge */}
+            {/* Standard REC badge when NOT shadowing */}
+            {!isShadowing && (
               <div style={{
                 position: "absolute", top: "12px", left: "12px",
                 background: isPaused ? "rgba(245,158,11,0.9)" : "rgba(248,113,113,0.9)",
@@ -5421,28 +5683,35 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   animation: isPaused ? "none" : "blink 1s infinite" }} />
                 {isPaused ? "PAUSED" : "REC"}
               </div>
+            )}
 
-              {/* Background blur badge - only show if active */}
-              {backgroundBlur && blurStatus === "active" && (
-                <div style={{
-                  position: "absolute", top: "12px", right: ncStatus === "active" ? "75px" : "12px",
-                  background: "rgba(139,92,246,0.85)", color: "#fff",
-                  padding: "0.2rem 0.55rem", borderRadius: "99px",
-                  fontSize: "0.68rem", fontWeight: 700,
-                  zIndex: 2,
-                }}>🌫️ AI BLUR</div>
-              )}
+            {/* Background blur badge - only show if active */}
+            {backgroundBlur && blurStatus === "active" && (
+              <div style={{
+                position: "absolute",
+                top: isShadowing ? "auto" : "12px",
+                bottom: isShadowing ? "12px" : "auto",
+                right: ncStatus === "active" ? "75px" : "12px",
+                background: "rgba(139,92,246,0.85)", color: "#fff",
+                padding: "0.2rem 0.55rem", borderRadius: "99px",
+                fontSize: "0.68rem", fontWeight: 700,
+                zIndex: 2,
+              }}>🌫️ AI BLUR</div>
+            )}
 
-              {/* NC badge */}
-              {ncStatus === "active" && (
-                <div style={{
-                  position: "absolute", top: "12px", right: "12px",
-                  background: "rgba(34,211,160,0.85)", color: "#fff",
-                  padding: "0.2rem 0.55rem", borderRadius: "99px",
-                  fontSize: "0.68rem", fontWeight: 700,
-                  zIndex: 2,
-                }}>🎙️ AI NC</div>
-              )}
+            {/* NC badge */}
+            {ncStatus === "active" && (
+              <div style={{
+                position: "absolute",
+                top: isShadowing ? "auto" : "12px",
+                bottom: isShadowing ? "12px" : "auto",
+                right: "12px",
+                background: "rgba(34,211,160,0.85)", color: "#fff",
+                padding: "0.2rem 0.55rem", borderRadius: "99px",
+                fontSize: "0.68rem", fontWeight: 700,
+                zIndex: 2,
+              }}>🎙️ AI NC</div>
+            )}
 
               {/* Paused Overlay */}
               {isPaused && (
