@@ -7008,7 +7008,7 @@ export default function AdminDashboard() {
                     { id: "monthly", icon: "💬", title: "Monthly Reflection Day", full: "durationMonthlyReflectionFull", max: "durationMonthlyReflectionMax", color: "#60a5fa" },
                     { id: "goals", icon: "🎯", title: "Monthly Goals Day", full: "durationMonthlyGoalsFull", max: "durationMonthlyGoalsMax", color: "#f472b6" },
                     { id: "picture", icon: "🖼️", title: "Picture Description Day", full: "durationPictureFull", max: "durationPictureMax", color: "#38bdf8" },
-                    { id: "shadowing", icon: "🎬", title: "Shadowing Activity Day", full: "durationShadowingFull", max: "durationShadowingMax", color: "#ec4899", minVal: 20, maxLimit: 180, hint: "Video must be ≤ 3 min (180s)" },
+                    { id: "shadowing", icon: "🎙️", title: "Shadowing Activity Day", full: "durationShadowingFull", max: "durationShadowingMax", color: "#ec4899", minVal: 20, maxLimit: 180, hint: "Audio must be ≤ 3 min (180s)" },
                   ].map(item => (
                     <div
                       key={item.id}
@@ -7434,9 +7434,9 @@ export default function AdminDashboard() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", flexWrap: "wrap", gap: "0.3rem" }}>
                       <div>
                         <label className="form-label" style={{ fontWeight: 700, fontSize: "0.86rem", margin: 0, color: "#ec4899" }}>
-                          🎬 Shadowing Activity Days
+                          🎙️ Shadowing Activity Days
                         </label>
-                        <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}> (default: Tuesday, video ≤ 3 min)</span>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}> (default: Tuesday, audio ≤ 3 min)</span>
                       </div>
                       <div style={{ display: "flex", gap: "0.3rem" }}>
                         <button
@@ -7465,7 +7465,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem" }}>
-                      Select which days of the week to automatically generate and publish shadowing video mimicry challenges.
+                      Select which days of the week to automatically generate and publish native human speaker audio shadowing challenges.
                     </p>
                     <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.6rem" }}>
                       {[
