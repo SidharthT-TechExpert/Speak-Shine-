@@ -371,3 +371,55 @@ export function getQuestionUIConfig(type, today = {}) {
       };
   }
 }
+
+/**
+ * Splits a transcript into proportional 3–6 second spoken phrases with word-weighted timestamps.
+ */
+export function buildTeleprompterCues(transcript, totalDuration = 60) {
+  if (!transcript || typeof transcript !== "string") return [];
+  const validDuration = Number(totalDuration) > 0 ? Number(totalDuration) : 60;
+
+  // Split on sentence boundaries (. ! ?)
+  const rawSentences = transcript
+    .replace(/\r?\n+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // Divide sentences longer than 13 words into natural ~4-6 second chunks
+  const phrases = [];
+  for (const s of rawSentences) {
+    const words = s.split(/\s+/).filter(Boolean);
+    if (words.length > 13) {
+      const clauses = s.split(/(?<=[,;:])\s+/).map(c => c.trim()).filter(Boolean);
+      if (clauses.length > 1 && clauses.every(c => c.length > 0)) {
+        phrases.push(...clauses);
+      } else {
+        const mid = Math.ceil(words.length / 2);
+        phrases.push(words.slice(0, mid).join(" "));
+        phrases.push(words.slice(mid).join(" "));
+      }
+    } else {
+      phrases.push(s);
+    }
+  }
+
+  const totalWords = phrases.reduce((sum, p) => sum + Math.max(1, p.split(/\s+/).length), 0);
+  let accTime = 0;
+  return phrases.map((text, idx) => {
+    const wordCount = Math.max(1, text.split(/\s+/).length);
+    const cueDur = (wordCount / totalWords) * validDuration;
+    const start = accTime;
+    const end = Math.min(validDuration, accTime + cueDur);
+    accTime = end;
+    return {
+      id: idx,
+      text,
+      start,
+      end,
+      duration: cueDur,
+      startFormatted: `${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
+      endFormatted: `${Math.floor(end / 60)}:${String(Math.floor(end % 60)).padStart(2, "0")}`,
+    };
+  });
+}

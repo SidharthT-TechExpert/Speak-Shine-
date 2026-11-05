@@ -23,6 +23,7 @@ import {
   parseQuestionItems,
   getCefrInfo,
   CEFR_LEVEL_MAP,
+  buildTeleprompterCues,
   DEFAULT_MONTHLY_REFLECTION_QUESTIONS,
   DEFAULT_MONTHLY_GOALS_QUESTIONS,
 } from "../utils/questionTypes.js";
@@ -241,6 +242,7 @@ export default function VideoAnalysis() {
   const [duration, setDuration] = useState(75);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [peekFullScript, setPeekFullScript] = useState(false);
   const audioRef = useRef(null);
   const speedMenuRef = useRef(null);
   const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
@@ -1210,58 +1212,305 @@ export default function VideoAnalysis() {
                       </div>
                     </div>
 
-                    {/* Synced Karaōke Teleprompter */}
+                    {/* Synchronized 5-Second Teleprompter */}
                     {(todayQuestion.videoTranscript || todayQuestion.question) && (() => {
                       const textToSplit = todayQuestion.videoTranscript || todayQuestion.question || "";
-                      const phrases = textToSplit
-                        .split(/(?<=[.!?])\s+/)
-                        .map(p => p.trim())
-                        .filter(Boolean);
-                      const progressRatio = duration > 0 ? (currentTime / duration) : 0;
-                      const activeIdx = Math.min(Math.floor(progressRatio * phrases.length), phrases.length - 1);
+                      const cues = buildTeleprompterCues(textToSplit, duration || todayQuestion.videoDuration || 60);
+                      if (!cues.length) return null;
 
+                      const activeIdx = cues.findIndex(c => currentTime >= c.start && currentTime < c.end);
+                      const safeIdx = activeIdx !== -1 ? activeIdx : (currentTime >= (duration || 60) ? cues.length - 1 : 0);
+                      const activeCue = cues[safeIdx] || cues[0];
+                      const prevCue = safeIdx > 0 ? cues[safeIdx - 1] : null;
+                      const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
+                      const cueProgress = activeCue && activeCue.duration > 0
+                        ? Math.min(1, Math.max(0, (currentTime - activeCue.start) / activeCue.duration))
+                        : 0;
+
+                      const seekToCue = (startSec) => {
+                        if (audioRef.current && !isNaN(audioRef.current.duration)) {
+                          audioRef.current.currentTime = startSec;
+                          setCurrentTime(startSec);
+                        }
+                      };
+
+                      // ── 1. Standby State (When audio has not started playing yet) ──
+                      if (!isPlaying && currentTime === 0 && !peekFullScript) {
+                        return (
+                          <div style={{
+                            marginTop: "0.85rem",
+                            background: "linear-gradient(135deg, rgba(17, 12, 34, 0.85) 0%, rgba(26, 16, 48, 0.75) 100%)",
+                            border: "1px solid rgba(236, 72, 153, 0.3)",
+                            borderRadius: 16,
+                            padding: "1.35rem 1.4rem",
+                            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem" }}>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                <span>🎙️</span> Dynamic Shadowing Teleprompter
+                              </span>
+                              <span style={{
+                                fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                                background: "rgba(148, 163, 184, 0.15)", color: "#94a3b8", border: "1px solid rgba(148, 163, 184, 0.25)"
+                              }}>
+                                ⏸️ Standby
+                              </span>
+                            </div>
+
+                            <div style={{ textAlign: "center", padding: "0.85rem 0.5rem" }}>
+                              <div style={{ fontSize: "1.75rem", marginBottom: "0.4rem" }}>🎧</div>
+                              <h4 style={{ margin: "0 0 0.35rem 0", color: "#ffffff", fontSize: "1.05rem", fontWeight: 700 }}>
+                                Teleprompter Synchronized to Audio
+                              </h4>
+                              <p style={{ margin: "0 auto 1.15rem auto", maxWidth: "460px", color: "#94a3b8", fontSize: "0.84rem", lineHeight: 1.55 }}>
+                                The spoken script will automatically appear <strong style={{ color: "#f472b6" }}>line-by-line in 4–5 second windows</strong> as the audio plays. Put on your earphones and press Play!
+                              </p>
+
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  onClick={togglePlay}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: "0.5rem",
+                                    padding: "0.55rem 1.15rem", borderRadius: 10,
+                                    background: "linear-gradient(135deg, #ec4899, #8b5cf6)",
+                                    color: "#ffffff", border: "none", fontWeight: 700, fontSize: "0.84rem",
+                                    cursor: "pointer", boxShadow: "0 4px 16px rgba(236,72,153,0.35)",
+                                  }}
+                                >
+                                  <span>▶</span> Play &amp; Start Teleprompter
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPeekFullScript(true)}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                                    padding: "0.55rem 0.95rem", borderRadius: 10,
+                                    background: "rgba(255, 255, 255, 0.06)", color: "#cbd5e1",
+                                    border: "1px solid rgba(255, 255, 255, 0.15)", fontWeight: 600, fontSize: "0.8rem",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <span>👁️</span> Peek Full Script ({cues.length} lines)
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // ── 2. Active Synchronized 5-Second Window (Playing or Paused mid-audio) ──
                       return (
                         <div style={{
                           marginTop: "0.85rem",
-                          background: "rgba(13, 10, 24, 0.65)",
-                          border: "1px solid rgba(236, 72, 153, 0.25)",
-                          borderRadius: 14,
-                          padding: "1rem 1.15rem",
+                          background: "linear-gradient(135deg, rgba(17, 12, 34, 0.9) 0%, rgba(26, 16, 48, 0.8) 100%)",
+                          border: "1px solid rgba(236, 72, 153, 0.45)",
+                          borderRadius: 16,
+                          padding: "1.15rem 1.35rem",
+                          boxShadow: "0 10px 35px rgba(236, 72, 153, 0.15)",
                         }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.6rem" }}>
-                            <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                              <span>📜</span> Spoken Script & Teleprompter
-                            </span>
-                            <span style={{ fontSize: "0.7rem", color: "#a855f7", fontWeight: 600 }}>
-                              🎧 Read & shadow simultaneously
-                            </span>
+                          {/* Prompter Header */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                <span>🎙️</span> Dynamic Shadowing Prompter
+                              </span>
+                              <span style={{
+                                display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                                fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                                background: isPlaying ? "rgba(52, 211, 153, 0.15)" : "rgba(251, 191, 36, 0.15)",
+                                color: isPlaying ? "#34d399" : "#fbbf24",
+                                border: `1px solid ${isPlaying ? "rgba(52, 211, 153, 0.35)" : "rgba(251, 191, 36, 0.35)"}`
+                              }}>
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: isPlaying ? "#34d399" : "#fbbf24" }} />
+                                {isPlaying ? "LIVE SYNC" : "PAUSED"}
+                              </span>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: "#94a3b8" }}>
+                              <span style={{ fontWeight: 700, color: "#e2e8f0" }}>
+                                Phrase {safeIdx + 1} / {cues.length}
+                              </span>
+                              <span>•</span>
+                              <span style={{ fontFamily: "monospace", color: "#c084fc" }}>
+                                {activeCue.startFormatted} – {activeCue.endFormatted}
+                              </span>
+                            </div>
                           </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                            {phrases.map((phrase, idx) => {
-                              const isActive = idx === activeIdx && isPlaying;
-                              const isPast = idx < activeIdx;
-                              return (
-                                <div
-                                  key={idx}
-                                  style={{
-                                    padding: "0.45rem 0.75rem",
-                                    borderRadius: "8px",
-                                    fontSize: "0.86rem",
-                                    lineHeight: 1.5,
-                                    transition: "all 0.25s ease",
-                                    background: isActive ? "rgba(236, 72, 153, 0.16)" : "transparent",
-                                    border: isActive ? "1px solid rgba(244, 114, 182, 0.45)" : "1px solid transparent",
-                                    color: isActive ? "#ffffff" : isPast ? "#94a3b8" : "#cbd5e1",
-                                    fontWeight: isActive ? 700 : 400,
-                                    boxShadow: isActive ? "0 2px 12px rgba(236, 72, 153, 0.25)" : "none",
-                                  }}
-                                >
-                                  {isActive && <span style={{ marginRight: "0.4rem", color: "#f472b6" }}>▶</span>}
-                                  {phrase}
-                                </div>
-                              );
-                            })}
+
+                          {/* Context: Previous Phrase (Dimmed) */}
+                          {prevCue && (
+                            <div
+                              onClick={() => seekToCue(prevCue.start)}
+                              style={{
+                                fontSize: "0.82rem",
+                                color: "#64748b",
+                                fontStyle: "italic",
+                                marginBottom: "0.45rem",
+                                padding: "0.2rem 0.6rem",
+                                cursor: "pointer",
+                                opacity: 0.6,
+                                transition: "all 0.2s ease",
+                              }}
+                              title="Click to jump back to this phrase"
+                            >
+                              &larr; {prevCue.text}
+                            </div>
+                          )}
+
+                          {/* ── HERO ACTIVE 5-SECOND PHRASE ── */}
+                          <div style={{
+                            background: "linear-gradient(135deg, rgba(236, 72, 153, 0.22) 0%, rgba(168, 85, 247, 0.15) 100%)",
+                            border: "1px solid rgba(244, 114, 182, 0.6)",
+                            borderRadius: 14,
+                            padding: "1.1rem 1.35rem",
+                            position: "relative",
+                            boxShadow: "0 6px 25px rgba(236, 72, 153, 0.2)",
+                            overflow: "hidden",
+                          }}>
+                            {/* Accent Neon Indicator */}
+                            <div style={{
+                              position: "absolute", top: 0, left: 0, bottom: 0, width: 4,
+                              background: "linear-gradient(180deg, #ec4899 0%, #8b5cf6 100%)",
+                            }} />
+
+                            <div style={{
+                              fontSize: "1.24rem",
+                              fontWeight: 700,
+                              color: "#ffffff",
+                              lineHeight: 1.55,
+                              letterSpacing: "-0.01em",
+                              textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+                            }}>
+                              {activeCue.text}
+                            </div>
+
+                            {/* Phrase Pacing Micro-Bar */}
+                            <div style={{
+                              height: 3,
+                              borderRadius: 99,
+                              background: "rgba(255, 255, 255, 0.1)",
+                              marginTop: "0.85rem",
+                              overflow: "hidden",
+                            }}>
+                              <div style={{
+                                height: "100%",
+                                width: `${Math.min(100, cueProgress * 100)}%`,
+                                background: "linear-gradient(90deg, #ec4899, #a855f7)",
+                                transition: "width 0.15s linear",
+                              }} />
+                            </div>
                           </div>
+
+                          {/* Context: Next Phrase (Upcoming Preview) */}
+                          {nextCue && (
+                            <div
+                              onClick={() => seekToCue(nextCue.start)}
+                              style={{
+                                fontSize: "0.84rem",
+                                color: "#94a3b8",
+                                marginTop: "0.55rem",
+                                padding: "0.2rem 0.6rem",
+                                opacity: 0.7,
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                              }}
+                              title="Click to skip forward to this phrase"
+                            >
+                              <span style={{ color: "#ec4899", fontWeight: 700, marginRight: "0.35rem" }}>Next &rarr;</span>
+                              {nextCue.text}
+                            </div>
+                          )}
+
+                          {/* Bottom Navigation & Controls */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.95rem", paddingTop: "0.65rem", borderTop: "1px solid rgba(255,255,255,0.07)", flexWrap: "wrap", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", gap: "0.4rem" }}>
+                              <button
+                                type="button"
+                                disabled={!prevCue}
+                                onClick={() => prevCue && seekToCue(prevCue.start)}
+                                style={{
+                                  background: "rgba(255,255,255,0.06)", color: prevCue ? "#e2e8f0" : "#475569",
+                                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "3px 8px",
+                                  fontSize: "0.72rem", fontWeight: 600, cursor: prevCue ? "pointer" : "not-allowed",
+                                }}
+                              >
+                                ◀ Prev Line
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!nextCue}
+                                onClick={() => nextCue && seekToCue(nextCue.start)}
+                                style={{
+                                  background: "rgba(255,255,255,0.06)", color: nextCue ? "#e2e8f0" : "#475569",
+                                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "3px 8px",
+                                  fontSize: "0.72rem", fontWeight: 600, cursor: nextCue ? "pointer" : "not-allowed",
+                                }}
+                              >
+                                Next Line ▶
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setPeekFullScript(p => !p)}
+                              style={{
+                                background: peekFullScript ? "rgba(236,72,153,0.18)" : "transparent",
+                                color: peekFullScript ? "#f472b6" : "#94a3b8",
+                                border: `1px solid ${peekFullScript ? "rgba(236,72,153,0.4)" : "rgba(255,255,255,0.1)"}`,
+                                borderRadius: 8, padding: "3px 8px", fontSize: "0.72rem", fontWeight: 600,
+                                cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
+                              }}
+                            >
+                              <span>{peekFullScript ? "▲ Collapse Full Script" : "👁️ Peek Full Script"}</span>
+                            </button>
+                          </div>
+
+                          {/* Collapsible Full Script Preview */}
+                          {peekFullScript && (
+                            <div style={{
+                              marginTop: "0.85rem",
+                              padding: "0.85rem",
+                              borderRadius: 12,
+                              background: "rgba(10, 8, 20, 0.6)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              maxHeight: "220px",
+                              overflowY: "auto",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.4rem",
+                            }}>
+                              <div style={{ fontSize: "0.7rem", color: "#a855f7", fontWeight: 700, textTransform: "uppercase", marginBottom: "0.2rem" }}>
+                                Full Transcript Reference (Click any phrase to jump audio)
+                              </div>
+                              {cues.map((c, i) => {
+                                const isCurrent = i === safeIdx;
+                                return (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => seekToCue(c.start)}
+                                    style={{
+                                      padding: "0.35rem 0.55rem",
+                                      borderRadius: 6,
+                                      fontSize: "0.82rem",
+                                      lineHeight: 1.45,
+                                      cursor: "pointer",
+                                      background: isCurrent ? "rgba(236,72,153,0.18)" : "transparent",
+                                      color: isCurrent ? "#ffffff" : i < safeIdx ? "#64748b" : "#cbd5e1",
+                                      fontWeight: isCurrent ? 700 : 400,
+                                      borderLeft: isCurrent ? "3px solid #ec4899" : "3px solid transparent",
+                                      transition: "all 0.15s ease",
+                                    }}
+                                  >
+                                    <span style={{ fontSize: "0.68rem", color: "#f472b6", marginRight: "0.45rem", fontFamily: "monospace" }}>
+                                      {c.startFormatted}
+                                    </span>
+                                    {c.text}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -5129,17 +5378,34 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                     </button>
                   </div>
                 </div>
-                <div style={{ fontSize: "0.88rem", color: "#ffffff", fontWeight: 600, lineHeight: 1.45 }}>
-                  {(() => {
-                    const fullText = question?.videoTranscript || question?.question || "";
-                    const phrases = fullText.split(/(?<=[.!?])\s+/).map(p => p.trim()).filter(Boolean);
-                    if (!phrases.length) return fullText;
-                    const refDur = question?.videoDuration || 60;
-                    const progress = Math.min(1, Math.max(0, elapsed / refDur));
-                    const curIdx = Math.min(Math.floor(progress * phrases.length), phrases.length - 1);
-                    return phrases[curIdx];
-                  })()}
-                </div>
+                {(() => {
+                  const fullText = question?.videoTranscript || question?.question || "";
+                  const cues = buildTeleprompterCues(fullText, question?.videoDuration || 60);
+                  if (!cues.length) return <div style={{ fontSize: "0.88rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
+                  const activeIdx = cues.findIndex(c => elapsed >= c.start && elapsed < c.end);
+                  const safeIdx = activeIdx !== -1 ? activeIdx : (elapsed >= (question?.videoDuration || 60) ? cues.length - 1 : 0);
+                  const curCue = cues[safeIdx] || cues[0];
+                  const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
+                  const cueProgress = curCue && curCue.duration > 0
+                    ? Math.min(1, Math.max(0, (elapsed - curCue.start) / curCue.duration))
+                    : 0;
+
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                      <div style={{ fontSize: "1.05rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.7)" }}>
+                        {curCue.text}
+                      </div>
+                      <div style={{ height: 2, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.15s linear" }} />
+                      </div>
+                      {nextCue && (
+                        <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <span style={{ color: "#ec4899", fontWeight: 700 }}>Next: </span>{nextCue.text}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
