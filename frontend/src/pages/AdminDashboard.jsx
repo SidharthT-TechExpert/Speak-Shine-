@@ -8804,18 +8804,20 @@ function ManualQuestionsPanel() {
         targetDuration: settings.durationShadowingFull || 75,
         topic: form.topic?.trim() || undefined,
       });
-      const { title, topic, instructions, videoUrl, videoDuration, videoTranscript } = res.data;
+      const { title, topic, instructions, videoUrl, audioUrl, videoDuration, videoTranscript } = res.data;
+      const finalAudio = audioUrl || videoUrl || "";
       setForm(f => ({
         ...f,
         topic: topic || title || f.topic,
         question: instructions || f.question,
-        videoUrl: videoUrl || "",
+        videoUrl: finalAudio,
+        audioUrl: finalAudio,
         videoDuration: videoDuration || 60,
         videoTranscript: videoTranscript || "",
         videoTitle: title || topic || "",
         category: "Shadowing Practice",
       }));
-      notify("🎬 Shadowing video challenge generated! All fields filled in.");
+      notify("🎙️ Native podcast speech ingested & sliced! All fields populated.");
     } catch (err) {
       notify(err.response?.data?.error || "Shadowing generation failed", "error");
     } finally {
