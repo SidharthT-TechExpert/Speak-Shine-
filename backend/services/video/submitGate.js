@@ -325,7 +325,7 @@ export function calculateCompositeScore({
   const isStoryTask = Boolean(isStorySummary || challengeType === "story_summary");
 
   // ── Shadowing Video: Effort-proportional duration matching + Speech delivery ──
-  // Duration Match (35 pts) | Communication, Rhythm & Fluency (50 pts) | Personal Growth (15 pts) = 100
+  // Duration Match (40 pts) | Delivery, Rhythm & Fluency (60 pts) | Personal Growth (0 pts) = 100
   // NO vocabulary requirement.
   const isShadowingTask = Boolean(isShadowing || challengeType === "shadowing_video");
   if (isShadowingTask) {
@@ -341,15 +341,15 @@ export function calculateCompositeScore({
     const targetDur = Math.max(20, Math.min(180, Number(targetVideoDuration) || Number(maxDurationSeconds) || 60));
     const actualDur = Math.max(0, Number(durationSeconds) || 0);
 
-    // 1. Duration / Effort Match (Max 35 points)
+    // 1. Duration / Effort Match (Max 40 points)
     // Rule:
     // - Ratio = actualDur / targetDur
-    // - If Ratio >= 0.90 (90%+): Full duration credit (35 pts).
-    // - If Ratio < 0.90: Proportional effort score: (Ratio / 0.90) * 35.
+    // - If Ratio >= 0.90 (90%+): Full duration credit (40 pts).
+    // - If Ratio < 0.90: Proportional effort score: (actualDur / (targetDur * 0.90)) * 40.
     const durationRatio = targetDur > 0 ? actualDur / targetDur : 1.0;
     const durationScore = durationRatio >= 0.90
-      ? 35
-      : Math.max(0, Math.min(35, (durationRatio / 0.90) * 35));
+      ? 40
+      : Math.max(0, Math.min(40, (durationRatio / 0.90) * 40));
 
     // 2. Speech continuity multiplier (student must actually be speaking, not just silent recording)
     let speechMult = 1.0;
@@ -375,21 +375,16 @@ export function calculateCompositeScore({
       : 5;
     const rhythmPace = typeof paceConsistency === "number" ? paceConsistency : fluency;
 
-    // Communication, Rhythm & Pronunciation: Max 50 points
-    // 25 pts for rhythm, cadence & flow + 25 pts for speech delivery & confidence
-    const rhythmComponent = ((rhythmPace * 0.4 + pauseScore * 0.3 + paceScore * 0.3) / 10) * 25 * speechMult;
-    const deliveryComponent = ((fluency * 0.4 + confidence * 0.3 + grammar * 0.3) / 10) * 25 * speechMult;
+    // Delivery, Rhythm & Fluency: Max 60 points
+    // 30 pts for Rhythm, Cadence, & Flow + 30 pts for Delivery, Intonation & Clarity
+    const rhythmComponent = ((rhythmPace * 0.4 + pauseScore * 0.3 + paceScore * 0.3) / 10) * 30 * speechMult;
+    const deliveryComponent = ((fluency * 0.4 + confidence * 0.3 + grammar * 0.3) / 10) * 30 * speechMult;
     const communicationScore = rhythmComponent + deliveryComponent;
 
-    // 3. Personal Growth: Max 15 points
-    const currentComm = (fluency + confidence + grammar) / 3;
-    const growthResult = calculateGrowthScore({
-      currentCommScore: currentComm,
-      history: userHistory,
-    });
-    const growthScore = growthResult.growthScore;
+    // 3. Personal Growth: 0 points (Waived for shadowing activity)
+    const growthScore = 0;
 
-    let total100 = Math.round((durationScore + communicationScore + growthScore) * 100) / 100;
+    let total100 = Math.round((durationScore + communicationScore) * 100) / 100;
     total100 = Math.min(100, Math.max(0, total100));
 
     const isNinetyPercent = durationRatio >= 0.90;
@@ -399,13 +394,17 @@ export function calculateCompositeScore({
       score: total100,
       breakdown: {
         duration:         Math.round(durationScore * 100) / 100,
+        length:           Math.round(durationScore * 100) / 100,
         communication:    Math.round(communicationScore * 100) / 100,
+        comm:             Math.round(communicationScore * 100) / 100,
         vocabulary:       0,
-        growth:           Math.round(growthScore * 100) / 100,
-        maxDuration:      35,
-        maxCommunication: 50,
+        growth:           0,
+        maxDuration:      40,
+        maxLength:        40,
+        maxCommunication: 60,
+        maxComm:          60,
         maxVocabulary:    0,
-        maxGrowth:        15,
+        maxGrowth:        0,
         targetDurationSeconds: targetDur,
         actualDurationSeconds: Math.round(actualDur),
         durationRatio:    matchPercent,
@@ -414,9 +413,9 @@ export function calculateCompositeScore({
           ? `Full duration credit awarded (${matchPercent}% match of ${targetDur}s video — >=90% target achieved).`
           : `Effort credit awarded (${matchPercent}% match of ${targetDur}s video — aim for 90%+ for maximum duration points).`,
         speechMultiplier: Math.round(speechMult * 100),
-        growthDelta:      growthResult.growthDelta,
-        baselineComm:     growthResult.baselineComm,
-        isCalibration:    growthResult.isCalibration,
+        growthDelta:      null,
+        baselineComm:     null,
+        isCalibration:    false,
         isShadowing:      true,
         isPictureDescription: false,
         isStorySummary:   false,

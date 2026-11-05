@@ -1100,7 +1100,7 @@ export default function VideoAnalysis() {
                         <span>🎙️</span> REFERENCE SHADOWING SPEECH ({duration || todayQuestion.videoDuration || 60}s)
                       </span>
                       <span style={{ fontSize: "0.74rem", color: "#34d399", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                        <span>⭐</span> ≥90% duration match = Full 35 pts
+                        <span>⭐</span> ≥90% duration match = Full 40 pts
                       </span>
                     </div>
 
@@ -4867,13 +4867,13 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", fontSize: "0.78rem" }}>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  🎯 <strong>≥90% duration match</strong>: Full 35 duration pts
+                  🎯 <strong>≥90% duration match</strong>: Full 40 duration pts
                 </span>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
                   ⏱️ <strong>Target</strong>: {question?.videoDuration || 60} seconds
                 </span>
                 <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  🎙️ <strong>Scored on</strong>: Rhythm, pacing & fluency
+                  🎙️ <strong>Delivery & Rhythm</strong>: 60 pts
                 </span>
               </div>
             </div>
@@ -5499,8 +5499,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 color: (elapsed / (question?.videoDuration || 60)) >= 0.9 ? "#34d399" : "#f472b6"
               }}>
                 {(elapsed / (question?.videoDuration || 60)) >= 0.9
-                  ? "⭐ ≥90% Duration Achieved (Full 35 Pts)"
-                  : `Effort Score: ${((Math.min(0.9, elapsed / (question?.videoDuration || 60)) / 0.9) * 35).toFixed(1)} / 35 Pts`}
+                  ? "⭐ ≥90% Duration Achieved (Full 40 Pts)"
+                  : `Effort Score: ${((Math.min(0.9, elapsed / (question?.videoDuration || 60)) / 0.9) * 40).toFixed(1)} / 40 Pts`}
               </div>
             </div>
           )}
@@ -5797,15 +5797,14 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       });
     }
     if (isShadowBd) {
-      const durGap = (bd.maxLength || 35) - (bd.length || 0);
-      const comGap = (bd.maxComm || 50) - (bd.comm || 0);
-      const groGap = (bd.maxGrowth || 15) - (bd.growth || 0);
+      const durGap = (bd.maxLength || 40) - (bd.length || 0);
+      const comGap = (bd.maxComm || 60) - (bd.comm || 0);
       if (durGap > 0.5) {
         const targetSec = bd.targetDuration || 60;
         improvementTips.push({
           icon: "⏱️",
           label: "Reach 90% duration match",
-          detail: `+${durGap.toFixed(1)} pts possible — speak for at least 90% of the reference speech (${Math.round(targetSec * 0.9)}s) to earn full 35 duration points!`,
+          detail: `+${durGap.toFixed(1)} pts possible — speak for at least 90% of the reference speech (${Math.round(targetSec * 0.9)}s) to earn full 40 duration points!`,
           gap: durGap,
         });
       }
@@ -5815,14 +5814,6 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
           label: "Mirror rhythm & flow",
           detail: `+${comGap.toFixed(1)} pts possible — shadow the speaker closely, matching pacing, pauses, and clear pronunciation.`,
           gap: comGap,
-        });
-      }
-      if (groGap > 2) {
-        improvementTips.push({
-          icon: "🌱",
-          label: "Aim for personal growth",
-          detail: `+${groGap.toFixed(1)} pts possible — beat your communication baseline to earn full bonus points!`,
-          gap: groGap,
         });
       }
     } else if (isPictureBd) {
@@ -6123,20 +6114,20 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                 {
                   label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%)`,
                   earned: bd.length || 0,
-                  max: bd.maxLength || 35,
+                  max: bd.maxLength || 40,
                   color: (bd.durationMatchRatio ?? 0) >= 0.9 ? "#10b981" : "#f472b6",
                   subtext: (bd.durationMatchRatio ?? 0) >= 0.9 ? "≥90% Full Score" : "Effort Proportional",
                 },
                 {
                   label: `🗣️ Delivery, Rhythm & Fluency`,
                   earned: bd.comm || 0,
-                  max: bd.maxComm || 50,
+                  max: bd.maxComm || 60,
                   color: "#60a5fa",
                 },
-                ...(bd.growth != null || bd.maxGrowth != null ? [{
+                ...(bd.growth != null && (bd.maxGrowth || 0) > 0 ? [{
                   label: "🌱 Personal Growth",
                   earned: bd.growth || 0,
-                  max: bd.maxGrowth || 15,
+                  max: bd.maxGrowth || 0,
                   color: "#10b981",
                   subtext: bd.isCalibration
                     ? "First submissions — establishing baseline"
@@ -6215,7 +6206,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                   color: "#f472b6",
                   lineHeight: 1.4,
                 }}>
-                  ✨ <strong>Shadowing Activity:</strong> Scored on duration matching (35 pts), delivery &amp; rhythm (50 pts), and growth (15 pts). Vocabulary measurement is waived.
+                  ✨ <strong>Shadowing Activity:</strong> Scored on duration matching (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.
                 </div>
               )}
 
