@@ -26,19 +26,28 @@ const activeShadowingTask = (status) => status?.todayContentType === "shadowing_
 export function resolvePlayableVideoUrl(rawUrl, statusId = null) {
   if (!rawUrl) return null;
   let fixedUrl = rawUrl;
-  if (rawUrl.includes("commondatastorage.googleapis.com") || rawUrl.includes("gtv-videos-bucket")) {
-    if (rawUrl.includes("ForBiggerBlazes")) fixedUrl = "https://videos.pexels.com/video-files/3209828/3209828-hd_1920_1080_25fps.mp4";
-    else if (rawUrl.includes("ForBiggerEscapes")) fixedUrl = "https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4";
-    else if (rawUrl.includes("ForBiggerFun")) fixedUrl = "https://videos.pexels.com/video-files/3191572/3191572-hd_1920_1080_25fps.mp4";
-    else if (rawUrl.includes("ForBiggerJoyBlazes")) fixedUrl = "https://videos.pexels.com/video-files/3196061/3196061-hd_1920_1080_25fps.mp4";
-    else if (rawUrl.includes("WeAreGoingOnBullrun")) fixedUrl = "https://videos.pexels.com/video-files/3205626/3205626-hd_1920_1080_25fps.mp4";
-    else fixedUrl = "https://videos.pexels.com/video-files/856973/856973-hd_1920_1080_25fps.mp4";
 
-    if (statusId) {
-      import("../../../models/statusSchema.js").then(({ default: Status }) => {
-        Status.updateOne({ _id: statusId }, { todayVideoUrl: fixedUrl }).catch(() => {});
-      }).catch(() => {});
-    }
+  // Map silent stock or deprecated sample URLs to 1080p audio-voiced video streams
+  if (rawUrl.includes("3191572") || rawUrl.includes("ForBiggerFun")) {
+    fixedUrl = "/shadowing/fluency-mindset.mp4";
+  } else if (rawUrl.includes("3195394") || rawUrl.includes("ForBiggerEscapes")) {
+    fixedUrl = "/shadowing/active-listening.mp4";
+  } else if (rawUrl.includes("3209828") || rawUrl.includes("ForBiggerBlazes")) {
+    fixedUrl = "/shadowing/stage-presence.mp4";
+  } else if (rawUrl.includes("3196061") || rawUrl.includes("ForBiggerJoyBlazes")) {
+    fixedUrl = "/shadowing/intentional-pauses.mp4";
+  } else if (rawUrl.includes("3205626") || rawUrl.includes("WeAreGoingOnBullrun")) {
+    fixedUrl = "/shadowing/speaking-habits.mp4";
+  } else if (rawUrl.includes("856973")) {
+    fixedUrl = "/shadowing/charismatic-presence.mp4";
+  } else if (rawUrl.includes("commondatastorage.googleapis.com") || rawUrl.includes("gtv-videos-bucket")) {
+    fixedUrl = "/shadowing/stage-presence.mp4";
+  }
+
+  if (fixedUrl !== rawUrl && statusId) {
+    import("../../models/statusSchema.js").then(({ default: Status }) => {
+      Status.updateOne({ _id: statusId }, { todayVideoUrl: fixedUrl }).catch(() => {});
+    }).catch(() => {});
   }
   return fixedUrl;
 }

@@ -100,6 +100,22 @@ export function parseQuestionItems(rawText) {
 }
 
 /**
+ * Clean & resolve video URL with verified audio track
+ */
+export function getCleanVideoUrl(url) {
+  if (!url) return "";
+  const s = String(url);
+  if (s.includes("3191572") || s.includes("ForBiggerFun") || s.includes("fluency-mindset")) return "/shadowing/fluency-mindset.mp4";
+  if (s.includes("3195394") || s.includes("ForBiggerEscapes") || s.includes("active-listening")) return "/shadowing/active-listening.mp4";
+  if (s.includes("3209828") || s.includes("ForBiggerBlazes") || s.includes("stage-presence")) return "/shadowing/stage-presence.mp4";
+  if (s.includes("3196061") || s.includes("ForBiggerJoyBlazes") || s.includes("intentional-pauses")) return "/shadowing/intentional-pauses.mp4";
+  if (s.includes("3205626") || s.includes("WeAreGoingOnBullrun") || s.includes("speaking-habits")) return "/shadowing/speaking-habits.mp4";
+  if (s.includes("856973") || s.includes("charismatic-presence")) return "/shadowing/charismatic-presence.mp4";
+  if (s.includes("commondatastorage.googleapis.com") || s.includes("gtv-videos-bucket")) return "/shadowing/stage-presence.mp4";
+  return url;
+}
+
+/**
  * Detect question type from today object / status
  */
 export function detectQuestionType(today = {}) {
@@ -208,7 +224,7 @@ export function getQuestionUIConfig(type, today = {}) {
         hasAudio: false,
         hasImage: false,
         hasVideo: Boolean(today.videoUrl),
-        videoUrl: today.videoUrl,
+        videoUrl: getCleanVideoUrl(today.videoUrl),
         videoDuration: today.videoDuration || 60,
         videoTranscript: today.videoTranscript || "",
         videoTitle: today.videoTitle || "",

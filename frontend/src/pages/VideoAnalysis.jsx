@@ -17,6 +17,7 @@ import { saveDraft, loadDraft, clearDraft } from "../utils/videoDraftDB.js";
 import MonthlyGraceCountdown from "../components/MonthlyGraceCountdown.jsx";
 import {
   detectQuestionType,
+  getCleanVideoUrl,
   getQuestionUIConfig,
   parseQuestionItems,
   getCefrInfo,
@@ -1062,7 +1063,7 @@ export default function VideoAnalysis() {
                       background: "#000",
                     }}>
                       <video
-                        src={shadowVideoSrcOverride || todayQuestion.videoUrl}
+                        src={shadowVideoSrcOverride || getCleanVideoUrl(todayQuestion.videoUrl)}
                         controls
                         playsInline
                         crossOrigin="anonymous"
@@ -4985,7 +4986,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
                   <video
                     ref={shadowingRefVideo}
-                    src={question.videoUrl}
+                    src={getCleanVideoUrl(question?.videoUrl)}
                     playsInline
                     crossOrigin="anonymous"
                     onError={() => {

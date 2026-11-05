@@ -748,9 +748,27 @@ export async function streamVideoProxy(req, res) {
     let targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send("Missing url query param");
 
-    // Auto-rewrite deprecated 403 google sample URLs to live 1080p Pexels clips
+    // Redirect any known shadowing video to local voiced MP4 with audio
+    if (targetUrl.includes("3191572") || targetUrl.includes("ForBiggerFun") || targetUrl.includes("fluency-mindset")) {
+      return res.redirect(302, "/shadowing/fluency-mindset.mp4");
+    }
+    if (targetUrl.includes("3195394") || targetUrl.includes("ForBiggerEscapes") || targetUrl.includes("active-listening")) {
+      return res.redirect(302, "/shadowing/active-listening.mp4");
+    }
+    if (targetUrl.includes("3209828") || targetUrl.includes("ForBiggerBlazes") || targetUrl.includes("stage-presence")) {
+      return res.redirect(302, "/shadowing/stage-presence.mp4");
+    }
+    if (targetUrl.includes("3196061") || targetUrl.includes("ForBiggerJoyBlazes") || targetUrl.includes("intentional-pauses")) {
+      return res.redirect(302, "/shadowing/intentional-pauses.mp4");
+    }
+    if (targetUrl.includes("3205626") || targetUrl.includes("WeAreGoingOnBullrun") || targetUrl.includes("speaking-habits")) {
+      return res.redirect(302, "/shadowing/speaking-habits.mp4");
+    }
+    if (targetUrl.includes("856973") || targetUrl.includes("charismatic-presence")) {
+      return res.redirect(302, "/shadowing/charismatic-presence.mp4");
+    }
     if (targetUrl.includes("commondatastorage.googleapis.com") || targetUrl.includes("gtv-videos-bucket")) {
-      targetUrl = "https://videos.pexels.com/video-files/856973/856973-hd_1920_1080_25fps.mp4";
+      return res.redirect(302, "/shadowing/stage-presence.mp4");
     }
 
     const headers = {
