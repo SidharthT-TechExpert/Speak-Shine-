@@ -8829,31 +8829,6 @@ function ManualQuestionsPanel() {
     }
   };
 
-  const [burningSubtitles, setBurningSubtitles] = useState(false);
-
-  const handleBurnSubtitles = async () => {
-    if (!form.videoUrl || !form.videoTranscript) {
-      notify("Please provide both a Video URL and Transcript first", "error");
-      return;
-    }
-    setBurningSubtitles(true);
-    try {
-      const res = await api.post("/questions/burn-shadowing-subtitles", {
-        videoUrl: form.videoUrl,
-        transcript: form.videoTranscript,
-        duration: form.videoDuration || 75
-      });
-      if (res.data.videoUrl) {
-        setForm(f => ({ ...f, videoUrl: res.data.videoUrl, videoDuration: res.data.duration || f.videoDuration }));
-        notify("🔥 Teleprompter subtitles burned directly onto video successfully!");
-      }
-    } catch (err) {
-      notify(err.response?.data?.error || "Failed to burn subtitles onto video", "error");
-    } finally {
-      setBurningSubtitles(false);
-    }
-  };
-
   const CURATED_SHADOWING_LESSONS = [
     {
       title: "Mastering Confident English Introductions",
@@ -9819,37 +9794,6 @@ function ManualQuestionsPanel() {
                     onChange={e => setForm(f => ({ ...f, videoTranscript: e.target.value }))}
                   />
                 </div>
-
-                {/* Subtitle Burn Button */}
-                {form.videoUrl && form.videoTranscript && (
-                  <div style={{ marginBottom: "1rem" }}>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      disabled={burningSubtitles}
-                      onClick={handleBurnSubtitles}
-                      style={{
-                        width: "100%",
-                        border: "1px solid rgba(236,72,153,0.5)",
-                        color: "#f472b6",
-                        background: "rgba(236,72,153,0.08)",
-                        fontWeight: 700,
-                        padding: "0.6rem 1rem",
-                        borderRadius: 8,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "0.5rem",
-                        cursor: burningSubtitles ? "not-allowed" : "pointer"
-                      }}
-                    >
-                      {burningSubtitles ? "🔥 Burning Teleprompter Subtitles into Video…" : "🔥 Burn Teleprompter Subtitles into Video"}
-                    </button>
-                    <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center", marginTop: "0.3rem" }}>
-                      Engraves high-contrast, semi-transparent black-box captions on the lower third for easy reading while shadowing.
-                    </div>
-                  </div>
-                )}
               </>
             )}
             <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
