@@ -714,6 +714,12 @@ export async function getSettings() {
           ? [status.pictureDescriptionDay]
           : (status.pictureDescriptionDay === -1 ? [] : [4])),
     pictureDescriptionDay: status.pictureDescriptionDay ?? (Array.isArray(status.pictureDescriptionDays) && status.pictureDescriptionDays.length > 0 ? status.pictureDescriptionDays[0] : -1),
+    shadowingDays: Array.isArray(status.shadowingDays)
+      ? status.shadowingDays
+      : (status.shadowingDay !== undefined && status.shadowingDay !== null && status.shadowingDay !== -1
+          ? [status.shadowingDay]
+          : (status.shadowingDay === -1 ? [] : [2])),
+    shadowingDay: status.shadowingDay ?? (Array.isArray(status.shadowingDays) && status.shadowingDays.length > 0 ? status.shadowingDays[0] : 2),
     coursePrice: status.coursePrice ?? status.paymentAmount ?? 5,
     taxAmount: status.taxAmount ?? 0,
     paymentAmount: status.paymentAmount ?? 5,
@@ -730,6 +736,8 @@ export async function getSettings() {
     durationMonthlyGoalsFull: status.durationMonthlyGoalsFull ?? 420,
     durationPictureMax: status.durationPictureMax ?? 180,
     durationPictureFull: status.durationPictureFull ?? 180,
+    durationShadowingMax: status.durationShadowingMax ?? 180,
+    durationShadowingFull: status.durationShadowingFull ?? 180,
     adminNotifyPhone: status.adminNotifyPhone || process.env.ADMIN_NOTIFY_PHONE || null,
     deploymentNotifyEnabled: status.deploymentNotifyEnabled !== false,
     prizeWinnerCount: status.prizeWinnerCount ?? 3,
@@ -777,7 +785,11 @@ export async function updateSettings(input, ...rest) {
       adminNotifyPhone,
       deploymentNotifyEnabled,
       storyDays,
-      pictureDescriptionDays
+      pictureDescriptionDays,
+      shadowingDays,
+      shadowingDay,
+      durationShadowingMax,
+      durationShadowingFull
     ] = [input, ...rest];
     params = {
       posterSendTime, questionGenerateTime, vocabWordCount, vocabRequiredCount, vocabLevel, storyWordCount, storyLevel, storyDay, storyDays,
@@ -791,6 +803,8 @@ export async function updateSettings(input, ...rest) {
       allowPrivateVideos,
       pictureDescriptionDay, pictureDescriptionDays,
       durationPictureMax, durationPictureFull,
+      shadowingDays, shadowingDay,
+      durationShadowingMax, durationShadowingFull,
       vocabNormalWordCount, vocabNormalRequiredCount,
       vocabStoryWordCount, vocabStoryRequiredCount,
       vocabPictureWordCount, vocabPictureRequiredCount,
@@ -821,6 +835,8 @@ export async function updateSettings(input, ...rest) {
     allowPrivateVideos,
     pictureDescriptionDay, pictureDescriptionDays,
     durationPictureMax, durationPictureFull,
+    shadowingDays, shadowingDay,
+    durationShadowingMax, durationShadowingFull,
     vocabNormalWordCount, vocabNormalRequiredCount,
     vocabStoryWordCount, vocabStoryRequiredCount,
     vocabPictureWordCount, vocabPictureRequiredCount,
@@ -1103,6 +1119,32 @@ export async function updateSettings(input, ...rest) {
     updates.pictureDescriptionDays = day === -1 ? [] : [day];
   }
 
+  if (shadowingDays !== undefined) {
+    if (!Array.isArray(shadowingDays)) {
+      const error = new Error("shadowingDays must be an array of day numbers (0-6)");
+      error.statusCode = 400;
+      throw error;
+    }
+    const parsed = shadowingDays.map(d => parseInt(d, 10));
+    if (parsed.some(d => isNaN(d) || d < 0 || d > 6)) {
+      const error = new Error("All days in shadowingDays must be numbers between 0 (Sunday) and 6 (Saturday)");
+      error.statusCode = 400;
+      throw error;
+    }
+    const uniqueDays = [...new Set(parsed)].sort((a, b) => a - b);
+    updates.shadowingDays = uniqueDays;
+    updates.shadowingDay = uniqueDays.length > 0 ? uniqueDays[0] : 2;
+  } else if (shadowingDay !== undefined) {
+    const day = parseInt(shadowingDay, 10);
+    if (isNaN(day) || day < -1 || day > 6) {
+      const error = new Error("shadowingDay must be -1 (disabled) or 0 (Sunday) through 6 (Saturday)");
+      error.statusCode = 400;
+      throw error;
+    }
+    updates.shadowingDay = day;
+    updates.shadowingDays = day === -1 ? [] : [day];
+  }
+
   if (coursePrice !== undefined || taxAmount !== undefined || paymentAmount !== undefined) {
     const currentStatus = await Status.findOne().select("coursePrice taxAmount paymentAmount").lean();
     let finalCp = coursePrice !== undefined
@@ -1152,6 +1194,8 @@ export async function updateSettings(input, ...rest) {
     { name: "durationMonthlyGoalsFull", label: "Monthly Goals Full Score Duration" },
     { name: "durationPictureMax", label: "Picture Description Max Duration" },
     { name: "durationPictureFull", label: "Picture Description Full Score Duration" },
+    { name: "durationShadowingMax", label: "Shadowing Activity Max Duration", minVal: 20, maxVal: 180 },
+    { name: "durationShadowingFull", label: "Shadowing Activity Full Score Duration", minVal: 20, maxVal: 180 },
   ];
 
   const durationArgs = {
@@ -1161,14 +1205,15 @@ export async function updateSettings(input, ...rest) {
     durationMonthlyReflectionMax, durationMonthlyReflectionFull,
     durationMonthlyGoalsMax, durationMonthlyGoalsFull,
     durationPictureMax, durationPictureFull,
+    durationShadowingMax, durationShadowingFull,
   };
 
-  for (const { name, label } of durationFields) {
+  for (const { name, label, minVal = 60, maxVal = 1200 } of durationFields) {
     const rawVal = durationArgs[name];
     if (rawVal !== undefined) {
       const val = parseInt(rawVal, 10);
-      if (isNaN(val) || val < 60 || val > 1200) {
-        const error = new Error(`${label} must be between 60 and 1200 seconds`);
+      if (isNaN(val) || val < minVal || val > maxVal) {
+        const error = new Error(`${label} must be between ${minVal} and ${maxVal} seconds`);
         error.statusCode = 400;
         throw error;
       }
@@ -1196,6 +1241,7 @@ export async function updateSettings(input, ...rest) {
   checkRelation("Monthly Reflection", "durationMonthlyReflectionMax", "durationMonthlyReflectionFull", 420, 420);
   checkRelation("Monthly Goals", "durationMonthlyGoalsMax", "durationMonthlyGoalsFull", 600, 420);
   checkRelation("Picture Description", "durationPictureMax", "durationPictureFull", 180, 180);
+  checkRelation("Shadowing Activity", "durationShadowingMax", "durationShadowingFull", 180, 180);
 
   if (allowPrivateVideos !== undefined) {
     updates.allowPrivateVideos = allowPrivateVideos === true || allowPrivateVideos === "true";

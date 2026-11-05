@@ -7008,6 +7008,7 @@ export default function AdminDashboard() {
                     { id: "monthly", icon: "💬", title: "Monthly Reflection Day", full: "durationMonthlyReflectionFull", max: "durationMonthlyReflectionMax", color: "#60a5fa" },
                     { id: "goals", icon: "🎯", title: "Monthly Goals Day", full: "durationMonthlyGoalsFull", max: "durationMonthlyGoalsMax", color: "#f472b6" },
                     { id: "picture", icon: "🖼️", title: "Picture Description Day", full: "durationPictureFull", max: "durationPictureMax", color: "#38bdf8" },
+                    { id: "shadowing", icon: "🎬", title: "Shadowing Activity Day", full: "durationShadowingFull", max: "durationShadowingMax", color: "#ec4899", minVal: 20, maxLimit: 180, hint: "Video must be ≤ 3 min (180s)" },
                   ].map(item => (
                     <div
                       key={item.id}
@@ -7033,9 +7034,9 @@ export default function AdminDashboard() {
                           <input
                             className="form-input"
                             type="number"
-                            min={60} max={1200}
+                            min={item.minVal || 60} max={item.maxLimit || 1200}
                             value={settings[item.full]}
-                            onChange={e => setSettings(s => ({ ...s, [item.full]: parseInt(e.target.value) || 60 }))}
+                            onChange={e => setSettings(s => ({ ...s, [item.full]: Math.min(item.maxLimit || 1200, Math.max(item.minVal || 60, parseInt(e.target.value) || (item.minVal || 60))) }))}
                             required
                             style={{ textAlign: "center", padding: "0.4rem", fontSize: "0.95rem" }}
                           />
@@ -7051,9 +7052,9 @@ export default function AdminDashboard() {
                           <input
                             className="form-input"
                             type="number"
-                            min={60} max={1200}
+                            min={item.minVal || 60} max={item.maxLimit || 1200}
                             value={settings[item.max]}
-                            onChange={e => setSettings(s => ({ ...s, [item.max]: parseInt(e.target.value) || 60 }))}
+                            onChange={e => setSettings(s => ({ ...s, [item.max]: Math.min(item.maxLimit || 1200, Math.max(item.minVal || 60, parseInt(e.target.value) || (item.minVal || 60))) }))}
                             required
                             style={{ textAlign: "center", padding: "0.4rem", fontSize: "0.95rem" }}
                           />
@@ -7062,6 +7063,12 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </div>
+
+                      {item.hint && (
+                        <div style={{ fontSize: "0.72rem", color: item.color, textAlign: "center", fontWeight: 600 }}>
+                          {item.hint}
+                        </div>
+                      )}
                     </div>
                   ))}
 
@@ -7091,7 +7098,7 @@ export default function AdminDashboard() {
               <form onSubmit={e => saveSettings(e, "vocab")}>
                 
                 {/* Vocabulary Word Count Targets Grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
                   {[
                     { key: "Normal", label: "🗣️ Normal Daily Topics", words: "vocabNormalWordCount", required: "vocabNormalRequiredCount" },
                     { key: "Story", label: "📖 Story Summary Day", words: "vocabStoryWordCount", required: "vocabStoryRequiredCount" },
@@ -7115,6 +7122,29 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Shadowing Activity Vocabulary Waived Card */}
+                  <div style={{ padding: "1rem", border: "1px solid rgba(236,72,153,0.35)", borderRadius: 12, background: "rgba(236,72,153,0.06)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.35rem", color: "#ec4899", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span>🎬 Shadowing Activity Day</span>
+                        <span style={{ fontSize: "0.68rem", background: "rgba(52,211,153,0.15)", color: "#34d399", padding: "1px 6px", borderRadius: 8, fontWeight: 700 }}>Waived</span>
+                      </div>
+                      <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem" }}>
+                        No vocabulary words required or penalized. Scored on rhythm, fluency, and duration matching.
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", opacity: 0.9 }}>
+                      <div style={{ flex: 1, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 8, padding: "0.35rem" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Shown</span>
+                        <strong style={{ fontSize: "0.88rem", color: "#34d399" }}>0 (Waived)</strong>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "center", background: "rgba(0,0,0,0.25)", borderRadius: 8, padding: "0.35rem" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--muted)", display: "block" }}>Required</span>
+                        <strong style={{ fontSize: "0.88rem", color: "#34d399" }}>0 (Waived)</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* CEFR Level Selector */}
@@ -7391,47 +7421,43 @@ export default function AdminDashboard() {
                     })()}
                   </div>
 
-                  {/* Shadowing Activity Days */}
-                  <div style={{
-                    marginTop: "1.25rem",
-                    padding: "1rem",
-                    background: "rgba(245, 158, 11, 0.05)",
-                    border: "1px solid rgba(245, 158, 11, 0.2)",
-                    borderRadius: 12,
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {/* Shadowing Activity Days (Multi-select) */}
+                  <div style={{ padding: "1rem 1.15rem", borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem", flexWrap: "wrap", gap: "0.3rem" }}>
                       <div>
-                        <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#f59e0b" }}>🎬 Shadowing Activity Days (Video Mimicry Task)</span>
-                        <span style={{ fontSize: "0.75rem", color: "var(--muted)", marginLeft: "0.5rem" }}>(default: Tuesday, video &le; 3 min)</span>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: "0.86rem", margin: 0, color: "#ec4899" }}>
+                          🎬 Shadowing Activity Days
+                        </label>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}> (default: Tuesday, video ≤ 3 min)</span>
                       </div>
-                      <div style={{ display: "flex", gap: "0.25rem" }}>
+                      <div style={{ display: "flex", gap: "0.3rem" }}>
                         <button
                           type="button"
                           onClick={() => setSettings(s => ({ ...s, shadowingDays: [0,1,2,3,4,5,6], shadowingDay: 0 }))}
-                          style={{ background: "none", border: "none", color: "#f59e0b", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem", fontWeight: 600 }}
+                          style={{ background: "none", border: "none", color: "#ec4899", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem", fontWeight: 600 }}
                         >
-                          All Days
+                          All
                         </button>
-                        <span style={{ color: "var(--border)" }}>|</span>
+                        <span style={{ color: "var(--muted)", fontSize: "0.72rem" }}>|</span>
                         <button
                           type="button"
                           onClick={() => setSettings(s => ({ ...s, shadowingDays: [2], shadowingDay: 2 }))}
-                          style={{ background: "none", border: "none", color: "#f59e0b", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem", fontWeight: 600 }}
+                          style={{ background: "none", border: "none", color: "#ec4899", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem", fontWeight: 600 }}
                         >
                           Tue Only
                         </button>
-                        <span style={{ color: "var(--border)" }}>|</span>
+                        <span style={{ color: "var(--muted)", fontSize: "0.72rem" }}>|</span>
                         <button
                           type="button"
                           onClick={() => setSettings(s => ({ ...s, shadowingDays: [], shadowingDay: -1 }))}
                           style={{ background: "none", border: "none", color: "var(--muted)", fontSize: "0.72rem", cursor: "pointer", padding: "0.1rem 0.3rem" }}
                         >
-                          Disable
+                          Clear / Off
                         </button>
                       </div>
                     </div>
-                    <p style={{ margin: "0 0 0.6rem", fontSize: "0.78rem", color: "var(--muted)" }}>
-                      Select which days of the week to automatically run Shadowing Activity tasks. Students practice speaking along with short reference videos.
+                    <p style={{ fontSize: "0.74rem", color: "var(--muted)", margin: "0 0 0.5rem" }}>
+                      Select which days of the week to automatically generate and publish shadowing video mimicry challenges.
                     </p>
                     <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.6rem" }}>
                       {[
@@ -7454,9 +7480,9 @@ export default function AdminDashboard() {
                             }}
                             style={{
                               padding: "0.35rem 0.65rem", borderRadius: 14, fontSize: "0.78rem", fontWeight: 700,
-                              border: isSelected ? "2px solid #f59e0b" : "1px solid var(--border)",
-                              background: isSelected ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.03)",
-                              color: isSelected ? "#f59e0b" : "var(--muted)",
+                              border: isSelected ? "2px solid #ec4899" : "1px solid var(--border)",
+                              background: isSelected ? "rgba(236,72,153,0.22)" : "rgba(255,255,255,0.03)",
+                              color: isSelected ? "#ec4899" : "var(--muted)",
                               cursor: "pointer",
                               transition: "all 0.15s ease",
                               display: "flex",
@@ -7478,7 +7504,7 @@ export default function AdminDashboard() {
                       return (
                         <div style={{ fontSize: "0.76rem", color: "var(--muted)" }}>
                           Runs on: {currentDays.length > 0 ? (
-                            <strong style={{ color: "#f59e0b" }}>
+                            <strong style={{ color: "#ec4899" }}>
                               {currentDays.map(d => dayNames[d]).join(", ")}
                             </strong>
                           ) : (
