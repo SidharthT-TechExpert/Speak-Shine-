@@ -43,8 +43,14 @@ const questionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Enforce uniqueness at DB level — prevents duplicates even from concurrent inserts
-questionSchema.index({ topic: 1 },    { unique: true, sparse: true });
-questionSchema.index({ question: 1 }, { unique: true, sparse: true });
+// Enforce uniqueness only for automated question bank, not manual activity setups
+questionSchema.index(
+  { topic: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { isManualSetup: false } }
+);
+questionSchema.index(
+  { question: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { isManualSetup: false } }
+);
 
 export default mongoose.model("Question", questionSchema);

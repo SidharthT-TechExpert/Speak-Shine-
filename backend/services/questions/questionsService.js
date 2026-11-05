@@ -157,34 +157,78 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     }
   }
 
-  const manualQuestion = await Question.create({
-    category,
-    topic,
-    question,
-    isManualSetup: true,
-    setupType,
-    contentType: setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question",
-    audioUrl: story.audioUrl || null,
-    storyTranscript: story.storyTranscript || null,
-    summaryGuide: story.summaryGuide || null,
-    imageUrl: story.imageUrl || null,
-    imageSource: story.imageSource || null,
-    imagePageUrl: story.imagePageUrl || null,
-    imagePhotographer: story.imagePhotographer || null,
-    imagePhotographerUrl: story.imagePhotographerUrl || null,
-    imageSearchQuery: story.imageSearchQuery || null,
-    imageInstructions: story.imageInstructions || null,
-    imageDifficulty: story.imageDifficulty || null,
-    speakingDuration: story.speakingDuration || null,
-    videoUrl: story.videoUrl || null,
-    videoDuration: story.videoDuration || null,
-    videoTranscript: story.videoTranscript || null,
-    videoTitle: story.videoTitle || topic || null,
-    scheduledFor: scheduleDate,
-    scheduledTime: normalizedTime,
-    createdBy,
-    isUsed: publishNow ? true : false
-  });
+  let manualQuestion;
+  try {
+    manualQuestion = await Question.create({
+      category,
+      topic,
+      question,
+      isManualSetup: true,
+      setupType,
+      contentType: setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question",
+      audioUrl: story.audioUrl || null,
+      storyTranscript: story.storyTranscript || null,
+      summaryGuide: story.summaryGuide || null,
+      imageUrl: story.imageUrl || null,
+      imageSource: story.imageSource || null,
+      imagePageUrl: story.imagePageUrl || null,
+      imagePhotographer: story.imagePhotographer || null,
+      imagePhotographerUrl: story.imagePhotographerUrl || null,
+      imageSearchQuery: story.imageSearchQuery || null,
+      imageInstructions: story.imageInstructions || null,
+      imageDifficulty: story.imageDifficulty || null,
+      speakingDuration: story.speakingDuration || null,
+      videoUrl: story.videoUrl || null,
+      videoDuration: story.videoDuration || null,
+      videoTranscript: story.videoTranscript || null,
+      videoTitle: story.videoTitle || topic || null,
+      scheduledFor: scheduleDate,
+      scheduledTime: normalizedTime,
+      createdBy,
+      isUsed: publishNow ? true : false
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      // Duplicate key: find the colliding document and update it with the new setup
+      const existing = await Question.findOne({
+        $or: [{ question }, { topic }]
+      });
+      if (existing) {
+        existing.category = category;
+        existing.topic = topic;
+        existing.question = question;
+        existing.isManualSetup = true;
+        existing.setupType = setupType;
+        existing.contentType = setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question";
+        existing.audioUrl = story.audioUrl || existing.audioUrl || null;
+        existing.storyTranscript = story.storyTranscript || existing.storyTranscript || null;
+        existing.summaryGuide = story.summaryGuide || existing.summaryGuide || null;
+        existing.imageUrl = story.imageUrl || existing.imageUrl || null;
+        existing.imageSource = story.imageSource || existing.imageSource || null;
+        existing.imagePageUrl = story.imagePageUrl || existing.imagePageUrl || null;
+        existing.imagePhotographer = story.imagePhotographer || existing.imagePhotographer || null;
+        existing.imagePhotographerUrl = story.imagePhotographerUrl || existing.imagePhotographerUrl || null;
+        existing.imageSearchQuery = story.imageSearchQuery || existing.imageSearchQuery || null;
+        existing.imageInstructions = story.imageInstructions || existing.imageInstructions || null;
+        existing.imageDifficulty = story.imageDifficulty || existing.imageDifficulty || null;
+        existing.speakingDuration = story.speakingDuration || existing.speakingDuration || null;
+        existing.videoUrl = story.videoUrl || existing.videoUrl || null;
+        existing.videoDuration = story.videoDuration || existing.videoDuration || null;
+        existing.videoTranscript = story.videoTranscript || existing.videoTranscript || null;
+        existing.videoTitle = story.videoTitle || topic || existing.videoTitle || null;
+        existing.scheduledFor = scheduleDate;
+        existing.scheduledTime = normalizedTime;
+        existing.createdBy = createdBy || existing.createdBy;
+        existing.isUsed = publishNow ? true : existing.isUsed;
+        await existing.save();
+        manualQuestion = existing;
+      } else {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   if (publishNow) {
     const { publishManualQuestion } = await import("../scheduler/questionSchedulerService.js");
