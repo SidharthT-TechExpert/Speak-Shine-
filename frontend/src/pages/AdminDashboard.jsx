@@ -8801,7 +8801,7 @@ function ManualQuestionsPanel() {
     setGeneratingShadowing(true);
     try {
       const res = await api.post("/questions/generate-shadowing-video", {
-        targetDuration: settings.durationShadowingFull || 75,
+        targetDuration: form.videoDuration || 75,
         topic: form.topic?.trim() || undefined,
       }, {
         timeout: 120000 // 2 minutes timeout for audio download, whisper transcribing, and slicing
