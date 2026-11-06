@@ -369,9 +369,9 @@ export const publishAutoStorySummary = publishAutoSaturdayStory;
 export async function publishManualQuestion(q) {
   if (!q) return { published: false };
 
-  const isStory = q.setupType === "story_summary";
-  const isPicture = q.setupType === "picture_description";
-  const isShadowing = q.setupType === "shadowing_video";
+  const isStory = q.setupType === "story_summary" || q.contentType === "story_audio" || q.category?.toLowerCase().includes("story");
+  const isPicture = q.setupType === "picture_description" || q.contentType === "picture_description" || q.category?.toLowerCase().includes("picture");
+  const isShadowing = q.setupType === "shadowing_video" || q.contentType === "shadowing_video" || q.category?.toLowerCase().includes("shadowing") || q.topic?.toLowerCase().includes("shadowing");
   const isReflection = q.setupType === "monthly_reflection";
   const isGoals = q.setupType === "monthly_goals";
 

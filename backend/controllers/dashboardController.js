@@ -150,8 +150,8 @@ export async function getUserScores(req, res) {
  */
 export async function setTodayQuestion(req, res) {
   try {
-    const { topic, question, category } = req.body;
-    const result = await dashboardService.setTodayQuestion(topic, question, category);
+    const { topic, question, category, ...extra } = req.body || {};
+    const result = await dashboardService.setTodayQuestion(topic, question, category, extra);
     res.json(result);
   } catch (error) {
     console.error("[Dashboard] Set today question error:", error.message);

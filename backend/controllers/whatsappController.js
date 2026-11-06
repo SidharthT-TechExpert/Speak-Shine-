@@ -38,7 +38,7 @@ export async function getWhatsAppStatus(req, res) {
   try {
     const status = getStatus();
     const dbStatus = await Status.findOne()
-      .select("todayTopic todayQuestion todayCategory todayContentType todayImageUrl todayAudioUrl isPictureDescriptionDay isStorySummaryDay todayVocabulary todayImageInstructions lastPosterStatus lastPosterError lastPosterAttemptAt lastPosterSentDate lastPosterSentTime")
+      .select("todayTopic todayQuestion todayCategory todayContentType todayImageUrl todayAudioUrl isPictureDescriptionDay isStorySummaryDay isShadowingDay todayVideoUrl todayVideoDuration todayVideoTitle todayVocabulary todayImageInstructions lastPosterStatus lastPosterError lastPosterAttemptAt lastPosterSentDate lastPosterSentTime")
       .lean();
 
     const submissionSummary = await getSubmissionReportSummary();

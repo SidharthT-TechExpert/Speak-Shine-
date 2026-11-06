@@ -1017,7 +1017,8 @@ export default function AdminDashboard() {
       setWaSendingPoster(true);
       const res = await api.post("/whatsapp/send-poster");
       if (res.data?.success) {
-        msg("✅ Poster and caption sent to WhatsApp group successfully!", "success");
+        const audioDelivered = res.data?.audioSent ? " and reference audio file" : "";
+        msg(`✅ Poster${audioDelivered} sent to WhatsApp group successfully!`, "success");
         await loadWhatsAppStatus();
       }
     } catch (err) {
@@ -2963,7 +2964,23 @@ export default function AdminDashboard() {
                   onChange={e=>{
                     const q=questions.find(x=>x._id===e.target.value);
                     setPublishQ(q||null);
-                    if(q) setPublishCustom({topic:q.topic,question:q.question,category:q.category});
+                    if(q) setPublishCustom({
+                      topic:q.topic,
+                      question:q.question,
+                      category:q.category,
+                      questionId: q._id,
+                      contentType: q.contentType,
+                      audioUrl: q.audioUrl,
+                      videoUrl: q.videoUrl,
+                      videoDuration: q.videoDuration,
+                      videoTranscript: q.videoTranscript,
+                      videoTitle: q.videoTitle,
+                      imageUrl: q.imageUrl,
+                      imageInstructions: q.imageInstructions,
+                      storyTranscript: q.storyTranscript,
+                      summaryGuide: q.summaryGuide,
+                      vocabulary: q.vocabulary
+                    });
                   }}>
                   <option value="">— Select a question —</option>
                   {questions.map(q=>(
@@ -2997,7 +3014,19 @@ export default function AdminDashboard() {
                 await api.patch("/dashboard/today-question",{
                   topic:publishCustom.topic,
                   question:publishCustom.question,
-                  category:publishCustom.category||"General"
+                  category:publishCustom.category||"General",
+                  questionId: publishCustom.questionId || publishQ?._id,
+                  contentType: publishCustom.contentType || publishQ?.contentType,
+                  audioUrl: publishCustom.audioUrl || publishQ?.audioUrl,
+                  videoUrl: publishCustom.videoUrl || publishQ?.videoUrl,
+                  videoDuration: publishCustom.videoDuration || publishQ?.videoDuration,
+                  videoTranscript: publishCustom.videoTranscript || publishQ?.videoTranscript,
+                  videoTitle: publishCustom.videoTitle || publishQ?.videoTitle,
+                  imageUrl: publishCustom.imageUrl || publishQ?.imageUrl,
+                  imageInstructions: publishCustom.imageInstructions || publishQ?.imageInstructions,
+                  storyTranscript: publishCustom.storyTranscript || publishQ?.storyTranscript,
+                  summaryGuide: publishCustom.summaryGuide || publishQ?.summaryGuide,
+                  vocabulary: publishCustom.vocabulary || publishQ?.vocabulary
                 });
                 msg("✅ Question published! Users can now see it.");
                 setPublishQ(null);

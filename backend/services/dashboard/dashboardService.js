@@ -766,7 +766,7 @@ export async function getUserScores(phone) {
 /**
  * Manually set today's question (admin only)
  */
-export async function setTodayQuestion(topic, question, category) {
+export async function setTodayQuestion(topic, question, category, extra = {}) {
   if (!question) {
     throw new Error("question is required");
   }
@@ -777,29 +777,76 @@ export async function setTodayQuestion(topic, question, category) {
   const d = String(nowIST.getDate()).padStart(2, "0");
   const todayIST = `${y}-${mo}-${d}`;
 
+  let matched = null;
+  try {
+    const Question = (await import("../../../models/questionSchema.js")).default;
+    matched = await Question.findOne({
+      $or: [
+        ...(extra?.questionId ? [{ _id: extra.questionId }] : []),
+        ...(topic ? [{ topic }] : []),
+        ...(question ? [{ question }] : [])
+      ]
+    }).lean();
+  } catch (err) {
+    console.warn("[DashboardService] Matched question lookup failed:", err.message);
+  }
+
+  const isShadowing = Boolean(
+    extra?.isShadowing ||
+    extra?.contentType === "shadowing_video" ||
+    matched?.contentType === "shadowing_video" ||
+    matched?.setupType === "shadowing_video" ||
+    (category && category.toLowerCase().includes("shadowing")) ||
+    (matched?.category && matched.category.toLowerCase().includes("shadowing")) ||
+    (topic && topic.toLowerCase().includes("shadowing"))
+  );
+
+  const isStory = Boolean(
+    extra?.isStorySummary ||
+    extra?.contentType === "story_audio" ||
+    matched?.contentType === "story_audio" ||
+    matched?.setupType === "story_audio" ||
+    (category && category.toLowerCase().includes("story")) ||
+    (matched?.category && matched.category.toLowerCase().includes("story"))
+  );
+
+  const isPicture = Boolean(
+    extra?.isPictureDescription ||
+    extra?.contentType === "picture_description" ||
+    matched?.contentType === "picture_description" ||
+    matched?.setupType === "picture_description" ||
+    (category && category.toLowerCase().includes("picture")) ||
+    (matched?.category && matched.category.toLowerCase().includes("picture"))
+  );
+
+  const resolvedContentType = isShadowing ? "shadowing_video" : isStory ? "story_audio" : isPicture ? "picture_description" : "question";
+
   await Status.updateOne({}, {
     $set: {
       todayQuestion: question,
       todayTopic: topic || null,
       todayCategory: category || null,
-      todayContentType: "question",
-      todayAudioUrl: null,
-      todayStoryTranscript: null,
-      todaySummaryGuide: null,
-      isStorySummaryDay: false,
-      isPictureDescriptionDay: false,
-      isShadowingDay: false,
-      todayVideoUrl: null,
-      todayVideoDuration: null,
-      todayVideoTranscript: null,
-      todayVideoTitle: null,
-      todayImageUrl: null,
-      todayImageSource: null,
-      todayImagePageUrl: null,
-      todayImagePhotographer: null,
-      todayImagePhotographerUrl: null,
-      todayImageSearchQuery: null,
-      todayImageInstructions: null,
+      todayContentType: resolvedContentType,
+      todayAudioUrl: isShadowing
+        ? (extra?.audioUrl || extra?.videoUrl || matched?.audioUrl || matched?.videoUrl || null)
+        : (isStory ? (extra?.audioUrl || matched?.audioUrl || null) : (extra?.audioUrl || matched?.audioUrl || null)),
+      todayStoryTranscript: isStory ? (extra?.storyTranscript || matched?.storyTranscript || null) : null,
+      todaySummaryGuide: isStory ? (extra?.summaryGuide || matched?.summaryGuide || null) : null,
+      isStorySummaryDay: isStory,
+      isPictureDescriptionDay: isPicture,
+      isShadowingDay: isShadowing,
+      todayVideoUrl: isShadowing ? (extra?.videoUrl || extra?.audioUrl || matched?.videoUrl || matched?.audioUrl || null) : null,
+      todayVideoDuration: isShadowing ? (extra?.videoDuration || matched?.videoDuration || matched?.speakingDuration || null) : null,
+      todayVideoTranscript: isShadowing ? (extra?.videoTranscript || matched?.videoTranscript || matched?.storyTranscript || null) : null,
+      todayVideoTitle: isShadowing ? (extra?.videoTitle || matched?.videoTitle || matched?.topic || topic || null) : null,
+      todayImageUrl: isPicture ? (extra?.imageUrl || matched?.imageUrl || null) : null,
+      todayImageSource: isPicture ? (extra?.imageSource || matched?.imageSource || null) : null,
+      todayImagePageUrl: isPicture ? (extra?.imagePageUrl || matched?.imagePageUrl || null) : null,
+      todayImagePhotographer: isPicture ? (extra?.imagePhotographer || matched?.imagePhotographer || null) : null,
+      todayImagePhotographerUrl: isPicture ? (extra?.imagePhotographerUrl || matched?.imagePhotographerUrl || null) : null,
+      todayImageSearchQuery: isPicture ? (extra?.imageSearchQuery || matched?.imageSearchQuery || null) : null,
+      todayImageInstructions: isPicture ? (extra?.imageInstructions || matched?.imageInstructions || null) : null,
+      todayVocabulary: isShadowing ? [] : (extra?.vocabulary || matched?.vocabulary || []),
       questionSentToday: true,
       questionPublishedDate: todayIST,
       lastPosterSentDate: todayIST,
