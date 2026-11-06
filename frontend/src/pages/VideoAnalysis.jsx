@@ -5573,13 +5573,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <span style={{
-                      fontSize: "0.68rem", fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                      background: "rgba(52, 211, 153, 0.15)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.3)",
-                    }}>
-                      ⭐ {Math.min(100, Math.round((elapsed / Math.max(1, question?.videoDuration || 60)) * 100))}% (40 pts)
-                    </span>
-
                     {/* Audio Backward 5s */}
                     <button
                       type="button"
@@ -6075,19 +6068,17 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               gap: "0.5rem"
             }}>
               <div>
-                <span style={{ fontWeight: 700, color: "#f472b6" }}>🎬 Shadowing Match: </span>
+                <span style={{ fontWeight: 700, color: "#f472b6" }}>🎬 Shadowing Recording: </span>
                 <span style={{ color: "var(--text)" }}>
-                  {fmtTime(elapsed)} of {fmtTime(question?.videoDuration || 60)} ({Math.min(100, Math.round((elapsed / (question?.videoDuration || 60)) * 100))}%)
+                  {fmtTime(elapsed)} of {fmtTime(question?.videoDuration || 60)} Target Audio
                 </span>
               </div>
               <div style={{
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: "0.82rem",
-                color: (elapsed / (question?.videoDuration || 60)) >= 0.9 ? "#34d399" : "#f472b6"
+                color: "#94a3b8"
               }}>
-                {(elapsed / (question?.videoDuration || 60)) >= 0.9
-                  ? "⭐ ≥90% Duration Achieved (Full 40 Pts)"
-                  : `Effort Score: ${((Math.min(0.9, elapsed / (question?.videoDuration || 60)) / 0.9) * 40).toFixed(1)} / 40 Pts`}
+                ✨ Active speech ratio (≥85%) &amp; delivery rhythm will be evaluated by AI upon submission
               </div>
             </div>
           )}
@@ -6699,7 +6690,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  label: `⏱️ Active Speech Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
                   color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6",
@@ -6793,7 +6784,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                   color: "#f472b6",
                   lineHeight: 1.4,
                 }}>
-                  ✨ <strong>Shadowing Activity:</strong> Scored on duration matching (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.
+                  ✨ <strong>Shadowing Activity:</strong> Scored on active speech ratio (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.
                 </div>
               )}
 
