@@ -8,7 +8,7 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
   const minLabel = isShadow ? "20 sec" : "1 min";
 
   const maxSeconds = isShadow
-    ? (settings.durationShadowingMax ?? 180)
+    ? Math.max(180, settings.durationShadowingMax ?? 180)
     : isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : isWeeklyReflection
@@ -22,7 +22,7 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
     : (settings.durationDefaultMax ?? 300);
 
   const fullScoreSeconds = isShadow
-    ? (settings.durationShadowingFull ?? 180)
+    ? Math.max(180, settings.durationShadowingFull ?? 180)
     : isMonthlyReflection
     ? (settings.durationMonthlyReflectionFull ?? 420)
     : isWeeklyReflection

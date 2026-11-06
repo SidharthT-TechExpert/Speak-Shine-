@@ -157,6 +157,28 @@ function StudioDropCountdownTimer({ posterSendTime = "08:00" }) {
 // "upload"  → existing file-upload flow
 // "record"  → new live-record flow
 
+const CACHE_RECORD_KEY = "record_today_cache_v1";
+
+function getCachedRecordToday() {
+  try {
+    const raw = localStorage.getItem(CACHE_RECORD_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.today?.question) return parsed;
+    }
+    const dashRaw = localStorage.getItem("dashboard_cache_v5");
+    if (dashRaw) {
+      const parsed = JSON.parse(dashRaw);
+      if (parsed?.data?.today?.question) {
+        return { today: parsed.data.today, profile: parsed.data.profile };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function VideoAnalysis() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -211,28 +233,51 @@ export default function VideoAnalysis() {
     }
   }, [location.pathname, location.hash]);
 
-  const [todayQuestion, setTodayQuestion] = useState(null);
-  const [todayVocabulary, setTodayVocabulary] = useState([]);
-  const [vocabWordCount, setVocabWordCount] = useState(5);
-  const [vocabRequiredCount, setVocabRequiredCount] = useState(3);
-  const [vocabLevel, setVocabLevel] = useState("B2");
-  const [isMonthlyReflection, setIsMonthlyReflection] = useState(false);
-  const [isWeeklyReflection, setIsWeeklyReflection] = useState(false);
-  const [isMonthlyGoals, setIsMonthlyGoals] = useState(false);
-  const [isStorySummary, setIsStorySummary] = useState(false);
-  const [isPictureDescription, setIsPictureDescription] = useState(false);
-  const [isShadowing, setIsShadowing] = useState(false);
+  const cachedTodayInit = getCachedRecordToday();
+  const initToday = cachedTodayInit?.today;
+  const initShadowing = Boolean(initToday?.contentType === "shadowing_video" || initToday?.isShadowing);
+
+  const [todayQuestion, setTodayQuestion] = useState(() => initToday?.question ? {
+    question: initToday.question,
+    topic: initToday.topic,
+    category: initToday.category,
+    audioUrl: initToday.audioUrl,
+    contentType: initToday.contentType,
+    imageUrl: initToday.imageUrl,
+    imageSource: initToday.imageSource,
+    imagePageUrl: initToday.imagePageUrl,
+    imagePhotographer: initToday.imagePhotographer,
+    imagePhotographerUrl: initToday.imagePhotographerUrl,
+    imageInstructions: initToday.imageInstructions,
+    videoUrl: initToday.videoUrl,
+    videoDuration: initToday.videoDuration,
+    videoTranscript: initToday.videoTranscript,
+    videoTitle: initToday.videoTitle,
+    durationSettings: initToday.durationSettings,
+    isWeeklyReflection: initToday.isWeeklyReflection,
+    isShadowing: initShadowing,
+  } : null);
+  const [todayVocabulary, setTodayVocabulary] = useState(() => initToday?.vocabulary || []);
+  const [vocabWordCount, setVocabWordCount] = useState(() => initToday?.vocabWordCount ?? 5);
+  const [vocabRequiredCount, setVocabRequiredCount] = useState(() => initToday?.vocabRequiredCount ?? 3);
+  const [vocabLevel, setVocabLevel] = useState(() => initToday?.vocabLevel || "B2");
+  const [isMonthlyReflection, setIsMonthlyReflection] = useState(() => Boolean(initToday?.isMonthlyReflection));
+  const [isWeeklyReflection, setIsWeeklyReflection] = useState(() => Boolean(initToday?.isWeeklyReflection));
+  const [isMonthlyGoals, setIsMonthlyGoals] = useState(() => Boolean(initToday?.isMonthlyGoals));
+  const [isStorySummary, setIsStorySummary] = useState(() => Boolean(initToday?.contentType === "story_audio" || initToday?.isStorySummaryDay));
+  const [isPictureDescription, setIsPictureDescription] = useState(() => Boolean(initToday?.contentType === "picture_description" || initToday?.isPictureDescriptionDay));
+  const [isShadowing, setIsShadowing] = useState(() => initShadowing);
   const [shadowVideoSrcOverride, setShadowVideoSrcOverride] = useState("");
   const [shadowingVideoFailed, setShadowingVideoFailed] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
-  const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
-  const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
-  const [durationLimits, setDurationLimits] = useState(null);
-  const [durationSettings, setDurationSettings] = useState(null);
-  const [isQuestionActive, setIsQuestionActive] = useState(false);
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(true);
-  const [posterSendTime, setPosterSendTime] = useState("08:00");
-  const [isTodaySubmitted, setIsTodaySubmitted] = useState(false);
+  const [allowPrivateVideos, setAllowPrivateVideos] = useState(() => initToday?.allowPrivateVideos ?? true);
+  const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(() => initToday?.enableBackgroundBlur ?? false);
+  const [durationLimits, setDurationLimits] = useState(() => initToday?.durationLimits || null);
+  const [durationSettings, setDurationSettings] = useState(() => initToday?.durationSettings || null);
+  const [isQuestionActive, setIsQuestionActive] = useState(() => Boolean(initToday?.question));
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(() => !initToday?.question);
+  const [posterSendTime, setPosterSendTime] = useState(() => initToday?.posterSendTime || "08:00");
+  const [isTodaySubmitted, setIsTodaySubmitted] = useState(() => Boolean(cachedTodayInit?.profile?.completed || initToday?.isSubmitted));
 
 
 
@@ -242,7 +287,6 @@ export default function VideoAnalysis() {
   const [duration, setDuration] = useState(75);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [peekFullScript, setPeekFullScript] = useState(false);
   const audioRef = useRef(null);
   const speedMenuRef = useRef(null);
   const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
@@ -592,13 +636,23 @@ export default function VideoAnalysis() {
     let isCancelled = false;
 
     const loadQuestionData = async () => {
-      setIsLoadingQuestion(true);
+      if (!todayQuestion) {
+        setIsLoadingQuestion(true);
+      }
+
+      const saveRecordCache = (today, profile = null) => {
+        try {
+          localStorage.setItem(CACHE_RECORD_KEY, JSON.stringify({ today, profile, ts: Date.now() }));
+        } catch {}
+      };
+
       if (isGuest) {
         try {
           const res = await api.get("/dashboard/today-question");
           if (!isCancelled && res.data?.question) {
             applyTodayData(res.data);
             setIsLoadingQuestion(false);
+            saveRecordCache(res.data);
             return;
           }
         } catch {
@@ -608,9 +662,10 @@ export default function VideoAnalysis() {
           const res = await api.get("/guest/preview");
           if (!isCancelled && res.data?.today) {
             applyTodayData(res.data.today, res.data.profile);
+            saveRecordCache(res.data.today, res.data.profile);
           }
         } catch {
-          if (!isCancelled) setIsQuestionActive(false);
+          if (!isCancelled && !todayQuestion) setIsQuestionActive(false);
         } finally {
           if (!isCancelled) setIsLoadingQuestion(false);
         }
@@ -618,28 +673,32 @@ export default function VideoAnalysis() {
       }
 
       loadMyReports();
-      try {
-        const r = await api.get("/dashboard/me?_duration_refresh=" + Date.now());
-        if (!isCancelled && r.data?.today) {
-          applyTodayData(r.data.today, r.data.profile, r.data.myStreakEntry);
-          setIsLoadingQuestion(false);
-          return;
-        }
-      } catch (err) {
-        console.warn("[VideoAnalysis] /dashboard/me failed, falling back to /dashboard/today-question", err);
-      }
 
-      // Fallback: fetch today-question directly
+      // Parallel fetch: fast today-question (0.1s) and dashboard/me
+      const todayPromise = api.get("/dashboard/today-question")
+        .then(res => {
+          if (!isCancelled && res.data?.question) {
+            applyTodayData(res.data);
+            setIsLoadingQuestion(false);
+            saveRecordCache(res.data);
+          }
+        })
+        .catch(() => {});
+
+      const mePromise = api.get("/dashboard/me")
+        .then(r => {
+          if (!isCancelled && r.data?.today) {
+            applyTodayData(r.data.today, r.data.profile, r.data.myStreakEntry);
+            setIsLoadingQuestion(false);
+            saveRecordCache(r.data.today, r.data.profile);
+          }
+        })
+        .catch(err => {
+          console.warn("[VideoAnalysis] /dashboard/me failed:", err.message);
+        });
+
       try {
-        const r = await api.get("/dashboard/today-question");
-        if (!isCancelled && r.data?.question) {
-          applyTodayData(r.data);
-          setIsLoadingQuestion(false);
-          return;
-        }
-        if (!isCancelled) setIsQuestionActive(false);
-      } catch {
-        if (!isCancelled) setIsQuestionActive(false);
+        await Promise.race([todayPromise, mePromise]);
       } finally {
         if (!isCancelled) setIsLoadingQuestion(false);
       }
@@ -1235,7 +1294,7 @@ export default function VideoAnalysis() {
                       };
 
                       // ── 1. Standby State (When audio has not started playing yet) ──
-                      if (!isPlaying && currentTime === 0 && !peekFullScript) {
+                      if (!isPlaying && currentTime === 0) {
                         return (
                           <div style={{
                             marginTop: "0.85rem",
@@ -1280,19 +1339,7 @@ export default function VideoAnalysis() {
                                 >
                                   <span>▶</span> Play &amp; Start Teleprompter
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPeekFullScript(true)}
-                                  style={{
-                                    display: "inline-flex", alignItems: "center", gap: "0.4rem",
-                                    padding: "0.55rem 0.95rem", borderRadius: 10,
-                                    background: "rgba(255, 255, 255, 0.06)", color: "#cbd5e1",
-                                    border: "1px solid rgba(255, 255, 255, 0.15)", fontWeight: 600, fontSize: "0.8rem",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  <span>👁️</span> Peek Full Script ({cues.length} lines)
-                                </button>
+
                               </div>
                             </div>
                           </div>
@@ -1451,66 +1498,7 @@ export default function VideoAnalysis() {
                               </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setPeekFullScript(p => !p)}
-                              style={{
-                                background: peekFullScript ? "rgba(236,72,153,0.18)" : "transparent",
-                                color: peekFullScript ? "#f472b6" : "#94a3b8",
-                                border: `1px solid ${peekFullScript ? "rgba(236,72,153,0.4)" : "rgba(255,255,255,0.1)"}`,
-                                borderRadius: 8, padding: "3px 8px", fontSize: "0.72rem", fontWeight: 600,
-                                cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
-                              }}
-                            >
-                              <span>{peekFullScript ? "▲ Collapse Full Script" : "👁️ Peek Full Script"}</span>
-                            </button>
                           </div>
-
-                          {/* Collapsible Full Script Preview */}
-                          {peekFullScript && (
-                            <div style={{
-                              marginTop: "0.85rem",
-                              padding: "0.85rem",
-                              borderRadius: 12,
-                              background: "rgba(10, 8, 20, 0.6)",
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              maxHeight: "220px",
-                              overflowY: "auto",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "0.4rem",
-                            }}>
-                              <div style={{ fontSize: "0.7rem", color: "#a855f7", fontWeight: 700, textTransform: "uppercase", marginBottom: "0.2rem" }}>
-                                Full Transcript Reference (Click any phrase to jump audio)
-                              </div>
-                              {cues.map((c, i) => {
-                                const isCurrent = i === safeIdx;
-                                return (
-                                  <div
-                                    key={c.id}
-                                    onClick={() => seekToCue(c.start)}
-                                    style={{
-                                      padding: "0.35rem 0.55rem",
-                                      borderRadius: 6,
-                                      fontSize: "0.82rem",
-                                      lineHeight: 1.45,
-                                      cursor: "pointer",
-                                      background: isCurrent ? "rgba(236,72,153,0.18)" : "transparent",
-                                      color: isCurrent ? "#ffffff" : i < safeIdx ? "#64748b" : "#cbd5e1",
-                                      fontWeight: isCurrent ? 700 : 400,
-                                      borderLeft: isCurrent ? "3px solid #ec4899" : "3px solid transparent",
-                                      transition: "all 0.15s ease",
-                                    }}
-                                  >
-                                    <span style={{ fontSize: "0.68rem", color: "#f472b6", marginRight: "0.45rem", fontFamily: "monospace" }}>
-                                      {c.startFormatted}
-                                    </span>
-                                    {c.text}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
                         </div>
                       );
                     })()}
@@ -4167,7 +4155,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   // ── Shadowing Activity state & refs ──
   const [shadowPlaybackSpeed, setShadowPlaybackSpeed] = useState(1);
-  const [showShadowScript, setShowShadowScript] = useState(false);
   const [shadowVideoMuted, setShadowVideoMuted] = useState(false);
   const [shadowAudioTime, setShadowAudioTime] = useState(0);
   const [shadowAudioPlaying, setShadowAudioPlaying] = useState(false);
@@ -4199,6 +4186,35 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           setShadowAudioPlaying(true);
         })
         .catch(e => console.warn("[Shadowing] Manual play failed:", e));
+    }
+  };
+
+  const handleSeekShadowAudio = (deltaSeconds) => {
+    if (shadowingRefVideo.current) {
+      const dur = shadowingRefVideo.current.duration || question?.videoDuration || 180;
+      const cur = shadowingRefVideo.current.currentTime || 0;
+      const targetTime = Math.max(0, Math.min(dur, cur + deltaSeconds));
+      shadowingRefVideo.current.currentTime = targetTime;
+      setShadowAudioTime(targetTime);
+    }
+  };
+
+  const handleToggleShadowPlay = () => {
+    if (shadowingRefVideo.current) {
+      if (shadowingRefVideo.current.paused) {
+        shadowingRefVideo.current.muted = false;
+        setShadowVideoMuted(false);
+        shadowingRefVideo.current.volume = shadowVolume;
+        shadowingRefVideo.current.play()
+          .then(() => {
+            setShadowAudioPlaying(true);
+            setShadowAudioBlocked(false);
+          })
+          .catch(e => console.warn("[Shadowing] play failed:", e));
+      } else {
+        shadowingRefVideo.current.pause();
+        setShadowAudioPlaying(false);
+      }
     }
   };
 
@@ -5564,6 +5580,48 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       ⭐ {Math.min(100, Math.round((elapsed / Math.max(1, question?.videoDuration || 60)) * 100))}% (40 pts)
                     </span>
 
+                    {/* Audio Backward 5s */}
+                    <button
+                      type="button"
+                      onClick={() => handleSeekShadowAudio(-5)}
+                      style={{
+                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "2px",
+                      }}
+                      title="Rewind earphone audio 5s"
+                    >
+                      ⏪ -5s
+                    </button>
+
+                    {/* Audio Play/Pause Toggle */}
+                    <button
+                      type="button"
+                      onClick={handleToggleShadowPlay}
+                      style={{
+                        background: shadowAudioPlaying ? "rgba(236,72,153,0.3)" : "rgba(255,255,255,0.12)",
+                        color: "#fff", border: `1px solid ${shadowAudioPlaying ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.2)"}`,
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                      }}
+                      title={shadowAudioPlaying ? "Pause earphone audio" : "Play earphone audio"}
+                    >
+                      {shadowAudioPlaying ? "⏸️" : "▶️"}
+                    </button>
+
+                    {/* Audio Forward 5s */}
+                    <button
+                      type="button"
+                      onClick={() => handleSeekShadowAudio(5)}
+                      style={{
+                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "2px",
+                      }}
+                      title="Forward earphone audio 5s"
+                    >
+                      +5s ⏩
+                    </button>
+
                     {/* Speed Toggle */}
                     <button
                       type="button"
@@ -5617,6 +5675,45 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       </button>
                     )}
                   </div>
+                </div>
+
+                {/* In-recording Audio Scrubber Timeline */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "0.22rem 0.65rem",
+                  background: "rgba(0,0,0,0.35)",
+                  borderRadius: 6,
+                  marginBottom: "0.65rem",
+                  fontSize: "0.68rem",
+                  color: "#94a3b8",
+                  fontFamily: "monospace",
+                }}>
+                  <span style={{ color: "#f472b6", fontWeight: 700 }}>🎧 Audio:</span>
+                  <span>{fmtTime(Math.round(shadowAudioPlaying ? shadowAudioTime : 0))}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(1, question?.videoDuration || 180)}
+                    step={0.5}
+                    value={shadowAudioTime}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (shadowingRefVideo.current) {
+                        shadowingRefVideo.current.currentTime = val;
+                        setShadowAudioTime(val);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      accentColor: "#ec4899",
+                      height: 4,
+                      cursor: "pointer",
+                    }}
+                    title="Scrub audio back or forward"
+                  />
+                  <span>{fmtTime(question?.videoDuration || 180)}</span>
                 </div>
 
                 {/* 5-Second Phrase Window */}
@@ -5899,35 +5996,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
                   ✨ Vocabulary requirement waived for Shadowing Activity
                 </span>
-                {question?.videoTranscript && (
-                  <button
-                    type="button"
-                    onClick={() => setShowShadowScript(p => !p)}
-                    style={{
-                      background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)",
-                      borderRadius: 8, padding: "3px 8px", fontSize: "0.72rem", color: "#f472b6",
-                      fontWeight: 700, cursor: "pointer",
-                    }}
-                  >
-                    📜 {showShadowScript ? "Hide Script" : "Show Script"}
-                  </button>
-                )}
-              </div>
-            )}
-            {isShadowing && showShadowScript && question?.videoTranscript && (
-              <div style={{
-                padding: "0.65rem 0.85rem",
-                borderRadius: 10,
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(236,72,153,0.3)",
-                fontSize: "0.82rem",
-                color: "#f8fafc",
-                lineHeight: 1.5,
-                maxHeight: "120px",
-                overflowY: "auto",
-                whiteSpace: "pre-line",
-              }}>
-                {question.videoTranscript}
               </div>
             )}
 

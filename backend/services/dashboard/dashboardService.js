@@ -208,6 +208,10 @@ export async function getTodayQuestionData() {
   const d = String(nowIST.getDate()).padStart(2, "0");
   const todayIST = `${y}-${mo}-${d}`;
 
+  if (status && ((status.durationShadowingMax ?? 0) < 180 || (status.durationShadowingFull ?? 0) < 180)) {
+    Status.updateOne({}, { $set: { durationShadowingMax: 180, durationShadowingFull: 180 } }).catch(() => {});
+  }
+
   const isQuestionSentToday = Boolean(
     status?.questionSentToday &&
     (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST || !status?.lastResetDate || status?.lastResetDate !== todayIST) &&
@@ -250,14 +254,18 @@ export async function getTodayQuestionData() {
       isPictureDescription: isPicture,
       isShadowing: isShadowing,
       challengeType: isShadowing ? "shadowing_video" : undefined,
-    }, status || {}) : null,
+    }, {
+      ...(status || {}),
+      durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+      durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
+    }) : null,
     durationSettings: {
       durationDefaultMax: status?.durationDefaultMax ?? 300,
       durationDefaultFull: status?.durationDefaultFull ?? 300,
       durationStoryMax: status?.durationStoryMax ?? 180,
       durationStoryFull: status?.durationStoryFull ?? 180,
-      durationShadowingMax: status?.durationShadowingMax ?? 180,
-      durationShadowingFull: status?.durationShadowingFull ?? 180,
+      durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+      durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
       durationWeeklyMax: status?.durationWeeklyMax ?? 420,
       durationWeeklyFull: status?.durationWeeklyFull ?? 300,
     },
@@ -368,14 +376,18 @@ export async function getTodayOverview() {
         isPictureDescription: activePictureTask(status),
         isShadowing: activeShadowingTask(status),
         challengeType: activeShadowingTask(status) ? "shadowing_video" : undefined,
-      }, status || {}),
+      }, {
+        ...(status || {}),
+        durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+        durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
+      }),
       durationSettings: {
         durationDefaultMax: status?.durationDefaultMax ?? 300,
         durationDefaultFull: status?.durationDefaultFull ?? 300,
         durationStoryMax: status?.durationStoryMax ?? 180,
         durationStoryFull: status?.durationStoryFull ?? 180,
-        durationShadowingMax: status?.durationShadowingMax ?? 180,
-        durationShadowingFull: status?.durationShadowingFull ?? 180,
+        durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+        durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
         durationWeeklyMax: status?.durationWeeklyMax ?? 420,
         durationWeeklyFull: status?.durationWeeklyFull ?? 300,
         durationMonthlyReflectionMax: status?.durationMonthlyReflectionMax ?? 420,

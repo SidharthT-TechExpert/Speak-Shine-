@@ -16,6 +16,7 @@ const THEMES = {
   "Personal Experience": { primary: "#fb7185", secondary: "#e11d48", glow: "251,113,133", badgeBg: "rgba(251,113,133,0.18)" },
   "Picture Description": { primary: "#38bdf8", secondary: "#818cf8", glow: "99,102,241",   badgeBg: "rgba(99,102,241,0.18)" },
   "Story Summary":       { primary: "#a78bfa", secondary: "#7c3aed", glow: "167,139,250", badgeBg: "rgba(167,139,250,0.18)" },
+  "Shadowing Practice":  { primary: "#ec4899", secondary: "#db2777", glow: "236,72,153",  badgeBg: "rgba(236,72,153,0.18)" },
   "Monthly Goals":       { primary: "#34d399", secondary: "#059669", glow: "52,211,153",  badgeBg: "rgba(52,211,153,0.18)" },
   "Monthly Reflection":  { primary: "#a78bfa", secondary: "#8b5cf6", glow: "167,139,250", badgeBg: "rgba(167,139,250,0.18)" },
   "default":             { primary: "#c084fc", secondary: "#9333ea", glow: "192,132,252", badgeBg: "rgba(192,132,252,0.18)" },
@@ -31,6 +32,7 @@ const KEYWORD_MAP = [
   { keywords: ["personal", "experience", "story", "memory"],        theme: "Personal Experience" },
   { keywords: ["picture", "image", "photo", "describe"],            theme: "Picture Description" },
   { keywords: ["story", "listen", "audio"],                         theme: "Story Summary" },
+  { keywords: ["shadowing", "shadow", "native speaker"],         theme: "Shadowing Practice" },
   { keywords: ["monthly reflection", "reflection", "end of month"], theme: "Monthly Reflection" },
   { keywords: ["monthly goals", "monthly goal", "goal setting"],    theme: "Monthly Goals" },
 ];
@@ -38,6 +40,7 @@ const KEYWORD_MAP = [
 function getTheme(category, contentType) {
   if (contentType === "picture_description") return THEMES["Picture Description"];
   if (contentType === "story_audio") return THEMES["Story Summary"];
+  if (contentType === "shadowing_video") return THEMES["Shadowing Practice"];
   if (!category) return THEMES.default;
   const cat = category.toLowerCase().trim();
   const exactKey = Object.keys(THEMES).find(k => k.toLowerCase() === cat);
@@ -157,6 +160,12 @@ export function generateSVGPoster({
     actionButtonLabel = "Listen & submit your story summary →";
     topicLabel = "STORY TITLE";
     promptLabel = "SUMMARY ASSIGNMENT";
+  } else if (contentType === "shadowing_video" || category === "Shadowing Practice") {
+    badgeTitle = "Shadowing Practice";
+    challengeTypeLabel = "NATIVE SPEAKER SHADOWING CHALLENGE";
+    actionButtonLabel = "Shadow with earphones & submit video →";
+    topicLabel = "SHADOWING TOPIC";
+    promptLabel = "🎙️ SHADOWING INSTRUCTIONS";
   } else if (isMonthlyReflection) {
     badgeTitle = "Monthly Reflection";
     challengeTypeLabel = "MONTHLY REFLECTION CHALLENGE";

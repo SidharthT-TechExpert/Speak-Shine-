@@ -24,7 +24,7 @@ export function getDurationLimits(flags = {}, settings = {}) {
     : flags.isPictureDescription
     ? (settings.durationPictureMax ?? 180)
     : isShadowing
-    ? (settings.durationShadowingMax ?? 180)
+    ? Math.max(180, settings.durationShadowingMax ?? 180)
     : (settings.durationDefaultMax ?? 300);
 
   const fullScoreSeconds = flags.isMonthlyReflection
@@ -38,7 +38,7 @@ export function getDurationLimits(flags = {}, settings = {}) {
     : flags.isPictureDescription
     ? (settings.durationPictureFull ?? 180)
     : isShadowing
-    ? (settings.durationShadowingFull ?? 180)
+    ? Math.max(180, settings.durationShadowingFull ?? 180)
     : (settings.durationDefaultFull ?? 300);
 
   return {
