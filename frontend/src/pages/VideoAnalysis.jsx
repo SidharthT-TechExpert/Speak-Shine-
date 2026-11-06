@@ -3417,16 +3417,77 @@ function buildRecordingMediaConstraints(camId, micId, isShadowing = false) {
     audio: {
       // Use 'exact' for deviceId to enforce the selected device, not 'ideal'
       ...(micId ? { deviceId: { exact: micId } } : {}),
-      // CRITICAL FOR SHADOWING: Disable browser AEC when shadowing through earphones.
-      // AEC compares playing reference speech with mic speech; because the user is shadowing the exact
-      // same words, AEC misidentifies the speaker's vocalization as an acoustic echo and cancels their voice!
-      echoCancellation: !isShadowing,
-      noiseSuppression: !isShadowing,
-      autoGainControl: !isShadowing,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      googEchoCancellation: true,
+      googAutoGainControl: true,
+      googNoiseSuppression: true,
+      googHighpassFilter: true,
       sampleRate: 48000,
       channelCount: 1,
     },
   };
+}
+
+/**
+ * Real-time WebAudio Studio Vocal Enhancement Chain
+ * 1. 85Hz High-pass filter — eliminates laptop cooling fan rumble and desk vibrations
+ * 2. 2.8kHz Presence filter — adds broadcast-grade speech articulation and vocal clarity
+ * 3. Studio Dynamic Compressor — lifts soft speech while preventing loud distortion/clipping
+ * 4. Master Gain Boost — configurable gain boost for crystal-clear microphone output
+ */
+function applyStudioVocalEnhancement(stream, boostMultiplier = 1.4) {
+  try {
+    const audioTrack = stream?.getAudioTracks?.()?.[0];
+    if (!audioTrack) return stream;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    const source = audioCtx.createMediaStreamSource(new MediaStream([audioTrack]));
+
+    // 1. High-Pass Filter (85Hz)
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 85;
+    hp.Q.value = 0.707;
+
+    // 2. Vocal Presence Boost (2.8kHz, +3.5dB)
+    const presence = audioCtx.createBiquadFilter();
+    presence.type = "peaking";
+    presence.frequency.value = 2800;
+    presence.gain.value = 3.5;
+    presence.Q.value = 1.1;
+
+    // 3. Studio Dynamic Compressor
+    const comp = audioCtx.createDynamicsCompressor();
+    comp.threshold.value = -24;
+    comp.knee.value = 12;
+    comp.ratio.value = 3.2;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+
+    // 4. Master Vocal Gain
+    const gain = audioCtx.createGain();
+    gain.gain.value = Math.max(0.8, Math.min(3.0, boostMultiplier));
+
+    source.connect(hp);
+    hp.connect(presence);
+    presence.connect(comp);
+    comp.connect(gain);
+
+    const dest = audioCtx.createMediaStreamDestination();
+    gain.connect(dest);
+
+    const enhancedAudioTrack = dest.stream.getAudioTracks()[0];
+    const videoTracks = stream.getVideoTracks();
+    const outputStream = new MediaStream([enhancedAudioTrack, ...videoTracks]);
+    outputStream._studioAudioCtx = audioCtx;
+    console.log(`[StudioAudio] Enhanced vocal clarity active (boost: ${boostMultiplier}x) ✓`);
+    return outputStream;
+  } catch (err) {
+    console.warn("[StudioAudio] Enhancement fallback:", err);
+    return stream;
+  }
 }
 
 async function openRecordingStream(camId, micId, isShadowing = false) {
@@ -3443,8 +3504,29 @@ async function openRecordingStream(camId, micId, isShadowing = false) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: camId ? { deviceId: { ideal: camId } } : { facingMode: "user" },
         audio: micId
-          ? { deviceId: { ideal: micId }, echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: !isShadowing }
-          : { echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: !isShadowing },
+          ? {
+              deviceId: { ideal: micId },
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              googEchoCancellation: true,
+              googAutoGainControl: true,
+              googNoiseSuppression: true,
+              googHighpassFilter: true,
+              sampleRate: 48000,
+              channelCount: 1,
+            }
+          : {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              googEchoCancellation: true,
+              googAutoGainControl: true,
+              googNoiseSuppression: true,
+              googHighpassFilter: true,
+              sampleRate: 48000,
+              channelCount: 1,
+            },
       });
       const track = stream.getVideoTracks()[0];
       if (track) await resetCameraZoom(track);
@@ -4239,8 +4321,55 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [shadowVolume, setShadowVolume] = useState(0.85);
   const [testInEarPlaying, setTestInEarPlaying] = useState(false);
   const [showTranscription, setShowTranscription] = useState(false); // Subtitles / transcription OFF by default per user request
+  const [micBoost, setMicBoost] = useState(1.4); // 1.0 (Normal), 1.4 (+3dB Studio), 2.0 (+6dB Max)
+  const [micTesting, setMicTesting] = useState(false);
+  const [micTestStatus, setMicTestStatus] = useState(""); // "" | "recording" | "playing"
   const shadowingRefVideo = useRef(null);
   const shadowingPreviewVideo = useRef(null);
+
+  const handleTestMicPlayback = async () => {
+    if (micTesting) return;
+    try {
+      setMicTesting(true);
+      setMicTestStatus("recording");
+      const testStream = await navigator.mediaDevices.getUserMedia({
+        audio: micId ? { deviceId: { exact: micId } } : true,
+        video: false,
+      });
+      const enhancedTest = applyStudioVocalEnhancement(testStream, micBoost);
+      const mediaRecorder = new MediaRecorder(enhancedTest);
+      const chunks = [];
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        testStream.getTracks().forEach(t => t.stop());
+        try { enhancedTest._studioAudioCtx?.close(); } catch {}
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        if (outputId && typeof audio.setSinkId === "function") {
+          audio.setSinkId(outputId).catch(() => {});
+        }
+        setMicTestStatus("playing");
+        audio.onended = () => {
+          setMicTesting(false);
+          setMicTestStatus("");
+          URL.revokeObjectURL(audioUrl);
+        };
+        audio.play().catch(() => {
+          setMicTesting(false);
+          setMicTestStatus("");
+        });
+      };
+      mediaRecorder.start();
+      setTimeout(() => {
+        if (mediaRecorder.state === "recording") mediaRecorder.stop();
+      }, 3000);
+    } catch (e) {
+      console.warn("[MicTest] Error:", e);
+      setMicTesting(false);
+      setMicTestStatus("");
+    }
+  };
 
   const handleVolumeChange = (newVol) => {
     setShadowVolume(newVol);
@@ -4636,6 +4765,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           t.stop();
         } catch (e) {}
       });
+      if (streamRef.current?._studioAudioCtx) {
+        try { streamRef.current._studioAudioCtx.close(); } catch {}
+      }
       streamRef.current = null;
     }
 
@@ -4700,10 +4832,13 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
       let finalStream = rawStream;
 
-      // ── Step 1: RNNoise WASM AI noise cancellation on audio ──
+      // ── Step 1: Real-time Studio Vocal Enhancement (Highpass 85Hz + 2.8kHz Presence + Dynamic Compressor) ──
+      finalStream = applyStudioVocalEnhancement(finalStream, micBoost);
+
+      // ── Step 2: RNNoise WASM AI noise cancellation on audio (if explicitly enabled) ──
       if (noiseCancel) {
         setNcStatus("loading");
-        finalStream = await applyNoiseCancellation(rawStream);
+        finalStream = await applyNoiseCancellation(finalStream);
         setNcStatus(finalStream !== rawStream ? "active" : "fallback");
       }
 
@@ -5605,19 +5740,76 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 style={{ cursor: 'pointer', position: 'relative', zIndex: 10 }}
               >
                 <option value="">Default mic (System default)</option>
-                {mics.map(d => {
-                  const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
-                  const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label);
-                  const isBuiltIn = /array|realtek|built-in|internal|integrated|studio|usb|smart sound/i.test(d.label) && !isVirtual;
-                  const prefix = isHeadset ? "🎧 " : (isVirtual ? "🔌 " : "🎙️ ");
-                  const suffix = isBuiltIn ? " (Recommended - HD Audio)" : (isHeadset ? " (Bluetooth)" : (isVirtual ? " (Virtual Cable)" : ""));
-                  return (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {prefix}{d.label || `Mic ${d.deviceId.slice(0,6)}`}{suffix}
-                    </option>
-                  );
-                })}
+                {(() => {
+                  const sortedMics = [...mics].sort((a, b) => {
+                    const aVirt = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(a.label);
+                    const bVirt = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(b.label);
+                    if (aVirt && !bVirt) return 1;
+                    if (!aVirt && bVirt) return -1;
+                    const aStudio = /array|realtek|built-in|internal|integrated|studio|usb/i.test(a.label);
+                    const bStudio = /array|realtek|built-in|internal|integrated|studio|usb/i.test(b.label);
+                    if (aStudio && !bStudio) return -1;
+                    if (!aStudio && bStudio) return 1;
+                    return 0;
+                  });
+                  return sortedMics.map(d => {
+                    const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
+                    const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label);
+                    const isBuiltIn = /array|realtek|built-in|internal|integrated|studio|usb|smart sound/i.test(d.label) && !isVirtual;
+                    const prefix = isHeadset ? "🎧 " : (isVirtual ? "⚠️ " : "🎙️ ");
+                    const suffix = isBuiltIn ? " (Recommended - Studio Voice)" : (isHeadset ? " (Bluetooth)" : (isVirtual ? " (Virtual Cable - No Mic)" : ""));
+                    return (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {prefix}{d.label || `Mic ${d.deviceId.slice(0,6)}`}{suffix}
+                      </option>
+                    );
+                  });
+                })()}
               </select>
+
+              {/* Voicemeeter / Virtual Cable Warning with 1-click Switch */}
+              {(() => {
+                const currentLabel = mics.find(d => d.deviceId === micId)?.label || "";
+                const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(currentLabel);
+                const hasStudioMic = mics.find(d => /array|realtek|built-in|internal|usb/i.test(d.label));
+                if (isVirtual && hasStudioMic) {
+                  return (
+                    <div style={{
+                      marginTop: "0.45rem",
+                      padding: "0.45rem 0.65rem",
+                      background: "rgba(245, 158, 11, 0.12)",
+                      border: "1px solid rgba(245, 158, 11, 0.4)",
+                      borderRadius: 8,
+                      fontSize: "0.72rem",
+                      color: "#fbbf24",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.5rem"
+                    }}>
+                      <span>⚠️ <strong>Virtual Cable (VoiceMeeter) selected</strong>: May record silence or distortion.</span>
+                      <button
+                        type="button"
+                        onClick={() => setMicId(hasStudioMic.deviceId)}
+                        style={{
+                          background: "#f59e0b",
+                          color: "#000",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "2px 7px",
+                          fontWeight: 800,
+                          fontSize: "0.68rem",
+                          cursor: "pointer",
+                          flexShrink: 0
+                        }}
+                      >
+                        Use Microphone Array
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {isShadowing && mics.some(d => d.deviceId === micId && /headset|buds|earphone|bluetooth/i.test(d.label)) && (
                 <div style={{ marginTop: "0.35rem", fontSize: "0.72rem", color: "#fbbf24", display: "flex", alignItems: "center", gap: "4px" }}>
@@ -5625,19 +5817,20 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 </div>
               )}
 
-              {/* Real-time Mic Level Visualizer */}
+              {/* Real-time Mic Level Visualizer & Hear Yourself 3s Test */}
               <div style={{
                 marginTop: "0.45rem",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
                 background: "rgba(0,0,0,0.25)",
-                padding: "4px 8px",
+                padding: "5px 8px",
                 borderRadius: 6,
-                border: "1px solid rgba(255,255,255,0.08)"
+                border: "1px solid rgba(255,255,255,0.08)",
+                flexWrap: "wrap",
               }}>
-                <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontWeight: 600 }}>Mic Test:</span>
-                <div style={{ flex: 1, height: 7, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontWeight: 600 }}>Mic Level:</span>
+                <div style={{ flex: 1, minWidth: 60, height: 7, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
                   <div style={{
                     width: `${Math.min(100, micLevel * 2)}%`,
                     height: "100%",
@@ -5650,8 +5843,77 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   fontWeight: 700,
                   color: micLevel > 4 ? "#4ade80" : (micActive ? "#94a3b8" : "#fbbf24")
                 }}>
-                  {micLevel > 4 ? "🎤 Sound Detected" : (micActive ? "Ready" : "Speak to test")}
+                  {micLevel > 4 ? "🎤 Active" : "Speak to test"}
                 </span>
+
+                {/* 3-Second Hear Yourself Test Button */}
+                <button
+                  type="button"
+                  onClick={handleTestMicPlayback}
+                  disabled={micTesting}
+                  style={{
+                    background: micTestStatus === "recording" 
+                      ? "rgba(245, 158, 11, 0.25)" 
+                      : (micTestStatus === "playing" ? "rgba(34, 197, 94, 0.25)" : "rgba(124, 111, 255, 0.18)"),
+                    color: micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#4ade80" : "#a78bfa"),
+                    border: `1px solid ${micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#22c55e" : "rgba(124, 111, 255, 0.45)")}`,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    cursor: micTesting ? "wait" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  title="Record 3 seconds and play it back in your earphones so you can hear your sound quality"
+                >
+                  {micTestStatus === "recording" ? "🔴 Speak now (3s)..." : (micTestStatus === "playing" ? "🔊 Playing back..." : "🎧 Hear Yourself")}
+                </button>
+              </div>
+
+              {/* Vocal Clarity & Boost Controls */}
+              <div style={{
+                marginTop: "0.45rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "6px",
+                background: "rgba(255,255,255,0.03)",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(255,255,255,0.05)"
+              }}>
+                <span style={{ fontSize: "0.7rem", color: "var(--muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
+                  <span>🎚️</span> Vocal Clarity &amp; Boost:
+                </span>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  {[
+                    { label: "Normal (1x)", val: 1.0 },
+                    { label: "✨ Studio (+3dB)", val: 1.4 },
+                    { label: "🚀 Max (+6dB)", val: 2.0 },
+                  ].map(b => (
+                    <button
+                      key={b.val}
+                      type="button"
+                      onClick={() => setMicBoost(b.val)}
+                      style={{
+                        background: micBoost === b.val ? "linear-gradient(135deg, #10b981, #059669)" : "rgba(255,255,255,0.06)",
+                        color: micBoost === b.val ? "#ffffff" : "var(--muted)",
+                        border: micBoost === b.val ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.1)",
+                        padding: "1px 7px",
+                        borderRadius: 5,
+                        fontSize: "0.66rem",
+                        fontWeight: micBoost === b.val ? 800 : 600,
+                        cursor: "pointer",
+                        transition: "all 0.12s ease",
+                      }}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
