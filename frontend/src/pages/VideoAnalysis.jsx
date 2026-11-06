@@ -3322,7 +3322,7 @@ async function resetCameraZoom(videoTrack) {
   }
 }
 
-function buildRecordingMediaConstraints(camId, micId) {
+function buildRecordingMediaConstraints(camId, micId, isShadowing = false) {
   const isMobile = isMobileRecordingDevice();
   // Use 'exact' for deviceId to enforce the selected device, not 'ideal'
   const videoBase = camId ? { deviceId: { exact: camId } } : { facingMode: "user" };
@@ -3349,8 +3349,11 @@ function buildRecordingMediaConstraints(camId, micId) {
     audio: {
       // Use 'exact' for deviceId to enforce the selected device, not 'ideal'
       ...(micId ? { deviceId: { exact: micId } } : {}),
-      echoCancellation: true,
-      noiseSuppression: true,
+      // CRITICAL FOR SHADOWING: Disable browser AEC when shadowing through earphones.
+      // AEC compares playing reference speech with mic speech; because the user is shadowing the exact
+      // same words, AEC misidentifies the speaker's vocalization as an acoustic echo and cancels their voice!
+      echoCancellation: !isShadowing,
+      noiseSuppression: !isShadowing,
       autoGainControl: true,
       sampleRate: 48000,
       channelCount: 1,
@@ -3358,9 +3361,9 @@ function buildRecordingMediaConstraints(camId, micId) {
   };
 }
 
-async function openRecordingStream(camId, micId) {
-  console.log(`[DeviceSelection] Opening stream with camId="${camId}", micId="${micId}"`);
-  const full = buildRecordingMediaConstraints(camId, micId);
+async function openRecordingStream(camId, micId, isShadowing = false) {
+  console.log(`[DeviceSelection] Opening stream with camId="${camId}", micId="${micId}", isShadowing=${isShadowing}`);
+  const full = buildRecordingMediaConstraints(camId, micId, isShadowing);
   try {
     const stream = await navigator.mediaDevices.getUserMedia(full);
     const track = stream.getVideoTracks()[0];
@@ -3371,7 +3374,9 @@ async function openRecordingStream(camId, micId) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: camId ? { deviceId: { ideal: camId } } : { facingMode: "user" },
-        audio: micId ? { deviceId: { ideal: micId }, echoCancellation: true, noiseSuppression: true } : { echoCancellation: true, noiseSuppression: true },
+        audio: micId
+          ? { deviceId: { ideal: micId }, echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: true }
+          : { echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: true },
       });
       const track = stream.getVideoTracks()[0];
       if (track) await resetCameraZoom(track);
@@ -4132,8 +4137,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [cameras, setCameras]       = useState([]);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
   const [mics, setMics]             = useState([]);
+  const [audioOutputs, setAudioOutputs] = useState([]);
   const [camId, setCamId]           = useState("");
   const [micId, setMicId]           = useState("");
+  const [outputId, setOutputId]     = useState("");
+  const [micLevel, setMicLevel]     = useState(0); // 0-100 real-time VU meter
+  const [micActive, setMicActive]   = useState(false);
   const [countdown, setCountdown]   = useState(3);
   const [elapsed, setElapsed]       = useState(0);
   const elapsedRef = useRef(0); // always holds the latest elapsed value — avoids stale closure in onstop
@@ -4145,7 +4154,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [uploadEta, setUploadEta]     = useState(null); // seconds
   const [compressProgress, setCompressProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
-  const [noiseCancel, setNoiseCancel] = useState(true);
+  const [noiseCancel, setNoiseCancel] = useState(!isShadowing); // Disabled by default for shadowing to avoid speech suppression
   const [backgroundBlur, setBackgroundBlur] = useState(false); // Background blur toggle
   const [blurStrength, setBlurStrength] = useState(20); // Blur strength in pixels (10-40)
   const [ncStatus, setNcStatus]     = useState("idle");
@@ -4312,13 +4321,121 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         tmp.getTracks().forEach(t => t.stop());
         const devices = await navigator.mediaDevices.enumerateDevices();
         setCameras(devices.filter(d => d.kind === "videoinput"));
-        setMics(devices.filter(d => d.kind === "audioinput"));
+        
+        const audioInputs = devices.filter(d => d.kind === "audioinput");
+        setMics(audioInputs);
+
+        const outs = devices.filter(d => d.kind === "audiooutput");
+        setAudioOutputs(outs);
+
+        // Auto-select best microphone:
+        // Prioritize headset/buds, then real hardware microphones, avoiding virtual cables (Voicemeeter)
+        if (!micId && audioInputs.length > 0) {
+          const headsetMic = audioInputs.find(d => /headset|buds|earphone|airpod|bluetooth/i.test(d.label));
+          const realMic = audioInputs.find(d => !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label));
+          if (headsetMic) {
+            console.log("[DeviceSelection] Auto-selected headset microphone:", headsetMic.label);
+            setMicId(headsetMic.deviceId);
+          } else if (realMic) {
+            console.log("[DeviceSelection] Auto-selected physical microphone:", realMic.label);
+            setMicId(realMic.deviceId);
+          }
+        }
+
+        // Auto-select best audio output for shadowing (headset/earbuds)
+        if (!outputId && outs.length > 0) {
+          const headsetOut = outs.find(d => /headset|buds|earphone|airpod|bluetooth/i.test(d.label));
+          if (headsetOut) {
+            console.log("[DeviceSelection] Auto-selected headset audio output:", headsetOut.label);
+            setOutputId(headsetOut.deviceId);
+          }
+        }
       } catch {
         setError("Camera/microphone permission denied. Please allow access and refresh.");
       }
     })();
     return () => cleanup();
   }, []);
+
+  // Live Microphone Level VU Meter during setup
+  useEffect(() => {
+    if (step !== "setup") return;
+    let audioCtx = null;
+    let analyser = null;
+    let monitorStream = null;
+    let animId = null;
+
+    async function startMicMonitor() {
+      try {
+        monitorStream = await navigator.mediaDevices.getUserMedia({
+          audio: micId ? { deviceId: { exact: micId } } : true,
+          video: false,
+        });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.4;
+        const source = audioCtx.createMediaStreamSource(monitorStream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const checkLevel = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          const avg = sum / dataArray.length;
+          const pct = Math.min(100, Math.round((avg / 96) * 100));
+          setMicLevel(pct);
+          if (pct > 4) setMicActive(true);
+          animId = requestAnimationFrame(checkLevel);
+        };
+        checkLevel();
+      } catch (err) {
+        try {
+          monitorStream = await navigator.mediaDevices.getUserMedia({
+            audio: micId ? { deviceId: { ideal: micId } } : true,
+            video: false,
+          });
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 256;
+          const source = audioCtx.createMediaStreamSource(monitorStream);
+          source.connect(analyser);
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const checkLevel = () => {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+            const pct = Math.min(100, Math.round((avg / 96) * 100));
+            setMicLevel(pct);
+            if (pct > 4) setMicActive(true);
+            animId = requestAnimationFrame(checkLevel);
+          };
+          checkLevel();
+        } catch (e) {
+          console.warn("[MicMonitor] Could not start monitor:", e);
+        }
+      }
+    }
+
+    startMicMonitor();
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+      if (monitorStream) monitorStream.getTracks().forEach(t => t.stop());
+      if (audioCtx) { try { audioCtx.close(); } catch {} }
+    };
+  }, [step, micId]);
+
+  // Keep shadowingRefVideo output sink synchronized
+  useEffect(() => {
+    if (outputId && shadowingRefVideo.current && typeof shadowingRefVideo.current.setSinkId === "function") {
+      shadowingRefVideo.current.setSinkId(outputId).catch(err => {
+        console.warn("[Shadowing] setSinkId error:", err);
+      });
+    }
+  }, [outputId, step]);
 
   const syncPreviewAspect = useCallback(() => {
     const v = liveVideoRef.current;
@@ -4503,7 +4620,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     }
     
     try {
-      const rawStream = await openRecordingStream(camId, micId);
+      const rawStream = await openRecordingStream(camId, micId, isShadowing);
       rawStreamRef.current = rawStream;
 
       let finalStream = rawStream;
@@ -5405,11 +5522,95 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 onChange={e => setMicId(e.target.value)}
                 style={{ cursor: 'pointer', position: 'relative', zIndex: 10 }}
               >
-                <option value="">Default mic</option>
-                {mics.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0,6)}`}</option>)}
+                <option value="">Default mic (System default)</option>
+                {mics.map(d => {
+                  const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
+                  const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label);
+                  const prefix = isHeadset ? "🎧 " : (isVirtual ? "🔌 " : "🎙️ ");
+                  const suffix = isHeadset ? " (Recommended for Earphones)" : (isVirtual ? " (Virtual Cable)" : "");
+                  return (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {prefix}{d.label || `Mic ${d.deviceId.slice(0,6)}`}{suffix}
+                    </option>
+                  );
+                })}
               </select>
+
+              {/* Real-time Mic Level Visualizer */}
+              <div style={{
+                marginTop: "0.45rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(0,0,0,0.25)",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(255,255,255,0.08)"
+              }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontWeight: 600 }}>Mic Test:</span>
+                <div style={{ flex: 1, height: 7, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{
+                    width: `${Math.min(100, micLevel * 2)}%`,
+                    height: "100%",
+                    background: micLevel > 4 ? "linear-gradient(90deg, #10b981, #22c55e)" : "rgba(255,255,255,0.2)",
+                    transition: "width 0.05s ease-out"
+                  }} />
+                </div>
+                <span style={{
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  color: micLevel > 4 ? "#4ade80" : (micActive ? "#94a3b8" : "#fbbf24")
+                }}>
+                  {micLevel > 4 ? "🎤 Sound Detected" : (micActive ? "Ready" : "Speak to test")}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Earphones / Audio Output Selector for Shadowing */}
+          {isShadowing && audioOutputs.length > 0 && (
+            <div style={{
+              background: "var(--card2)", border: "1px solid rgba(236,72,153,0.3)",
+              borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "0.75rem",
+              position: 'relative', zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <label className="form-label" style={{ margin: 0, fontSize: "0.85rem", color: "#f472b6" }}>
+                  🎧 Earphones / Audio Output
+                </label>
+                <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>In-ear reference speech destination</span>
+              </div>
+              <select 
+                className="form-input" 
+                value={outputId} 
+                onChange={async (e) => {
+                  const id = e.target.value;
+                  setOutputId(id);
+                  if (shadowingRefVideo.current && typeof shadowingRefVideo.current.setSinkId === "function") {
+                    try {
+                      await shadowingRefVideo.current.setSinkId(id);
+                      console.log("[Shadowing] Audio output redirected to sinkId:", id);
+                    } catch (err) {
+                      console.warn("[Shadowing] setSinkId failed:", err);
+                    }
+                  }
+                }}
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 10 }}
+              >
+                <option value="">Default Earphones / Speakers (System default)</option>
+                {audioOutputs.map(d => {
+                  const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
+                  const prefix = isHeadset ? "🎧 " : "🔊 ";
+                  const suffix = isHeadset ? " (Recommended Earphones)" : "";
+                  return (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {prefix}{d.label || `Output ${d.deviceId.slice(0,6)}`}{suffix}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
 
           {/* Noise cancellation toggle */}
           <div style={{
@@ -5421,8 +5622,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
                 🎙️ AI Noise Cancellation
               </div>
-              <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                RNNoise WASM — removes background noise
+              <div style={{ fontSize: "0.72rem", color: isShadowing ? "#f59e0b" : "var(--muted)", marginTop: "0.15rem" }}>
+                {isShadowing 
+                  ? "RNNoise WASM (Off recommended for Shadowing so voice isn't cut off)"
+                  : "RNNoise WASM — removes background noise"}
               </div>
             </div>
             <button onClick={() => setNoiseCancel(v => !v)} style={{

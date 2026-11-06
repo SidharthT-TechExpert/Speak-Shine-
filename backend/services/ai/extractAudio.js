@@ -69,29 +69,39 @@ export async function extractAudio(videoPath, id) {
   const isSilent = (meanVolume !== null && meanVolume < -48) || (maxVolume !== null && maxVolume < -40);
 
   // Automatic amplification / normalization for quiet recordings
-  // If maxVolume is quiet (below -6dB) or meanVolume is below -32dB, boost gain so Whisper transcribes accurately
+  // If maxVolume is quiet (below -6dB) or meanVolume is below -28dB, boost gain so Whisper transcribes accurately
   // CRITICAL: NEVER amplify pure silence (< -48dB) as that boosts microphone hiss and triggers Whisper hallucinations!
-  if (!isSilent && maxVolume !== null && maxVolume < -6) {
-    const boostDb = Math.min(26, Math.max(3, -2 - maxVolume));
-    console.log(`🔊 Low audio level detected (${maxVolume}dB max, ${meanVolume}dB mean). Amplifying by +${boostDb.toFixed(1)}dB for Whisper...`);
-    const boostedPath = path.resolve(`./tmp/audio_${id}_norm.wav`);
-    try {
-      await execFileAsync("ffmpeg", [
-        "-i", audioPath,
-        "-af", `volume=${boostDb.toFixed(1)}dB`,
-        "-ar", "16000",
-        "-ac", "1",
-        "-acodec", "pcm_s16le",
-        boostedPath,
-        "-y",
-      ], { timeout: 30000 });
-      if (fs.existsSync(boostedPath)) {
-        if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-        fs.renameSync(boostedPath, audioPath);
-        console.log(`✅ Audio amplified by +${boostDb.toFixed(1)}dB for high-accuracy Whisper transcription`);
+  const needsBoost = !isSilent && ((maxVolume !== null && maxVolume < -6) || (meanVolume !== null && meanVolume < -28));
+  if (needsBoost) {
+    let boostDb = 0;
+    if (maxVolume !== null && maxVolume < -6) {
+      boostDb = Math.min(26, Math.max(3, -2 - maxVolume));
+    } else if (meanVolume !== null && meanVolume < -28) {
+      // Handles cases where a transient click hit 0dB but real speech is quiet (-35dB)
+      boostDb = Math.min(18, Math.max(3, -22 - meanVolume));
+    }
+
+    if (boostDb > 0) {
+      console.log(`🔊 Low audio level detected (${maxVolume}dB max, ${meanVolume}dB mean). Amplifying by +${boostDb.toFixed(1)}dB with brickwall limiter for Whisper...`);
+      const boostedPath = path.resolve(`./tmp/audio_${id}_norm.wav`);
+      try {
+        await execFileAsync("ffmpeg", [
+          "-i", audioPath,
+          "-af", `volume=${boostDb.toFixed(1)}dB,alimiter=limit=0.95`,
+          "-ar", "16000",
+          "-ac", "1",
+          "-acodec", "pcm_s16le",
+          boostedPath,
+          "-y",
+        ], { timeout: 30000 });
+        if (fs.existsSync(boostedPath)) {
+          if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+          fs.renameSync(boostedPath, audioPath);
+          console.log(`✅ Audio amplified by +${boostDb.toFixed(1)}dB for high-accuracy Whisper transcription`);
+        }
+      } catch (normErr) {
+        console.warn("Audio normalization warning:", normErr.message);
       }
-    } catch (normErr) {
-      console.warn("Audio normalization warning:", normErr.message);
     }
   }
 
