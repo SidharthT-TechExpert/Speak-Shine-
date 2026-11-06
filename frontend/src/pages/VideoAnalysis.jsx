@@ -4177,15 +4177,20 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   const handleManualPlayAudio = () => {
     if (shadowingRefVideo.current) {
-      shadowingRefVideo.current.muted = false;
+      const a = shadowingRefVideo.current;
+      a.muted = false;
       setShadowVideoMuted(false);
-      shadowingRefVideo.current.volume = shadowVolume;
-      shadowingRefVideo.current.play()
+      a.volume = shadowVolume > 0 ? shadowVolume : 0.85;
+      a.play()
         .then(() => {
           setShadowAudioBlocked(false);
           setShadowAudioPlaying(true);
         })
-        .catch(e => console.warn("[Shadowing] Manual play failed:", e));
+        .catch(e => {
+          console.warn("[Shadowing] Manual play failed:", e);
+          setShadowAudioBlocked(true);
+          setShadowAudioPlaying(false);
+        });
     }
   };
 
@@ -4201,18 +4206,23 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   const handleToggleShadowPlay = () => {
     if (shadowingRefVideo.current) {
-      if (shadowingRefVideo.current.paused) {
-        shadowingRefVideo.current.muted = false;
+      const a = shadowingRefVideo.current;
+      if (a.paused || !shadowAudioPlaying) {
+        a.muted = false;
         setShadowVideoMuted(false);
-        shadowingRefVideo.current.volume = shadowVolume;
-        shadowingRefVideo.current.play()
+        a.volume = shadowVolume > 0 ? shadowVolume : 0.85;
+        a.play()
           .then(() => {
             setShadowAudioPlaying(true);
             setShadowAudioBlocked(false);
           })
-          .catch(e => console.warn("[Shadowing] play failed:", e));
+          .catch(e => {
+            console.warn("[Shadowing] play failed:", e);
+            setShadowAudioBlocked(true);
+            setShadowAudioPlaying(false);
+          });
       } else {
-        shadowingRefVideo.current.pause();
+        a.pause();
         setShadowAudioPlaying(false);
       }
     }
@@ -4476,13 +4486,16 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     // Prime in-ear shadowing audio playback in direct response to user gesture (silent during countdown)
     if (isShadowing && shadowingRefVideo.current) {
       try {
-        shadowingRefVideo.current.currentTime = 0;
-        shadowingRefVideo.current.volume = 0;
-        shadowingRefVideo.current.muted = true;
-        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
-        const unlock = shadowingRefVideo.current.play();
+        const a = shadowingRefVideo.current;
+        a.currentTime = 0;
+        a.muted = false; // NEVER set muted = true on user gesture! Keeps unmuted permission intact
+        a.volume = 0.0001; // Silent during countdown
+        a.playbackRate = shadowPlaybackSpeed;
+        const unlock = a.play();
         if (unlock !== undefined) {
-          unlock.catch(e => {
+          unlock.then(() => {
+            console.log("[Shadowing] In-ear audio primed and unlocked via user gesture");
+          }).catch(e => {
             console.warn("[Shadowing] Pre-warm audio unlock caught:", e);
           });
         }
@@ -4520,6 +4533,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       countdownRef.current = setInterval(() => {
         c--;
         setCountdown(c);
+        if (isShadowing && shadowingRefVideo.current) {
+          try { shadowingRefVideo.current.currentTime = 0; } catch {}
+        }
         if (c <= 0) { clearInterval(countdownRef.current); startRecording(finalStream); }
       }, 1000);
     } catch (err) {
@@ -4673,18 +4689,25 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     // Immediately activate reference audio from 0:00 when recording starts
     if (isShadowing && shadowingRefVideo.current) {
       try {
-        shadowingRefVideo.current.currentTime = 0;
-        shadowingRefVideo.current.muted = shadowVideoMuted;
-        shadowingRefVideo.current.volume = shadowVolume;
-        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
-        if (shadowingRefVideo.current.paused) {
-          shadowingRefVideo.current.play().catch(e => {
+        const a = shadowingRefVideo.current;
+        a.currentTime = 0;
+        a.muted = shadowVideoMuted;
+        a.volume = shadowVideoMuted ? 0 : shadowVolume;
+        a.playbackRate = shadowPlaybackSpeed;
+        const p = a.play();
+        if (p !== undefined) {
+          p.then(() => {
+            setShadowAudioPlaying(!shadowVideoMuted);
+            setShadowAudioBlocked(false);
+          }).catch(e => {
             console.warn("[Shadowing] Play on startRecording caught:", e);
             setShadowAudioBlocked(true);
+            setShadowAudioPlaying(false);
           });
+        } else {
+          setShadowAudioPlaying(!shadowVideoMuted);
+          setShadowAudioBlocked(false);
         }
-        setShadowAudioPlaying(!shadowVideoMuted);
-        setShadowAudioBlocked(false);
       } catch (err) {}
     }
 
@@ -4716,7 +4739,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   // Synchronized playback for Shadowing Activity reference speech
   useEffect(() => {
-    if (step !== "recording" && shadowingRefVideo.current) {
+    if (step !== "recording" && step !== "countdown" && shadowingRefVideo.current) {
       try {
         shadowingRefVideo.current.pause();
         setShadowAudioPlaying(false);
@@ -5102,10 +5125,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       {/* ── Preloaded In-Ear Reference Audio for Shadowing ── */}
       {isShadowing && (
         <audio
+          key={question?.audioUrl || question?.videoUrl || "shadow-audio"}
           ref={shadowingRefVideo}
           src={getCleanAudioUrl(question?.audioUrl || question?.videoUrl)}
           preload="auto"
           playsInline
+          style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, opacity: 0.001, pointerEvents: "none" }}
           onTimeUpdate={() => {
             if (shadowingRefVideo.current) {
               setShadowAudioTime(shadowingRefVideo.current.currentTime);
@@ -5124,7 +5149,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           onError={(e) => {
             console.warn("[Shadowing] Audio preload/playback error:", e);
           }}
-          style={{ display: "none" }}
         />
       )}
 
@@ -5504,9 +5528,15 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           <div style={{ position: "relative", marginBottom: "0.85rem" }}>
             <video ref={liveVideoRef} autoPlay muted playsInline
               onLoadedMetadata={syncPreviewAspect}
+              onClick={() => {
+                if (isShadowing && step === "recording" && (!shadowAudioPlaying || shadowAudioBlocked)) {
+                  handleManualPlayAudio();
+                }
+              }}
               style={{
                 ...livePreviewStyle,
                 maxWidth: "100%",
+                cursor: (isShadowing && step === "recording" && (!shadowAudioPlaying || shadowAudioBlocked)) ? "pointer" : "default"
               }} />
 
             {/* Countdown Overlay on Camera Feed */}
@@ -5568,7 +5598,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       color: shadowAudioPlaying ? "#4ade80" : "#fbbf24",
                       border: shadowAudioPlaying ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(245, 158, 11, 0.35)",
                     }}>
-                      {shadowAudioPlaying ? "🎧 In-Ear Playing" : (isPaused ? "⏸️ Audio Paused" : "⚠️ Audio Muted/Off")}
+                      {shadowAudioPlaying ? "🎧 In-Ear Playing" : (isPaused ? "⏸️ Audio Paused" : (shadowAudioBlocked ? "⚠️ Audio Blocked" : "⏸️ Audio Paused"))}
                     </span>
                   </div>
 
@@ -5592,13 +5622,14 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       type="button"
                       onClick={handleToggleShadowPlay}
                       style={{
-                        background: shadowAudioPlaying ? "rgba(236,72,153,0.3)" : "rgba(255,255,255,0.12)",
-                        color: "#fff", border: `1px solid ${shadowAudioPlaying ? "rgba(236,72,153,0.5)" : "rgba(255,255,255,0.2)"}`,
-                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        background: shadowAudioPlaying ? "rgba(236,72,153,0.3)" : "rgba(245,158,11,0.35)",
+                        color: "#fff", border: `1px solid ${shadowAudioPlaying ? "rgba(236,72,153,0.5)" : "rgba(245,158,11,0.5)"}`,
+                        padding: "2px 7px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "3px"
                       }}
                       title={shadowAudioPlaying ? "Pause earphone audio" : "Play earphone audio"}
                     >
-                      {shadowAudioPlaying ? "⏸️" : "▶️"}
+                      {shadowAudioPlaying ? "⏸️" : "▶️ Play"}
                     </button>
 
                     {/* Audio Forward 5s */}
@@ -5654,17 +5685,19 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       {shadowVideoMuted ? "🔇" : "🔊"}
                     </button>
 
-                    {/* Unblock/Force Play Button if browser blocked */}
-                    {shadowAudioBlocked && (
+                    {/* Unblock/Force Play Button if browser blocked or paused */}
+                    {(!shadowAudioPlaying || shadowAudioBlocked) && (
                       <button
                         type="button"
                         onClick={handleManualPlayAudio}
                         style={{
                           background: "linear-gradient(135deg, #ec4899, #8b5cf6)", color: "#fff", border: "none",
                           padding: "2px 8px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 800, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: "3px",
+                          boxShadow: "0 0 10px rgba(236,72,153,0.5)"
                         }}
                       >
-                        ▶ Play Sound
+                        🔊 Play Audio
                       </button>
                     )}
                   </div>
@@ -5684,7 +5717,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   fontFamily: "monospace",
                 }}>
                   <span style={{ color: "#f472b6", fontWeight: 700 }}>🎧 Audio:</span>
-                  <span>{fmtTime(Math.round(shadowAudioPlaying ? shadowAudioTime : 0))}</span>
+                  <span>{fmtTime(Math.round(shadowAudioTime || 0))}</span>
                   <input
                     type="range"
                     min={0}
