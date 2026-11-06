@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import Layout from "../components/Layout.jsx";
 import api from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useTheme } from "../context/ThemeContext.jsx";
 import { getSharedSocket } from "../hooks/useSocket.js";
 import GuestBanner from "../components/GuestBanner.jsx";
 import StreakBadge from "../components/StreakBadge.jsx";
@@ -31,40 +32,44 @@ const SCORE_LABELS = [
   { key: "vocabulary", label: "Vocabulary", icon: "📚" },
 ];
 
-function ScoreBar({ label, icon, value }) {
+function ScoreBar({ label, icon, value, isDark }) {
   if (value == null) return null;
   return (
     <div style={{ marginBottom: "0.6rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", fontSize: "0.78rem" }}>
-        <span style={{ color: "var(--muted)" }}>{icon} {label}</span>
+        <span style={{ color: isDark ? "#94a3b8" : "#64748b" }}>{icon} {label}</span>
         <span style={{ fontWeight: 700, color: scoreColor(value) }}>{value}/10</span>
       </div>
-      <div style={{ height: "6px", borderRadius: "99px", background: "var(--border2)", overflow: "hidden" }}>
+      <div style={{ height: "6px", borderRadius: "99px", background: isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${value * 10}%`, background: scoreColor(value), borderRadius: "99px", transition: "width 0.6s ease" }} />
       </div>
     </div>
   );
 }
 
-function BlockScoreBar({ score }) {
+function BlockScoreBar({ score, isDark }) {
   const filled = Math.round(score || 0);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
       <div style={{ display: "flex", gap: "2px" }}>
         {Array.from({ length: 10 }, (_, i) => (
-          <div key={i} style={{ width: "16px", height: "16px", borderRadius: "3px", background: i < filled ? scoreColor(score) : "var(--bg)", border: "1px solid var(--border)" }} />
+          <div key={i} style={{
+            width: "16px", height: "16px", borderRadius: "3px",
+            background: i < filled ? scoreColor(score) : (isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0"),
+            border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #cbd5e1",
+          }} />
         ))}
       </div>
-      <span style={{ fontWeight: 700, minWidth: "36px", fontSize: "0.85rem" }}>{score}/10</span>
+      <span style={{ fontWeight: 700, minWidth: "36px", fontSize: "0.85rem", color: isDark ? "#ffffff" : "#0f172a" }}>{score}/10</span>
     </div>
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, isDark }) {
   return (
     <div style={{ marginBottom: "1.1rem" }}>
-      <div style={{ borderTop: "1px solid var(--border)", margin: "0.9rem 0 0.65rem" }} />
-      <div style={{ fontWeight: 700, marginBottom: "0.65rem", color: "var(--text)", fontSize: "0.88rem" }}>{title}</div>
+      <div style={{ borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0", margin: "0.9rem 0 0.65rem" }} />
+      <div style={{ fontWeight: 700, marginBottom: "0.65rem", color: isDark ? "#ffffff" : "#0f172a", fontSize: "0.88rem" }}>{title}</div>
       {children}
     </div>
   );
@@ -120,19 +125,27 @@ function useContentProtection() {
 }
 
 // ── Short Feedback Panel — scores + one-liner only ───────────────────────────
-function FeedbackPanel({ a }) {
+function FeedbackPanel({ a, isDark }) {
   if (!a) return null;
+  const bd = a.scoreBreakdown || a._scoreBreakdown || null;
+  const isShadowBd = a.challengeType === "shadowing_video" || bd?.isShadowing === true || (bd?.maxLength === 40 && bd?.maxComm === 60);
+
+  // For shadowing, vocabulary is waived, so filter it out of quick rubric labels
+  const labels = isShadowBd
+    ? SCORE_LABELS.filter(l => l.key !== "vocabulary")
+    : SCORE_LABELS;
+
   return (
     <div style={{ fontSize: "0.85rem" }}>
       {/* Score bars */}
-      {SCORE_LABELS.map(({ key, label, icon }) => (
-        <ScoreBar key={key} label={label} icon={icon} value={a[key]} />
+      {labels.map(({ key, label, icon }) => (
+        <ScoreBar key={key} label={label} icon={icon} value={a[key]} isDark={isDark} />
       ))}
 
       {/* Overall score */}
       {a.overallScore != null && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border2)" }}>
-          <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>⭐ Overall</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0" }}>
+          <span style={{ fontSize: "0.8rem", color: isDark ? "#94a3b8" : "#64748b" }}>⭐ Overall</span>
           <span style={{ fontWeight: 800, fontSize: "1rem", color: scoreColor(a.overallScore), background: scoreBg(a.overallScore), padding: "0.2rem 0.6rem", borderRadius: "8px" }}>
             {a.overallScore}/10
           </span>
@@ -141,7 +154,7 @@ function FeedbackPanel({ a }) {
 
       {/* One-line overall comment */}
       {a.overallComment && (
-        <p style={{ marginTop: "0.75rem", fontSize: "0.78rem", color: "var(--text2)", lineHeight: 1.6, fontStyle: "italic", borderTop: "1px solid var(--border2)", paddingTop: "0.75rem" }}>
+        <p style={{ marginTop: "0.75rem", fontSize: "0.78rem", color: isDark ? "#cbd5e1" : "#334155", lineHeight: 1.6, fontStyle: "italic", borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0", paddingTop: "0.75rem" }}>
           "{a.overallComment.slice(0, 160)}{a.overallComment.length > 160 ? "…" : ""}"
         </p>
       )}
@@ -150,49 +163,94 @@ function FeedbackPanel({ a }) {
 }
 
 // ── Full Detailed Report — everything ────────────────────────────────────────
-function DetailedReport({ a }) {
+function DetailedReport({ a, challengeType, isDark: propIsDark }) {
+  const themeContext = useTheme();
+  const isDark = propIsDark ?? themeContext?.isDark ?? true;
   if (!a) return null;
   const s = a.stats || {};
 
   // ── Composite score card (same data as VideoAnalysis page) ────────────────
   const bd = a.scoreBreakdown || a._scoreBreakdown || null;
   const cs = a.compositeScore ?? a._compositeScore ?? null;
-  const isPictureBd = a.challengeType === "picture_description" || bd?.isPictureDescription === true;
-  const isStoryBd = a.challengeType === "story_summary" || bd?.isStorySummary === true;
+  const effectiveChallengeType = challengeType || a.challengeType || null;
+  const isShadowBd = effectiveChallengeType === "shadowing_video" || bd?.isShadowing === true || (bd?.maxLength === 40 && bd?.maxComm === 60);
+  const isPictureBd = effectiveChallengeType === "picture_description" || bd?.isPictureDescription === true || (bd?.maxContent === 35 && bd?.maxCommunication === 20);
+  const isStoryBd = effectiveChallengeType === "story_summary" || bd?.isStorySummary === true;
 
   const improvementTips = [];
   if (bd) {
-    if (bd.isOffTopic) {
+    if (bd.isSilentAttempt) {
+      improvementTips.push({
+        icon: "🔇",
+        label: "Enable microphone & shadow aloud",
+        detail: bd.silenceWarning || "No audible speech was detected in this recording. Turn up your microphone and shadow the native speaker aloud to earn points.",
+        gap: 100,
+      });
+    } else if (bd.isOffTopic) {
       improvementTips.push({
         icon: "🚨",
         label: "Answer today's challenge",
         detail: bd.offTopicReason || "Your video does not address today's topic. Re-record answering today's question to earn a higher score.",
         gap: 50,
       });
+    } else if (isShadowBd) {
+      const durGap = (bd.maxLength || 40) - (bd.length || 0);
+      const comGap = (bd.maxComm || 60) - (bd.comm || 0);
+      if (durGap > 0.5) {
+        const targetSec = bd.targetDuration || 60;
+        improvementTips.push({
+          icon: "⏱️",
+          label: "Reach 85% active spoken time",
+          detail: `+${durGap.toFixed(1)} pts possible — speak actively for at least 85% of the reference speech (${Math.round(targetSec * 0.85)}s) to earn full 40 duration points!`,
+          gap: durGap,
+        });
+      }
+      if (comGap > 2) {
+        improvementTips.push({
+          icon: "🗣️",
+          label: "Mirror rhythm & flow",
+          detail: `+${comGap.toFixed(1)} pts possible — shadow the speaker closely, matching pacing, pauses, and clear pronunciation.`,
+          gap: comGap,
+        });
+      }
+    } else if (isPictureBd) {
+      const comGap = (bd.maxCommunication || 20) - (bd.communication || 0);
+      const conGap = (bd.maxContent || 35) - (bd.content || 0);
+      const vocGap = (bd.maxVocabulary || 10) - (bd.vocabulary || 0);
+      const durGap = (bd.maxDuration || 20) - (bd.duration || 0);
+      if (durGap > 0.5) improvementTips.push({ icon: "⏱️", label: "Make a complete attempt", detail: `+${durGap.toFixed(1)} pts possible — speak for a reasonable amount of time`, gap: durGap });
+      if (vocGap > 1.5) {
+        const requiredVocabWords = bd.requiredVocabWords || 1;
+        const totalVocabWords = bd.totalVocabWords || 3;
+        improvementTips.push({ icon: "📚", label: "Use more vocab words", detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`, gap: vocGap });
+      }
+      if (conGap > 2 && !bd.isOffTopic) improvementTips.push({ icon: "🧠", label: "Develop content", detail: `+${conGap.toFixed(1)} pts possible — connect observations and explain the image in more depth`, gap: conGap });
+      if (comGap > 2) improvementTips.push({ icon: "🗣️", label: "Improve communication", detail: `+${comGap.toFixed(1)} pts possible — improve fluency, confidence, grammar and flow`, gap: comGap });
+    } else {
+      const lenGap = (bd.maxLength || 30) - (bd.length || 0);
+      const vocGap = (bd.maxVocab || 30) - (bd.vocabUsed || 0);
+      const topGap = (bd.maxTopic || 15) - (bd.topic || 0);
+      const comGap = (bd.maxComm || (bd.isSpecialDay ? 25 : 10)) - (bd.comm || 0);
+      const groGap = (bd.maxGrowth || 15) - (bd.growth || 0);
+      if (lenGap > 2) improvementTips.push({ icon: "⏱️", label: "Record longer", detail: `+${lenGap.toFixed(1)} pts possible — speak closer to the full-score time`, gap: lenGap });
+      if (vocGap > 1.5) {
+        const requiredVocabWords = bd.requiredVocabWords || (isStoryBd ? 1 : 3);
+        const totalVocabWords = bd.totalVocabWords || (isStoryBd ? 3 : 5);
+        improvementTips.push({ icon: "📚", label: "Use more vocab words", detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`, gap: vocGap });
+      }
+      if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
+        improvementTips.push({
+          icon: isStoryBd ? "📖" : "🎯",
+          label: isStoryBd ? "Cover key story points" : "Stay on topic",
+          detail: isStoryBd
+            ? `+${topGap.toFixed(1)} pts possible — retell the story plot, characters, key events, and conclusion`
+            : `+${topGap.toFixed(1)} pts possible — answer the question more directly`,
+          gap: topGap,
+        });
+      }
+      if (comGap > 2) improvementTips.push({ icon: "🗣️", label: "Improve communication", detail: `+${comGap.toFixed(1)} pts possible — work on fluency, grammar, confidence & eye contact`, gap: comGap });
+      if (groGap > 2) improvementTips.push({ icon: "🌱", label: "Aim for personal growth", detail: `+${groGap.toFixed(1)} pts possible — speak with slightly clearer pacing and flow to beat your baseline`, gap: groGap });
     }
-    const lenGap = isPictureBd ? (bd.maxDuration || 20) - (bd.duration || 0) : (bd.maxLength || 30) - (bd.length || 0);
-    const vocGap = isPictureBd ? (bd.maxVocabulary || 10) - (bd.vocabulary || 0) : (bd.maxVocab || 30) - (bd.vocabUsed || 0);
-    const topGap = isPictureBd ? (bd.maxContent || 35) - (bd.content || 0) : (bd.maxTopic || 15) - (bd.topic || 0);
-    const comGap = isPictureBd ? (bd.maxCommunication || 20) - (bd.communication || 0) : (bd.maxComm || (bd.isSpecialDay ? 25 : 10)) - (bd.comm || 0);
-    const groGap = (bd.maxGrowth || 15) - (bd.growth || 0);
-    if (lenGap > 2) improvementTips.push({ icon: "⏱️", label: "Record longer",          detail: `+${lenGap.toFixed(1)} pts possible — speak closer to the full-score time`,                      gap: lenGap });
-    if (vocGap > 1.5) {
-      const requiredVocabWords = bd.requiredVocabWords || (isPictureBd || isStoryBd ? 1 : 3);
-      const totalVocabWords = bd.totalVocabWords || (isPictureBd || isStoryBd ? 3 : 5);
-      improvementTips.push({ icon: "📚", label: "Use more vocab words",    detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`,                  gap: vocGap });
-    }
-    if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
-      improvementTips.push({
-        icon: isStoryBd ? "📖" : "🎯",
-        label: isStoryBd ? "Cover key story points" : "Stay on topic",
-        detail: isStoryBd
-          ? `+${topGap.toFixed(1)} pts possible — retell the story plot, characters, key events, and conclusion`
-          : `+${topGap.toFixed(1)} pts possible — answer the question more directly`,
-        gap: topGap,
-      });
-    }
-    if (comGap > 2) improvementTips.push({ icon: "🗣️", label: "Improve communication",  detail: `+${comGap.toFixed(1)} pts possible — work on fluency, grammar, confidence & eye contact`,     gap: comGap });
-    if (groGap > 2) improvementTips.push({ icon: "🌱", label: "Aim for personal growth", detail: `+${groGap.toFixed(1)} pts possible — speak with slightly clearer pacing and flow to beat your baseline`, gap: groGap });
     improvementTips.sort((x, y) => y.gap - x.gap);
   }
 
@@ -205,17 +263,19 @@ function DetailedReport({ a }) {
           marginBottom: "0.85rem",
           padding: "0.65rem 0.85rem",
           borderRadius: 10,
-          background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(74,222,128,0.08))",
-          border: "1px solid rgba(16,185,129,0.45)",
+          background: isDark
+            ? "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(74,222,128,0.08))"
+            : "#ecfdf5",
+          border: isDark ? "1px solid rgba(16,185,129,0.45)" : "1px solid #a7f3d0",
           display: "flex", alignItems: "center", gap: "0.65rem",
         }}>
           <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>🌱</span>
           <div>
-            <div style={{ fontWeight: 800, color: "#10b981", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+            <div style={{ fontWeight: 800, color: isDark ? "#10b981" : "#047857", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
               Personal Growth Bonus! +{bd.growth} pts
             </div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>
-              Beat baseline ({bd.baselineComm != null ? `${bd.baselineComm.toFixed(1)} avg` : "past attempts"}) by <strong style={{ color: "#34d399" }}>+{bd.growthDelta.toFixed(1)}</strong>!
+            <div style={{ fontSize: "0.75rem", color: isDark ? "rgba(255,255,255,0.75)" : "#065f46", lineHeight: 1.4 }}>
+              Beat baseline ({bd.baselineComm != null ? `${bd.baselineComm.toFixed(1)} avg` : "past attempts"}) by <strong style={{ color: isDark ? "#34d399" : "#059669" }}>+{bd.growthDelta.toFixed(1)}</strong>!
             </div>
           </div>
         </div>
@@ -227,16 +287,18 @@ function DetailedReport({ a }) {
           marginBottom: "0.85rem",
           padding: "0.75rem 0.95rem",
           borderRadius: 10,
-          background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.08))",
-          border: "1px solid rgba(239, 68, 68, 0.45)",
+          background: isDark
+            ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.08))"
+            : "#fef2f2",
+          border: isDark ? "1px solid rgba(239, 68, 68, 0.45)" : "1px solid #fecaca",
           display: "flex", alignItems: "center", gap: "0.65rem",
         }}>
           <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>⚠️</span>
           <div>
-            <div style={{ fontWeight: 800, color: "#f87171", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+            <div style={{ fontWeight: 800, color: isDark ? "#f87171" : "#b91c1c", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
               Off-Topic Submission Detected
             </div>
-            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
+            <div style={{ fontSize: "0.75rem", color: isDark ? "rgba(255,255,255,0.8)" : "#991b1b", lineHeight: 1.4 }}>
               {bd.offTopicReason || "This video does not address today's assigned topic or question. Please re-record to earn full score!"}
             </div>
           </div>
@@ -248,29 +310,32 @@ function DetailedReport({ a }) {
         <div style={{
           marginBottom: "1rem",
           borderRadius: 14,
-          border: "1px solid rgba(124,111,255,0.35)",
-          background: "linear-gradient(135deg, rgba(124,111,255,0.13) 0%, rgba(79,70,229,0.07) 100%)",
+          border: isDark ? "1px solid rgba(124,111,255,0.35)" : "1px solid #e2e8f0",
+          background: isDark
+            ? "linear-gradient(135deg, rgba(124,111,255,0.13) 0%, rgba(79,70,229,0.07) 100%)"
+            : "#ffffff",
+          boxShadow: isDark ? "none" : "0 4px 16px rgba(0,0,0,0.04)",
           overflow: "hidden",
         }}>
           {/* Header */}
           <div style={{ padding: "0.9rem 1.1rem 0.7rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
             <div>
-              <div style={{ fontSize: "0.65rem", color: "rgba(167,139,250,0.8)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.2rem" }}>
+              <div style={{ fontSize: "0.65rem", color: isDark ? "rgba(167,139,250,0.9)" : "#6d28d9", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.2rem" }}>
                 🏆 Score
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem" }}>
-                <span style={{ fontSize: "2rem", fontWeight: 900, lineHeight: 1, color: cs >= 80 ? "#4ade80" : cs >= 60 ? "#a78bfa" : cs >= 40 ? "#fbbf24" : "#f87171" }}>
+                <span style={{ fontSize: "2rem", fontWeight: 900, lineHeight: 1, color: cs >= 80 ? "#10b981" : cs >= 60 ? (isDark ? "#a78bfa" : "#7c3aed") : cs >= 40 ? "#f59e0b" : "#ef4444" }}>
                   {Math.round(cs)}
                 </span>
-                <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600 }}>/100 pts</span>
+                <span style={{ fontSize: "0.85rem", color: isDark ? "var(--muted)" : "#64748b", fontWeight: 600 }}>/100 pts</span>
               </div>
             </div>
             <div style={{
-              background: cs >= 80 ? "rgba(74,222,128,0.15)" : cs >= 60 ? "rgba(124,111,255,0.15)" : cs >= 40 ? "rgba(251,191,36,0.15)" : "rgba(248,113,113,0.15)",
-              border: `1px solid ${cs >= 80 ? "rgba(74,222,128,0.4)" : cs >= 60 ? "rgba(124,111,255,0.4)" : cs >= 40 ? "rgba(251,191,36,0.4)" : "rgba(248,113,113,0.4)"}`,
+              background: cs >= 80 ? "rgba(74,222,128,0.15)" : cs >= 60 ? (isDark ? "rgba(124,111,255,0.15)" : "#ede9fe") : cs >= 40 ? "rgba(251,191,36,0.15)" : "rgba(248,113,113,0.15)",
+              border: `1px solid ${cs >= 80 ? "rgba(74,222,128,0.4)" : cs >= 60 ? (isDark ? "rgba(124,111,255,0.4)" : "#c4b5fd") : cs >= 40 ? "rgba(251,191,36,0.4)" : "rgba(248,113,113,0.4)"}`,
               borderRadius: 10, padding: "0.4rem 0.85rem", textAlign: "center",
             }}>
-              <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--text)" }}>
+              <div style={{ fontSize: "0.95rem", fontWeight: 800, color: isDark ? "var(--text)" : "#0f172a" }}>
                 {cs >= 90 ? "🏆 Elite" : cs >= 80 ? "⭐ Excellent" : cs >= 65 ? "✅ Good" : cs >= 50 ? "📈 Developing" : "💪 Keep going"}
               </div>
             </div>
@@ -279,11 +344,38 @@ function DetailedReport({ a }) {
           {/* Breakdown bars */}
           {bd && (
             <div style={{ padding: "0 1.1rem 0.85rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {(isPictureBd ? [
+              {(isShadowBd ? [
+                {
+                  label: `⏱️ Active Speech Match (${bd.durationMatchPercent ?? (bd.speechRatio != null ? `${bd.speechRatio}% speaking` : Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100))}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  earned: bd.length || 0,
+                  max: bd.maxLength || 40,
+                  color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch || (bd.length || 0) >= 40) ? "#10b981" : "#f472b6",
+                  subtext: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch || (bd.length || 0) >= 40) ? "≥85% Full Score" : "Effort Proportional",
+                },
+                {
+                  label: "🗣️ Delivery, Rhythm & Fluency",
+                  earned: bd.comm || 0,
+                  max: bd.maxComm || 60,
+                  color: "#60a5fa",
+                },
+                ...(bd.growth != null && (bd.maxGrowth || 0) > 0 ? [{
+                  label: "🌱 Personal Growth",
+                  earned: bd.growth || 0,
+                  max: bd.maxGrowth || 0,
+                  color: "#10b981",
+                  subtext: bd.isCalibration
+                    ? "Establishing baseline"
+                    : bd.growthDelta > 0
+                    ? `+${bd.growthDelta.toFixed(1)} vs baseline`
+                    : bd.growthDelta === 0
+                    ? "Matches baseline"
+                    : `${bd.growthDelta.toFixed(1)} vs baseline`,
+                }] : []),
+              ] : isPictureBd ? [
                 { label: "🗣️ Communication", earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
-                { label: "🧠 Content & Relevance",      earned: bd.content       || 0, max: bd.maxContent       || 35, color: "#a78bfa" },
-                { label: "📚 Vocabulary",               earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 10, color: "#34d399" },
-                { label: "⏱️ Duration",                 earned: bd.duration      || 0, max: bd.maxDuration      || 20, color: "#fbbf24" },
+                { label: "🧠 Content & Relevance", earned: bd.content || 0, max: bd.maxContent || 35, color: "#a78bfa" },
+                { label: "📚 Vocabulary", earned: bd.vocabulary || 0, max: bd.maxVocabulary || 10, color: "#34d399" },
+                { label: "⏱️ Duration", earned: bd.duration || 0, max: bd.maxDuration || 20, color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",
                   earned: bd.growth || 0,
@@ -318,7 +410,7 @@ function DetailedReport({ a }) {
               ]).map(({ label, earned, max, color, subtext }) => (
                 <div key={label}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.72rem", marginBottom: "0.18rem" }}>
-                    <span style={{ color: "var(--muted)" }}>
+                    <span style={{ color: isDark ? "var(--muted)" : "#475569" }}>
                       {label}
                       {subtext && (
                         <span style={{ marginLeft: "0.35rem", color: color, fontSize: "0.68rem", fontWeight: 600 }}>
@@ -326,33 +418,33 @@ function DetailedReport({ a }) {
                         </span>
                       )}
                     </span>
-                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{earned.toFixed(1)} / {max.toFixed(1)}</span>
+                    <span style={{ color: isDark ? "var(--text)" : "#0f172a", fontWeight: 600 }}>{earned.toFixed(1)} / {max.toFixed(1)}</span>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 99, height: 5, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, (earned / max) * 100)}%`, background: color, borderRadius: 99 }} />
+                  <div style={{ background: isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0", borderRadius: 99, height: 5, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, (earned / Math.max(1, max)) * 100)}%`, background: color, borderRadius: 99 }} />
                   </div>
                 </div>
               ))}
 
-              {Array.isArray(a.vocabularyUsed) && a.vocabularyUsed.length > 0 && (
+              {!isShadowBd && Array.isArray(a.vocabularyUsed) && a.vocabularyUsed.length > 0 && (
                 <div style={{
                   marginTop: "0.2rem",
                   padding: "0.4rem 0.65rem",
                   borderRadius: 8,
-                  background: "rgba(167, 139, 250, 0.08)",
-                  border: "1px solid rgba(167, 139, 250, 0.2)",
+                  background: isDark ? "rgba(167, 139, 250, 0.08)" : "#f5f3ff",
+                  border: isDark ? "1px solid rgba(167, 139, 250, 0.2)" : "1px solid #ddd6fe",
                   display: "flex",
                   alignItems: "center",
                   gap: "0.4rem",
                   flexWrap: "wrap",
                   fontSize: "0.72rem",
                 }}>
-                  <span style={{ color: "#c4b5fd", fontWeight: 700 }}>🎯 Target Words Recognized:</span>
+                  <span style={{ color: isDark ? "#c4b5fd" : "#6d28d9", fontWeight: 700 }}>🎯 Target Words Recognized:</span>
                   {a.vocabularyUsed.map((w, i) => (
                     <span key={i} style={{
-                      background: "rgba(74, 222, 128, 0.15)",
-                      border: "1px solid rgba(74, 222, 128, 0.35)",
-                      color: "#4ade80",
+                      background: isDark ? "rgba(74, 222, 128, 0.15)" : "#dcfce7",
+                      border: isDark ? "1px solid rgba(74, 222, 128, 0.35)" : "1px solid #86efac",
+                      color: isDark ? "#4ade80" : "#15803d",
                       padding: "1px 6px",
                       borderRadius: 6,
                       fontWeight: 700,
@@ -368,8 +460,18 @@ function DetailedReport({ a }) {
 
           {/* Improvement tips */}
           {improvementTips.length > 0 && (
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "0.7rem 1.1rem" }}>
-              <div style={{ fontSize: "0.65rem", color: "rgba(167,139,250,0.8)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
+            <div style={{
+              borderTop: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid #f1f5f9",
+              padding: "0.7rem 1.1rem",
+            }}>
+              <div style={{
+                fontSize: "0.65rem",
+                color: isDark ? "rgba(167,139,250,0.9)" : "#6d28d9",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: "0.5rem"
+              }}>
                 🚀 How to score higher
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -377,8 +479,8 @@ function DetailedReport({ a }) {
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", fontSize: "0.78rem" }}>
                     <span style={{ flexShrink: 0 }}>{tip.icon}</span>
                     <div>
-                      <span style={{ color: "var(--text)", fontWeight: 600 }}>{tip.label}</span>
-                      <span style={{ color: "var(--muted)", marginLeft: "0.3rem" }}>{tip.detail}</span>
+                      <span style={{ color: isDark ? "var(--text)" : "#0f172a", fontWeight: 600 }}>{tip.label}</span>
+                      <span style={{ color: isDark ? "var(--muted)" : "#64748b", marginLeft: "0.3rem" }}>{tip.detail}</span>
                     </div>
                   </div>
                 ))}
@@ -389,50 +491,72 @@ function DetailedReport({ a }) {
       )}
 
       {/* Stats bar */}
-      <div style={{ background: "var(--bg)", borderRadius: "8px", padding: "0.65rem 0.9rem", marginBottom: "0.9rem", display: "flex", flexWrap: "wrap", gap: "0.75rem", fontSize: "0.82rem" }}>
+      <div style={{
+        background: isDark ? "rgba(255,255,255,0.04)" : "#ffffff",
+        border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid #e2e8f0",
+        borderRadius: "8px",
+        padding: "0.65rem 0.9rem",
+        marginBottom: "0.9rem",
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "0.75rem",
+        fontSize: "0.82rem",
+        color: isDark ? "#cbd5e1" : "#334155",
+      }}>
         {s.duration   && <span>⏱️ <strong>{s.duration}</strong></span>}
         {s.wpm        && <span>📊 <strong>{s.wpm} wpm</strong> {s.wpm < 100 ? "🐢 Slow" : s.wpm <= 150 ? "✅ Good" : "⚡ Fast"}</span>}
-        {s.fillerTotal > 0 && <span>🗣️ Fillers: <strong>{Object.entries(s.fillerWords || {}).map(([w,c]) => `"${w}" ×${c}`).join(", ")}</strong></span>}
+        {s.fillerTotal > 0 && (
+          <span>🗣️ Fillers: <strong>{
+            Object.keys(s.fillerWords || {}).length > 0
+              ? Object.entries(s.fillerWords).map(([w,c]) => `"${w}" ×${c}`).join(", ")
+              : s.fillerTotal
+          }</strong></span>
+        )}
         {s.pauses > 0 && <span>🔇 Pauses: <strong>{s.pauses}</strong></span>}
         {s.rhythm?.speechRatio != null && (
           <span>🎵 Speech: <strong>{s.rhythm.speechRatio}%</strong> {s.rhythm.speechRatio >= 75 ? "✅" : s.rhythm.speechRatio >= 55 ? "⚠️" : "❌"}</span>
         )}
       </div>
 
+      {!isShadowBd && s.rhythm?.rushesAtStart && <p style={{ color: "var(--warning)", marginBottom: "0.5rem", fontSize: "0.8rem" }}>⚡ Tends to rush at the start — slow down your opening.</p>}
+      {!isShadowBd && s.rhythm?.rushesAtEnd   && <p style={{ color: "var(--warning)", marginBottom: "0.5rem", fontSize: "0.8rem" }}>⚡ Speeds up toward the end — maintain steady pace throughout.</p>}
       {a.qualityWarning && <p style={{ color: "var(--warning)", marginBottom: "0.5rem" }}>🔈 {a.qualityWarning}</p>}
 
       {/* Speech scores */}
-      <Section title="🗣️ Speech Scores">
+      <Section title="🗣️ Speech Scores" isDark={isDark}>
         {[
           { icon: "🗣️", label: "Fluency",    v: a.fluency },
           { icon: "📚", label: "Grammar",    v: a.grammar },
           { icon: "🔥", label: "Confidence", v: a.confidence },
-          { icon: "🧠", label: "Vocabulary", v: a.vocabulary },
+          ...(!isShadowBd ? [{ icon: "🧠", label: "Vocabulary", v: a.vocabulary }] : []),
         ].map(({ icon, label, v }) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-            <span style={{ width: "100px", color: "var(--muted)", fontSize: "0.8rem" }}>{icon} {label}</span>
-            <BlockScoreBar score={v} />
+            <span style={{ width: "100px", color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.8rem" }}>{icon} {label}</span>
+            <BlockScoreBar score={v} isDark={isDark} />
           </div>
         ))}
         {s.cefrLevel && (
-          <p style={{ marginTop: "0.4rem", color: "var(--muted)", fontSize: "0.8rem" }}>
-            🎓 Level: <strong>{s.cefrLevel.level}</strong> — <em>{s.cefrLevel.description}</em>
+          <p style={{ marginTop: "0.4rem", color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.8rem" }}>
+            🎓 Level: <strong>{typeof s.cefrLevel === "string" ? s.cefrLevel : s.cefrLevel.level}</strong>
+            {typeof s.cefrLevel === "object" && s.cefrLevel?.description ? (
+              <span> — <em>{s.cefrLevel.description}</em></span>
+            ) : null}
           </p>
         )}
-        {a.topicRelevance != null && (
+        {!isShadowBd && a.topicRelevance != null && (
           <div style={{ marginTop: "0.4rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.3rem" }}>
-              <span style={{ width: "100px", color: "var(--muted)", fontSize: "0.8rem" }}>🎯 On-topic</span>
-              <BlockScoreBar score={a.topicRelevance} />
+              <span style={{ width: "100px", color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.8rem" }}>🎯 On-topic</span>
+              <BlockScoreBar score={a.topicRelevance} isDark={isDark} />
             </div>
-            {a.topicFeedback && <p style={{ color: "var(--muted)", fontSize: "0.8rem", fontStyle: "italic" }}>💬 {a.topicFeedback}</p>}
+            {a.topicFeedback && <p style={{ color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.8rem", fontStyle: "italic" }}>💬 {a.topicFeedback}</p>}
           </div>
         )}
       </Section>
 
       {/* Visual presence */}
       {a.eyeContact != null && (
-        <Section title="📹 Visual Presence">
+        <Section title="📹 Visual Presence" isDark={isDark}>
           {[
             { icon: "👁️", label: "Eye Contact",   v: a.eyeContact },
             { icon: "🧍", label: "Body Language",  v: a.bodyLanguage },
@@ -440,8 +564,8 @@ function DetailedReport({ a }) {
             { icon: "✨", label: "Presence",       v: a.overallPresence },
           ].map(({ icon, label, v }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-              <span style={{ width: "110px", color: "var(--muted)", fontSize: "0.8rem" }}>{icon} {label}</span>
-              <BlockScoreBar score={v} />
+              <span style={{ width: "110px", color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.8rem" }}>{icon} {label}</span>
+              <BlockScoreBar score={v} isDark={isDark} />
             </div>
           ))}
         </Section>
@@ -449,15 +573,16 @@ function DetailedReport({ a }) {
 
       {/* Pronunciation & Rhythm */}
       {(a.pronunciationNote || a.rhythmNote) && (
-        <Section title="🎵 Pronunciation &amp; Rhythm">
-          {a.pronunciationNote && <p style={{ marginBottom: "0.3rem" }}>🗣️ {a.pronunciationNote}</p>}
-          {a.rhythmNote        && <p>🎵 {a.rhythmNote}</p>}
+        <Section title="🎵 Pronunciation & Rhythm" isDark={isDark}>
+          {a.pronunciationNote && <p style={{ marginBottom: "0.3rem", color: isDark ? "var(--text)" : "#1e293b" }}>🗣️ {a.pronunciationNote}</p>}
+          {a.rhythmNote        && <p style={{ color: isDark ? "var(--text)" : "#1e293b" }}>🎵 {a.rhythmNote}</p>}
         </Section>
       )}
 
       {/* Grammar errors */}
       {(() => {
         const validGrammarErrors = (a.grammarErrors || []).filter(e => {
+          if (!e || typeof e !== "object") return false;
           const o = (e?.original || "").trim().toLowerCase();
           const c = (e?.correction || "").trim().toLowerCase();
           const rule = (e?.rule || "").toLowerCase();
@@ -472,13 +597,13 @@ function DetailedReport({ a }) {
         if (!validGrammarErrors.length) return null;
 
         return (
-          <Section title="❌ Grammar Issues">
+          <Section title="❌ Grammar Issues" isDark={isDark}>
             {validGrammarErrors.map((e, i) => (
-              <div key={i} style={{ marginBottom: "0.5rem", paddingLeft: "0.5rem", borderLeft: "3px solid var(--danger)" }}>
-                <span style={{ color: "var(--muted)", fontStyle: "italic" }}>"{e.original}"</span>
+              <div key={i} style={{ marginBottom: "0.5rem", paddingLeft: "0.5rem", borderLeft: "3px solid #ef4444" }}>
+                <span style={{ color: isDark ? "var(--muted)" : "#64748b", fontStyle: "italic" }}>"{e.original}"</span>
                 {" → "}
-                <strong style={{ color: "var(--success)" }}>"{e.correction}"</strong>
-                {e.rule && <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}> ({e.rule})</span>}
+                <strong style={{ color: isDark ? "var(--success)" : "#16a34a" }}>"{e.correction}"</strong>
+                {e.rule && <span style={{ color: isDark ? "var(--muted)" : "#64748b", fontSize: "0.78rem" }}> ({e.rule})</span>}
               </div>
             ))}
           </Section>
@@ -487,8 +612,8 @@ function DetailedReport({ a }) {
 
       {/* Strong points */}
       {a.strongPoints?.length > 0 && (
-        <Section title="✅ What They Did Well">
-          <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
+        <Section title="✅ What They Did Well" isDark={isDark}>
+          <ul style={{ paddingLeft: "1.1rem", margin: 0, color: isDark ? "var(--text)" : "#1e293b" }}>
             {a.strongPoints.map((p, i) => <li key={i} style={{ marginBottom: "0.25rem" }}>{p}</li>)}
           </ul>
         </Section>
@@ -496,30 +621,30 @@ function DetailedReport({ a }) {
 
       {/* Visual observations */}
       {(a.eyeContactNote || a.bodyLanguageNote || a.expressionNote || a.visualStrengths?.length > 0) && (
-        <Section title="📹 Visual Observations">
-          {a.eyeContactNote   && <p style={{ marginBottom: "0.3rem" }}>👁️ {a.eyeContactNote}</p>}
-          {a.bodyLanguageNote && <p style={{ marginBottom: "0.3rem" }}>🧍 {a.bodyLanguageNote}</p>}
-          {a.expressionNote   && <p style={{ marginBottom: "0.3rem" }}>😊 {a.expressionNote}</p>}
-          {a.visualStrengths?.map((vs, i) => <p key={i} style={{ marginBottom: "0.25rem" }}>✅ {vs}</p>)}
+        <Section title="📹 Visual Observations" isDark={isDark}>
+          {a.eyeContactNote   && <p style={{ marginBottom: "0.3rem", color: isDark ? "var(--text)" : "#1e293b" }}>👁️ {a.eyeContactNote}</p>}
+          {a.bodyLanguageNote && <p style={{ marginBottom: "0.3rem", color: isDark ? "var(--text)" : "#1e293b" }}>🧍 {a.bodyLanguageNote}</p>}
+          {a.expressionNote   && <p style={{ marginBottom: "0.3rem", color: isDark ? "var(--text)" : "#1e293b" }}>😊 {a.expressionNote}</p>}
+          {a.visualStrengths?.map((vs, i) => <p key={i} style={{ marginBottom: "0.25rem", color: isDark ? "var(--text)" : "#1e293b" }}>✅ {vs}</p>)}
         </Section>
       )}
 
-      {/* Vocabulary */}
-      {(a.vocabularyHighlights?.strong?.length > 0 || a.vocabularyHighlights?.weak?.length > 0) && (
-        <Section title="📖 Vocabulary">
+      {/* Vocabulary (waived for shadowing) */}
+      {!isShadowBd && (a.vocabularyHighlights?.strong?.length > 0 || a.vocabularyHighlights?.weak?.length > 0) && (
+        <Section title="📖 Vocabulary" isDark={isDark}>
           {a.vocabularyHighlights.strong?.length > 0 && (
-            <p style={{ marginBottom: "0.3rem" }}>💎 Good words: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>
+            <p style={{ marginBottom: "0.3rem", color: isDark ? "var(--text)" : "#1e293b" }}>💎 Good words: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>
           )}
           {a.vocabularyHighlights.weak?.length > 0 && (
-            <p>📖 Words to upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>
+            <p style={{ color: isDark ? "var(--text)" : "#1e293b" }}>📖 Words to upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>
           )}
         </Section>
       )}
 
       {/* Speaking tips */}
       {a.suggestions?.length > 0 && (
-        <Section title="💡 Speaking Tips">
-          <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
+        <Section title="💡 Speaking Tips" isDark={isDark}>
+          <ul style={{ paddingLeft: "1.1rem", margin: 0, color: isDark ? "var(--text)" : "#1e293b" }}>
             {a.suggestions.map((t, i) => <li key={i} style={{ marginBottom: "0.25rem" }}>{t}</li>)}
           </ul>
         </Section>
@@ -527,8 +652,8 @@ function DetailedReport({ a }) {
 
       {/* Presentation tips */}
       {a.visualSuggestions?.length > 0 && (
-        <Section title="🎬 Presentation Tips">
-          <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
+        <Section title="🎬 Presentation Tips" isDark={isDark}>
+          <ul style={{ paddingLeft: "1.1rem", margin: 0, color: isDark ? "var(--text)" : "#1e293b" }}>
             {a.visualSuggestions.map((t, i) => <li key={i} style={{ marginBottom: "0.25rem" }}>{t}</li>)}
           </ul>
         </Section>
@@ -536,8 +661,27 @@ function DetailedReport({ a }) {
 
       {/* Overall feedback */}
       {a.overallComment && (
-        <Section title="📝 Overall Feedback">
-          <p style={{ lineHeight: 1.7 }}>{a.overallComment}</p>
+        <Section title="📝 Overall Feedback" isDark={isDark}>
+          <p style={{ lineHeight: 1.7, color: isDark ? "var(--text)" : "#1e293b" }}>{a.overallComment}</p>
+        </Section>
+      )}
+
+      {/* Speech transcription */}
+      {a.transcription && (
+        <Section title="📝 Speech Transcription" isDark={isDark}>
+          <p style={{
+            fontSize: "0.82rem",
+            lineHeight: 1.6,
+            color: isDark ? "#cbd5e1" : "#334155",
+            background: isDark ? "rgba(255,255,255,0.02)" : "#f1f5f9",
+            padding: "0.65rem 0.85rem",
+            borderRadius: 8,
+            border: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid #e2e8f0",
+            fontStyle: "italic",
+            margin: 0,
+          }}>
+            "{a.transcription}"
+          </p>
         </Section>
       )}
     </div>
@@ -2067,33 +2211,47 @@ export default function CommunityFeed() {
                             type="button"
                             onClick={() => toggleView(item._id, "feedback")}
                             style={{
-                              background: isDark ? "rgba(244, 114, 182, 0.15)" : "#fdf2f8",
-                              border: isDark ? "1px solid rgba(244, 114, 182, 0.35)" : "1px solid #fbcfe8",
-                              color: isDark ? "#f472b6" : "#db2777",
+                              background: view[item._id] === "feedback"
+                                ? (isDark ? "#f472b6" : "#db2777")
+                                : (isDark ? "rgba(244, 114, 182, 0.15)" : "#fdf2f8"),
+                              border: view[item._id] === "feedback"
+                                ? "none"
+                                : (isDark ? "1px solid rgba(244, 114, 182, 0.35)" : "1px solid #fbcfe8"),
+                              color: view[item._id] === "feedback"
+                                ? "#ffffff"
+                                : (isDark ? "#f472b6" : "#db2777"),
                               borderRadius: 8,
                               padding: "0.35rem 0.85rem",
                               fontSize: "0.75rem",
                               fontWeight: 700,
                               cursor: "pointer",
+                              transition: "all 0.15s ease",
                             }}
                           >
-                            📊 View Feedback
+                            {view[item._id] === "feedback" ? "📊 Hide Feedback" : "📊 View Feedback"}
                           </button>
                           <button
                             type="button"
                             onClick={() => toggleView(item._id, "report")}
                             style={{
-                              background: isDark ? "rgba(167, 139, 250, 0.15)" : "#f5f3ff",
-                              border: isDark ? "1px solid rgba(167, 139, 250, 0.35)" : "1px solid #ddd6fe",
-                              color: isDark ? "#c084fc" : "#7c3aed",
+                              background: view[item._id] === "report"
+                                ? (isDark ? "#7c6fff" : "#4f46e5")
+                                : (isDark ? "rgba(167, 139, 250, 0.15)" : "#f5f3ff"),
+                              border: view[item._id] === "report"
+                                ? "none"
+                                : (isDark ? "1px solid rgba(167, 139, 250, 0.35)" : "1px solid #ddd6fe"),
+                              color: view[item._id] === "report"
+                                ? "#ffffff"
+                                : (isDark ? "#c084fc" : "#7c3aed"),
                               borderRadius: 8,
                               padding: "0.35rem 0.85rem",
                               fontSize: "0.75rem",
                               fontWeight: 700,
                               cursor: "pointer",
+                              transition: "all 0.15s ease",
                             }}
                           >
-                            📋 View Detailed Report
+                            {view[item._id] === "report" ? "📋 Hide Detailed Report" : "📋 View Detailed Report"}
                           </button>
                         </div>
 
@@ -2194,8 +2352,8 @@ export default function CommunityFeed() {
                           background: view[item._id] === "feedback"
                             ? (isDark ? "#7c6fff" : "#4f46e5")
                             : (isDark ? "rgba(255,255,255,0.04)" : "#f1f5f9"),
-                          color: view[item._id] === "feedback" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
-                          border: view[item._id] === "feedback" ? "none" : (isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0"),
+                          color: view[item._id] === "feedback" ? "#ffffff" : (isDark ? "#cbd5e1" : "#334155"),
+                          border: view[item._id] === "feedback" ? "none" : (isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #cbd5e1"),
                           fontSize: "0.78rem",
                           fontWeight: 700,
                           cursor: "pointer",
@@ -2221,8 +2379,8 @@ export default function CommunityFeed() {
                           background: view[item._id] === "report"
                             ? (isDark ? "#7c6fff" : "#4f46e5")
                             : (isDark ? "rgba(255,255,255,0.04)" : "#f1f5f9"),
-                          color: view[item._id] === "report" ? "#ffffff" : (isDark ? "#cbd5e1" : "#475569"),
-                          border: view[item._id] === "report" ? "none" : (isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0"),
+                          color: view[item._id] === "report" ? "#ffffff" : (isDark ? "#cbd5e1" : "#334155"),
+                          border: view[item._id] === "report" ? "none" : (isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #cbd5e1"),
                           fontSize: "0.78rem",
                           fontWeight: 700,
                           cursor: "pointer",
@@ -2248,7 +2406,7 @@ export default function CommunityFeed() {
                         <div style={{ fontSize: "0.82rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.85rem" }}>
                           📊 Rubric Performance Breakdown
                         </div>
-                        <FeedbackPanel a={item.analysis} />
+                        <FeedbackPanel a={item.analysis} isDark={isDark} />
                       </div>
                     )}
 
@@ -2263,7 +2421,7 @@ export default function CommunityFeed() {
                           📋 Detailed AI Speaking Analysis
                         </div>
                         {item.analysis
-                          ? <DetailedReport a={item.analysis} />
+                          ? <DetailedReport a={item.analysis} challengeType={item.challengeType} isDark={isDark} />
                           : <p style={{ color: isDark ? "#94a3b8" : "#64748b", fontSize: "0.82rem" }}>The detailed report is not available for this submission.</p>}
                       </div>
                     )}
