@@ -117,12 +117,13 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
 
     // Stage 1: Extract audio
     const extractStage = startStage("extractAudio");
-    let qualityWarning, meanVolume;
+    let qualityWarning, meanVolume, isSilentAudio = false;
     try {
       const extracted = await extractAudio(videoPath, id);
       audioPath = extracted.audioPath;
       qualityWarning = extracted.qualityWarning;
       meanVolume = extracted.meanVolume ?? null;
+      isSilentAudio = Boolean(extracted.isSilent || (meanVolume !== null && meanVolume < -48));
       extractStage.end();
     } catch (err) {
       extractStage.end(err);
@@ -156,7 +157,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     let speechScoringError = null;
 
     const speechChainPromise = withTimeout(
-      transcribe(audioPath, { meanVolume }),
+      transcribe(audioPath, { meanVolume, isSilent: isSilentAudio }),
       Number(process.env.TRANSCRIBE_TIMEOUT_MS) || TRANSCRIBE_TIMEOUT_MS,
       "transcription"
     )
@@ -217,7 +218,10 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     }
 
     if (transcriptionError) throw new Error("Transcription failed: " + transcriptionError.message);
-    if (!transcription?.text || transcription.text.length < 10) throw new Error("Could not detect speech in the video.");
+    if (isSilentAudio || transcription?.isSilent || !transcription?.text || transcription.text.trim().length < 10) {
+      const volInfo = meanVolume !== null ? ` (audio volume was ${meanVolume}dB)` : "";
+      throw new Error(`Could not detect speech in the video${volInfo}. Please ensure your microphone is enabled and speak clearly.`);
+    }
     if (speechScoringError) throw new Error("Speech scoring failed: " + speechScoringError.message);
     if (!speechResult) throw new Error("Speech scoring failed.");
 

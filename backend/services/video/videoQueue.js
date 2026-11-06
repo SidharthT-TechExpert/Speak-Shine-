@@ -377,6 +377,7 @@ async function processJob(job) {
         isStorySummary:     gateFlags.isStorySummary || false,
         isShadowing:        gateFlags.isShadowing || false,
         targetVideoDuration: status?.todayVideoDuration || 60,
+        targetVideoTranscript: status?.todayVideoTranscript || null,
         userHistory:        userDoc?.feedbackScores || [],
       });
       compositeScore = score;
@@ -401,6 +402,10 @@ async function processJob(job) {
         spokenDurationSeconds: breakdown.spokenDurationSeconds ?? null,
         speechRatio: breakdown.speechRatio ?? null,
         durationMessage: breakdown.durationMessage ?? null,
+        isSilentAttempt: breakdown.isSilentAttempt ?? false,
+        silenceWarning: breakdown.silenceWarning ?? null,
+        isOffTopic: breakdown.isOffTopic ?? false,
+        offTopicReason: breakdown.offTopicReason ?? null,
         isShadowing: true,
       } : breakdown.isPictureDescription ? {
         ...breakdown,

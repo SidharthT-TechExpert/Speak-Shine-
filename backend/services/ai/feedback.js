@@ -48,7 +48,7 @@ export async function generateFeedback(
 
   const pipelineStart = Date.now();
   const id = Date.now();
-  let videoPath, audioPath, qualityWarning, meanVolume;
+  let videoPath, audioPath, qualityWarning, meanVolume, isSilentAudio = false;
 
   try {
     // -----------------------------------------------------------------------
@@ -74,6 +74,7 @@ export async function generateFeedback(
       audioPath = extracted.audioPath;
       qualityWarning = extracted.qualityWarning;
       meanVolume = extracted.meanVolume ?? null;
+      isSilentAudio = Boolean(extracted.isSilent || (meanVolume !== null && meanVolume < -48));
       extractStage.end();
     } catch (err) {
       extractStage.end(err);
@@ -110,7 +111,7 @@ export async function generateFeedback(
     let speechScoringError = null;
 
     const speechChainPromise = withTimeout(
-      transcribe(audioPath, { meanVolume }),
+      transcribe(audioPath, { meanVolume, isSilent: isSilentAudio }),
       transcribeTimeout,
       "transcription"
     )
@@ -178,8 +179,8 @@ export async function generateFeedback(
       return "⚠️ _The transcription service is currently unavailable. Please try resubmitting your video._";
     }
 
-    if (!transcription || !transcription.text || transcription.text.length < 10) {
-      return "⚠️ _Could not detect speech in the video._";
+    if (isSilentAudio || transcription?.isSilent || !transcription || !transcription.text || transcription.text.trim().length < 10) {
+      return "⚠️ _Could not detect speech in the video" + (meanVolume !== null ? ` (${meanVolume}dB)` : "") + ". Please speak clearly into your microphone._";
     }
 
     if (speechScoringError || !speechResult) {

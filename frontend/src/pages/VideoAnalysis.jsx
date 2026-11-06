@@ -6366,15 +6366,21 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
   // Generate improvement tips based on what's missing from full score
   const improvementTips = [];
   if (bd) {
-    if (bd.isOffTopic) {
+    if (bd.isSilentAttempt) {
+      improvementTips.push({
+        icon: "🔇",
+        label: "Enable microphone & shadow aloud",
+        detail: bd.silenceWarning || "No audible speech was detected in this recording. Turn up your microphone and shadow the native speaker aloud to earn points.",
+        gap: 100,
+      });
+    } else if (bd.isOffTopic) {
       improvementTips.push({
         icon: "🚨",
         label: "Answer today's challenge",
         detail: bd.offTopicReason || "Your video does not address today's topic. Re-record answering today's question to earn a higher score.",
         gap: 50,
       });
-    }
-    if (isShadowBd) {
+    } else if (isShadowBd) {
       const durGap = (bd.maxLength || 40) - (bd.length || 0);
       const comGap = (bd.maxComm || 60) - (bd.comm || 0);
       if (durGap > 0.5) {
@@ -6778,13 +6784,19 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                   marginTop: "0.25rem",
                   padding: "0.45rem 0.75rem",
                   borderRadius: 10,
-                  background: "rgba(244, 114, 182, 0.08)",
-                  border: "1px solid rgba(244, 114, 182, 0.25)",
+                  background: bd.isSilentAttempt ? "rgba(239, 68, 68, 0.12)" : bd.isOffTopic ? "rgba(245, 158, 11, 0.12)" : "rgba(244, 114, 182, 0.08)",
+                  border: bd.isSilentAttempt ? "1px solid rgba(239, 68, 68, 0.35)" : bd.isOffTopic ? "1px solid rgba(245, 158, 11, 0.35)" : "1px solid rgba(244, 114, 182, 0.25)",
                   fontSize: "0.74rem",
-                  color: "#f472b6",
+                  color: bd.isSilentAttempt ? "#f87171" : bd.isOffTopic ? "#fbbf24" : "#f472b6",
                   lineHeight: 1.4,
                 }}>
-                  ✨ <strong>Shadowing Activity:</strong> Scored on active speech ratio (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.
+                  {bd.isSilentAttempt ? (
+                    <>🔇 <strong>No Speech Detected:</strong> {bd.silenceWarning || "The audio was completely silent. You must speak along with the audio to earn points."}</>
+                  ) : bd.isOffTopic ? (
+                    <>🚨 <strong>Off-Topic Shadowing:</strong> {bd.offTopicReason || "Your speech did not match today's assigned shadowing audio."}</>
+                  ) : (
+                    <>✨ <strong>Shadowing Activity:</strong> Scored on active speech ratio (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.</>
+                  )}
                 </div>
               )}
 

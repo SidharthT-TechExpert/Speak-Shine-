@@ -109,4 +109,79 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     expect(breakdown.communication).toBeGreaterThanOrEqual(45);
     expect(score).toBeGreaterThanOrEqual(85);
   });
+
+  it("awards 0 points and sets isSilentAttempt: true when video audio is completely silent (-85.5 dB)", () => {
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: 126,
+      targetVideoDuration: 85,
+      isShadowing: true,
+      analysis: {
+        fluency: 6.5,
+        confidence: 6.5,
+        grammar: 7.0,
+        qualityWarning: "Audio is quiet (-85.5dB). For best clarity, record in a quieter environment and speak closer to your microphone.",
+        stats: {
+          wpm: 45,
+          pauses: 4,
+          rhythm: { speechRatio: 32 },
+        },
+      },
+    });
+
+    expect(score).toBe(0);
+    expect(breakdown.duration).toBe(0);
+    expect(breakdown.communication).toBe(0);
+    expect(breakdown.isSilentAttempt).toBe(true);
+    expect(breakdown.silenceWarning).toContain("No audible speech detected (-85.5dB)");
+  });
+
+  it("awards 0 points when isSilent is explicitly flagged or wordCount < 5", () => {
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: 60,
+      targetVideoDuration: 60,
+      isShadowing: true,
+      analysis: {
+        isSilent: true,
+        stats: {
+          wordCount: 0,
+          wpm: 0,
+        },
+      },
+    });
+
+    expect(score).toBe(0);
+    expect(breakdown.duration).toBe(0);
+    expect(breakdown.communication).toBe(0);
+    expect(breakdown.isSilentAttempt).toBe(true);
+  });
+
+  it("penalizes and flags isOffTopic: true when spoken transcript does not match the reference shadowing transcript", () => {
+    const referenceTranscript = "Today we are discussing personal growth, emotional resilience, and how consistent daily practice transforms public speaking and confidence.";
+    const unrelatedTranscript = "I love eating chocolate ice cream and pizza on Friday evenings while watching cartoons with my friends.";
+
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: 60,
+      targetVideoDuration: 60,
+      targetVideoTranscript: referenceTranscript,
+      isShadowing: true,
+      analysis: {
+        transcription: unrelatedTranscript,
+        fluency: 8,
+        confidence: 8,
+        grammar: 8,
+        stats: {
+          wordCount: 16,
+          wpm: 120,
+          pauses: 1,
+          rhythm: { speechRatio: 85, paceConsistency: 8 },
+        },
+      },
+    });
+
+    expect(breakdown.isOffTopic).toBe(true);
+    expect(breakdown.duration).toBe(0); // Zero duration match for wrong speech
+    expect(breakdown.communication).toBeLessThanOrEqual(20);
+    expect(score).toBeLessThanOrEqual(20);
+    expect(breakdown.offTopicReason).toContain("Your speech did not match today's assigned shadowing reference script");
+  });
 });

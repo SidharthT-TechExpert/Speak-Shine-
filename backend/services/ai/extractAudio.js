@@ -63,9 +63,15 @@ export async function extractAudio(videoPath, id) {
     console.log(`🔊 Audio quality: mean=${meanVolume}dB max=${maxVolume}dB`);
   }
 
+  // Detect complete silence or muted microphone (mean below -48dB or peak never above -40dB)
+  // Human speech is typically -18dB to -32dB; even a whisper into mic is -36dB to -44dB.
+  // Below -48dB is pure room noise, empty silence, or a muted microphone.
+  const isSilent = (meanVolume !== null && meanVolume < -48) || (maxVolume !== null && maxVolume < -40);
+
   // Automatic amplification / normalization for quiet recordings
   // If maxVolume is quiet (below -6dB) or meanVolume is below -32dB, boost gain so Whisper transcribes accurately
-  if (maxVolume !== null && maxVolume < -6) {
+  // CRITICAL: NEVER amplify pure silence (< -48dB) as that boosts microphone hiss and triggers Whisper hallucinations!
+  if (!isSilent && maxVolume !== null && maxVolume < -6) {
     const boostDb = Math.min(26, Math.max(3, -2 - maxVolume));
     console.log(`🔊 Low audio level detected (${maxVolume}dB max, ${meanVolume}dB mean). Amplifying by +${boostDb.toFixed(1)}dB for Whisper...`);
     const boostedPath = path.resolve(`./tmp/audio_${id}_norm.wav`);
@@ -89,14 +95,27 @@ export async function extractAudio(videoPath, id) {
     }
   }
 
+  if (isSilent) {
+    console.log(`🔇 Pure silence detected (mean=${meanVolume}dB, max=${maxVolume}dB) — no speech present`);
+    return {
+      audioPath,
+      isSilent: true,
+      qualityWarning: `Audio is silent (${meanVolume ?? maxVolume}dB). No audible speech detected.`,
+      meanVolume,
+      maxVolume,
+    };
+  }
+
   if (meanVolume !== null && meanVolume < MIN_VOLUME_DB) {
     console.log(`⚠️ Audio too quiet (${meanVolume}dB) — transcription may be inaccurate`);
     return {
       audioPath,
+      isSilent: false,
       qualityWarning: `Audio is quiet (${meanVolume}dB). For best clarity, record in a quieter environment and speak closer to your microphone.`,
       meanVolume,
+      maxVolume,
     };
   }
 
-  return { audioPath, qualityWarning: null, meanVolume: meanVolume ?? null };
+  return { audioPath, isSilent: false, qualityWarning: null, meanVolume: meanVolume ?? null, maxVolume: maxVolume ?? null };
 }

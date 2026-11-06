@@ -319,6 +319,7 @@ export function calculateCompositeScore({
   isStorySummary = false,
   isShadowing = false,
   targetVideoDuration = null,
+  targetVideoTranscript = null,
   userHistory = [],
 }) {
   const challengeType = analysis?.challengeType || null;
@@ -341,6 +342,88 @@ export function calculateCompositeScore({
     const targetDur = Math.max(20, Math.min(180, Number(targetVideoDuration) || Number(maxDurationSeconds) || 60));
     const actualDur = Math.max(0, Number(durationSeconds) || 0);
 
+    // Parse audio volume if recorded in analysis / quality warning
+    const volMatch = typeof analysis.qualityWarning === "string" ? analysis.qualityWarning.match(/(-?\d+(?:\.\d+)?)dB/i) : null;
+    const detectedMeanVolume = (typeof analysis.meanVolume === "number" ? analysis.meanVolume : null)
+      ?? (typeof statsObj.meanVolume === "number" ? statsObj.meanVolume : null)
+      ?? (volMatch ? parseFloat(volMatch[1]) : null);
+
+    // Audio is considered silent if:
+    // 1. Explicitly marked silent
+    // 2. Mean audio volume measured below -48dB (human speech does not exist below -48dB; -85.5dB is completely silent)
+    // 3. Spoke fewer than 5 words on an attempt > 8 seconds
+    // 4. Speech ratio <= 5% with fewer than 10 words
+    const isSilentAttempt = Boolean(
+      analysis.isSilent ||
+      analysis.isSilentAttempt ||
+      statsObj.isSilent ||
+      (detectedMeanVolume !== null && detectedMeanVolume < -48) ||
+      (wordCount < 5 && actualDur > 8) ||
+      (typeof rawSpeechRatio === "number" && rawSpeechRatio <= 5 && wordCount < 10)
+    );
+
+    if (isSilentAttempt) {
+      const volNotice = detectedMeanVolume !== null ? ` (${detectedMeanVolume.toFixed(1)}dB)` : "";
+      return {
+        score: 0,
+        breakdown: {
+          duration: 0,
+          length: 0,
+          communication: 0,
+          comm: 0,
+          vocabulary: 0,
+          growth: 0,
+          maxDuration: 40,
+          maxLength: 40,
+          maxCommunication: 60,
+          maxComm: 60,
+          maxVocabulary: 0,
+          maxGrowth: 0,
+          targetDurationSeconds: targetDur,
+          targetActiveSpeechSeconds: targetDur,
+          actualDurationSeconds: Math.round(actualDur),
+          spokenDurationSeconds: 0,
+          speechRatio: 0,
+          durationRatio: 0,
+          durationMatchRatio: 0,
+          isEightyFivePercentMatch: false,
+          isNinetyPercentMatch: false,
+          isSilentAttempt: true,
+          silenceWarning: `No audible speech detected${volNotice}. You must speak along with the audio to earn points.`,
+          durationMessage: `No audible speech detected${volNotice}. Please ensure your microphone is enabled and shadow the speaker aloud.`,
+          speechMultiplier: 0,
+          growthDelta: null,
+          baselineComm: null,
+          isCalibration: false,
+          isShadowing: true,
+          isPictureDescription: false,
+          isStorySummary: false,
+          isSpecialDay: false,
+        }
+      };
+    }
+
+    // Check if student shadowed the assigned reference text or spoke unrelated text
+    const refTranscript = targetVideoTranscript || analysis.targetVideoTranscript || analysis.referenceTranscript || null;
+    const userTranscript = analysis.transcription || analysis.transcriptText || analysis.text || "";
+    let isOffTopic = false;
+    let offTopicWarning = null;
+
+    if (typeof refTranscript === "string" && refTranscript.trim().length > 30 && typeof userTranscript === "string" && userTranscript.trim().length > 30) {
+      const stopWords = new Set(["the", "and", "a", "an", "is", "in", "it", "to", "of", "for", "on", "with", "as", "at", "by", "this", "that", "i", "you", "we", "they", "he", "she"]);
+      const tokenize = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+      const refTokens = new Set(tokenize(refTranscript));
+      const userTokens = tokenize(userTranscript);
+      if (refTokens.size >= 8 && userTokens.length >= 10) {
+        const overlapCount = userTokens.filter(w => refTokens.has(w)).length;
+        const overlapRatio = overlapCount / userTokens.length;
+        if (overlapRatio < 0.10) {
+          isOffTopic = true;
+          offTopicWarning = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
+        }
+      }
+    }
+
     // Exact amount of time the student actually spoke on this video
     // Spoken Seconds = Video Duration * (Speech Ratio / 100)
     const spokenSeconds = typeof rawSpeechRatio === "number" && rawSpeechRatio >= 0
@@ -356,7 +439,7 @@ export function calculateCompositeScore({
     // - If below 85%: Proportional effort score: (spokenSeconds / (targetActiveSpeechTime * 0.85)) * 40.
     const spokenRatio = targetActiveSpeechTime > 0 ? spokenSeconds / targetActiveSpeechTime : 1.0;
     const isEightyFivePercent = spokenRatio >= 0.85;
-    const durationScore = isEightyFivePercent
+    let durationScore = isEightyFivePercent
       ? 40
       : Math.max(0, Math.min(40, (spokenRatio / 0.85) * 40));
 
@@ -413,7 +496,12 @@ export function calculateCompositeScore({
       rhythmComponent = Math.max(18.0, rhythmComponent);
       deliveryComponent = Math.max(18.0, deliveryComponent);
     }
-    const communicationScore = Math.min(60, Math.round((rhythmComponent + deliveryComponent) * 100) / 100);
+    let communicationScore = Math.min(60, Math.round((rhythmComponent + deliveryComponent) * 100) / 100);
+    if (isOffTopic) {
+      // Off topic shadowing penalty: zero duration score and heavily penalized delivery
+      durationScore = 0;
+      communicationScore = Math.min(20, Math.round(communicationScore * 0.35));
+    }
 
     // 3. Personal Growth: 0 points (Waived for shadowing activity)
     const growthScore = 0;
@@ -447,6 +535,8 @@ export function calculateCompositeScore({
         durationMatchRatio:    spokenRatio,
         isEightyFivePercentMatch: isEightyFivePercent,
         isNinetyPercentMatch:  isEightyFivePercent,
+        isOffTopic,
+        offTopicReason: offTopicWarning,
         durationMessage: isEightyFivePercent
           ? `Full duration credit awarded (${matchPercent}% active spoken time vs ${targetActiveSpeechTime}s target speech — >=85% target achieved).`
           : `Effort credit awarded (${Math.round(spokenSeconds)}s active spoken time vs ${targetActiveSpeechTime}s target speech — aim for >=85% for full duration points).`,

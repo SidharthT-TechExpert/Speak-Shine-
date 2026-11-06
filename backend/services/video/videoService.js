@@ -1074,6 +1074,7 @@ async function prepareReportAnalysis(report) {
       analysis: source,
       isShadowing: true,
       targetVideoDuration: status?.todayVideoDuration || 60,
+      targetVideoTranscript: status?.todayVideoTranscript || null,
       userHistory,
     });
     const shadowBreakdown = {
@@ -1093,6 +1094,13 @@ async function prepareReportAnalysis(report) {
       durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
       targetDuration: status?.todayVideoDuration || 60,
       userDuration: report.videoDuration || 0,
+      spokenDurationSeconds: breakdown.spokenDurationSeconds ?? null,
+      speechRatio: breakdown.speechRatio ?? null,
+      durationMessage: breakdown.durationMessage ?? null,
+      isSilentAttempt: breakdown.isSilentAttempt ?? false,
+      silenceWarning: breakdown.silenceWarning ?? null,
+      isOffTopic: breakdown.isOffTopic ?? false,
+      offTopicReason: breakdown.offTopicReason ?? null,
       isShadowing: true,
     };
     analysis = { ...source, compositeScore: score, scoreBreakdown: shadowBreakdown };
@@ -1832,6 +1840,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     isStorySummary: isStory || false,
     isShadowing: isShadow || false,
     targetVideoDuration: targetDur,
+    targetVideoTranscript: status?.todayVideoTranscript || null,
     userHistory: user?.feedbackScores || [],
   });
 
@@ -1866,6 +1875,10 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     spokenDurationSeconds: breakdown.spokenDurationSeconds ?? (typeof breakdown.speechRatio === "number" ? Math.round((report.videoDuration || 0) * (breakdown.speechRatio / 100)) : null),
     speechRatio: breakdown.speechRatio ?? null,
     durationMessage: breakdown.durationMessage ?? null,
+    isSilentAttempt: breakdown.isSilentAttempt ?? false,
+    silenceWarning: breakdown.silenceWarning ?? null,
+    isOffTopic: breakdown.isOffTopic ?? false,
+    offTopicReason: breakdown.offTopicReason ?? null,
     isShadowing: true,
   } : {
     ...breakdown,
@@ -1901,7 +1914,9 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   const { analysis: reportAnalysis } = await prepareReportAnalysis(report);
 
   const resultMessage = isShadow
-    ? `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.`
+    ? updatedBreakdown.isSilentAttempt
+      ? `Score re-evaluated: No audible speech detected in recording (-85.5dB). Score updated to 0/100 pts.`
+      : `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.`
     : `Score re-evaluated! Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`;
 
   return {

@@ -105,7 +105,28 @@ function computeWordThreshold(words, meanVolume) {
  * @param {number|null} [opts.meanVolume]  — dB from ffmpeg volumedetect (used for dynamic thresholds)
  */
 export async function transcribe(audioPath, opts = {}) {
-  const { meanVolume = null } = opts;
+  const { meanVolume = null, isSilent = false } = opts;
+
+  // Silence short-circuit: do not invoke Groq Whisper if the audio has no speech energy
+  if (isSilent || (meanVolume !== null && meanVolume < -48)) {
+    console.log(`🔇 Audio is silent (${meanVolume}dB) — returning empty transcript without calling Groq Whisper`);
+    return {
+      text: "",
+      words: [],
+      segments: [],
+      duration: 0,
+      pronunciationIssues: [],
+      rhythm: {
+        speechRatio: 0,
+        longestPause: 0,
+        longestPauseAfter: "",
+        rushesAtStart: false,
+        rushesAtEnd: false,
+        paceConsistency: 0,
+      },
+      isSilent: true,
+    };
+  }
   // Retry with next key on 429 — rebuild FormData fresh each attempt
   // (ReadStream can only be consumed once, so we can't reuse the same form)
   let res;
@@ -159,6 +180,37 @@ export async function transcribe(audioPath, opts = {}) {
   const confidentSegments = allSegments.filter(
     (seg) => (seg.avg_logprob ?? 0) >= segmentThreshold
   );
+  // Whisper hallucination guard:
+  // If no segments passed the confidence threshold, check if segments are hallucinations on silence/noise:
+  // 1. High no_speech_prob (> 0.45) across all segments
+  // 2. Repetitive compression ratio (> 2.4 - OpenAI's hallucination metric)
+  // 3. Audio was quiet (< -38dB) and avg_logprob is very low (< -1.0)
+  const isAllHallucination = allSegments.length > 0 && confidentSegments.length === 0 && (
+    allSegments.every((s) => (s.no_speech_prob ?? 0) > 0.45) ||
+    allSegments.some((s) => (s.compression_ratio ?? 0) > 2.4) ||
+    (meanVolume !== null && meanVolume < -38)
+  );
+
+  if (isAllHallucination) {
+    console.log(`🔇 Discarded ${allSegments.length} Whisper hallucinations on quiet/silent audio`);
+    return {
+      text: "",
+      words: [],
+      segments: [],
+      duration: 0,
+      pronunciationIssues: [],
+      rhythm: {
+        speechRatio: 0,
+        longestPause: 0,
+        longestPauseAfter: "",
+        rushesAtStart: false,
+        rushesAtEnd: false,
+        paceConsistency: 0,
+      },
+      isSilent: true,
+    };
+  }
+
   const filteredSegments = confidentSegments.length > 0 ? confidentSegments : allSegments;
 
   // Build a set of time ranges from confident segments
