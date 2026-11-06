@@ -268,7 +268,10 @@ export default function ModernDashboardView({
   // ── Challenge Type Detection & UI Config ────────────────────────────────────
   const questionType = detectQuestionType(today);
   const effectiveDurationLimits = useMemo(() => {
-    if (today?.durationLimits && typeof today.durationLimits === "object") {
+    const isShadow = Boolean(today?.isShadowing || questionType === "shadowing_video" || today?.contentType === "shadowing_video");
+    const targetDur = Number(today?.videoDuration || today?.todayVideoDuration || 0);
+
+    if (today?.durationLimits && typeof today.durationLimits === "object" && (!isShadow || today.durationLimits.targetVideoDuration)) {
       return today.durationLimits;
     }
     const flags = {
@@ -277,6 +280,9 @@ export default function ModernDashboardView({
       isMonthlyGoals: Boolean(today?.isMonthlyGoals || questionType === "monthly_goals"),
       isStorySummary: Boolean(today?.isStorySummary || questionType === "story_audio" || today?.contentType === "story_audio"),
       isPictureDescription: Boolean(today?.isPictureDescription || questionType === "picture_description" || today?.contentType === "picture_description"),
+      isShadowing: isShadow,
+      targetVideoDuration: targetDur,
+      videoDuration: targetDur,
     };
     return getDurationLimits(flags, today?.durationSettings || {});
   }, [today, questionType]);

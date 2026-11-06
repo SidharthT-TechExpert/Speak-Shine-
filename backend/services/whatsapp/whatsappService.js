@@ -635,6 +635,92 @@ export async function logoutWhatsAppBot() {
  * @param {string} [options.category]
  * @param {string} [options.targetGroup] - override target group if needed
  */
+/**
+ * Helper to fetch and deliver audio file to WhatsApp group reliably.
+ * Pre-fetches buffer from remote URL or reads from disk to avoid Baileys stream failures.
+ */
+async function sendAudioFileToGroup(targetGroup, audioUrl, topic, options = {}) {
+  if (!sock || !audioUrl) return { success: false, reason: "No socket or audioUrl" };
+  const cleanTitle = (topic || "Challenge").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
+  const fileName = options.fileName || `${cleanTitle}_Audio.mp3`;
+
+  try {
+    let audioBuffer = null;
+    let mimetype = options.mimetype || "audio/mpeg";
+
+    if (typeof audioUrl === "string") {
+      const trimmed = audioUrl.trim();
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        console.log(`[WhatsApp] 📥 Fetching audio stream from remote URL: ${trimmed}...`);
+        const res = await fetch(trimmed, { headers: { "User-Agent": "SpeakShine-Bot/1.0" } });
+        if (res.ok) {
+          const arrBuf = await res.arrayBuffer();
+          audioBuffer = Buffer.from(arrBuf);
+          const ct = res.headers.get("content-type");
+          if (ct && ct.includes("audio")) {
+            mimetype = ct.split(";")[0].trim();
+          }
+        } else {
+          console.warn(`[WhatsApp] Failed to fetch remote audio (HTTP ${res.status}): ${trimmed}`);
+        }
+      } else {
+        // Local file path resolution
+        const candidates = [
+          path.resolve(process.cwd(), "frontend", "public", trimmed.replace(/^\//, "")),
+          path.resolve(process.cwd(), trimmed.replace(/^\//, "")),
+          path.resolve(process.cwd(), "tmp", trimmed.replace(/^\//, ""))
+        ];
+        for (const candidate of candidates) {
+          if (fs.existsSync(candidate)) {
+            audioBuffer = fs.readFileSync(candidate);
+            console.log(`[WhatsApp] 📂 Read local audio file: ${candidate}`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!audioBuffer) {
+      // Fallback: pass URL directly to Baileys if buffer couldn't be loaded
+      console.log(`[WhatsApp] 🎵 Passing audio URL directly to Baileys: ${audioUrl}...`);
+      await sock.sendMessage(targetGroup, {
+        audio: { url: audioUrl },
+        mimetype: mimetype || "audio/mp4",
+        ptt: false,
+        fileName,
+      });
+      return { success: true };
+    }
+
+    // Try sending as native playable audio first (ptt: false allows playback controls in chat)
+    try {
+      console.log(`[WhatsApp] 📤 Dispatching native playable audio (${(audioBuffer.length / 1024).toFixed(1)} KB) to ${targetGroup}...`);
+      await sock.sendMessage(targetGroup, {
+        audio: audioBuffer,
+        mimetype: mimetype || "audio/mpeg",
+        ptt: false,
+        fileName,
+      });
+      console.log(`[WhatsApp] ✅ Audio delivered to group!`);
+      return { success: true };
+    } catch (sendAudioErr) {
+      console.warn(`[WhatsApp] Native audio send failed, falling back to document: ${sendAudioErr.message}`);
+      // Fallback: send as audio document
+      await sock.sendMessage(targetGroup, {
+        document: audioBuffer,
+        mimetype: mimetype || "audio/mpeg",
+        fileName,
+        caption: options.caption || `🎧 *Reference Audio:* ${topic}`,
+      });
+      console.log(`[WhatsApp] ✅ Audio document delivered to group!`);
+      return { success: true, asDocument: true };
+    }
+  } catch (err) {
+    console.error(`[WhatsApp] ❌ sendAudioFileToGroup error: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function sendDailyPosterToGroup(options = {}) {
   try {
     const rawTargetGroup = options.targetGroup || process.env.TARGET_GROUP;
@@ -650,10 +736,10 @@ export async function sendDailyPosterToGroup(options = {}) {
     // Fetch full status from DB to inspect content type and attachments
     const status = await Status.findOne().lean();
 
-    const contentType = options.contentType || status?.todayContentType || "question";
     let topic = options.topic || status?.todayTopic || "Speaking Practice";
     let question = options.question || status?.todayQuestion || "";
     let category = options.category || status?.todayCategory || "General";
+    let contentType = options.contentType || status?.todayContentType || "question";
     const vocabulary = status?.todayVocabulary || [];
     const frontendUrl = process.env.FRONTEND_URL || "https://speakandshine.com";
 
@@ -661,9 +747,52 @@ export async function sendDailyPosterToGroup(options = {}) {
       throw new Error("No active daily challenge found in database.");
     }
 
-    const isPicture = contentType === "picture_description" || status?.isPictureDescriptionDay || status?.todayContentType === "picture_description";
-    const isStory = contentType === "story_audio" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
-    const isShadowing = contentType === "shadowing_video" || status?.isShadowingDay || status?.todayContentType === "shadowing_video";
+    // Dynamic lookup from Question collection to ensure attachments/type aren't missed
+    let dbQuestion = null;
+    try {
+      const Question = (await import("../../../models/questionSchema.js")).default;
+      dbQuestion = await Question.findOne({
+        $or: [
+          ...(options.questionId ? [{ _id: options.questionId }] : []),
+          ...(topic ? [{ topic }] : []),
+          ...(question ? [{ question }] : [])
+        ]
+      }).lean();
+    } catch (dbQErr) {
+      console.warn("[WhatsApp] Question lookup failed (non-fatal):", dbQErr.message);
+    }
+
+    const resolvedCategory = options.category || status?.todayCategory || dbQuestion?.category || category;
+    category = resolvedCategory;
+
+    const isPicture = contentType === "picture_description"
+      || Boolean(status?.isPictureDescriptionDay)
+      || status?.todayContentType === "picture_description"
+      || resolvedCategory?.toLowerCase().includes("picture")
+      || dbQuestion?.contentType === "picture_description"
+      || dbQuestion?.setupType === "picture_description";
+
+    const isStory = contentType === "story_audio"
+      || Boolean(status?.isStorySummaryDay)
+      || status?.todayContentType === "story_audio"
+      || resolvedCategory?.toLowerCase().includes("story")
+      || dbQuestion?.contentType === "story_audio"
+      || dbQuestion?.setupType === "story_audio";
+
+    const isShadowing = contentType === "shadowing_video"
+      || Boolean(status?.isShadowingDay)
+      || status?.todayContentType === "shadowing_video"
+      || resolvedCategory?.toLowerCase().includes("shadowing")
+      || topic?.toLowerCase().includes("shadowing")
+      || dbQuestion?.contentType === "shadowing_video"
+      || dbQuestion?.setupType === "shadowing_video";
+
+    const resolvedAudioUrl = options.audioUrl
+      || status?.todayAudioUrl
+      || status?.todayVideoUrl
+      || dbQuestion?.audioUrl
+      || dbQuestion?.videoUrl
+      || null;
     const vocabReq = isPicture
       ? (status?.vocabPictureRequiredCount ?? 1)
       : isStory
@@ -809,25 +938,18 @@ export async function sendDailyPosterToGroup(options = {}) {
         });
       }
 
-      // If audio URL is available, also send the audio file directly into the WhatsApp group!
-      if (status?.todayAudioUrl) {
-        try {
-          console.log(`[WhatsApp] 🎵 Sending story audio file to group: ${status.todayAudioUrl}...`);
-          await sock.sendMessage(targetGroup, {
-            audio: { url: status.todayAudioUrl },
-            mimetype: "audio/mp4",
-            ptt: false,
-            fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}.mp3`,
-          });
-          console.log(`[WhatsApp] ✅ Story audio file delivered to group!`);
-        } catch (audioErr) {
-          console.warn("[WhatsApp] Could not send audio file attachment (non-fatal):", audioErr.message);
-        }
+      // Deliver story audio file to WhatsApp group reliably
+      let audioSent = false;
+      if (resolvedAudioUrl) {
+        const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic, {
+          fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Story_Audio.mp3`
+        });
+        if (audioRes.success) audioSent = true;
       }
 
       await recordSuccess();
       console.log(`[WhatsApp] ✅ Story summary challenge sent successfully!`);
-      return { success: true, targetGroup, topic, type: "story_audio", sentAt: new Date() };
+      return { success: true, targetGroup, topic, type: "story_audio", audioSent: Boolean(audioSent), sentAt: new Date() };
     }
 
     // ── CASE 2.5: SHADOWING PRACTICE CHALLENGE ──────────────────────────────────
@@ -877,26 +999,19 @@ export async function sendDailyPosterToGroup(options = {}) {
         });
       }
 
-      // If audio URL or video URL is available, send reference audio directly to WhatsApp group!
-      const audioUrl = status?.todayAudioUrl || status?.todayVideoUrl;
-      if (audioUrl) {
-        try {
-          console.log(`[WhatsApp] 🎵 Sending shadowing reference audio file to group: ${audioUrl}...`);
-          await sock.sendMessage(targetGroup, {
-            audio: { url: audioUrl },
-            mimetype: "audio/mp4",
-            ptt: false,
-            fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Shadowing_Audio.mp3`,
-          });
-          console.log(`[WhatsApp] ✅ Shadowing audio file delivered to group!`);
-        } catch (audioErr) {
-          console.warn("[WhatsApp] Could not send shadowing audio file attachment (non-fatal):", audioErr.message);
-        }
+      // Deliver shadowing reference audio file directly to WhatsApp group
+      let audioSent = false;
+      if (resolvedAudioUrl) {
+        const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic, {
+          fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Shadowing_Audio.mp3`,
+          caption: `🎧 *Reference Speech Audio:* ${topic}`
+        });
+        if (audioRes.success) audioSent = true;
       }
 
       await recordSuccess();
       console.log(`[WhatsApp] ✅ Shadowing challenge sent successfully!`);
-      return { success: true, targetGroup, topic, type: "shadowing_video", sentAt: new Date() };
+      return { success: true, targetGroup, topic, type: "shadowing_video", audioSent: Boolean(audioSent), sentAt: new Date() };
     }
 
     // ── CASE 3: REGULAR DAILY QUESTION CHALLENGE ─────────────────────────────────
@@ -964,6 +1079,12 @@ export async function sendDailyPosterToGroup(options = {}) {
       });
     }
 
+    let audioSent = false;
+    if (resolvedAudioUrl) {
+      const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic);
+      if (audioRes.success) audioSent = true;
+    }
+
     await recordSuccess();
     console.log(`[WhatsApp] ✅ Poster sent successfully to ${targetGroup}!`);
 
@@ -973,6 +1094,7 @@ export async function sendDailyPosterToGroup(options = {}) {
       topic,
       category,
       type: "question",
+      audioSent: Boolean(audioSent),
       sentAt: new Date(),
     };
   } catch (err) {

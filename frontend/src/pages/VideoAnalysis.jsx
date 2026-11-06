@@ -2367,6 +2367,7 @@ export default function VideoAnalysis() {
                     const minSec = effectiveLimits?.minSeconds || 60;
                     const fullSec = effectiveLimits?.fullScoreSeconds || 300;
                     const maxSec = effectiveLimits?.maxSeconds || 300;
+                    const minLabel = effectiveLimits?.minLabel || `${minSec}s`;
                     const fullLabel = effectiveLimits?.fullScoreLabel || "5 min";
                     const maxLabel = effectiveLimits?.maxLabel || "5 min";
 
@@ -2388,7 +2389,7 @@ export default function VideoAnalysis() {
                             TIMING SWEET SPOT
                           </span>
                           <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#fb923c" : "#ea580c" }}>
-                            ⏱️ 60s min · {fullLabel} full pts
+                            ⏱️ {minLabel} min · {fullLabel} full pts
                           </span>
                         </div>
                         {/* Visual Sweet Spot Progress Bar */}
@@ -2410,7 +2411,7 @@ export default function VideoAnalysis() {
                           }} />
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.62rem", color: isDark ? "#64748b" : "#94a3b8", marginTop: "4px", fontWeight: 600 }}>
-                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>60s min target</span>
+                          <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>{minLabel} min target</span>
                           <span style={{ color: isDark ? "#4ade80" : "#16a34a", fontWeight: 700 }}>{fullLabel} (Full Points)</span>
                           <span>Max: {maxLabel}</span>
                         </div>

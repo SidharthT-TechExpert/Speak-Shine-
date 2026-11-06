@@ -2,13 +2,22 @@
  * Client-side submit gate — mirrors backend submitGate.js for instant feedback.
  */
 
-export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing } = {}, settings = {}) {
+export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing, targetVideoDuration, videoDuration } = {}, settings = {}) {
   const isShadow = Boolean(isShadowing);
-  const minSeconds = isShadow ? 20 : 60;
-  const minLabel = isShadow ? "20 sec" : "1 min";
+  const targetDur = Number(targetVideoDuration || videoDuration || settings.targetVideoDuration || settings.videoDuration || 0);
+
+  const dynamicShadowFull = targetDur > 0
+    ? Math.round(targetDur * 0.85)
+    : Math.max(60, settings.durationShadowingFull ?? 180);
+
+  const dynamicShadowMin = targetDur > 0
+    ? Math.max(15, Math.min(30, Math.round(targetDur * 0.25)))
+    : 20;
+
+  const minSeconds = isShadow ? dynamicShadowMin : 60;
 
   const maxSeconds = isShadow
-    ? Math.max(180, settings.durationShadowingMax ?? 180)
+    ? Math.min(180, Math.max(180, settings.durationShadowingMax ?? 180))
     : isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : isWeeklyReflection
@@ -22,7 +31,7 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
     : (settings.durationDefaultMax ?? 300);
 
   const fullScoreSeconds = isShadow
-    ? Math.max(180, settings.durationShadowingFull ?? 180)
+    ? dynamicShadowFull
     : isMonthlyReflection
     ? (settings.durationMonthlyReflectionFull ?? 420)
     : isWeeklyReflection
@@ -43,9 +52,12 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
     if (minutes === 0) return `${remainder} sec`;
     return `${minutes} min ${remainder} sec`;
   };
+  const minLabel = formatDurationLabel(minSeconds);
   const maxLabel = formatDurationLabel(maxSeconds);
-  const fullScoreLabel = formatDurationLabel(fullScoreSeconds);
-  return { minSeconds, maxSeconds, fullScoreSeconds, minLabel, maxLabel, fullScoreLabel };
+  const fullScoreLabel = isShadow && targetDur > 0
+    ? `${formatDurationLabel(fullScoreSeconds)} (85% Match)`
+    : formatDurationLabel(fullScoreSeconds);
+  return { minSeconds, maxSeconds, fullScoreSeconds, minLabel, maxLabel, fullScoreLabel, targetVideoDuration: targetDur || null };
 }
 
 function fmtDuration(sec) {

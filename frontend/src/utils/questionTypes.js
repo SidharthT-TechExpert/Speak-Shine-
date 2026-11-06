@@ -215,6 +215,8 @@ export function getQuestionUIConfig(type, today = {}) {
     isStorySummary: type === "story_audio" || Boolean(today?.isStorySummary),
     isPictureDescription: type === "picture_description" || Boolean(today?.isPictureDescription),
     isShadowing: type === "shadowing_video" || Boolean(today?.isShadowing),
+    targetVideoDuration: Number(today.videoDuration || today.todayVideoDuration || 0),
+    videoDuration: Number(today.videoDuration || today.todayVideoDuration || 0),
   }, today?.durationSettings || {});
 
   switch (type) {

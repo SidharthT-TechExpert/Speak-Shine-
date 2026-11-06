@@ -13,6 +13,16 @@ export const GATE_FRAME_IDEAL = 16;
  */
 export function getDurationLimits(flags = {}, settings = {}) {
   const isShadowing = Boolean(flags.isShadowing || flags.challengeType === "shadowing_video");
+  const targetDur = Number(flags.targetVideoDuration || flags.videoDuration || settings.targetVideoDuration || settings.videoDuration || 0);
+
+  const dynamicShadowFull = targetDur > 0
+    ? Math.round(targetDur * 0.85)
+    : Math.max(60, settings.durationShadowingFull ?? 180);
+
+  const dynamicShadowMin = targetDur > 0
+    ? Math.max(15, Math.min(30, Math.round(targetDur * 0.25)))
+    : 20;
+
   const maxSeconds = flags.isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : flags.isWeeklyReflection
@@ -24,7 +34,7 @@ export function getDurationLimits(flags = {}, settings = {}) {
     : flags.isPictureDescription
     ? (settings.durationPictureMax ?? 180)
     : isShadowing
-    ? Math.max(180, settings.durationShadowingMax ?? 180)
+    ? Math.min(180, Math.max(180, settings.durationShadowingMax ?? 180))
     : (settings.durationDefaultMax ?? 300);
 
   const fullScoreSeconds = flags.isMonthlyReflection
@@ -38,16 +48,23 @@ export function getDurationLimits(flags = {}, settings = {}) {
     : flags.isPictureDescription
     ? (settings.durationPictureFull ?? 180)
     : isShadowing
-    ? Math.max(180, settings.durationShadowingFull ?? 180)
+    ? dynamicShadowFull
     : (settings.durationDefaultFull ?? 300);
 
+  const minSeconds = isShadowing ? dynamicShadowMin : 60;
+  const minLabel = formatMaxLabel(minSeconds);
+  const fullScoreLabel = isShadowing && targetDur > 0
+    ? `${formatMaxLabel(fullScoreSeconds)} (85% Match)`
+    : formatMaxLabel(fullScoreSeconds);
+
   return {
-    minSeconds: isShadowing ? 20 : 60,
+    minSeconds,
     maxSeconds,
     fullScoreSeconds,
-    minLabel: isShadowing ? "20 sec" : "1 min",
+    minLabel,
     maxLabel: formatMaxLabel(maxSeconds),
-    fullScoreLabel: formatMaxLabel(fullScoreSeconds),
+    fullScoreLabel,
+    targetVideoDuration: targetDur || null,
   };
 }
 
