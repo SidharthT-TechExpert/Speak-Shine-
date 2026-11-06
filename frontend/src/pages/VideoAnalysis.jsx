@@ -3373,40 +3373,28 @@ function buildRecordingMediaConstraints(camId, micId) {
 async function openRecordingStream(camId, micId) {
   console.log(`[DeviceSelection] Opening stream with camId="${camId}", micId="${micId}"`);
   const full = buildRecordingMediaConstraints(camId, micId);
-  console.log('[DeviceSelection] Built constraints:', JSON.stringify(full, null, 2));
   try {
     const stream = await navigator.mediaDevices.getUserMedia(full);
     const track = stream.getVideoTracks()[0];
-    if (track) {
-      const settings = track.getSettings();
-      console.log(`[DeviceSelection] ✓ Video track using deviceId: "${settings.deviceId}", label: "${track.label}"`);
-      await resetCameraZoom(track);
-    }
-    const audioTrack = stream.getAudioTracks()[0];
-    if (audioTrack) {
-      const audioSettings = audioTrack.getSettings();
-      console.log(`[DeviceSelection] ✓ Audio track using deviceId: "${audioSettings.deviceId}", label: "${audioTrack.label}"`);
-    }
+    if (track) await resetCameraZoom(track);
     return stream;
   } catch (err) {
-    console.warn('[DeviceSelection] Primary constraints failed, trying fallback:', err.message);
-    // Fallback: use 'exact' deviceId if specified, otherwise use facingMode
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: camId ? { deviceId: { exact: camId }, facingMode: "user" } : { facingMode: "user" },
-      audio: full.audio,
-    });
-    const track = stream.getVideoTracks()[0];
-    if (track) {
-      const settings = track.getSettings();
-      console.log(`[DeviceSelection] ✓ Fallback video track using deviceId: "${settings.deviceId}", label: "${track.label}"`);
-      await resetCameraZoom(track);
+    console.warn('[DeviceSelection] Primary constraints failed, trying fallback 1 (ideal match):', err.message);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: camId ? { deviceId: { ideal: camId } } : { facingMode: "user" },
+        audio: micId ? { deviceId: { ideal: micId }, echoCancellation: true, noiseSuppression: true } : { echoCancellation: true, noiseSuppression: true },
+      });
+      const track = stream.getVideoTracks()[0];
+      if (track) await resetCameraZoom(track);
+      return stream;
+    } catch (err2) {
+      console.warn('[DeviceSelection] Fallback 1 failed, trying fallback 2 (failsafe barebones):', err2.message);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const track = stream.getVideoTracks()[0];
+      if (track) await resetCameraZoom(track);
+      return stream;
     }
-    const audioTrack = stream.getAudioTracks()[0];
-    if (audioTrack) {
-      const audioSettings = audioTrack.getSettings();
-      console.log(`[DeviceSelection] ✓ Fallback audio track using deviceId: "${audioSettings.deviceId}", label: "${audioTrack.label}"`);
-    }
-    return stream;
   }
 }
 
@@ -4469,21 +4457,16 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       return;
     }
 
-    // Prime in-ear shadowing audio playback in direct response to user gesture
+    // Prime in-ear shadowing audio playback in direct response to user gesture (silent during countdown)
     if (isShadowing && shadowingRefVideo.current) {
       try {
         shadowingRefVideo.current.currentTime = 0;
-        shadowingRefVideo.current.volume = shadowVolume;
-        shadowingRefVideo.current.muted = shadowVideoMuted;
+        shadowingRefVideo.current.volume = 0;
+        shadowingRefVideo.current.muted = true;
         shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
         const unlock = shadowingRefVideo.current.play();
         if (unlock !== undefined) {
-          unlock.then(() => {
-            if (shadowingRefVideo.current) {
-              shadowingRefVideo.current.pause();
-              shadowingRefVideo.current.currentTime = 0;
-            }
-          }).catch(e => {
+          unlock.catch(e => {
             console.warn("[Shadowing] Pre-warm audio unlock caught:", e);
           });
         }
@@ -4612,7 +4595,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       
       // More aggressive size validation using the finalized recording duration.
       const finalElapsed = closeActiveRecordingSegment();
-      const expectedMinSize = finalElapsed * 3000; // ~3KB per second (very conservative)
+      const expectedMinSize = Math.max(1024, finalElapsed * 500); // ~3KB per second (very conservative)
       const expectedMaxSize = finalElapsed * 500000; // ~500KB per second (generous)
       
       if (totalSize < expectedMinSize) {
@@ -4671,10 +4654,28 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       console.log(`[Recording] State changed to: ${recorder.state}`);
     };
     
-    // Start with 2-second intervals for better chunk collection
+    // Immediately activate reference audio from 0:00 when recording starts
+    if (isShadowing && shadowingRefVideo.current) {
+      try {
+        shadowingRefVideo.current.currentTime = 0;
+        shadowingRefVideo.current.muted = shadowVideoMuted;
+        shadowingRefVideo.current.volume = shadowVolume;
+        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+        if (shadowingRefVideo.current.paused) {
+          shadowingRefVideo.current.play().catch(e => {
+            console.warn("[Shadowing] Play on startRecording caught:", e);
+            setShadowAudioBlocked(true);
+          });
+        }
+        setShadowAudioPlaying(!shadowVideoMuted);
+        setShadowAudioBlocked(false);
+      } catch (err) {}
+    }
+
+    // Start with 1000ms timeslice for responsive and reliable chunk collection
     try {
-      recorder.start(2000);
-      console.log(`[Recording] Started with 2000ms intervals`);
+      recorder.start(1000);
+      console.log(`[Recording] Started with 1000ms intervals`);
     } catch (startErr) {
       console.error(`[Recording] Failed to start:`, startErr);
       setError("Could not start recording. Try a different browser.");
@@ -4699,35 +4700,28 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   // Synchronized playback for Shadowing Activity reference speech
   useEffect(() => {
-    if (step === "recording" && isShadowing && shadowingRefVideo.current) {
-      try {
-        shadowingRefVideo.current.currentTime = 0;
-        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
-        shadowingRefVideo.current.muted = shadowVideoMuted;
-        shadowingRefVideo.current.volume = shadowVolume;
-        const playPromise = shadowingRefVideo.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setShadowAudioBlocked(false);
-              setShadowAudioPlaying(true);
-            })
-            .catch(e => {
-              console.warn("[Shadowing] Audio play warning:", e);
-              setShadowAudioBlocked(true);
-            });
-        }
-      } catch (err) {
-        console.warn("[Shadowing] Audio autoplay err:", err);
-        setShadowAudioBlocked(true);
-      }
-    } else if (step !== "recording" && shadowingRefVideo.current) {
+    if (step !== "recording" && shadowingRefVideo.current) {
       try {
         shadowingRefVideo.current.pause();
         setShadowAudioPlaying(false);
       } catch {}
     }
-  }, [step, isShadowing, shadowPlaybackSpeed, shadowVideoMuted, shadowVolume]);
+  }, [step]);
+
+  // Handle playback speed changes without resetting currentTime
+  useEffect(() => {
+    if (shadowingRefVideo.current) {
+      shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+    }
+  }, [shadowPlaybackSpeed]);
+
+  // Handle volume / mute toggles without resetting currentTime
+  useEffect(() => {
+    if (shadowingRefVideo.current) {
+      shadowingRefVideo.current.volume = shadowVolume;
+      shadowingRefVideo.current.muted = shadowVideoMuted;
+    }
+  }, [shadowVolume, shadowVideoMuted]);
 
   const stopRecording = () => {
     clearInterval(timerRef.current);
@@ -4747,10 +4741,11 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         console.error(`[Recording] Error stopping recorder:`, err);
         setError("Error stopping recording. Please try again.");
         setStep("setup");
+        cleanup();
       }
+    } else {
+      cleanup();
     }
-    // Immediately stop hardware camera and mic access
-    cleanup();
   };
 
   const togglePause = useCallback(() => {
@@ -4871,7 +4866,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     
     console.log(`[Upload] Validating blob - size: ${recordedBlob.size}, type: ${recordedBlob.type}, elapsed: ${elapsed}s`);
     
-    const expectedMinSize = elapsed * 8000;
+    const expectedMinSize = Math.max(1024, elapsed * 500);
     if (recordedBlob.size < expectedMinSize) {
       setError(`Recording seems corrupted (too small: ${Math.round(recordedBlob.size/1024)}KB for ${elapsed}s). Please record again.`);
       return;
@@ -5486,48 +5481,8 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         </div>
       )}
 
-      {/* ── COUNTDOWN ── */}
-      {step === "countdown" && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem" }}>
-          <video ref={liveVideoRef} autoPlay muted playsInline
-            onLoadedMetadata={syncPreviewAspect}
-            style={livePreviewStyle} />
-          <div style={{ fontSize: "5rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1 }}>{countdown}</div>
-          
-          {/* Noise cancellation status */}
-          {ncStatus === "loading" && (
-            <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI noise cancellation…</p>
-          )}
-          {ncStatus === "active" && (
-            <p style={{ color: "var(--success)", fontSize: "0.82rem" }}>✅ AI noise cancellation active</p>
-          )}
-          {ncStatus === "fallback" && (
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
-          )}
-          {!noiseCancel && (
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
-          )}
-          
-          {/* Background blur status */}
-          {backgroundBlur && blurStatus === "loading" && (
-            <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI background blur…</p>
-          )}
-          {backgroundBlur && blurStatus === "active" && (
-            <p style={{ color: "var(--success)", fontSize: "0.82rem" }}>✅ AI background blur active</p>
-          )}
-          {backgroundBlur && blurStatus === "fallback" && (
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🌫️ Background blur unavailable — continuing without</p>
-          )}
-          {backgroundBlur && blurStatus === "error" && (
-            <p style={{ color: "var(--danger)", fontSize: "0.82rem" }}>⚠️ Background blur error — continuing without</p>
-          )}
-          
-          <p style={{ color: "var(--muted)" }}>Get ready…</p>
-        </div>
-      )}
-
-      {/* ── RECORDING ── */}
-      {step === "recording" && (
+      {/* ── COUNTDOWN & RECORDING (Single persistent camera stream) ── */}
+      {(step === "countdown" || step === "recording") && (
         <div>
           {/* Unified Camera Recording View */}
           <div style={{ position: "relative", marginBottom: "0.85rem" }}>
@@ -5537,6 +5492,35 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 ...livePreviewStyle,
                 maxWidth: "100%",
               }} />
+
+            {/* Countdown Overlay on Camera Feed */}
+            {step === "countdown" && (
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)", zIndex: 10, borderRadius: 12,
+                padding: "1rem", textAlign: "center"
+              }}>
+                <div style={{
+                  fontSize: "6rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1,
+                  textShadow: "0 4px 25px rgba(0,0,0,0.9)", animation: "pulse 1s infinite"
+                }}>
+                  {countdown}
+                </div>
+                <p style={{ color: "#ffffff", fontWeight: 700, fontSize: "1.05rem", marginTop: "0.6rem", textShadow: "0 2px 8px rgba(0,0,0,0.9)" }}>
+                  {isShadowing ? "🎧 Listen through earphones & get ready to shadow..." : "Get ready to speak clearly..."}
+                </p>
+                {ncStatus === "loading" && (
+                  <p style={{ color: "var(--warning)", fontSize: "0.82rem", margin: "0.2rem 0" }}>⚙️ Loading AI noise cancellation…</p>
+                )}
+                {ncStatus === "active" && (
+                  <p style={{ color: "var(--success)", fontSize: "0.82rem", margin: "0.2rem 0" }}>✅ AI noise cancellation active</p>
+                )}
+                {backgroundBlur && blurStatus === "active" && (
+                  <p style={{ color: "var(--success)", fontSize: "0.82rem", margin: "0.2rem 0" }}>✅ AI background blur active</p>
+                )}
+              </div>
+            )}
 
             {/* Floating Teleprompter banner for shadowing */}
             {isShadowing && (
