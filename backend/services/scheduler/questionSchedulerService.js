@@ -236,6 +236,12 @@ export async function publishAutoShadowingVideo() {
     }, { upsert: true });
 
     console.log(`[QuestionScheduler] ✅ Shadowing Video published: "${challenge.title}"`);
+    await dispatchPosterToWhatsApp({
+      topic: challenge.title,
+      question: challenge.instructions,
+      category: SHADOWING_CATEGORY,
+      contentType: "shadowing_video",
+    });
     return { published: true, type: "shadowing_video", topic: challenge.title, source: "auto" };
   } catch (err) {
     console.error("[QuestionScheduler] Shadowing Video auto-publish failed:", err.message);
@@ -413,6 +419,7 @@ export async function publishManualQuestion(q) {
     topic: q.topic,
     question: q.question,
     category: q.category,
+    contentType: isShadowing ? "shadowing_video" : isStory ? "story_audio" : isPicture ? "picture_description" : "question",
   });
 
   return {

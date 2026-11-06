@@ -16,13 +16,19 @@ class RNNoiseProcessor extends AudioWorkletProcessor {
     this._outBuf   = null;       // Float32 heap output
     this._inPtr    = 0;
     this._outPtr   = 0;
-    this._leftover = new Float32Array(0); // samples waiting for a full frame
+
+    // FIFO ring buffers to bridge WebAudio 128-sample quanta with RNNoise 480-sample frames
+    // Capacity 4096 is ~85ms at 48kHz, more than enough to handle burst cycles without loss
+    this._inputBuf  = new Float32Array(4096);
+    this._inputLen  = 0;
+    this._outputBuf = new Float32Array(4096);
+    this._outputLen = 0;
+    this._primed    = false;
 
     this.port.onmessage = async (e) => {
       if (e.data?.type === "init") {
         try {
           // Instantiate the WASM module from the binary sent by the main thread
-          // Provide empty import object with all possible namespaces to avoid import errors
           const importObject = {
             a: {},        // @jitsi/rnnoise-wasm uses "a" as import namespace
             env: {},
@@ -59,35 +65,58 @@ class RNNoiseProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Accumulate samples — RNNoise needs exactly 480 at a time
-    const combined = new Float32Array(this._leftover.length + input.length);
-    combined.set(this._leftover);
-    combined.set(input, this._leftover.length);
+    const quantum = input.length; // 128 samples
 
-    let offset = 0;
-    const processed = new Float32Array(combined.length);
+    // 1. Accumulate incoming samples into input FIFO buffer
+    if (this._inputLen + quantum <= this._inputBuf.length) {
+      this._inputBuf.set(input, this._inputLen);
+      this._inputLen += quantum;
+    } else {
+      // Emergency overflow guard: keep the latest audio
+      const keep = this._inputBuf.length - quantum;
+      this._inputBuf.copyWithin(0, this._inputLen - keep, this._inputLen);
+      this._inputLen = keep;
+      this._inputBuf.set(input, this._inputLen);
+      this._inputLen += quantum;
+    }
 
-    while (offset + FRAME_SIZE <= combined.length) {
-      // Scale to int16 range that RNNoise expects
+    // 2. Process all complete 480-sample frames through RNNoise
+    while (this._inputLen >= FRAME_SIZE) {
+      // Copy 480 samples to WASM heap (scale to int16 range)
       for (let i = 0; i < FRAME_SIZE; i++) {
-        this._inBuf[i] = combined[offset + i] * 32768;
+        this._inBuf[i] = this._inputBuf[i] * 32768;
       }
 
       this._module.rnnoise_process_frame(this._st, this._outPtr, this._inPtr);
 
-      // Scale back to float32
-      for (let i = 0; i < FRAME_SIZE; i++) {
-        processed[offset + i] = this._outBuf[i] / 32768;
+      // Shift input FIFO by FRAME_SIZE
+      this._inputBuf.copyWithin(0, FRAME_SIZE, this._inputLen);
+      this._inputLen -= FRAME_SIZE;
+
+      // Push 480 denoised samples into output FIFO (scale back to float32)
+      if (this._outputLen + FRAME_SIZE <= this._outputBuf.length) {
+        for (let i = 0; i < FRAME_SIZE; i++) {
+          this._outputBuf[this._outputLen + i] = this._outBuf[i] / 32768;
+        }
+        this._outputLen += FRAME_SIZE;
       }
-      offset += FRAME_SIZE;
     }
 
-    // Save leftover samples for next call
-    this._leftover = combined.slice(offset);
+    // 3. Priming: wait until at least 2 frames (960 samples = 20ms) are buffered before draining.
+    // Once primed, _outputLen strictly fluctuates between 576 and 960 samples, GUARANTEEING
+    // _outputLen >= 128 on EVERY SINGLE QUANTUM with zero underflows, zero silence insertion, and zero phase jumps.
+    if (!this._primed && this._outputLen >= FRAME_SIZE * 2) {
+      this._primed = true;
+    }
 
-    // Copy processed samples to output (may be shorter than input on first frames)
-    const copyLen = Math.min(processed.length, output.length);
-    output.set(processed.subarray(0, copyLen));
+    if (this._primed && this._outputLen >= quantum) {
+      output.set(this._outputBuf.subarray(0, quantum));
+      this._outputBuf.copyWithin(0, quantum, this._outputLen);
+      this._outputLen -= quantum;
+    } else {
+      // During initial 20ms priming warmup, output silence
+      output.fill(0);
+    }
 
     return true;
   }

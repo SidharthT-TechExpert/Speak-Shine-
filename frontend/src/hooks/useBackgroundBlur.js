@@ -1,3 +1,28 @@
+let mediaPipeLoadingPromise = null;
+function loadMediaPipeScript() {
+  if (typeof window !== 'undefined' && window.SelfieSegmentation) {
+    return Promise.resolve(window.SelfieSegmentation);
+  }
+  if (mediaPipeLoadingPromise) return mediaPipeLoadingPromise;
+  mediaPipeLoadingPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src*="selfie_segmentation"]');
+    if (existing) {
+      if (window.SelfieSegmentation) return resolve(window.SelfieSegmentation);
+      existing.addEventListener('load', () => resolve(window.SelfieSegmentation));
+      existing.addEventListener('error', reject);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/@mediapipe/selfie_segmentation@0.1.1675465747/selfie_segmentation.js';
+    script.crossOrigin = 'anonymous';
+    script.async = true;
+    script.onload = () => resolve(window.SelfieSegmentation);
+    script.onerror = (e) => reject(e);
+    document.head.appendChild(script);
+  });
+  return mediaPipeLoadingPromise;
+}
+
 import { useRef, useCallback, useEffect, useState } from 'react';
 
 /**
@@ -104,6 +129,13 @@ export function useBackgroundBlur(blurStrength = 20) {
         console.warn('[BackgroundBlur] Canvas.captureStream() not supported');
         setBlurStatus('fallback');
         return originalStream;
+      }
+
+      // Load MediaPipe on-demand if not already in window
+      try {
+        await loadMediaPipeScript();
+      } catch (err) {
+        console.warn('[BackgroundBlur] On-demand script load error:', err);
       }
 
       // Wait for MediaPipe to load (script tag loads async)

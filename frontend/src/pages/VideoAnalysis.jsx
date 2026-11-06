@@ -157,6 +157,28 @@ function StudioDropCountdownTimer({ posterSendTime = "08:00" }) {
 // "upload"  → existing file-upload flow
 // "record"  → new live-record flow
 
+const CACHE_RECORD_KEY = "record_today_cache_v1";
+
+function getCachedRecordToday() {
+  try {
+    const raw = localStorage.getItem(CACHE_RECORD_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.today?.question) return parsed;
+    }
+    const dashRaw = localStorage.getItem("dashboard_cache_v5");
+    if (dashRaw) {
+      const parsed = JSON.parse(dashRaw);
+      if (parsed?.data?.today?.question) {
+        return { today: parsed.data.today, profile: parsed.data.profile };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function VideoAnalysis() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -211,28 +233,52 @@ export default function VideoAnalysis() {
     }
   }, [location.pathname, location.hash]);
 
-  const [todayQuestion, setTodayQuestion] = useState(null);
-  const [todayVocabulary, setTodayVocabulary] = useState([]);
-  const [vocabWordCount, setVocabWordCount] = useState(5);
-  const [vocabRequiredCount, setVocabRequiredCount] = useState(3);
-  const [vocabLevel, setVocabLevel] = useState("B2");
-  const [isMonthlyReflection, setIsMonthlyReflection] = useState(false);
-  const [isWeeklyReflection, setIsWeeklyReflection] = useState(false);
-  const [isMonthlyGoals, setIsMonthlyGoals] = useState(false);
-  const [isStorySummary, setIsStorySummary] = useState(false);
-  const [isPictureDescription, setIsPictureDescription] = useState(false);
-  const [isShadowing, setIsShadowing] = useState(false);
+  const cachedTodayInit = getCachedRecordToday();
+  const initToday = cachedTodayInit?.today;
+  const initShadowing = Boolean(initToday?.contentType === "shadowing_video" || initToday?.isShadowing);
+
+  const [todayQuestion, setTodayQuestion] = useState(() => initToday?.question ? {
+    question: initToday.question,
+    topic: initToday.topic,
+    category: initToday.category,
+    audioUrl: initToday.audioUrl,
+    contentType: initToday.contentType,
+    imageUrl: initToday.imageUrl,
+    imageSource: initToday.imageSource,
+    imagePageUrl: initToday.imagePageUrl,
+    imagePhotographer: initToday.imagePhotographer,
+    imagePhotographerUrl: initToday.imagePhotographerUrl,
+    imageInstructions: initToday.imageInstructions,
+    videoUrl: initToday.videoUrl,
+    videoDuration: initToday.videoDuration,
+    videoTranscript: initToday.videoTranscript,
+    videoTitle: initToday.videoTitle,
+    durationSettings: initToday.durationSettings,
+    isWeeklyReflection: initToday.isWeeklyReflection,
+    isShadowing: initShadowing,
+  } : null);
+  const [todayVocabulary, setTodayVocabulary] = useState(() => initToday?.vocabulary || []);
+  const [vocabWordCount, setVocabWordCount] = useState(() => initToday?.vocabWordCount ?? 5);
+  const [vocabRequiredCount, setVocabRequiredCount] = useState(() => initToday?.vocabRequiredCount ?? 3);
+  const [vocabLevel, setVocabLevel] = useState(() => initToday?.vocabLevel || "B2");
+  const [isMonthlyReflection, setIsMonthlyReflection] = useState(() => Boolean(initToday?.isMonthlyReflection));
+  const [isWeeklyReflection, setIsWeeklyReflection] = useState(() => Boolean(initToday?.isWeeklyReflection));
+  const [isMonthlyGoals, setIsMonthlyGoals] = useState(() => Boolean(initToday?.isMonthlyGoals));
+  const [isStorySummary, setIsStorySummary] = useState(() => Boolean(initToday?.contentType === "story_audio" || initToday?.isStorySummaryDay));
+  const [isPictureDescription, setIsPictureDescription] = useState(() => Boolean(initToday?.contentType === "picture_description" || initToday?.isPictureDescriptionDay));
+  const [isShadowing, setIsShadowing] = useState(() => initShadowing);
+  const [showPreviewScript, setShowPreviewScript] = useState(false); // Script turned OFF by default; toggle ON if needed
   const [shadowVideoSrcOverride, setShadowVideoSrcOverride] = useState("");
   const [shadowingVideoFailed, setShadowingVideoFailed] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
-  const [allowPrivateVideos, setAllowPrivateVideos] = useState(true);
-  const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(false);
-  const [durationLimits, setDurationLimits] = useState(null);
-  const [durationSettings, setDurationSettings] = useState(null);
-  const [isQuestionActive, setIsQuestionActive] = useState(false);
-  const [isLoadingQuestion, setIsLoadingQuestion] = useState(true);
-  const [posterSendTime, setPosterSendTime] = useState("08:00");
-  const [isTodaySubmitted, setIsTodaySubmitted] = useState(false);
+  const [allowPrivateVideos, setAllowPrivateVideos] = useState(() => initToday?.allowPrivateVideos ?? true);
+  const [enableBackgroundBlur, setEnableBackgroundBlur] = useState(() => initToday?.enableBackgroundBlur ?? false);
+  const [durationLimits, setDurationLimits] = useState(() => initToday?.durationLimits || null);
+  const [durationSettings, setDurationSettings] = useState(() => initToday?.durationSettings || null);
+  const [isQuestionActive, setIsQuestionActive] = useState(() => Boolean(initToday?.question));
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(() => !initToday?.question);
+  const [posterSendTime, setPosterSendTime] = useState(() => initToday?.posterSendTime || "08:00");
+  const [isTodaySubmitted, setIsTodaySubmitted] = useState(() => Boolean(cachedTodayInit?.profile?.completed || initToday?.isSubmitted));
 
 
 
@@ -242,7 +288,6 @@ export default function VideoAnalysis() {
   const [duration, setDuration] = useState(75);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
-  const [peekFullScript, setPeekFullScript] = useState(false);
   const audioRef = useRef(null);
   const speedMenuRef = useRef(null);
   const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2];
@@ -592,13 +637,23 @@ export default function VideoAnalysis() {
     let isCancelled = false;
 
     const loadQuestionData = async () => {
-      setIsLoadingQuestion(true);
+      if (!todayQuestion) {
+        setIsLoadingQuestion(true);
+      }
+
+      const saveRecordCache = (today, profile = null) => {
+        try {
+          localStorage.setItem(CACHE_RECORD_KEY, JSON.stringify({ today, profile, ts: Date.now() }));
+        } catch {}
+      };
+
       if (isGuest) {
         try {
           const res = await api.get("/dashboard/today-question");
           if (!isCancelled && res.data?.question) {
             applyTodayData(res.data);
             setIsLoadingQuestion(false);
+            saveRecordCache(res.data);
             return;
           }
         } catch {
@@ -608,9 +663,10 @@ export default function VideoAnalysis() {
           const res = await api.get("/guest/preview");
           if (!isCancelled && res.data?.today) {
             applyTodayData(res.data.today, res.data.profile);
+            saveRecordCache(res.data.today, res.data.profile);
           }
         } catch {
-          if (!isCancelled) setIsQuestionActive(false);
+          if (!isCancelled && !todayQuestion) setIsQuestionActive(false);
         } finally {
           if (!isCancelled) setIsLoadingQuestion(false);
         }
@@ -618,28 +674,32 @@ export default function VideoAnalysis() {
       }
 
       loadMyReports();
-      try {
-        const r = await api.get("/dashboard/me?_duration_refresh=" + Date.now());
-        if (!isCancelled && r.data?.today) {
-          applyTodayData(r.data.today, r.data.profile, r.data.myStreakEntry);
-          setIsLoadingQuestion(false);
-          return;
-        }
-      } catch (err) {
-        console.warn("[VideoAnalysis] /dashboard/me failed, falling back to /dashboard/today-question", err);
-      }
 
-      // Fallback: fetch today-question directly
+      // Parallel fetch: fast today-question (0.1s) and dashboard/me
+      const todayPromise = api.get("/dashboard/today-question")
+        .then(res => {
+          if (!isCancelled && res.data?.question) {
+            applyTodayData(res.data);
+            setIsLoadingQuestion(false);
+            saveRecordCache(res.data);
+          }
+        })
+        .catch(() => {});
+
+      const mePromise = api.get("/dashboard/me")
+        .then(r => {
+          if (!isCancelled && r.data?.today) {
+            applyTodayData(r.data.today, r.data.profile, r.data.myStreakEntry);
+            setIsLoadingQuestion(false);
+            saveRecordCache(r.data.today, r.data.profile);
+          }
+        })
+        .catch(err => {
+          console.warn("[VideoAnalysis] /dashboard/me failed:", err.message);
+        });
+
       try {
-        const r = await api.get("/dashboard/today-question");
-        if (!isCancelled && r.data?.question) {
-          applyTodayData(r.data);
-          setIsLoadingQuestion(false);
-          return;
-        }
-        if (!isCancelled) setIsQuestionActive(false);
-      } catch {
-        if (!isCancelled) setIsQuestionActive(false);
+        await Promise.race([todayPromise, mePromise]);
       } finally {
         if (!isCancelled) setIsLoadingQuestion(false);
       }
@@ -1183,7 +1243,7 @@ export default function VideoAnalysis() {
                         })}
                       </div>
 
-                      {/* Time & Speed */}
+                      {/* Time, Speed & Script Toggle */}
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
                         <span style={{ fontSize: "0.78rem", color: "#e2e8f0", fontFamily: "monospace", fontWeight: 600 }}>
                           {fmtTime(currentTime)} / {fmtTime(duration)}
@@ -1209,14 +1269,79 @@ export default function VideoAnalysis() {
                             </button>
                           ))}
                         </div>
+
+                        {/* Script / Subtitles Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => setShowPreviewScript(prev => !prev)}
+                          style={{
+                            background: showPreviewScript ? "rgba(236, 72, 153, 0.28)" : "rgba(255,255,255,0.1)",
+                            color: showPreviewScript ? "#f472b6" : "#cbd5e1",
+                            border: showPreviewScript ? "1px solid rgba(236, 72, 153, 0.55)" : "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "8px",
+                            padding: "3px 8px",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "3px",
+                          }}
+                          title={showPreviewScript ? "Hide Teleprompter Script" : "Show Teleprompter Script"}
+                        >
+                          {showPreviewScript ? "📝 Script: ON" : "📝 Script: OFF"}
+                        </button>
                       </div>
                     </div>
 
                     {/* Synchronized 5-Second Teleprompter */}
-                    {(todayQuestion.videoTranscript || todayQuestion.question) && (() => {
-                      const textToSplit = todayQuestion.videoTranscript || todayQuestion.question || "";
-                      const cues = buildTeleprompterCues(textToSplit, duration || todayQuestion.videoDuration || 60);
-                      if (!cues.length) return null;
+                    {(todayQuestion.videoTranscript || todayQuestion.question) && (
+                      !showPreviewScript ? (
+                        <div style={{
+                          marginTop: "0.75rem",
+                          background: "linear-gradient(135deg, rgba(17, 12, 34, 0.6) 0%, rgba(26, 16, 48, 0.5) 100%)",
+                          border: "1px dashed rgba(236, 72, 153, 0.3)",
+                          borderRadius: 14,
+                          padding: "0.85rem 1.15rem",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "0.75rem",
+                          flexWrap: "wrap",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                            <span style={{ fontSize: "1.2rem" }}>🎧</span>
+                            <div>
+                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#f472b6" }}>Pure Ear Training Mode (Script Hidden)</div>
+                              <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>Focus on in-ear reference audio to train native shadowing reflexes.</div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowPreviewScript(true)}
+                            style={{
+                              background: "rgba(236, 72, 153, 0.16)",
+                              color: "#f472b6",
+                              border: "1px solid rgba(236, 72, 153, 0.45)",
+                              padding: "4px 12px",
+                              borderRadius: 8,
+                              fontSize: "0.74rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                            title="Turn on teleprompter script"
+                          >
+                            👁️ Show Teleprompter Script
+                          </button>
+                        </div>
+                      ) : (
+                        (() => {
+                          const textToSplit = todayQuestion.videoTranscript || todayQuestion.question || "";
+                          const cues = buildTeleprompterCues(textToSplit, duration || todayQuestion.videoDuration || 60);
+                          if (!cues.length) return null;
 
                       const activeIdx = cues.findIndex(c => currentTime >= c.start && currentTime < c.end);
                       const safeIdx = activeIdx !== -1 ? activeIdx : (currentTime >= (duration || 60) ? cues.length - 1 : 0);
@@ -1235,7 +1360,7 @@ export default function VideoAnalysis() {
                       };
 
                       // ── 1. Standby State (When audio has not started playing yet) ──
-                      if (!isPlaying && currentTime === 0 && !peekFullScript) {
+                      if (!isPlaying && currentTime === 0) {
                         return (
                           <div style={{
                             marginTop: "0.85rem",
@@ -1280,19 +1405,7 @@ export default function VideoAnalysis() {
                                 >
                                   <span>▶</span> Play &amp; Start Teleprompter
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPeekFullScript(true)}
-                                  style={{
-                                    display: "inline-flex", alignItems: "center", gap: "0.4rem",
-                                    padding: "0.55rem 0.95rem", borderRadius: 10,
-                                    background: "rgba(255, 255, 255, 0.06)", color: "#cbd5e1",
-                                    border: "1px solid rgba(255, 255, 255, 0.15)", fontWeight: 600, fontSize: "0.8rem",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  <span>👁️</span> Peek Full Script ({cues.length} lines)
-                                </button>
+
                               </div>
                             </div>
                           </div>
@@ -1451,69 +1564,12 @@ export default function VideoAnalysis() {
                               </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setPeekFullScript(p => !p)}
-                              style={{
-                                background: peekFullScript ? "rgba(236,72,153,0.18)" : "transparent",
-                                color: peekFullScript ? "#f472b6" : "#94a3b8",
-                                border: `1px solid ${peekFullScript ? "rgba(236,72,153,0.4)" : "rgba(255,255,255,0.1)"}`,
-                                borderRadius: 8, padding: "3px 8px", fontSize: "0.72rem", fontWeight: 600,
-                                cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem",
-                              }}
-                            >
-                              <span>{peekFullScript ? "▲ Collapse Full Script" : "👁️ Peek Full Script"}</span>
-                            </button>
                           </div>
-
-                          {/* Collapsible Full Script Preview */}
-                          {peekFullScript && (
-                            <div style={{
-                              marginTop: "0.85rem",
-                              padding: "0.85rem",
-                              borderRadius: 12,
-                              background: "rgba(10, 8, 20, 0.6)",
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              maxHeight: "220px",
-                              overflowY: "auto",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "0.4rem",
-                            }}>
-                              <div style={{ fontSize: "0.7rem", color: "#a855f7", fontWeight: 700, textTransform: "uppercase", marginBottom: "0.2rem" }}>
-                                Full Transcript Reference (Click any phrase to jump audio)
-                              </div>
-                              {cues.map((c, i) => {
-                                const isCurrent = i === safeIdx;
-                                return (
-                                  <div
-                                    key={c.id}
-                                    onClick={() => seekToCue(c.start)}
-                                    style={{
-                                      padding: "0.35rem 0.55rem",
-                                      borderRadius: 6,
-                                      fontSize: "0.82rem",
-                                      lineHeight: 1.45,
-                                      cursor: "pointer",
-                                      background: isCurrent ? "rgba(236,72,153,0.18)" : "transparent",
-                                      color: isCurrent ? "#ffffff" : i < safeIdx ? "#64748b" : "#cbd5e1",
-                                      fontWeight: isCurrent ? 700 : 400,
-                                      borderLeft: isCurrent ? "3px solid #ec4899" : "3px solid transparent",
-                                      transition: "all 0.15s ease",
-                                    }}
-                                  >
-                                    <span style={{ fontSize: "0.68rem", color: "#f472b6", marginRight: "0.45rem", fontFamily: "monospace" }}>
-                                      {c.startFormatted}
-                                    </span>
-                                    {c.text}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
                         </div>
                       );
-                    })()}
+                    })()
+                  )
+                )}
                   </div>
                 )}
 
@@ -3334,7 +3390,7 @@ async function resetCameraZoom(videoTrack) {
   }
 }
 
-function buildRecordingMediaConstraints(camId, micId) {
+function buildRecordingMediaConstraints(camId, micId, isShadowing = false) {
   const isMobile = isMobileRecordingDevice();
   // Use 'exact' for deviceId to enforce the selected device, not 'ideal'
   const videoBase = camId ? { deviceId: { exact: camId } } : { facingMode: "user" };
@@ -3364,49 +3420,124 @@ function buildRecordingMediaConstraints(camId, micId) {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
+      googEchoCancellation: true,
+      googAutoGainControl: true,
+      googNoiseSuppression: true,
+      googHighpassFilter: true,
       sampleRate: 48000,
       channelCount: 1,
     },
   };
 }
 
-async function openRecordingStream(camId, micId) {
-  console.log(`[DeviceSelection] Opening stream with camId="${camId}", micId="${micId}"`);
-  const full = buildRecordingMediaConstraints(camId, micId);
-  console.log('[DeviceSelection] Built constraints:', JSON.stringify(full, null, 2));
+/**
+ * Real-time WebAudio Studio Vocal Enhancement Chain
+ * 1. 85Hz High-pass filter — eliminates laptop cooling fan rumble and desk vibrations
+ * 2. 2.8kHz Presence filter — adds broadcast-grade speech articulation and vocal clarity
+ * 3. Studio Dynamic Compressor — lifts soft speech while preventing loud distortion/clipping
+ * 4. Master Gain Boost — configurable gain boost for crystal-clear microphone output
+ */
+function applyStudioVocalEnhancement(stream, boostMultiplier = 1.4) {
+  try {
+    const audioTrack = stream?.getAudioTracks?.()?.[0];
+    if (!audioTrack) return stream;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    const source = audioCtx.createMediaStreamSource(new MediaStream([audioTrack]));
+
+    // 1. High-Pass Filter (85Hz)
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 85;
+    hp.Q.value = 0.707;
+
+    // 2. Vocal Presence Boost (2.8kHz, +3.5dB)
+    const presence = audioCtx.createBiquadFilter();
+    presence.type = "peaking";
+    presence.frequency.value = 2800;
+    presence.gain.value = 3.5;
+    presence.Q.value = 1.1;
+
+    // 3. Studio Dynamic Compressor
+    const comp = audioCtx.createDynamicsCompressor();
+    comp.threshold.value = -24;
+    comp.knee.value = 12;
+    comp.ratio.value = 3.2;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+
+    // 4. Master Vocal Gain
+    const gain = audioCtx.createGain();
+    gain.gain.value = Math.max(0.8, Math.min(3.0, boostMultiplier));
+
+    source.connect(hp);
+    hp.connect(presence);
+    presence.connect(comp);
+    comp.connect(gain);
+
+    const dest = audioCtx.createMediaStreamDestination();
+    gain.connect(dest);
+
+    const enhancedAudioTrack = dest.stream.getAudioTracks()[0];
+    const videoTracks = stream.getVideoTracks();
+    const outputStream = new MediaStream([enhancedAudioTrack, ...videoTracks]);
+    outputStream._studioAudioCtx = audioCtx;
+    console.log(`[StudioAudio] Enhanced vocal clarity active (boost: ${boostMultiplier}x) ✓`);
+    return outputStream;
+  } catch (err) {
+    console.warn("[StudioAudio] Enhancement fallback:", err);
+    return stream;
+  }
+}
+
+async function openRecordingStream(camId, micId, isShadowing = false) {
+  console.log(`[DeviceSelection] Opening stream with camId="${camId}", micId="${micId}", isShadowing=${isShadowing}`);
+  const full = buildRecordingMediaConstraints(camId, micId, isShadowing);
   try {
     const stream = await navigator.mediaDevices.getUserMedia(full);
     const track = stream.getVideoTracks()[0];
-    if (track) {
-      const settings = track.getSettings();
-      console.log(`[DeviceSelection] ✓ Video track using deviceId: "${settings.deviceId}", label: "${track.label}"`);
-      await resetCameraZoom(track);
-    }
-    const audioTrack = stream.getAudioTracks()[0];
-    if (audioTrack) {
-      const audioSettings = audioTrack.getSettings();
-      console.log(`[DeviceSelection] ✓ Audio track using deviceId: "${audioSettings.deviceId}", label: "${audioTrack.label}"`);
-    }
+    if (track) await resetCameraZoom(track);
     return stream;
   } catch (err) {
-    console.warn('[DeviceSelection] Primary constraints failed, trying fallback:', err.message);
-    // Fallback: use 'exact' deviceId if specified, otherwise use facingMode
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: camId ? { deviceId: { exact: camId }, facingMode: "user" } : { facingMode: "user" },
-      audio: full.audio,
-    });
-    const track = stream.getVideoTracks()[0];
-    if (track) {
-      const settings = track.getSettings();
-      console.log(`[DeviceSelection] ✓ Fallback video track using deviceId: "${settings.deviceId}", label: "${track.label}"`);
-      await resetCameraZoom(track);
+    console.warn('[DeviceSelection] Primary constraints failed, trying fallback 1 (ideal match):', err.message);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: camId ? { deviceId: { ideal: camId } } : { facingMode: "user" },
+        audio: micId
+          ? {
+              deviceId: { ideal: micId },
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              googEchoCancellation: true,
+              googAutoGainControl: true,
+              googNoiseSuppression: true,
+              googHighpassFilter: true,
+              sampleRate: 48000,
+              channelCount: 1,
+            }
+          : {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              googEchoCancellation: true,
+              googAutoGainControl: true,
+              googNoiseSuppression: true,
+              googHighpassFilter: true,
+              sampleRate: 48000,
+              channelCount: 1,
+            },
+      });
+      const track = stream.getVideoTracks()[0];
+      if (track) await resetCameraZoom(track);
+      return stream;
+    } catch (err2) {
+      console.warn('[DeviceSelection] Fallback 1 failed, trying fallback 2 (failsafe barebones):', err2.message);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const track = stream.getVideoTracks()[0];
+      if (track) await resetCameraZoom(track);
+      return stream;
     }
-    const audioTrack = stream.getAudioTracks()[0];
-    if (audioTrack) {
-      const audioSettings = audioTrack.getSettings();
-      console.log(`[DeviceSelection] ✓ Fallback audio track using deviceId: "${audioSettings.deviceId}", label: "${audioTrack.label}"`);
-    }
-    return stream;
   }
 }
 
@@ -4156,8 +4287,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [cameras, setCameras]       = useState([]);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
   const [mics, setMics]             = useState([]);
+  const [audioOutputs, setAudioOutputs] = useState([]);
   const [camId, setCamId]           = useState("");
   const [micId, setMicId]           = useState("");
+  const [outputId, setOutputId]     = useState("");
+  const [micLevel, setMicLevel]     = useState(0); // 0-100 real-time VU meter
+  const [micActive, setMicActive]   = useState(false);
   const [countdown, setCountdown]   = useState(3);
   const [elapsed, setElapsed]       = useState(0);
   const elapsedRef = useRef(0); // always holds the latest elapsed value — avoids stale closure in onstop
@@ -4169,7 +4304,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [uploadEta, setUploadEta]     = useState(null); // seconds
   const [compressProgress, setCompressProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
-  const [noiseCancel, setNoiseCancel] = useState(true);
+  const [noiseCancel, setNoiseCancel] = useState(false); // Default OFF for pure hardware fidelity; RNNoise FIFO is available on toggle
   const [backgroundBlur, setBackgroundBlur] = useState(false); // Background blur toggle
   const [blurStrength, setBlurStrength] = useState(20); // Blur strength in pixels (10-40)
   const [ncStatus, setNcStatus]     = useState("idle");
@@ -4179,15 +4314,62 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   // ── Shadowing Activity state & refs ──
   const [shadowPlaybackSpeed, setShadowPlaybackSpeed] = useState(1);
-  const [showShadowScript, setShowShadowScript] = useState(false);
   const [shadowVideoMuted, setShadowVideoMuted] = useState(false);
   const [shadowAudioTime, setShadowAudioTime] = useState(0);
   const [shadowAudioPlaying, setShadowAudioPlaying] = useState(false);
   const [shadowAudioBlocked, setShadowAudioBlocked] = useState(false);
   const [shadowVolume, setShadowVolume] = useState(0.85);
   const [testInEarPlaying, setTestInEarPlaying] = useState(false);
+  const [showTranscription, setShowTranscription] = useState(false); // Subtitles / transcription OFF by default per user request
+  const [micBoost, setMicBoost] = useState(1.4); // 1.0 (Normal), 1.4 (+3dB Studio), 2.0 (+6dB Max)
+  const [micTesting, setMicTesting] = useState(false);
+  const [micTestStatus, setMicTestStatus] = useState(""); // "" | "recording" | "playing"
   const shadowingRefVideo = useRef(null);
   const shadowingPreviewVideo = useRef(null);
+
+  const handleTestMicPlayback = async () => {
+    if (micTesting) return;
+    try {
+      setMicTesting(true);
+      setMicTestStatus("recording");
+      const testStream = await navigator.mediaDevices.getUserMedia({
+        audio: micId ? { deviceId: { exact: micId } } : true,
+        video: false,
+      });
+      const enhancedTest = applyStudioVocalEnhancement(testStream, micBoost);
+      const mediaRecorder = new MediaRecorder(enhancedTest);
+      const chunks = [];
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        testStream.getTracks().forEach(t => t.stop());
+        try { enhancedTest._studioAudioCtx?.close(); } catch {}
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+        if (outputId && typeof audio.setSinkId === "function") {
+          audio.setSinkId(outputId).catch(() => {});
+        }
+        setMicTestStatus("playing");
+        audio.onended = () => {
+          setMicTesting(false);
+          setMicTestStatus("");
+          URL.revokeObjectURL(audioUrl);
+        };
+        audio.play().catch(() => {
+          setMicTesting(false);
+          setMicTestStatus("");
+        });
+      };
+      mediaRecorder.start();
+      setTimeout(() => {
+        if (mediaRecorder.state === "recording") mediaRecorder.stop();
+      }, 3000);
+    } catch (e) {
+      console.warn("[MicTest] Error:", e);
+      setMicTesting(false);
+      setMicTestStatus("");
+    }
+  };
 
   const handleVolumeChange = (newVol) => {
     setShadowVolume(newVol);
@@ -4202,15 +4384,54 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   const handleManualPlayAudio = () => {
     if (shadowingRefVideo.current) {
-      shadowingRefVideo.current.muted = false;
+      const a = shadowingRefVideo.current;
+      a.muted = false;
       setShadowVideoMuted(false);
-      shadowingRefVideo.current.volume = shadowVolume;
-      shadowingRefVideo.current.play()
+      a.volume = shadowVolume > 0 ? shadowVolume : 0.85;
+      a.play()
         .then(() => {
           setShadowAudioBlocked(false);
           setShadowAudioPlaying(true);
         })
-        .catch(e => console.warn("[Shadowing] Manual play failed:", e));
+        .catch(e => {
+          console.warn("[Shadowing] Manual play failed:", e);
+          setShadowAudioBlocked(true);
+          setShadowAudioPlaying(false);
+        });
+    }
+  };
+
+  const handleSeekShadowAudio = (deltaSeconds) => {
+    if (shadowingRefVideo.current) {
+      const dur = shadowingRefVideo.current.duration || question?.videoDuration || 180;
+      const cur = shadowingRefVideo.current.currentTime || 0;
+      const targetTime = Math.max(0, Math.min(dur, cur + deltaSeconds));
+      shadowingRefVideo.current.currentTime = targetTime;
+      setShadowAudioTime(targetTime);
+    }
+  };
+
+  const handleToggleShadowPlay = () => {
+    if (shadowingRefVideo.current) {
+      const a = shadowingRefVideo.current;
+      if (a.paused || !shadowAudioPlaying) {
+        a.muted = false;
+        setShadowVideoMuted(false);
+        a.volume = shadowVolume > 0 ? shadowVolume : 0.85;
+        a.play()
+          .then(() => {
+            setShadowAudioPlaying(true);
+            setShadowAudioBlocked(false);
+          })
+          .catch(e => {
+            console.warn("[Shadowing] play failed:", e);
+            setShadowAudioBlocked(true);
+            setShadowAudioPlaying(false);
+          });
+      } else {
+        a.pause();
+        setShadowAudioPlaying(false);
+      }
     }
   };
 
@@ -4298,13 +4519,127 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         tmp.getTracks().forEach(t => t.stop());
         const devices = await navigator.mediaDevices.enumerateDevices();
         setCameras(devices.filter(d => d.kind === "videoinput"));
-        setMics(devices.filter(d => d.kind === "audioinput"));
+        
+        const audioInputs = devices.filter(d => d.kind === "audioinput");
+        setMics(audioInputs);
+
+        const outs = devices.filter(d => d.kind === "audiooutput");
+        setAudioOutputs(outs);
+
+        // Auto-select best microphone:
+        // Prioritize physical built-in or USB microphone arrays (keeps Bluetooth earphones in crystal-clear A2DP stereo mode)
+        if (!micId && audioInputs.length > 0) {
+          const physicalMic = audioInputs.find(d => 
+            /array|realtek|built-in|internal|integrated|studio|usb|smart sound/i.test(d.label) &&
+            !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label)
+          );
+          const realMic = audioInputs.find(d => 
+            !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label) &&
+            !/headset|buds|earphone|airpod|bluetooth/i.test(d.label)
+          );
+          const headsetMic = audioInputs.find(d => /headset|buds|earphone|airpod|bluetooth/i.test(d.label));
+          const nonVirtual = audioInputs.find(d => !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label));
+          const chosen = physicalMic || realMic || headsetMic || nonVirtual || audioInputs[0];
+          if (chosen) {
+            console.log("[DeviceSelection] Auto-selected optimal microphone:", chosen.label);
+            setMicId(chosen.deviceId);
+          }
+        }
+
+        // Auto-select best audio output for shadowing (headset/earbuds)
+        if (!outputId && outs.length > 0) {
+          const headsetOut = outs.find(d => /headset|buds|earphone|airpod|bluetooth/i.test(d.label));
+          if (headsetOut) {
+            console.log("[DeviceSelection] Auto-selected headset audio output:", headsetOut.label);
+            setOutputId(headsetOut.deviceId);
+          }
+        }
       } catch {
         setError("Camera/microphone permission denied. Please allow access and refresh.");
       }
     })();
     return () => cleanup();
   }, []);
+
+  // Live Microphone Level VU Meter during setup
+  useEffect(() => {
+    if (step !== "setup") return;
+    let audioCtx = null;
+    let analyser = null;
+    let monitorStream = null;
+    let animId = null;
+
+    async function startMicMonitor() {
+      try {
+        monitorStream = await navigator.mediaDevices.getUserMedia({
+          audio: micId ? { deviceId: { exact: micId } } : true,
+          video: false,
+        });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.4;
+        const source = audioCtx.createMediaStreamSource(monitorStream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const checkLevel = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          const avg = sum / dataArray.length;
+          const pct = Math.min(100, Math.round((avg / 96) * 100));
+          setMicLevel(pct);
+          if (pct > 4) setMicActive(true);
+          animId = requestAnimationFrame(checkLevel);
+        };
+        checkLevel();
+      } catch (err) {
+        try {
+          monitorStream = await navigator.mediaDevices.getUserMedia({
+            audio: micId ? { deviceId: { ideal: micId } } : true,
+            video: false,
+          });
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+          analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 256;
+          const source = audioCtx.createMediaStreamSource(monitorStream);
+          source.connect(analyser);
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const checkLevel = () => {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+            const pct = Math.min(100, Math.round((avg / 96) * 100));
+            setMicLevel(pct);
+            if (pct > 4) setMicActive(true);
+            animId = requestAnimationFrame(checkLevel);
+          };
+          checkLevel();
+        } catch (e) {
+          console.warn("[MicMonitor] Could not start monitor:", e);
+        }
+      }
+    }
+
+    startMicMonitor();
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+      if (monitorStream) monitorStream.getTracks().forEach(t => t.stop());
+      if (audioCtx) { try { audioCtx.close(); } catch {} }
+    };
+  }, [step, micId]);
+
+  // Keep shadowingRefVideo output sink synchronized
+  useEffect(() => {
+    if (outputId && shadowingRefVideo.current && typeof shadowingRefVideo.current.setSinkId === "function") {
+      shadowingRefVideo.current.setSinkId(outputId).catch(err => {
+        console.warn("[Shadowing] setSinkId error:", err);
+      });
+    }
+  }, [outputId, step]);
 
   const syncPreviewAspect = useCallback(() => {
     const v = liveVideoRef.current;
@@ -4430,6 +4765,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           t.stop();
         } catch (e) {}
       });
+      if (streamRef.current?._studioAudioCtx) {
+        try { streamRef.current._studioAudioCtx.close(); } catch {}
+      }
       streamRef.current = null;
     }
 
@@ -4469,20 +4807,18 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       return;
     }
 
-    // Prime in-ear shadowing audio playback in direct response to user gesture
+    // Prime in-ear shadowing audio playback in direct response to user gesture (silent during countdown)
     if (isShadowing && shadowingRefVideo.current) {
       try {
-        shadowingRefVideo.current.currentTime = 0;
-        shadowingRefVideo.current.volume = shadowVolume;
-        shadowingRefVideo.current.muted = shadowVideoMuted;
-        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
-        const unlock = shadowingRefVideo.current.play();
+        const a = shadowingRefVideo.current;
+        a.currentTime = 0;
+        a.muted = false; // NEVER set muted = true on user gesture! Keeps unmuted permission intact
+        a.volume = 0.0001; // Silent during countdown
+        a.playbackRate = shadowPlaybackSpeed;
+        const unlock = a.play();
         if (unlock !== undefined) {
           unlock.then(() => {
-            if (shadowingRefVideo.current) {
-              shadowingRefVideo.current.pause();
-              shadowingRefVideo.current.currentTime = 0;
-            }
+            console.log("[Shadowing] In-ear audio primed and unlocked via user gesture");
           }).catch(e => {
             console.warn("[Shadowing] Pre-warm audio unlock caught:", e);
           });
@@ -4491,15 +4827,18 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     }
     
     try {
-      const rawStream = await openRecordingStream(camId, micId);
+      const rawStream = await openRecordingStream(camId, micId, isShadowing);
       rawStreamRef.current = rawStream;
 
       let finalStream = rawStream;
 
-      // ── Step 1: RNNoise WASM AI noise cancellation on audio ──
+      // ── Step 1: Real-time Studio Vocal Enhancement (Highpass 85Hz + 2.8kHz Presence + Dynamic Compressor) ──
+      finalStream = applyStudioVocalEnhancement(finalStream, micBoost);
+
+      // ── Step 2: RNNoise WASM AI noise cancellation on audio (if explicitly enabled) ──
       if (noiseCancel) {
         setNcStatus("loading");
-        finalStream = await applyNoiseCancellation(rawStream);
+        finalStream = await applyNoiseCancellation(finalStream);
         setNcStatus(finalStream !== rawStream ? "active" : "fallback");
       }
 
@@ -4521,6 +4860,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       countdownRef.current = setInterval(() => {
         c--;
         setCountdown(c);
+        if (isShadowing && shadowingRefVideo.current) {
+          try { shadowingRefVideo.current.currentTime = 0; } catch {}
+        }
         if (c <= 0) { clearInterval(countdownRef.current); startRecording(finalStream); }
       }, 1000);
     } catch (err) {
@@ -4536,10 +4878,17 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     // limit. ~1.1 Mbps video + 96 kbps audio ≈ 90 MB at 10 min, ~45 MB at 5 min.
     // Without this, the browser default (~2.5 Mbps) produced 130 MB+ files.
     let recorder;
-    const recorderOptions = { videoBitsPerSecond: 1_100_000, audioBitsPerSecond: 96_000 };
+    const preferredMime = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
+      : (typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : undefined);
+    const recorderOptions = {
+      ...(preferredMime ? { mimeType: preferredMime } : {}),
+      videoBitsPerSecond: 1_100_000,
+      audioBitsPerSecond: 160_000
+    };
     try {
       recorder = new MediaRecorder(stream, recorderOptions);
-      console.log(`[Recording] MediaRecorder with capped bitrate (1.1 Mbps video / 96 kbps audio)`);
+      console.log(`[Recording] MediaRecorder with studio audio (1.1 Mbps video / 160 kbps Opus)`);
     } catch (err) {
       // Some browsers reject the options object — fall back to the most basic config.
       console.warn(`[Recording] Bitrate options unsupported, falling back to basic:`, err);
@@ -4612,7 +4961,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       
       // More aggressive size validation using the finalized recording duration.
       const finalElapsed = closeActiveRecordingSegment();
-      const expectedMinSize = finalElapsed * 3000; // ~3KB per second (very conservative)
+      const expectedMinSize = Math.max(1024, finalElapsed * 500); // ~3KB per second (very conservative)
       const expectedMaxSize = finalElapsed * 500000; // ~500KB per second (generous)
       
       if (totalSize < expectedMinSize) {
@@ -4671,10 +5020,35 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       console.log(`[Recording] State changed to: ${recorder.state}`);
     };
     
-    // Start with 2-second intervals for better chunk collection
+    // Immediately activate reference audio from 0:00 when recording starts
+    if (isShadowing && shadowingRefVideo.current) {
+      try {
+        const a = shadowingRefVideo.current;
+        a.currentTime = 0;
+        a.muted = shadowVideoMuted;
+        a.volume = shadowVideoMuted ? 0 : shadowVolume;
+        a.playbackRate = shadowPlaybackSpeed;
+        const p = a.play();
+        if (p !== undefined) {
+          p.then(() => {
+            setShadowAudioPlaying(!shadowVideoMuted);
+            setShadowAudioBlocked(false);
+          }).catch(e => {
+            console.warn("[Shadowing] Play on startRecording caught:", e);
+            setShadowAudioBlocked(true);
+            setShadowAudioPlaying(false);
+          });
+        } else {
+          setShadowAudioPlaying(!shadowVideoMuted);
+          setShadowAudioBlocked(false);
+        }
+      } catch (err) {}
+    }
+
+    // Start with 1000ms timeslice for responsive and reliable chunk collection
     try {
-      recorder.start(2000);
-      console.log(`[Recording] Started with 2000ms intervals`);
+      recorder.start(1000);
+      console.log(`[Recording] Started with 1000ms intervals`);
     } catch (startErr) {
       console.error(`[Recording] Failed to start:`, startErr);
       setError("Could not start recording. Try a different browser.");
@@ -4699,35 +5073,28 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
   // Synchronized playback for Shadowing Activity reference speech
   useEffect(() => {
-    if (step === "recording" && isShadowing && shadowingRefVideo.current) {
-      try {
-        shadowingRefVideo.current.currentTime = 0;
-        shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
-        shadowingRefVideo.current.muted = shadowVideoMuted;
-        shadowingRefVideo.current.volume = shadowVolume;
-        const playPromise = shadowingRefVideo.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setShadowAudioBlocked(false);
-              setShadowAudioPlaying(true);
-            })
-            .catch(e => {
-              console.warn("[Shadowing] Audio play warning:", e);
-              setShadowAudioBlocked(true);
-            });
-        }
-      } catch (err) {
-        console.warn("[Shadowing] Audio autoplay err:", err);
-        setShadowAudioBlocked(true);
-      }
-    } else if (step !== "recording" && shadowingRefVideo.current) {
+    if (step !== "recording" && step !== "countdown" && shadowingRefVideo.current) {
       try {
         shadowingRefVideo.current.pause();
         setShadowAudioPlaying(false);
       } catch {}
     }
-  }, [step, isShadowing, shadowPlaybackSpeed, shadowVideoMuted, shadowVolume]);
+  }, [step]);
+
+  // Handle playback speed changes without resetting currentTime
+  useEffect(() => {
+    if (shadowingRefVideo.current) {
+      shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+    }
+  }, [shadowPlaybackSpeed]);
+
+  // Handle volume / mute toggles without resetting currentTime
+  useEffect(() => {
+    if (shadowingRefVideo.current) {
+      shadowingRefVideo.current.volume = shadowVolume;
+      shadowingRefVideo.current.muted = shadowVideoMuted;
+    }
+  }, [shadowVolume, shadowVideoMuted]);
 
   const stopRecording = () => {
     clearInterval(timerRef.current);
@@ -4747,10 +5114,11 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         console.error(`[Recording] Error stopping recorder:`, err);
         setError("Error stopping recording. Please try again.");
         setStep("setup");
+        cleanup();
       }
+    } else {
+      cleanup();
     }
-    // Immediately stop hardware camera and mic access
-    cleanup();
   };
 
   const togglePause = useCallback(() => {
@@ -4871,7 +5239,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     
     console.log(`[Upload] Validating blob - size: ${recordedBlob.size}, type: ${recordedBlob.type}, elapsed: ${elapsed}s`);
     
-    const expectedMinSize = elapsed * 8000;
+    const expectedMinSize = Math.max(1024, elapsed * 500);
     if (recordedBlob.size < expectedMinSize) {
       setError(`Recording seems corrupted (too small: ${Math.round(recordedBlob.size/1024)}KB for ${elapsed}s). Please record again.`);
       return;
@@ -5091,10 +5459,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
       {/* ── Preloaded In-Ear Reference Audio for Shadowing ── */}
       {isShadowing && (
         <audio
+          key={question?.audioUrl || question?.videoUrl || "shadow-audio"}
           ref={shadowingRefVideo}
           src={getCleanAudioUrl(question?.audioUrl || question?.videoUrl)}
           preload="auto"
           playsInline
+          style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, opacity: 0.001, pointerEvents: "none" }}
           onTimeUpdate={() => {
             if (shadowingRefVideo.current) {
               setShadowAudioTime(shadowingRefVideo.current.currentTime);
@@ -5113,7 +5483,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           onError={(e) => {
             console.warn("[Shadowing] Audio preload/playback error:", e);
           }}
-          style={{ display: "none" }}
         />
       )}
 
@@ -5370,11 +5739,229 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 onChange={e => setMicId(e.target.value)}
                 style={{ cursor: 'pointer', position: 'relative', zIndex: 10 }}
               >
-                <option value="">Default mic</option>
-                {mics.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0,6)}`}</option>)}
+                <option value="">Default mic (System default)</option>
+                {(() => {
+                  const sortedMics = [...mics].sort((a, b) => {
+                    const aVirt = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(a.label);
+                    const bVirt = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(b.label);
+                    if (aVirt && !bVirt) return 1;
+                    if (!aVirt && bVirt) return -1;
+                    const aStudio = /array|realtek|built-in|internal|integrated|studio|usb/i.test(a.label);
+                    const bStudio = /array|realtek|built-in|internal|integrated|studio|usb/i.test(b.label);
+                    if (aStudio && !bStudio) return -1;
+                    if (!aStudio && bStudio) return 1;
+                    return 0;
+                  });
+                  return sortedMics.map(d => {
+                    const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
+                    const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label);
+                    const isBuiltIn = /array|realtek|built-in|internal|integrated|studio|usb|smart sound/i.test(d.label) && !isVirtual;
+                    const prefix = isHeadset ? "🎧 " : (isVirtual ? "⚠️ " : "🎙️ ");
+                    const suffix = isBuiltIn ? " (Recommended - Studio Voice)" : (isHeadset ? " (Bluetooth)" : (isVirtual ? " (Virtual Cable - No Mic)" : ""));
+                    return (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {prefix}{d.label || `Mic ${d.deviceId.slice(0,6)}`}{suffix}
+                      </option>
+                    );
+                  });
+                })()}
               </select>
+
+              {/* Voicemeeter / Virtual Cable Warning with 1-click Switch */}
+              {(() => {
+                const currentLabel = mics.find(d => d.deviceId === micId)?.label || "";
+                const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(currentLabel);
+                const hasStudioMic = mics.find(d => /array|realtek|built-in|internal|usb/i.test(d.label));
+                if (isVirtual && hasStudioMic) {
+                  return (
+                    <div style={{
+                      marginTop: "0.45rem",
+                      padding: "0.45rem 0.65rem",
+                      background: "rgba(245, 158, 11, 0.12)",
+                      border: "1px solid rgba(245, 158, 11, 0.4)",
+                      borderRadius: 8,
+                      fontSize: "0.72rem",
+                      color: "#fbbf24",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.5rem"
+                    }}>
+                      <span>⚠️ <strong>Virtual Cable (VoiceMeeter) selected</strong>: May record silence or distortion.</span>
+                      <button
+                        type="button"
+                        onClick={() => setMicId(hasStudioMic.deviceId)}
+                        style={{
+                          background: "#f59e0b",
+                          color: "#000",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "2px 7px",
+                          fontWeight: 800,
+                          fontSize: "0.68rem",
+                          cursor: "pointer",
+                          flexShrink: 0
+                        }}
+                      >
+                        Use Microphone Array
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {isShadowing && mics.some(d => d.deviceId === micId && /headset|buds|earphone|bluetooth/i.test(d.label)) && (
+                <div style={{ marginTop: "0.35rem", fontSize: "0.72rem", color: "#fbbf24", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span>💡 Tip: For high-fidelity stereo in your earphones, select your laptop's Microphone Array.</span>
+                </div>
+              )}
+
+              {/* Real-time Mic Level Visualizer & Hear Yourself 3s Test */}
+              <div style={{
+                marginTop: "0.45rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(0,0,0,0.25)",
+                padding: "5px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(255,255,255,0.08)",
+                flexWrap: "wrap",
+              }}>
+                <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontWeight: 600 }}>Mic Level:</span>
+                <div style={{ flex: 1, minWidth: 60, height: 7, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{
+                    width: `${Math.min(100, micLevel * 2)}%`,
+                    height: "100%",
+                    background: micLevel > 4 ? "linear-gradient(90deg, #10b981, #22c55e)" : "rgba(255,255,255,0.2)",
+                    transition: "width 0.05s ease-out"
+                  }} />
+                </div>
+                <span style={{
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  color: micLevel > 4 ? "#4ade80" : (micActive ? "#94a3b8" : "#fbbf24")
+                }}>
+                  {micLevel > 4 ? "🎤 Active" : "Speak to test"}
+                </span>
+
+                {/* 3-Second Hear Yourself Test Button */}
+                <button
+                  type="button"
+                  onClick={handleTestMicPlayback}
+                  disabled={micTesting}
+                  style={{
+                    background: micTestStatus === "recording" 
+                      ? "rgba(245, 158, 11, 0.25)" 
+                      : (micTestStatus === "playing" ? "rgba(34, 197, 94, 0.25)" : "rgba(124, 111, 255, 0.18)"),
+                    color: micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#4ade80" : "#a78bfa"),
+                    border: `1px solid ${micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#22c55e" : "rgba(124, 111, 255, 0.45)")}`,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    fontSize: "0.68rem",
+                    fontWeight: 700,
+                    cursor: micTesting ? "wait" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  title="Record 3 seconds and play it back in your earphones so you can hear your sound quality"
+                >
+                  {micTestStatus === "recording" ? "🔴 Speak now (3s)..." : (micTestStatus === "playing" ? "🔊 Playing back..." : "🎧 Hear Yourself")}
+                </button>
+              </div>
+
+              {/* Vocal Clarity & Boost Controls */}
+              <div style={{
+                marginTop: "0.45rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "6px",
+                background: "rgba(255,255,255,0.03)",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid rgba(255,255,255,0.05)"
+              }}>
+                <span style={{ fontSize: "0.7rem", color: "var(--muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
+                  <span>🎚️</span> Vocal Clarity &amp; Boost:
+                </span>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  {[
+                    { label: "Normal (1x)", val: 1.0 },
+                    { label: "✨ Studio (+3dB)", val: 1.4 },
+                    { label: "🚀 Max (+6dB)", val: 2.0 },
+                  ].map(b => (
+                    <button
+                      key={b.val}
+                      type="button"
+                      onClick={() => setMicBoost(b.val)}
+                      style={{
+                        background: micBoost === b.val ? "linear-gradient(135deg, #10b981, #059669)" : "rgba(255,255,255,0.06)",
+                        color: micBoost === b.val ? "#ffffff" : "var(--muted)",
+                        border: micBoost === b.val ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.1)",
+                        padding: "1px 7px",
+                        borderRadius: 5,
+                        fontSize: "0.66rem",
+                        fontWeight: micBoost === b.val ? 800 : 600,
+                        cursor: "pointer",
+                        transition: "all 0.12s ease",
+                      }}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Earphones / Audio Output Selector for Shadowing */}
+          {isShadowing && audioOutputs.length > 0 && (
+            <div style={{
+              background: "var(--card2)", border: "1px solid rgba(236,72,153,0.3)",
+              borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "0.75rem",
+              position: 'relative', zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <label className="form-label" style={{ margin: 0, fontSize: "0.85rem", color: "#f472b6" }}>
+                  🎧 Earphones / Audio Output
+                </label>
+                <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>In-ear reference speech destination</span>
+              </div>
+              <select 
+                className="form-input" 
+                value={outputId} 
+                onChange={async (e) => {
+                  const id = e.target.value;
+                  setOutputId(id);
+                  if (shadowingRefVideo.current && typeof shadowingRefVideo.current.setSinkId === "function") {
+                    try {
+                      await shadowingRefVideo.current.setSinkId(id);
+                      console.log("[Shadowing] Audio output redirected to sinkId:", id);
+                    } catch (err) {
+                      console.warn("[Shadowing] setSinkId failed:", err);
+                    }
+                  }
+                }}
+                style={{ cursor: 'pointer', position: 'relative', zIndex: 10 }}
+              >
+                <option value="">Default Earphones / Speakers (System default)</option>
+                {audioOutputs.map(d => {
+                  const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
+                  const prefix = isHeadset ? "🎧 " : "🔊 ";
+                  const suffix = isHeadset ? " (Recommended Earphones)" : "";
+                  return (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {prefix}{d.label || `Output ${d.deviceId.slice(0,6)}`}{suffix}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
 
           {/* Noise cancellation toggle */}
           <div style={{
@@ -5386,8 +5973,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
                 🎙️ AI Noise Cancellation
               </div>
-              <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.15rem" }}>
-                RNNoise WASM — removes background noise
+              <div style={{ fontSize: "0.72rem", color: isShadowing ? "#f59e0b" : "var(--muted)", marginTop: "0.15rem" }}>
+                {isShadowing 
+                  ? "RNNoise WASM (Off recommended for Shadowing so voice isn't cut off)"
+                  : "RNNoise WASM — removes background noise"}
               </div>
             </div>
             <button onClick={() => setNoiseCancel(v => !v)} style={{
@@ -5486,57 +6075,52 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         </div>
       )}
 
-      {/* ── COUNTDOWN ── */}
-      {step === "countdown" && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem" }}>
-          <video ref={liveVideoRef} autoPlay muted playsInline
-            onLoadedMetadata={syncPreviewAspect}
-            style={livePreviewStyle} />
-          <div style={{ fontSize: "5rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1 }}>{countdown}</div>
-          
-          {/* Noise cancellation status */}
-          {ncStatus === "loading" && (
-            <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI noise cancellation…</p>
-          )}
-          {ncStatus === "active" && (
-            <p style={{ color: "var(--success)", fontSize: "0.82rem" }}>✅ AI noise cancellation active</p>
-          )}
-          {ncStatus === "fallback" && (
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
-          )}
-          {!noiseCancel && (
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🎙️ Browser noise suppression active</p>
-          )}
-          
-          {/* Background blur status */}
-          {backgroundBlur && blurStatus === "loading" && (
-            <p style={{ color: "var(--warning)", fontSize: "0.82rem" }}>⚙️ Loading AI background blur…</p>
-          )}
-          {backgroundBlur && blurStatus === "active" && (
-            <p style={{ color: "var(--success)", fontSize: "0.82rem" }}>✅ AI background blur active</p>
-          )}
-          {backgroundBlur && blurStatus === "fallback" && (
-            <p style={{ color: "var(--muted)", fontSize: "0.82rem" }}>🌫️ Background blur unavailable — continuing without</p>
-          )}
-          {backgroundBlur && blurStatus === "error" && (
-            <p style={{ color: "var(--danger)", fontSize: "0.82rem" }}>⚠️ Background blur error — continuing without</p>
-          )}
-          
-          <p style={{ color: "var(--muted)" }}>Get ready…</p>
-        </div>
-      )}
-
-      {/* ── RECORDING ── */}
-      {step === "recording" && (
+      {/* ── COUNTDOWN & RECORDING (Single persistent camera stream) ── */}
+      {(step === "countdown" || step === "recording") && (
         <div>
           {/* Unified Camera Recording View */}
           <div style={{ position: "relative", marginBottom: "0.85rem" }}>
             <video ref={liveVideoRef} autoPlay muted playsInline
               onLoadedMetadata={syncPreviewAspect}
+              onClick={() => {
+                if (isShadowing && step === "recording" && (!shadowAudioPlaying || shadowAudioBlocked)) {
+                  handleManualPlayAudio();
+                }
+              }}
               style={{
                 ...livePreviewStyle,
                 maxWidth: "100%",
+                cursor: (isShadowing && step === "recording" && (!shadowAudioPlaying || shadowAudioBlocked)) ? "pointer" : "default"
               }} />
+
+            {/* Countdown Overlay on Camera Feed */}
+            {step === "countdown" && (
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)", zIndex: 10, borderRadius: 12,
+                padding: "1rem", textAlign: "center"
+              }}>
+                <div style={{
+                  fontSize: "6rem", fontWeight: 900, color: "var(--primary)", lineHeight: 1,
+                  textShadow: "0 4px 25px rgba(0,0,0,0.9)", animation: "pulse 1s infinite"
+                }}>
+                  {countdown}
+                </div>
+                <p style={{ color: "#ffffff", fontWeight: 700, fontSize: "1.05rem", marginTop: "0.6rem", textShadow: "0 2px 8px rgba(0,0,0,0.9)" }}>
+                  {isShadowing ? "🎧 Listen through earphones & get ready to shadow..." : "Get ready to speak clearly..."}
+                </p>
+                {ncStatus === "loading" && (
+                  <p style={{ color: "var(--warning)", fontSize: "0.82rem", margin: "0.2rem 0" }}>⚙️ Loading AI noise cancellation…</p>
+                )}
+                {ncStatus === "active" && (
+                  <p style={{ color: "var(--success)", fontSize: "0.82rem", margin: "0.2rem 0" }}>✅ AI noise cancellation active</p>
+                )}
+                {backgroundBlur && blurStatus === "active" && (
+                  <p style={{ color: "var(--success)", fontSize: "0.82rem", margin: "0.2rem 0" }}>✅ AI background blur active</p>
+                )}
+              </div>
+            )}
 
             {/* Floating Teleprompter banner for shadowing */}
             {isShadowing && (
@@ -5568,17 +6152,53 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       color: shadowAudioPlaying ? "#4ade80" : "#fbbf24",
                       border: shadowAudioPlaying ? "1px solid rgba(34, 197, 94, 0.35)" : "1px solid rgba(245, 158, 11, 0.35)",
                     }}>
-                      {shadowAudioPlaying ? "🎧 In-Ear Playing" : (isPaused ? "⏸️ Audio Paused" : "⚠️ Audio Muted/Off")}
+                      {shadowAudioPlaying ? "🎧 In-Ear Playing" : (isPaused ? "⏸️ Audio Paused" : (shadowAudioBlocked ? "⚠️ Audio Blocked" : "⏸️ Audio Paused"))}
                     </span>
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <span style={{
-                      fontSize: "0.68rem", fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                      background: "rgba(52, 211, 153, 0.15)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.3)",
-                    }}>
-                      ⭐ {Math.min(100, Math.round((elapsed / Math.max(1, question?.videoDuration || 60)) * 100))}% (40 pts)
-                    </span>
+                    {/* Audio Backward 5s */}
+                    <button
+                      type="button"
+                      onClick={() => handleSeekShadowAudio(-5)}
+                      style={{
+                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "2px",
+                      }}
+                      title="Rewind earphone audio 5s"
+                    >
+                      ⏪ -5s
+                    </button>
+
+                    {/* Audio Play/Pause Toggle */}
+                    <button
+                      type="button"
+                      onClick={handleToggleShadowPlay}
+                      style={{
+                        background: shadowAudioPlaying ? "rgba(236,72,153,0.3)" : "rgba(245,158,11,0.35)",
+                        color: "#fff", border: `1px solid ${shadowAudioPlaying ? "rgba(236,72,153,0.5)" : "rgba(245,158,11,0.5)"}`,
+                        padding: "2px 7px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "3px"
+                      }}
+                      title={shadowAudioPlaying ? "Pause earphone audio" : "Play earphone audio"}
+                    >
+                      {shadowAudioPlaying ? "⏸️" : "▶️ Play"}
+                    </button>
+
+                    {/* Audio Forward 5s */}
+                    <button
+                      type="button"
+                      onClick={() => handleSeekShadowAudio(5)}
+                      style={{
+                        background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 6px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "2px",
+                      }}
+                      title="Forward earphone audio 5s"
+                    >
+                      +5s ⏩
+                    </button>
 
                     {/* Speed Toggle */}
                     <button
@@ -5619,54 +6239,166 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       {shadowVideoMuted ? "🔇" : "🔊"}
                     </button>
 
-                    {/* Unblock/Force Play Button if browser blocked */}
-                    {shadowAudioBlocked && (
+                    {/* Subtitles / Script Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowTranscription(prev => !prev)}
+                      style={{
+                        background: showTranscription ? "rgba(236,72,153,0.3)" : "rgba(255,255,255,0.12)",
+                        color: showTranscription ? "#f472b6" : "#ffffff",
+                        border: showTranscription ? "1px solid rgba(236,72,153,0.6)" : "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 7px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "3px",
+                        transition: "all 0.15s ease",
+                      }}
+                      title={showTranscription ? "Hide Script / Subtitles" : "Show Script / Subtitles"}
+                    >
+                      {showTranscription ? "📝 Script: ON" : "📝 Script: OFF"}
+                    </button>
+
+                    {/* Unblock/Force Play Button if browser blocked or paused */}
+                    {(!shadowAudioPlaying || shadowAudioBlocked) && (
                       <button
                         type="button"
                         onClick={handleManualPlayAudio}
                         style={{
                           background: "linear-gradient(135deg, #ec4899, #8b5cf6)", color: "#fff", border: "none",
                           padding: "2px 8px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 800, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: "3px",
+                          boxShadow: "0 0 10px rgba(236,72,153,0.5)"
                         }}
                       >
-                        ▶ Play Sound
+                        🔊 Play Audio
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* 5-Second Phrase Window */}
-                {(() => {
-                  const fullText = question?.videoTranscript || question?.question || "";
-                  const audioDuration = question?.videoDuration || durationLimits.fullScoreSeconds || 60;
-                  const cues = buildTeleprompterCues(fullText, audioDuration);
-                  if (!cues.length) return <div style={{ fontSize: "0.92rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
+                {/* In-recording Audio Scrubber Timeline */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "0.22rem 0.65rem",
+                  background: "rgba(0,0,0,0.35)",
+                  borderRadius: 6,
+                  marginBottom: "0.65rem",
+                  fontSize: "0.68rem",
+                  color: "#94a3b8",
+                  fontFamily: "monospace",
+                }}>
+                  <span style={{ color: "#f472b6", fontWeight: 700 }}>🎧 Audio:</span>
+                  <span>{fmtTime(Math.round(shadowAudioTime || 0))}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(1, question?.videoDuration || 180)}
+                    step={0.5}
+                    value={shadowAudioTime}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (shadowingRefVideo.current) {
+                        shadowingRefVideo.current.currentTime = val;
+                        setShadowAudioTime(val);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      accentColor: "#ec4899",
+                      height: 4,
+                      cursor: "pointer",
+                    }}
+                    title="Scrub audio back or forward"
+                  />
+                  <span>{fmtTime(question?.videoDuration || 180)}</span>
+                </div>
 
-                  const refTime = shadowAudioPlaying ? shadowAudioTime : elapsed;
-                  const activeIdx = cues.findIndex(c => refTime >= c.start && refTime < c.end);
-                  const safeIdx = activeIdx !== -1 ? activeIdx : (refTime >= audioDuration ? cues.length - 1 : 0);
-                  const curCue = cues[safeIdx] || cues[0];
-                  const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
-                  const cueProgress = curCue && curCue.duration > 0
-                    ? Math.min(1, Math.max(0, (refTime - curCue.start) / curCue.duration))
-                    : 0;
+                {/* 5-Second Phrase Window / Subtitles */}
+                {showTranscription ? (
+                  (() => {
+                    const fullText = question?.videoTranscript || question?.question || "";
+                    const audioDuration = question?.videoDuration || durationLimits.fullScoreSeconds || 60;
+                    const cues = buildTeleprompterCues(fullText, audioDuration);
+                    if (!cues.length) return <div style={{ fontSize: "0.92rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
 
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                      <div style={{ fontSize: "1.06rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.85)" }}>
-                        {curCue.text}
-                      </div>
-                      <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.12s linear" }} />
-                      </div>
-                      {nextCue && (
-                        <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <span style={{ color: "#ec4899", fontWeight: 700 }}>Next: </span>{nextCue.text}
+                    const refTime = shadowAudioPlaying ? shadowAudioTime : elapsed;
+                    const activeIdx = cues.findIndex(c => refTime >= c.start && refTime < c.end);
+                    const safeIdx = activeIdx !== -1 ? activeIdx : (refTime >= audioDuration ? cues.length - 1 : 0);
+                    const curCue = cues[safeIdx] || cues[0];
+                    const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
+                    const cueProgress = curCue && curCue.duration > 0
+                      ? Math.min(1, Math.max(0, (refTime - curCue.start) / curCue.duration))
+                      : 0;
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                          <div style={{ fontSize: "1.06rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.85)" }}>
+                            {curCue.text}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowTranscription(false)}
+                            style={{
+                              background: "rgba(255,255,255,0.08)",
+                              color: "#cbd5e1",
+                              border: "1px solid rgba(255,255,255,0.15)",
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              fontSize: "0.62rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              flexShrink: 0,
+                            }}
+                            title="Hide Script"
+                          >
+                            Hide ✕
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                        <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.12s linear" }} />
+                        </div>
+                        {nextCue && (
+                          <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <span style={{ color: "#ec4899", fontWeight: 700 }}>Next: </span>{nextCue.text}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.15rem 0.1rem",
+                    gap: "0.5rem"
+                  }}>
+                    <span style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.65)", fontStyle: "italic", display: "flex", alignItems: "center", gap: "5px" }}>
+                      <span>🎧</span> In-ear reference audio playing · Pure shadowing mode (script hidden)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowTranscription(true)}
+                      style={{
+                        background: "rgba(236, 72, 153, 0.18)",
+                        color: "#f472b6",
+                        border: "1px solid rgba(236, 72, 153, 0.45)",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Turn on subtitles / transcription"
+                    >
+                      👁️ Show Script
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -5915,35 +6647,6 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
                   ✨ Vocabulary requirement waived for Shadowing Activity
                 </span>
-                {question?.videoTranscript && (
-                  <button
-                    type="button"
-                    onClick={() => setShowShadowScript(p => !p)}
-                    style={{
-                      background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)",
-                      borderRadius: 8, padding: "3px 8px", fontSize: "0.72rem", color: "#f472b6",
-                      fontWeight: 700, cursor: "pointer",
-                    }}
-                  >
-                    📜 {showShadowScript ? "Hide Script" : "Show Script"}
-                  </button>
-                )}
-              </div>
-            )}
-            {isShadowing && showShadowScript && question?.videoTranscript && (
-              <div style={{
-                padding: "0.65rem 0.85rem",
-                borderRadius: 10,
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(236,72,153,0.3)",
-                fontSize: "0.82rem",
-                color: "#f8fafc",
-                lineHeight: 1.5,
-                maxHeight: "120px",
-                overflowY: "auto",
-                whiteSpace: "pre-line",
-              }}>
-                {question.videoTranscript}
               </div>
             )}
 
@@ -6023,19 +6726,17 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               gap: "0.5rem"
             }}>
               <div>
-                <span style={{ fontWeight: 700, color: "#f472b6" }}>🎬 Shadowing Match: </span>
+                <span style={{ fontWeight: 700, color: "#f472b6" }}>🎬 Shadowing Recording: </span>
                 <span style={{ color: "var(--text)" }}>
-                  {fmtTime(elapsed)} of {fmtTime(question?.videoDuration || 60)} ({Math.min(100, Math.round((elapsed / (question?.videoDuration || 60)) * 100))}%)
+                  {fmtTime(elapsed)} of {fmtTime(question?.videoDuration || 60)} Target Audio
                 </span>
               </div>
               <div style={{
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: "0.82rem",
-                color: (elapsed / (question?.videoDuration || 60)) >= 0.9 ? "#34d399" : "#f472b6"
+                color: "#94a3b8"
               }}>
-                {(elapsed / (question?.videoDuration || 60)) >= 0.9
-                  ? "⭐ ≥90% Duration Achieved (Full 40 Pts)"
-                  : `Effort Score: ${((Math.min(0.9, elapsed / (question?.videoDuration || 60)) / 0.9) * 40).toFixed(1)} / 40 Pts`}
+                ✨ Active speech ratio (≥85%) &amp; delivery rhythm will be evaluated by AI upon submission
               </div>
             </div>
           )}
@@ -6323,15 +7024,21 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
   // Generate improvement tips based on what's missing from full score
   const improvementTips = [];
   if (bd) {
-    if (bd.isOffTopic) {
+    if (bd.isSilentAttempt) {
+      improvementTips.push({
+        icon: "🔇",
+        label: "Enable microphone & shadow aloud",
+        detail: bd.silenceWarning || "No audible speech was detected in this recording. Turn up your microphone and shadow the native speaker aloud to earn points.",
+        gap: 100,
+      });
+    } else if (bd.isOffTopic) {
       improvementTips.push({
         icon: "🚨",
         label: "Answer today's challenge",
         detail: bd.offTopicReason || "Your video does not address today's topic. Re-record answering today's question to earn a higher score.",
         gap: 50,
       });
-    }
-    if (isShadowBd) {
+    } else if (isShadowBd) {
       const durGap = (bd.maxLength || 40) - (bd.length || 0);
       const comGap = (bd.maxComm || 60) - (bd.comm || 0);
       if (durGap > 0.5) {
@@ -6563,16 +7270,16 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                     borderRadius: 10,
                     fontSize: "0.78rem",
                     fontWeight: 700,
-                    border: "1px solid rgba(167, 139, 250, 0.4)",
-                    background: "rgba(124, 111, 255, 0.15)",
-                    color: "#c4b5fd",
+                    border: isShadowBd ? "1px solid rgba(236, 72, 153, 0.45)" : "1px solid rgba(167, 139, 250, 0.4)",
+                    background: isShadowBd ? "rgba(236, 72, 153, 0.15)" : "rgba(124, 111, 255, 0.15)",
+                    color: isShadowBd ? "#f472b6" : "#c4b5fd",
                     cursor: reEvaluating ? "not-allowed" : "pointer",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.35rem",
                     transition: "all 0.15s ease",
                   }}
-                  title="Re-run vocabulary detection and recalculate score"
+                  title={isShadowBd ? "Recalculate shadowing speech ratio, rhythm & fluency score" : "Re-run vocabulary detection and recalculate score"}
                 >
                   {reEvaluating ? (
                     <>
@@ -6647,7 +7354,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Duration Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  label: `⏱️ Active Speech Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
                   color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6",
@@ -6735,13 +7442,19 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                   marginTop: "0.25rem",
                   padding: "0.45rem 0.75rem",
                   borderRadius: 10,
-                  background: "rgba(244, 114, 182, 0.08)",
-                  border: "1px solid rgba(244, 114, 182, 0.25)",
+                  background: bd.isSilentAttempt ? "rgba(239, 68, 68, 0.12)" : bd.isOffTopic ? "rgba(245, 158, 11, 0.12)" : "rgba(244, 114, 182, 0.08)",
+                  border: bd.isSilentAttempt ? "1px solid rgba(239, 68, 68, 0.35)" : bd.isOffTopic ? "1px solid rgba(245, 158, 11, 0.35)" : "1px solid rgba(244, 114, 182, 0.25)",
                   fontSize: "0.74rem",
-                  color: "#f472b6",
+                  color: bd.isSilentAttempt ? "#f87171" : bd.isOffTopic ? "#fbbf24" : "#f472b6",
                   lineHeight: 1.4,
                 }}>
-                  ✨ <strong>Shadowing Activity:</strong> Scored on duration matching (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.
+                  {bd.isSilentAttempt ? (
+                    <>🔇 <strong>No Speech Detected:</strong> {bd.silenceWarning || "The audio was completely silent. You must speak along with the audio to earn points."}</>
+                  ) : bd.isOffTopic ? (
+                    <>🚨 <strong>Off-Topic Shadowing:</strong> {bd.offTopicReason || "Your speech did not match today's assigned shadowing audio."}</>
+                  ) : (
+                    <>✨ <strong>Shadowing Activity:</strong> Scored on active speech ratio (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.</>
+                  )}
                 </div>
               )}
 

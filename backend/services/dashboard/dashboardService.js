@@ -6,6 +6,106 @@
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import DailyReport from "../../../models/dailyReportSchema.js";
+
+let lastManualQuestionCheck = 0;
+async function maybePublishDueManualQuestion() {
+  const now = Date.now();
+  if (now - lastManualQuestionCheck < 60_000) return;
+  lastManualQuestionCheck = now;
+  await maybePublishDueManualQuestion();
+}
+
+let cachedLeaderboardSummary = null;
+let cachedLeaderboardTime = 0;
+const LEADERBOARD_CACHE_TTL = 30 * 1000; // 30s cache
+
+export function invalidateLeaderboardCache() {
+  cachedLeaderboardSummary = null;
+  cachedLeaderboardTime = 0;
+}
+
+async function getCachedLeaderboardData(todayIST) {
+  const now = Date.now();
+  if (cachedLeaderboardSummary && (now - cachedLeaderboardTime < LEADERBOARD_CACHE_TTL) && cachedLeaderboardSummary.todayIST === todayIST) {
+    return cachedLeaderboardSummary;
+  }
+
+  const [allUsers, existingStreakRecord] = await Promise.all([
+    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze freezeStreakProgress avatarUrl").lean(),
+    StreakRecord.findOne().lean(),
+  ]);
+
+  const paidUsers = allUsers.filter(u => u.paid === true);
+  const completed = paidUsers.filter(u => u.completed).length;
+  const sortedByStreak = [...paidUsers].sort((a, b) => (b.streak || 0) - (a.streak || 0));
+
+  const leaderboardSorted = [...paidUsers].sort((a, b) => {
+    const streakA = a.streak || 0;
+    const streakB = b.streak || 0;
+    const hasStreakA = streakA > 0;
+    const hasStreakB = streakB > 0;
+
+    if (hasStreakA && !hasStreakB) return -1;
+    if (!hasStreakA && hasStreakB) return 1;
+
+    const scoreA = a.monthlyScore ?? 0;
+    const scoreB = b.monthlyScore ?? 0;
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    if (b.completed !== a.completed) return b.completed ? 1 : -1;
+    return streakB - streakA;
+  });
+
+  let activeRankCounter = 0;
+  const topStreak = leaderboardSorted
+    .map((u) => {
+      const hasStreak = (u.streak || 0) > 0;
+      let rank = null;
+      if (hasStreak) {
+        activeRankCounter += 1;
+        rank = activeRankCounter;
+      }
+      const isScoredToday = Boolean(u.lastScoreDate === todayIST && u.todayScore != null);
+      const todayPoints = isScoredToday ? Math.round(u.todayScore) : null;
+
+      return withBadgeData(u, {
+        rank,
+        name: u.name,
+        userId: u.userId,
+        phone: u.phone,
+        avatarUrl: u.avatarUrl || null,
+        streak: u.streak || 0,
+        weeklySubmissions: u.weeklySubmissions || 0,
+        completed: u.completed || false,
+        monthlyScore: u.monthlyScore ?? 0,
+        todayScore: todayPoints,
+        isCompletedToday: Boolean(u.completed || isScoredToday),
+        lastScoreDate: u.lastScoreDate,
+      });
+    });
+
+  const todayScoredUsers = paidUsers.filter(u => u.lastScoreDate === todayIST && u.todayScore != null);
+  const topScorerToday = todayScoredUsers.length > 0
+    ? todayScoredUsers.reduce((best, u) => (u.todayScore > best.todayScore ? u : best))
+    : null;
+  const todayTopScorer = topScorerToday ? {
+    name: topScorerToday.name,
+    score: Math.round(topScorerToday.todayScore),
+  } : null;
+
+  cachedLeaderboardSummary = {
+    todayIST,
+    paidUsers,
+    completed,
+    sortedByStreak,
+    leaderboardSorted,
+    topStreak,
+    todayTopScorer,
+    existingStreakRecord,
+  };
+  cachedLeaderboardTime = now;
+  return cachedLeaderboardSummary;
+}
+
 import StreakRecord from "../../../models/streakRecordSchema.js";
 import VideoReport from "../../../models/videoReportSchema.js";
 import { generateSVGPoster } from "../../../api/posterGenerator.js";
@@ -96,6 +196,84 @@ function getPosterImage(status) {
 /**
  * Get today's dashboard overview (all roles)
  */
+
+/**
+ * Fast endpoint data for today question (avoids full user table scans)
+ */
+export async function getTodayQuestionData() {
+  const status = await Status.findOne().lean();
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  const todayIST = `${y}-${mo}-${d}`;
+
+  if (status && ((status.durationShadowingMax ?? 0) < 180 || (status.durationShadowingFull ?? 0) < 180)) {
+    Status.updateOne({}, { $set: { durationShadowingMax: 180, durationShadowingFull: 180 } }).catch(() => {});
+  }
+
+  const isQuestionSentToday = Boolean(
+    status?.questionSentToday &&
+    (status?.questionPublishedDate === todayIST || status?.lastPosterSentDate === todayIST || !status?.lastResetDate || status?.lastResetDate !== todayIST) &&
+    (status?.todayQuestion || status?.todayTopic)
+  );
+
+  const isShadowing = isQuestionSentToday && activeShadowingTask(status);
+  const isPicture = isQuestionSentToday && activePictureTask(status);
+  const isStory = isQuestionSentToday && activeStoryTask(status);
+
+  return {
+    questionSent: isQuestionSentToday,
+    topic: isQuestionSentToday ? (status?.todayTopic || null) : null,
+    question: isQuestionSentToday ? (status?.todayQuestion || null) : null,
+    category: isQuestionSentToday ? (status?.todayCategory || null) : null,
+    audioUrl: isQuestionSentToday
+      ? (isShadowing ? resolvePlayableAudioUrl(status?.todayAudioUrl || status?.todayVideoUrl, status?._id) : (status?.todayAudioUrl || null))
+      : null,
+    imageUrl: isQuestionSentToday ? (status?.todayImageUrl || null) : null,
+    contentType: isQuestionSentToday ? (status?.todayContentType || "question") : "question",
+    isShadowing,
+    videoUrl: (isQuestionSentToday && isShadowing) ? resolvePlayableVideoUrl(status?.todayVideoUrl, status?._id) : null,
+    videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
+    videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
+    videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
+    vocabulary: (isQuestionSentToday && !isShadowing)
+      ? (status?.todayVocabulary || []).slice(
+          0,
+          isPicture ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
+            : isStory ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
+            : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
+        )
+      : [],
+    vocabWordCount: isShadowing ? 0 : isPicture ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5) : isStory ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5) : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
+    vocabRequiredCount: isShadowing ? 0 : isPicture ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3) : isStory ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3) : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3),
+    vocabLevel: status?.vocabLevel || 'B2',
+    durationLimits: isQuestionSentToday ? getDurationLimits({
+      contentType: status?.todayContentType,
+      isStorySummary: isStory,
+      isPictureDescription: isPicture,
+      isShadowing: isShadowing,
+      challengeType: isShadowing ? "shadowing_video" : undefined,
+    }, {
+      ...(status || {}),
+      durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+      durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
+    }) : null,
+    durationSettings: {
+      durationDefaultMax: status?.durationDefaultMax ?? 300,
+      durationDefaultFull: status?.durationDefaultFull ?? 300,
+      durationStoryMax: status?.durationStoryMax ?? 180,
+      durationStoryFull: status?.durationStoryFull ?? 180,
+      durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+      durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
+      durationWeeklyMax: status?.durationWeeklyMax ?? 420,
+      durationWeeklyFull: status?.durationWeeklyFull ?? 300,
+    },
+    allowPrivateVideos: status?.allowPrivateVideos ?? true,
+    enableBackgroundBlur: status?.enableBackgroundBlur ?? false,
+  };
+}
+
 export async function getTodayOverview() {
   try {
     const { publishDueManualQuestion } = await import("../scheduler/questionSchedulerService.js");
@@ -198,14 +376,18 @@ export async function getTodayOverview() {
         isPictureDescription: activePictureTask(status),
         isShadowing: activeShadowingTask(status),
         challengeType: activeShadowingTask(status) ? "shadowing_video" : undefined,
-      }, status || {}),
+      }, {
+        ...(status || {}),
+        durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+        durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
+      }),
       durationSettings: {
         durationDefaultMax: status?.durationDefaultMax ?? 300,
         durationDefaultFull: status?.durationDefaultFull ?? 300,
         durationStoryMax: status?.durationStoryMax ?? 180,
         durationStoryFull: status?.durationStoryFull ?? 180,
-        durationShadowingMax: status?.durationShadowingMax ?? 180,
-        durationShadowingFull: status?.durationShadowingFull ?? 180,
+        durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
+        durationShadowingFull: Math.max(180, Number(status?.durationShadowingFull) || 180),
         durationWeeklyMax: status?.durationWeeklyMax ?? 420,
         durationWeeklyFull: status?.durationWeeklyFull ?? 300,
         durationMonthlyReflectionMax: status?.durationMonthlyReflectionMax ?? 420,
@@ -277,11 +459,31 @@ export async function getUserProfile(phone) {
     }).lean();
   }
 
-  const [status, allUsers, existingStreakRecord] = await Promise.all([
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const y = nowIST.getFullYear();
+  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
+  const d = String(nowIST.getDate()).padStart(2, "0");
+  const todayIST = `${y}-${mo}-${d}`;
+
+  const [status, leaderboardData] = await Promise.all([
     Status.findOne().lean(),
-    User.find().select("name phone userId streak weeklySubmissions monthlySubmissions monthlyScore completed lastScoreDate todayScore earnedBadges paid streakFreeze freezeStreakProgress avatarUrl").lean(),
-    StreakRecord.findOne().lean(),
+    getCachedLeaderboardData(todayIST),
   ]);
+
+  const {
+    paidUsers,
+    completed,
+    sortedByStreak,
+    leaderboardSorted,
+    topStreak: cachedTopStreak,
+    todayTopScorer,
+    existingStreakRecord
+  } = leaderboardData;
+
+  const topStreak = cachedTopStreak.map(u => ({
+    ...u,
+    isCurrentUser: u.phone === phone || u.phone === strippedPhone || `91${u.phone}` === phone,
+  }));
 
   const profileUser = user || {
     name: "User",
@@ -316,18 +518,6 @@ export async function getUserProfile(phone) {
       };
     }
   }
-  // ── Paid Members Only ───────────────────────────────────────────────────
-  // Only paid active students count in group stats, leaderboard, and streak records.
-  const paidUsers = allUsers.filter(u => u.paid === true);
-  const completed = paidUsers.filter(u => u.completed).length;
-  const sortedByStreak = [...paidUsers].sort((a, b) => (b.streak || 0) - (a.streak || 0));
-
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const y = nowIST.getFullYear();
-  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-  const d = String(nowIST.getDate()).padStart(2, "0");
-  const todayIST = `${y}-${mo}-${d}`;
-
   // Check if today's question was genuinely published for today and has not reset
   const isQuestionSentToday = Boolean(
     status?.questionSentToday &&
@@ -339,68 +529,6 @@ export async function getUserProfile(phone) {
   const vocabularyPromise = (isQuestionSentToday && status?.todayQuestion)
     ? getTodayVocabulary().catch(() => [])
     : Promise.resolve(isQuestionSentToday ? (status?.todayVocabulary || []) : []);
-
-  // ── Leaderboard sort (Paid Members Only) ──────────────────────────────────
-  // 1. Active streak speakers (streak > 0) rank above 0-day speakers (streak === 0).
-  // 2. Primary sort within tier: monthlyScore desc (highest pts first, always).
-  // 3. Secondary sort: streak desc (tiebreaker when scores are equal).
-  // 4. Submitted today floats above non-submitted at equal score.
-  const leaderboardSorted = [...paidUsers].sort((a, b) => {
-    const streakA = a.streak || 0;
-    const streakB = b.streak || 0;
-    const hasStreakA = streakA > 0;
-    const hasStreakB = streakB > 0;
-
-    // Active streak speakers always sort above 0-day speakers
-    if (hasStreakA && !hasStreakB) return -1;
-    if (!hasStreakA && hasStreakB) return 1;
-
-    const scoreA = a.monthlyScore ?? 0;
-    const scoreB = b.monthlyScore ?? 0;
-    if (scoreB !== scoreA) return scoreB - scoreA;          // higher pts first
-    if (b.completed !== a.completed) return b.completed ? 1 : -1; // submitted floats up
-    return streakB - streakA;                               // streak tiebreaker
-  });
-
-  let activeRankCounter = 0;
-  const topStreak = leaderboardSorted
-    .map((u) => {
-      const hasStreak = (u.streak || 0) > 0;
-      let rank = null;
-      if (hasStreak) {
-        activeRankCounter += 1;
-        rank = activeRankCounter;
-      }
-      const isScoredToday = Boolean(u.lastScoreDate === todayIST && u.todayScore != null);
-      const todayPoints = isScoredToday ? Math.round(u.todayScore) : null;
-
-      return withBadgeData(u, {
-        rank,
-        name: u.name,
-        userId: u.userId,
-        phone: u.phone,
-        avatarUrl: u.avatarUrl || null,
-        streak: u.streak || 0,
-        weeklySubmissions: u.weeklySubmissions || 0,
-        completed: u.completed || false,
-        monthlyScore: u.monthlyScore ?? 0,
-        todayScore: todayPoints,
-        isCompletedToday: Boolean(u.completed || isScoredToday),
-        lastScoreDate: u.lastScoreDate,
-        isCurrentUser: u.phone === phone || u.phone === strippedPhone || `91${u.phone}` === phone,
-      });
-    });
-
-  // ── Today's top scorer ──────────────────────────────────────────────────
-  // Find the paid user with the highest todayScore who actually scored today
-  const todayScoredUsers = paidUsers.filter(u => u.lastScoreDate === todayIST && u.todayScore != null);
-  const topScorerToday = todayScoredUsers.length > 0
-    ? todayScoredUsers.reduce((best, u) => (u.todayScore > best.todayScore ? u : best))
-    : null;
-  const todayTopScorer = topScorerToday ? {
-    name: topScorerToday.name,
-    score: Math.round(topScorerToday.todayScore),
-  } : null;
 
   // Find the current user's rank in the full leaderboard
   const myRankIdx = leaderboardSorted.findIndex(u =>

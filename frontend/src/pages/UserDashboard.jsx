@@ -8,10 +8,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 import GuestBanner from "../components/GuestBanner.jsx";
 import StreakBadge from "../components/StreakBadge.jsx";
 import { useGsapEntrance, AnimatedNumber } from "../hooks/useGsapStagger.jsx";
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Legend, Area, AreaChart,
-} from "recharts";
 import { STREAK_BADGES } from "../utils/streakBadges.js";
 
 const MOTIVATIONAL = [
@@ -719,9 +715,8 @@ function getCachedDashboard() {
     });
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) return null;
-    return data;
+    const { data } = JSON.parse(raw);
+    return data || null;
   } catch { return null; }
 }
 
@@ -791,6 +786,37 @@ function buildGuestData() {
   };
 }
 
+function getInitialDashboardData(hasRealUser, cached, user) {
+  if (hasRealUser && cached) return cached;
+  if (!hasRealUser) return buildGuestData();
+  try {
+    const rawUser = localStorage.getItem("speakshine_user");
+    const u = user || (rawUser ? JSON.parse(rawUser) : null);
+    const rawProfile = localStorage.getItem("speakshine_profile_cache");
+    const p = rawProfile ? JSON.parse(rawProfile) : null;
+    if (u || p) {
+      return {
+        profile: {
+          name: p?.name || u?.name || "Speaker",
+          phone: u?.phone || "",
+          streak: p?.streak ?? u?.streak ?? 0,
+          weeklySubmissions: p?.weeklySubmissions ?? 0,
+          monthlySubmissions: p?.monthlySubmissions ?? 0,
+          completed: Boolean(p?.completed ?? u?.completed),
+          fine: p?.fine ?? 0,
+          streakFreeze: p?.streakFreeze ?? 0,
+          monthlyScore: p?.monthlyScore ?? 0,
+          feedbackScores: p?.feedbackScores || [],
+        },
+        today: {},
+        topStreak: [],
+        leaderboard: [],
+      };
+    }
+  } catch {}
+  return null;
+}
+
 export default function UserDashboard() {
   const { user, logout } = useAuth();
   const cached = getCachedDashboard();
@@ -808,9 +834,10 @@ export default function UserDashboard() {
   );
   const isGuest = !hasRealUser;
 
-  const [data, setData] = useState(() => (hasRealUser && cached) ? cached : (hasRealUser ? null : buildGuestData()));
+  const initialData = getInitialDashboardData(hasRealUser, cached, user);
+  const [data, setData] = useState(() => initialData);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(hasRealUser && !cached);
+  const [loading, setLoading] = useState(hasRealUser && !initialData);
   const [liveSessions, setLiveSessions] = useState([]);
   const [sessionPage, setSessionPage] = useState(1);
   const [celebrationQueue, setCelebrationQueue] = useState([]);
@@ -864,14 +891,12 @@ export default function UserDashboard() {
   useEffect(() => {
     if (isGuest && !hasRealUser) return; // only pure guests skip fetching
     const fetchData = () => {
-      Promise.all([
-        api.get("/dashboard/me"),
-        api.get("/live-sessions").catch(() => ({ data: [] })),
-      ]).then(([d, ls]) => {
-        applyDashboardData(d.data);
-        setCachedDashboard(d.data);
-        setLiveSessions((ls.data || []).filter(s => s.status === "live" || s.status === "scheduled"));
-      })
+      // Fetch primary dashboard immediately to clear loading state in <200ms
+      api.get("/dashboard/me")
+        .then(d => {
+          applyDashboardData(d.data);
+          setCachedDashboard(d.data);
+        })
         .catch(err => {
           if (err.response?.status === 401 && !user) {
             setData(buildGuestData());
@@ -880,6 +905,11 @@ export default function UserDashboard() {
           }
         })
         .finally(() => setLoading(false));
+
+      // Fetch live sessions concurrently without blocking dashboard render
+      api.get("/live-sessions")
+        .then(ls => setLiveSessions((ls.data || []).filter(s => s.status === "live" || s.status === "scheduled")))
+        .catch(() => {});
     };
 
     fetchData();

@@ -663,6 +663,7 @@ export async function sendDailyPosterToGroup(options = {}) {
 
     const isPicture = contentType === "picture_description" || status?.isPictureDescriptionDay || status?.todayContentType === "picture_description";
     const isStory = contentType === "story_audio" || status?.isStorySummaryDay || status?.todayContentType === "story_audio";
+    const isShadowing = contentType === "shadowing_video" || status?.isShadowingDay || status?.todayContentType === "shadowing_video";
     const vocabReq = isPicture
       ? (status?.vocabPictureRequiredCount ?? 1)
       : isStory
@@ -827,6 +828,75 @@ export async function sendDailyPosterToGroup(options = {}) {
       await recordSuccess();
       console.log(`[WhatsApp] ✅ Story summary challenge sent successfully!`);
       return { success: true, targetGroup, topic, type: "story_audio", sentAt: new Date() };
+    }
+
+    // ── CASE 2.5: SHADOWING PRACTICE CHALLENGE ──────────────────────────────────
+    if (isShadowing) {
+      let posterBuffer = null;
+      try {
+        posterBuffer = await generatePNGPosterBuffer({
+          topic,
+          question: question || "Put in your earphones, listen to the native speaker, and shadow along in real-time! Match their pacing, pronunciation, and rhythm.",
+          category: "Shadowing Practice",
+          contentType: "shadowing_video",
+          vocabulary: [],
+          vocabRequiredCount: 0,
+        });
+      } catch (shadowPosterErr) {
+        console.warn("[WhatsApp] ⚠️ Shadowing poster buffer generation failed, falling back to rich text dispatch:", shadowPosterErr.message);
+      }
+
+      const caption = [
+        `🎙️ *SPEAK & SHINE — NATIVE SPEAKER SHADOWING CHALLENGE* 🎙️`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `🎧 *Shadowing Topic:* ${topic}`,
+        ``,
+        `📝 *Your Assignment:*`,
+        `1. Put on your earphones so you can hear the native speaker clearly while speaking.`,
+        `2. Play the native speaker audio on the Speak & Shine webapp.`,
+        `3. Record your video while shadowing (speaking along in real-time).`,
+        `4. Focus on matching pacing, pauses, and natural speech rhythm!`,
+        ``,
+        `💡 *Note:* Vocabulary requirement is waived for today's shadowing mission. Focus on rhythm and flow!`,
+        `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        `🎥 *TASK:* Record your shadowing video! (Max duration: 3 mins)`,
+        `🚀 *Start shadowing here:* ${frontendUrl}`,
+      ].filter(Boolean).join("\n");
+
+      if (posterBuffer) {
+        console.log(`[WhatsApp] 📤 Sending shadowing poster to group: ${targetGroup}...`);
+        await sock.sendMessage(targetGroup, {
+          image: posterBuffer,
+          mimetype: "image/png",
+          caption,
+        });
+      } else {
+        console.log(`[WhatsApp] 📤 Sending rich-text shadowing challenge to group: ${targetGroup}...`);
+        await sock.sendMessage(targetGroup, {
+          text: caption,
+        });
+      }
+
+      // If audio URL or video URL is available, send reference audio directly to WhatsApp group!
+      const audioUrl = status?.todayAudioUrl || status?.todayVideoUrl;
+      if (audioUrl) {
+        try {
+          console.log(`[WhatsApp] 🎵 Sending shadowing reference audio file to group: ${audioUrl}...`);
+          await sock.sendMessage(targetGroup, {
+            audio: { url: audioUrl },
+            mimetype: "audio/mp4",
+            ptt: false,
+            fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Shadowing_Audio.mp3`,
+          });
+          console.log(`[WhatsApp] ✅ Shadowing audio file delivered to group!`);
+        } catch (audioErr) {
+          console.warn("[WhatsApp] Could not send shadowing audio file attachment (non-fatal):", audioErr.message);
+        }
+      }
+
+      await recordSuccess();
+      console.log(`[WhatsApp] ✅ Shadowing challenge sent successfully!`);
+      return { success: true, targetGroup, topic, type: "shadowing_video", sentAt: new Date() };
     }
 
     // ── CASE 3: REGULAR DAILY QUESTION CHALLENGE ─────────────────────────────────
