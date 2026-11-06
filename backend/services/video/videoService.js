@@ -1764,21 +1764,29 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   const todayVocab = status?.todayVocabulary || [];
   const transcript = report.analysis?.transcription || "";
 
-  // 1. Re-match vocabulary with intelligent matcher
-  const matchedWords = matchVocabularyInTranscript(transcript, todayVocab, report.analysis);
+  // Check if shadowing challenge from report or status
+  const isShadowReport = report.challengeType === "shadowing_video" ||
+    report.analysis?.challengeType === "shadowing_video" ||
+    Boolean(report.analysis?.scoreBreakdown?.isShadowing) ||
+    status?.todayContentType === "shadowing_video" ||
+    Boolean(status?.isShadowingDay);
+
+  // 1. Re-match vocabulary with intelligent matcher (waived for shadowing)
+  const matchedWords = isShadowReport ? [] : matchVocabularyInTranscript(transcript, todayVocab, report.analysis);
 
   // 2. Re-calculate composite score and score breakdown
-  const challengeType = report.challengeType || report.analysis?.challengeType || (
+  let challengeType = report.challengeType || report.analysis?.challengeType || (
     status?.isMonthlyReflectionDay ? "monthly_reflection"
     : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio")) ? "picture_description"
     : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
+    : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
     : status?.isMonthlyGoalsDay ? "monthly_goals"
     : "topic"
   );
 
   const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
   const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-  const isShadow = challengeType === "shadowing_video" || status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
+  const isShadow = isShadowReport || challengeType === "shadowing_video";
   if (isShadow) {
     challengeType = "shadowing_video";
   }
@@ -1808,6 +1816,10 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
 
   const user = report.phone ? await User.findOne({ phone: report.phone }).lean() : null;
 
+  const targetDur = isShadow
+    ? Math.max(20, Math.min(180, Number(report.analysis?.targetVideoDuration) || Number(report.analysis?.scoreBreakdown?.targetDuration) || Number(status?.todayVideoDuration) || 85))
+    : (status?.todayVideoDuration || 60);
+
   const { score, breakdown } = calculateCompositeScore({
     durationSeconds: report.videoDuration || 0,
     maxDurationSeconds: fullScoreSeconds,
@@ -1819,7 +1831,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
     isShadowing: isShadow || false,
-    targetVideoDuration: status?.todayVideoDuration || 60,
+    targetVideoDuration: targetDur,
     userHistory: user?.feedbackScores || [],
   });
 
@@ -1847,9 +1859,9 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     maxGrowth: 0,
     vocabulary: 0,
     maxVocabulary: 0,
-    durationMatchPercent: breakdown.durationRatio ?? Math.round(((report.videoDuration || 0) / (status?.todayVideoDuration || 60)) * 100),
+    durationMatchPercent: breakdown.durationRatio ?? Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100),
     durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
-    targetDuration: status?.todayVideoDuration || 60,
+    targetDuration: targetDur,
     userDuration: report.videoDuration || 0,
     spokenDurationSeconds: breakdown.spokenDurationSeconds ?? (typeof breakdown.speechRatio === "number" ? Math.round((report.videoDuration || 0) * (breakdown.speechRatio / 100)) : null),
     speechRatio: breakdown.speechRatio ?? null,
@@ -1888,10 +1900,14 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
 
   const { analysis: reportAnalysis } = await prepareReportAnalysis(report);
 
+  const resultMessage = isShadow
+    ? `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.`
+    : `Score re-evaluated! Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`;
+
   return {
     success: true,
-    message: `Score re-evaluated! Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`,
-    matchedWords,
+    message: resultMessage,
+    matchedWords: isShadow ? [] : matchedWords,
     score,
     analysis: reportAnalysis,
   };

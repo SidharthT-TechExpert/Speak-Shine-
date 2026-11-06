@@ -6606,16 +6606,16 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                     borderRadius: 10,
                     fontSize: "0.78rem",
                     fontWeight: 700,
-                    border: "1px solid rgba(167, 139, 250, 0.4)",
-                    background: "rgba(124, 111, 255, 0.15)",
-                    color: "#c4b5fd",
+                    border: isShadowBd ? "1px solid rgba(236, 72, 153, 0.45)" : "1px solid rgba(167, 139, 250, 0.4)",
+                    background: isShadowBd ? "rgba(236, 72, 153, 0.15)" : "rgba(124, 111, 255, 0.15)",
+                    color: isShadowBd ? "#f472b6" : "#c4b5fd",
                     cursor: reEvaluating ? "not-allowed" : "pointer",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.35rem",
                     transition: "all 0.15s ease",
                   }}
-                  title="Re-run vocabulary detection and recalculate score"
+                  title={isShadowBd ? "Recalculate shadowing speech ratio, rhythm & fluency score" : "Re-run vocabulary detection and recalculate score"}
                 >
                   {reEvaluating ? (
                     <>
