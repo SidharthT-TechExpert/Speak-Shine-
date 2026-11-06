@@ -296,9 +296,19 @@ export default function VideoAnalysis() {
     setPlaybackSpeed(speed);
     if (audioRef.current) {
       audioRef.current.playbackRate = speed;
+      audioRef.current.defaultPlaybackRate = speed;
     }
     setShowSpeedMenu(false);
   };
+
+  const changeSpeed = handleSelectSpeed;
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackSpeed;
+      audioRef.current.defaultPlaybackRate = playbackSpeed;
+    }
+  }, [playbackSpeed]);
 
   const handleCycleSpeed = () => {
     const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
@@ -402,6 +412,8 @@ export default function VideoAnalysis() {
     if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
       setDuration(Math.round(audioRef.current.duration));
     }
+    audioRef.current.playbackRate = playbackSpeed;
+    audioRef.current.defaultPlaybackRate = playbackSpeed;
   };
 
   const handleAudioEnded = () => {
@@ -938,7 +950,10 @@ export default function VideoAnalysis() {
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
             onPlay={() => {
-              if (audioRef.current) audioRef.current.playbackRate = playbackSpeed;
+              if (audioRef.current) {
+                audioRef.current.playbackRate = playbackSpeed;
+                audioRef.current.defaultPlaybackRate = playbackSpeed;
+              }
             }}
             onEnded={handleAudioEnded}
             preload="metadata"
@@ -970,14 +985,17 @@ export default function VideoAnalysis() {
             audioUrl: qType === "story_audio" ? todayQuestion?.audioUrl : (qType === "shadowing_video" ? getCleanAudioUrl(todayQuestion?.audioUrl || todayQuestion?.videoUrl) : null),
           };
 
-          const effectiveLimits = durationLimits || getDurationLimits({
-            isMonthlyReflection: Boolean(isMonthlyReflection || effectiveToday.isMonthlyReflection),
-            isWeeklyReflection: Boolean(isWeeklyReflection || effectiveToday.isWeeklyReflection),
-            isMonthlyGoals: Boolean(isMonthlyGoals || effectiveToday.isMonthlyGoals),
-            isStorySummary: Boolean(qType === "story_audio"),
-            isPictureDescription: Boolean(qType === "picture_description"),
-            isShadowing: Boolean(qType === "shadowing_video"),
-          }, durationSettings || todayQuestion?.durationSettings || {});
+          const effectiveLimits = (durationLimits && (!effectiveToday.isShadowing && qType !== "shadowing_video"))
+            ? durationLimits
+            : getDurationLimits({
+                isMonthlyReflection: Boolean(isMonthlyReflection || effectiveToday.isMonthlyReflection),
+                isWeeklyReflection: Boolean(isWeeklyReflection || effectiveToday.isWeeklyReflection),
+                isMonthlyGoals: Boolean(isMonthlyGoals || effectiveToday.isMonthlyGoals),
+                isStorySummary: Boolean(qType === "story_audio"),
+                isPictureDescription: Boolean(qType === "picture_description"),
+                isShadowing: Boolean(qType === "shadowing_video" || isShadowing),
+                targetVideoDuration: todayQuestion?.videoDuration || todayQuestion?.duration || duration || 0,
+              }, durationSettings || todayQuestion?.durationSettings || {});
           effectiveToday.durationLimits = effectiveLimits;
           effectiveToday.durationSettings = durationSettings || todayQuestion?.durationSettings;
           const qConfig = getQuestionUIConfig(qType, effectiveToday);
@@ -1158,10 +1176,10 @@ export default function VideoAnalysis() {
                 {qType === "shadowing_video" && (
                   <div style={{ marginBottom: "1.35rem" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.55rem" }}>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", color: "#f472b6", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#f472b6" : "#be185d", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "0.35rem" }}>
                         <span>🎙️</span> REFERENCE SHADOWING SPEECH ({duration || todayQuestion.videoDuration || 60}s)
                       </span>
-                      <span style={{ fontSize: "0.74rem", color: "#34d399", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                      <span style={{ fontSize: "0.74rem", color: isDark ? "#34d399" : "#059669", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
                         <span>⭐</span> ≥85% active spoken time = Full 40 pts
                       </span>
                     </div>
@@ -1173,9 +1191,11 @@ export default function VideoAnalysis() {
                       display: "flex",
                       alignItems: "center",
                       gap: "1.1rem",
-                      background: "linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(168, 85, 247, 0.04))",
-                      border: "1px solid rgba(236, 72, 153, 0.35)",
-                      boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                      background: isDark
+                        ? "linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(168, 85, 247, 0.04))"
+                        : "linear-gradient(135deg, rgba(236, 72, 153, 0.06), rgba(168, 85, 247, 0.03))",
+                      border: isDark ? "1px solid rgba(236, 72, 153, 0.35)" : "1.5px solid rgba(236, 72, 153, 0.35)",
+                      boxShadow: isDark ? "0 8px 30px rgba(0,0,0,0.3)" : "0 4px 16px rgba(236, 72, 153, 0.08)",
                     }}>
                       <button
                         type="button"
@@ -1234,7 +1254,7 @@ export default function VideoAnalysis() {
                                 minWidth: "3px",
                                 height: `${height}px`,
                                 borderRadius: "3px",
-                                background: isPassed ? "linear-gradient(180deg, #ec4899, #a855f7)" : "rgba(255,255,255,0.12)",
+                                background: isPassed ? "linear-gradient(180deg, #ec4899, #a855f7)" : (isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"),
                                 boxShadow: (isPassed && isPlaying) ? "0 0 8px rgba(236,72,153,0.5)" : "none",
                                 transition: "all 0.15s ease",
                               }}
@@ -1245,18 +1265,25 @@ export default function VideoAnalysis() {
 
                       {/* Time, Speed & Script Toggle */}
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
-                        <span style={{ fontSize: "0.78rem", color: "#e2e8f0", fontFamily: "monospace", fontWeight: 600 }}>
+                        <span style={{ fontSize: "0.78rem", color: isDark ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", fontWeight: 600 }}>
                           {fmtTime(currentTime)} / {fmtTime(duration)}
                         </span>
-                        <div style={{ display: "flex", gap: "2px", background: "rgba(0,0,0,0.35)", padding: "2px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        <div style={{
+                          display: "flex",
+                          gap: "2px",
+                          background: isDark ? "rgba(0,0,0,0.35)" : "#f1f5f9",
+                          padding: "2px",
+                          borderRadius: "8px",
+                          border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1"
+                        }}>
                           {[0.8, 1.0, 1.2].map((spd) => (
                             <button
                               key={spd}
                               type="button"
-                              onClick={() => changeSpeed(spd)}
+                              onClick={() => handleSelectSpeed(spd)}
                               style={{
                                 background: playbackSpeed === spd ? "linear-gradient(135deg, #ec4899, #a855f7)" : "transparent",
-                                color: playbackSpeed === spd ? "#fff" : "#94a3b8",
+                                color: playbackSpeed === spd ? "#fff" : (isDark ? "#94a3b8" : "#475569"),
                                 border: "none",
                                 borderRadius: "6px",
                                 padding: "2px 6px",
@@ -1275,9 +1302,13 @@ export default function VideoAnalysis() {
                           type="button"
                           onClick={() => setShowPreviewScript(prev => !prev)}
                           style={{
-                            background: showPreviewScript ? "rgba(236, 72, 153, 0.28)" : "rgba(255,255,255,0.1)",
-                            color: showPreviewScript ? "#f472b6" : "#cbd5e1",
-                            border: showPreviewScript ? "1px solid rgba(236, 72, 153, 0.55)" : "1px solid rgba(255,255,255,0.15)",
+                            background: showPreviewScript
+                              ? (isDark ? "rgba(236, 72, 153, 0.28)" : "#fce7f3")
+                              : (isDark ? "rgba(255,255,255,0.1)" : "#f1f5f9"),
+                            color: showPreviewScript ? (isDark ? "#f472b6" : "#be185d") : (isDark ? "#cbd5e1" : "#475569"),
+                            border: showPreviewScript
+                              ? (isDark ? "1px solid rgba(236, 72, 153, 0.55)" : "1.5px solid #ec4899")
+                              : (isDark ? "1px solid rgba(255,255,255,0.15)" : "1px solid #cbd5e1"),
                             borderRadius: "8px",
                             padding: "3px 8px",
                             fontSize: "0.68rem",
@@ -1299,8 +1330,10 @@ export default function VideoAnalysis() {
                       !showPreviewScript ? (
                         <div style={{
                           marginTop: "0.75rem",
-                          background: "linear-gradient(135deg, rgba(17, 12, 34, 0.6) 0%, rgba(26, 16, 48, 0.5) 100%)",
-                          border: "1px dashed rgba(236, 72, 153, 0.3)",
+                          background: isDark
+                            ? "linear-gradient(135deg, rgba(17, 12, 34, 0.6) 0%, rgba(26, 16, 48, 0.5) 100%)"
+                            : "#ffffff",
+                          border: isDark ? "1px dashed rgba(236, 72, 153, 0.3)" : "1.5px dashed rgba(236, 72, 153, 0.45)",
                           borderRadius: 14,
                           padding: "0.85rem 1.15rem",
                           display: "flex",
@@ -1308,21 +1341,22 @@ export default function VideoAnalysis() {
                           justifyContent: "space-between",
                           gap: "0.75rem",
                           flexWrap: "wrap",
+                          boxShadow: isDark ? "none" : "0 2px 10px rgba(0,0,0,0.03)",
                         }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                             <span style={{ fontSize: "1.2rem" }}>🎧</span>
                             <div>
-                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#f472b6" }}>Pure Ear Training Mode (Script Hidden)</div>
-                              <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>Focus on in-ear reference audio to train native shadowing reflexes.</div>
+                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: isDark ? "#f472b6" : "#be185d" }}>Pure Ear Training Mode (Script Hidden)</div>
+                              <div style={{ fontSize: "0.72rem", color: isDark ? "#94a3b8" : "#64748b" }}>Focus on in-ear reference audio to train native shadowing reflexes.</div>
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => setShowPreviewScript(true)}
                             style={{
-                              background: "rgba(236, 72, 153, 0.16)",
-                              color: "#f472b6",
-                              border: "1px solid rgba(236, 72, 153, 0.45)",
+                              background: isDark ? "rgba(236, 72, 153, 0.16)" : "#fdf2f8",
+                              color: isDark ? "#f472b6" : "#be185d",
+                              border: isDark ? "1px solid rgba(236, 72, 153, 0.45)" : "1.5px solid #ec4899",
                               padding: "4px 12px",
                               borderRadius: 8,
                               fontSize: "0.74rem",
@@ -1331,6 +1365,7 @@ export default function VideoAnalysis() {
                               display: "inline-flex",
                               alignItems: "center",
                               gap: "4px",
+                              boxShadow: isDark ? "none" : "0 1px 3px rgba(236,72,153,0.15)",
                             }}
                             title="Turn on teleprompter script"
                           >
@@ -1364,19 +1399,23 @@ export default function VideoAnalysis() {
                         return (
                           <div style={{
                             marginTop: "0.85rem",
-                            background: "linear-gradient(135deg, rgba(17, 12, 34, 0.85) 0%, rgba(26, 16, 48, 0.75) 100%)",
-                            border: "1px solid rgba(236, 72, 153, 0.3)",
+                            background: isDark
+                              ? "linear-gradient(135deg, rgba(17, 12, 34, 0.85) 0%, rgba(26, 16, 48, 0.75) 100%)"
+                              : "#ffffff",
+                            border: isDark ? "1px solid rgba(236, 72, 153, 0.3)" : "1.5px solid rgba(236, 72, 153, 0.35)",
                             borderRadius: 16,
                             padding: "1.35rem 1.4rem",
-                            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+                            boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.35)" : "0 4px 20px rgba(0,0,0,0.06)",
                           }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem" }}>
-                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#f472b6" : "#be185d", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                                 <span>🎙️</span> Dynamic Shadowing Teleprompter
                               </span>
                               <span style={{
                                 fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 99,
-                                background: "rgba(148, 163, 184, 0.15)", color: "#94a3b8", border: "1px solid rgba(148, 163, 184, 0.25)"
+                                background: isDark ? "rgba(148, 163, 184, 0.15)" : "#f1f5f9",
+                                color: isDark ? "#94a3b8" : "#475569",
+                                border: isDark ? "1px solid rgba(148, 163, 184, 0.25)" : "1px solid #cbd5e1"
                               }}>
                                 ⏸️ Standby
                               </span>
@@ -1384,11 +1423,11 @@ export default function VideoAnalysis() {
 
                             <div style={{ textAlign: "center", padding: "0.85rem 0.5rem" }}>
                               <div style={{ fontSize: "1.75rem", marginBottom: "0.4rem" }}>🎧</div>
-                              <h4 style={{ margin: "0 0 0.35rem 0", color: "#ffffff", fontSize: "1.05rem", fontWeight: 700 }}>
+                              <h4 style={{ margin: "0 0 0.35rem 0", color: isDark ? "#ffffff" : "#0f172a", fontSize: "1.05rem", fontWeight: 700 }}>
                                 Teleprompter Synchronized to Audio
                               </h4>
-                              <p style={{ margin: "0 auto 1.15rem auto", maxWidth: "460px", color: "#94a3b8", fontSize: "0.84rem", lineHeight: 1.55 }}>
-                                The spoken script will automatically appear <strong style={{ color: "#f472b6" }}>line-by-line in 4–5 second windows</strong> as the audio plays. Put on your earphones and press Play!
+                              <p style={{ margin: "0 auto 1.15rem auto", maxWidth: "460px", color: isDark ? "#94a3b8" : "#475569", fontSize: "0.84rem", lineHeight: 1.55 }}>
+                                The spoken script will automatically appear <strong style={{ color: isDark ? "#f472b6" : "#be185d" }}>line-by-line in 4–5 second windows</strong> as the audio plays. Put on your earphones and press Play!
                               </p>
 
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem", flexWrap: "wrap" }}>
@@ -1416,23 +1455,25 @@ export default function VideoAnalysis() {
                       return (
                         <div style={{
                           marginTop: "0.85rem",
-                          background: "linear-gradient(135deg, rgba(17, 12, 34, 0.9) 0%, rgba(26, 16, 48, 0.8) 100%)",
-                          border: "1px solid rgba(236, 72, 153, 0.45)",
+                          background: isDark
+                            ? "linear-gradient(135deg, rgba(17, 12, 34, 0.9) 0%, rgba(26, 16, 48, 0.8) 100%)"
+                            : "#ffffff",
+                          border: isDark ? "1px solid rgba(236, 72, 153, 0.45)" : "1.5px solid rgba(236, 72, 153, 0.35)",
                           borderRadius: 16,
                           padding: "1.15rem 1.35rem",
-                          boxShadow: "0 10px 35px rgba(236, 72, 153, 0.15)",
+                          boxShadow: isDark ? "0 10px 35px rgba(236, 72, 153, 0.15)" : "0 4px 20px rgba(0,0,0,0.06)",
                         }}>
                           {/* Prompter Header */}
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#f472b6" : "#be185d", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
                                 <span>🎙️</span> Dynamic Shadowing Prompter
                               </span>
                               <span style={{
                                 display: "inline-flex", alignItems: "center", gap: "0.3rem",
                                 fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 99,
                                 background: isPlaying ? "rgba(52, 211, 153, 0.15)" : "rgba(251, 191, 36, 0.15)",
-                                color: isPlaying ? "#34d399" : "#fbbf24",
+                                color: isPlaying ? (isDark ? "#34d399" : "#15803d") : (isDark ? "#fbbf24" : "#b45309"),
                                 border: `1px solid ${isPlaying ? "rgba(52, 211, 153, 0.35)" : "rgba(251, 191, 36, 0.35)"}`
                               }}>
                                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: isPlaying ? "#34d399" : "#fbbf24" }} />
@@ -1440,12 +1481,12 @@ export default function VideoAnalysis() {
                               </span>
                             </div>
 
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: "#94a3b8" }}>
-                              <span style={{ fontWeight: 700, color: "#e2e8f0" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                              <span style={{ fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
                                 Phrase {safeIdx + 1} / {cues.length}
                               </span>
                               <span>•</span>
-                              <span style={{ fontFamily: "monospace", color: "#c084fc" }}>
+                              <span style={{ fontFamily: "monospace", color: isDark ? "#c084fc" : "#7c3aed" }}>
                                 {activeCue.startFormatted} – {activeCue.endFormatted}
                               </span>
                             </div>
@@ -1457,12 +1498,12 @@ export default function VideoAnalysis() {
                               onClick={() => seekToCue(prevCue.start)}
                               style={{
                                 fontSize: "0.82rem",
-                                color: "#64748b",
+                                color: isDark ? "#64748b" : "#94a3b8",
                                 fontStyle: "italic",
                                 marginBottom: "0.45rem",
                                 padding: "0.2rem 0.6rem",
                                 cursor: "pointer",
-                                opacity: 0.6,
+                                opacity: 0.8,
                                 transition: "all 0.2s ease",
                               }}
                               title="Click to jump back to this phrase"
@@ -1473,12 +1514,14 @@ export default function VideoAnalysis() {
 
                           {/* ── HERO ACTIVE 5-SECOND PHRASE ── */}
                           <div style={{
-                            background: "linear-gradient(135deg, rgba(236, 72, 153, 0.22) 0%, rgba(168, 85, 247, 0.15) 100%)",
-                            border: "1px solid rgba(244, 114, 182, 0.6)",
+                            background: isDark
+                              ? "linear-gradient(135deg, rgba(236, 72, 153, 0.22) 0%, rgba(168, 85, 247, 0.15) 100%)"
+                              : "linear-gradient(135deg, #fdf2f8 0%, #faf5ff 100%)",
+                            border: isDark ? "1px solid rgba(244, 114, 182, 0.6)" : "1.5px solid #ec4899",
                             borderRadius: 14,
                             padding: "1.1rem 1.35rem",
                             position: "relative",
-                            boxShadow: "0 6px 25px rgba(236, 72, 153, 0.2)",
+                            boxShadow: isDark ? "0 6px 25px rgba(236, 72, 153, 0.2)" : "0 4px 14px rgba(236, 72, 153, 0.12)",
                             overflow: "hidden",
                           }}>
                             {/* Accent Neon Indicator */}
@@ -1490,10 +1533,10 @@ export default function VideoAnalysis() {
                             <div style={{
                               fontSize: "1.24rem",
                               fontWeight: 700,
-                              color: "#ffffff",
+                              color: isDark ? "#ffffff" : "#0f172a",
                               lineHeight: 1.55,
                               letterSpacing: "-0.01em",
-                              textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+                              textShadow: isDark ? "0 2px 10px rgba(0,0,0,0.5)" : "none",
                             }}>
                               {activeCue.text}
                             </div>
@@ -1502,7 +1545,7 @@ export default function VideoAnalysis() {
                             <div style={{
                               height: 3,
                               borderRadius: 99,
-                              background: "rgba(255, 255, 255, 0.1)",
+                              background: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
                               marginTop: "0.85rem",
                               overflow: "hidden",
                             }}>
@@ -1521,30 +1564,32 @@ export default function VideoAnalysis() {
                               onClick={() => seekToCue(nextCue.start)}
                               style={{
                                 fontSize: "0.84rem",
-                                color: "#94a3b8",
+                                color: isDark ? "#94a3b8" : "#475569",
                                 marginTop: "0.55rem",
                                 padding: "0.2rem 0.6rem",
-                                opacity: 0.7,
+                                opacity: 0.85,
                                 cursor: "pointer",
                                 transition: "all 0.2s ease",
                               }}
                               title="Click to skip forward to this phrase"
                             >
-                              <span style={{ color: "#ec4899", fontWeight: 700, marginRight: "0.35rem" }}>Next &rarr;</span>
+                              <span style={{ color: isDark ? "#ec4899" : "#be185d", fontWeight: 700, marginRight: "0.35rem" }}>Next &rarr;</span>
                               {nextCue.text}
                             </div>
                           )}
 
                           {/* Bottom Navigation & Controls */}
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.95rem", paddingTop: "0.65rem", borderTop: "1px solid rgba(255,255,255,0.07)", flexWrap: "wrap", gap: "0.5rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.95rem", paddingTop: "0.65rem", borderTop: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid #e2e8f0", flexWrap: "wrap", gap: "0.5rem" }}>
                             <div style={{ display: "flex", gap: "0.4rem" }}>
                               <button
                                 type="button"
                                 disabled={!prevCue}
                                 onClick={() => prevCue && seekToCue(prevCue.start)}
                                 style={{
-                                  background: "rgba(255,255,255,0.06)", color: prevCue ? "#e2e8f0" : "#475569",
-                                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "3px 8px",
+                                  background: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                                  color: prevCue ? (isDark ? "#e2e8f0" : "#1e293b") : (isDark ? "#475569" : "#94a3b8"),
+                                  border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #cbd5e1",
+                                  borderRadius: 8, padding: "3px 8px",
                                   fontSize: "0.72rem", fontWeight: 600, cursor: prevCue ? "pointer" : "not-allowed",
                                 }}
                               >
@@ -1555,8 +1600,10 @@ export default function VideoAnalysis() {
                                 disabled={!nextCue}
                                 onClick={() => nextCue && seekToCue(nextCue.start)}
                                 style={{
-                                  background: "rgba(255,255,255,0.06)", color: nextCue ? "#e2e8f0" : "#475569",
-                                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "3px 8px",
+                                  background: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                                  color: nextCue ? (isDark ? "#e2e8f0" : "#1e293b") : (isDark ? "#475569" : "#94a3b8"),
+                                  border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #cbd5e1",
+                                  borderRadius: 8, padding: "3px 8px",
                                   fontSize: "0.72rem", fontWeight: 600, cursor: nextCue ? "pointer" : "not-allowed",
                                 }}
                               >
@@ -1590,8 +1637,9 @@ export default function VideoAnalysis() {
                       display: "flex",
                       alignItems: "center",
                       gap: "1rem",
-                      background: "rgba(255, 255, 255, 0.04)",
+                      background: isDark ? "rgba(255, 255, 255, 0.04)" : "#f8fafc",
                       border: `1px solid ${qConfig.theme.border}`,
+                      boxShadow: isDark ? "none" : "0 2px 8px rgba(0, 0, 0, 0.04)",
                     }}>
                       <button
                         type="button"
@@ -1649,7 +1697,7 @@ export default function VideoAnalysis() {
                         })}
                       </div>
 
-                      <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "#e2e8f0" }}>
+                      <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: isDark ? "#e2e8f0" : "#1e293b" }}>
                         {fmtTime(currentTime)} / {fmtTime(duration)}
                       </span>
 
@@ -1668,9 +1716,9 @@ export default function VideoAnalysis() {
                             fontSize: "0.74rem",
                             fontWeight: 700,
                             cursor: "pointer",
-                            background: playbackSpeed !== 1 ? qConfig.theme.primary : "rgba(255, 255, 255, 0.08)",
-                            color: playbackSpeed !== 1 ? "#0d0a18" : "#e2e8f0",
-                            border: playbackSpeed !== 1 ? "none" : "1px solid rgba(255, 255, 255, 0.15)",
+                            background: playbackSpeed !== 1 ? qConfig.theme.primary : (isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9"),
+                            color: playbackSpeed !== 1 ? "#0d0a18" : (isDark ? "#e2e8f0" : "#1e293b"),
+                            border: playbackSpeed !== 1 ? "none" : (isDark ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid #cbd5e1"),
                             transition: "all 0.15s ease",
                             boxShadow: playbackSpeed !== 1 ? `0 2px 8px ${qConfig.theme.primary}55` : "none",
                           }}
@@ -1687,19 +1735,19 @@ export default function VideoAnalysis() {
                             position: "absolute",
                             bottom: "calc(100% + 8px)",
                             right: 0,
-                            background: "#18142a",
-                            border: "1px solid rgba(255, 255, 255, 0.18)",
+                            background: isDark ? "#18142a" : "#ffffff",
+                            border: isDark ? "1px solid rgba(255, 255, 255, 0.18)" : "1px solid #e2e8f0",
                             borderRadius: 10,
                             padding: "4px",
                             display: "flex",
                             flexDirection: "column",
                             gap: "2px",
                             minWidth: 92,
-                            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.55)",
+                            boxShadow: isDark ? "0 10px 25px rgba(0, 0, 0, 0.55)" : "0 10px 25px rgba(0, 0, 0, 0.1)",
                             zIndex: 50,
                             backdropFilter: "blur(12px)",
                           }}>
-                            <div style={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", padding: "4px 8px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "2px" }}>
+                            <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", padding: "4px 8px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0", marginBottom: "2px" }}>
                               Speed
                             </div>
                             {PLAYBACK_SPEEDS.map(speed => {
@@ -1718,13 +1766,13 @@ export default function VideoAnalysis() {
                                     fontSize: "0.75rem",
                                     fontWeight: isSelected ? 800 : 500,
                                     background: isSelected ? qConfig.theme.primary : "transparent",
-                                    color: isSelected ? "#0d0a18" : "#f1f5f9",
+                                    color: isSelected ? "#0d0a18" : (isDark ? "#f1f5f9" : "#1e293b"),
                                     border: "none",
                                     cursor: "pointer",
                                     textAlign: "left",
                                     transition: "background 0.12s ease",
                                   }}
-                                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"; }}
+                                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9"; }}
                                   onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
                                 >
                                   <span>{speed}x</span>
@@ -2442,9 +2490,11 @@ export default function VideoAnalysis() {
         {/* Accomplishment celebration banner if today's task is already submitted */}
         {isTodaySubmitted && (
           <div style={{
-            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)",
-            border: "1px solid rgba(74, 222, 128, 0.35)",
-            boxShadow: "0 4px 20px rgba(16, 185, 129, 0.12)",
+            background: isDark
+              ? "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)"
+              : "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.06) 100%)",
+            border: isDark ? "1px solid rgba(74, 222, 128, 0.35)" : "1.5px solid rgba(16, 185, 129, 0.45)",
+            boxShadow: isDark ? "0 4px 20px rgba(16, 185, 129, 0.12)" : "0 4px 16px rgba(16, 185, 129, 0.08)",
             borderRadius: 14,
             padding: "1rem 1.35rem",
             marginBottom: "1.25rem",
@@ -2457,12 +2507,12 @@ export default function VideoAnalysis() {
             <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
               <span style={{ fontSize: "1.6rem" }}>🎉</span>
               <div>
-                <div style={{ fontSize: "0.98rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ fontSize: "0.98rem", fontWeight: 800, color: isDark ? "#ffffff" : "#065f46", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <span>Today's Speaking Challenge Accomplished!</span>
                   <span style={{
-                    background: "rgba(34, 197, 94, 0.2)",
-                    border: "1px solid rgba(74, 222, 128, 0.4)",
-                    color: "#86efac",
+                    background: isDark ? "rgba(34, 197, 94, 0.2)" : "#dcfce7",
+                    border: isDark ? "1px solid rgba(74, 222, 128, 0.4)" : "1px solid #86efac",
+                    color: isDark ? "#86efac" : "#15803d",
                     borderRadius: 999,
                     padding: "2px 8px",
                     fontSize: "0.68rem",
@@ -2472,7 +2522,7 @@ export default function VideoAnalysis() {
                     ✓ Submitted &amp; Verified
                   </span>
                 </div>
-                <div style={{ fontSize: "0.8rem", color: "#cbd5e1", marginTop: "2px" }}>
+                <div style={{ fontSize: "0.8rem", color: isDark ? "#cbd5e1" : "#047857", marginTop: "2px", fontWeight: isDark ? 400 : 500 }}>
                   Your attendance is marked and your streak is safe! You can record or upload additional takes below anytime for free practice.
                 </div>
               </div>
@@ -2501,10 +2551,10 @@ export default function VideoAnalysis() {
         <div id="video-studio-container" style={{
           display: "inline-flex",
           gap: "0.35rem",
-          background: "rgba(255, 255, 255, 0.03)",
+          background: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.04)",
           padding: 4,
           borderRadius: 12,
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
           marginBottom: "1.25rem",
           scrollMarginTop: "90px",
         }}>
@@ -2543,9 +2593,11 @@ export default function VideoAnalysis() {
           </div>
         ) : !isQuestionActive ? (
           <div className="card" style={{
-            background: "linear-gradient(145deg, #130f24 0%, #17112c 100%)",
-            border: "1px solid rgba(249, 115, 22, 0.25)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            background: isDark
+              ? "linear-gradient(145deg, #130f24 0%, #17112c 100%)"
+              : "linear-gradient(145deg, #fff7ed 0%, #ffffff 100%)",
+            border: isDark ? "1px solid rgba(249, 115, 22, 0.25)" : "1.5px solid #fed7aa",
+            boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.35)" : "0 4px 20px rgba(249, 115, 22, 0.08)",
             borderRadius: 18,
             padding: "2.2rem 2rem",
             marginBottom: "1.75rem",
@@ -2570,9 +2622,9 @@ export default function VideoAnalysis() {
                   gap: "0.5rem",
                   padding: "0.35rem 0.85rem",
                   borderRadius: 9999,
-                  background: "rgba(249, 115, 22, 0.15)",
-                  border: "1px solid rgba(249, 115, 22, 0.4)",
-                  color: "#f97316",
+                  background: isDark ? "rgba(249, 115, 22, 0.15)" : "#ffedd5",
+                  border: isDark ? "1px solid rgba(249, 115, 22, 0.4)" : "1px solid #fdba74",
+                  color: isDark ? "#f97316" : "#c2410c",
                   fontSize: "0.78rem",
                   fontWeight: 800,
                   letterSpacing: "0.06em",
@@ -2582,31 +2634,32 @@ export default function VideoAnalysis() {
                   <span>🔒</span> Studio Locked · Daily Reset Period
                 </div>
 
-                <h2 style={{ fontSize: "1.65rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.5rem 0", lineHeight: 1.25 }}>
+                <h2 style={{ fontSize: "1.65rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", margin: "0 0 0.5rem 0", lineHeight: 1.25 }}>
                   Recording &amp; Uploading Are Locked
                 </h2>
-                <p style={{ fontSize: "0.92rem", color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: "0.92rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.6, margin: 0 }}>
                   The midnight reset has cleared the previous challenge. Our AI curriculum engine is preparing today's mission, audio story, and vocabulary. Studio recording and video uploading will automatically unlock once the new mission is released.
                 </p>
               </div>
 
               {/* Countdown section */}
               <div style={{
-                background: "rgba(10, 8, 20, 0.65)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                background: isDark ? "rgba(10, 8, 20, 0.65)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1.5px solid #fed7aa",
                 borderRadius: 16,
                 padding: "1.25rem 1.5rem",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 minWidth: 240,
+                boxShadow: isDark ? "none" : "0 4px 14px rgba(249, 115, 22, 0.08)",
               }}>
-                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#f97316", marginBottom: "0.25rem" }}>
+                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: isDark ? "#f97316" : "#c2410c", marginBottom: "0.25rem" }}>
                   ⏳ Next Mission Drops In
                 </span>
                 <StudioDropCountdownTimer posterSendTime={posterSendTime} />
-                <span style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
-                  Unlocks today at <strong style={{ color: "#ffffff" }}>{formatDropTime(posterSendTime)} IST</strong>
+                <span style={{ fontSize: "0.78rem", color: isDark ? "#cbd5e1" : "#475569" }}>
+                  Unlocks today at <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>{formatDropTime(posterSendTime)} IST</strong>
                 </span>
               </div>
             </div>
@@ -2620,46 +2673,49 @@ export default function VideoAnalysis() {
               marginBottom: "1.75rem",
             }}>
               <div style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
+                background: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #fed7aa",
                 borderRadius: 12,
                 padding: "1rem 1.15rem",
+                boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.03)",
               }}>
                 <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>🌙</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.25rem" }}>
                   Midnight Reset Active
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
                   The 12:00 AM reset has archived yesterday's mission. Streaks and leaderboard scores are now being finalized.
                 </div>
               </div>
 
               <div style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
+                background: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #fed7aa",
                 borderRadius: 12,
                 padding: "1rem 1.15rem",
+                boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.03)",
               }}>
                 <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>🎯</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.25rem" }}>
                   Fresh Mission Coming
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
                   A brand-new question, audio prompt, and curated vocabulary list will drop at {formatDropTime(posterSendTime)} IST.
                 </div>
               </div>
 
               <div style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
+                background: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #fed7aa",
                 borderRadius: 12,
                 padding: "1rem 1.15rem",
+                boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.03)",
               }}>
                 <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>📊</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.25rem" }}>
                   Review Past Feedback
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
                   Take this rest window to review your previous speech evaluations, filler word analyses, and vocabulary mastery below.
                 </div>
               </div>
@@ -3904,8 +3960,18 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
   const uploadStartRef = useRef(null);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
 
-  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing };
-  const durationLimits = dbDurationLimits || getDurationLimits(gateFlags, durationSettings);
+  const gateFlags = {
+    isMonthlyReflection,
+    isWeeklyReflection,
+    isMonthlyGoals,
+    isStorySummary,
+    isPictureDescription,
+    isShadowing,
+    targetVideoDuration: 0,
+  };
+  const durationLimits = (dbDurationLimits && !isShadowing)
+    ? dbDurationLimits
+    : getDurationLimits(gateFlags, durationSettings);
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -4284,6 +4350,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
 
 function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription = false, isShadowing = false, vocabulary = [], vocabRequiredCount = 3, vocabWordCount = 5, isGuest = false, durationLimits: dbDurationLimits, durationSettings = {}, allowPrivateVideos = true, enableBackgroundBlur = false }) {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
   const [step, setStep]             = useState("setup");
   const [cameras, setCameras]       = useState([]);
   const { generateHashAndFrames, cacheResult, isHashing, hashProgress } = useVideoFrameHash();
@@ -4482,8 +4549,18 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     return seconds;
   }, []);
 
-  const gateFlags = { isMonthlyReflection, isWeeklyReflection, isMonthlyGoals, isStorySummary, isPictureDescription, isShadowing };
-  const durationLimits = dbDurationLimits || getDurationLimits(gateFlags, durationSettings);
+  const gateFlags = {
+    isMonthlyReflection,
+    isWeeklyReflection,
+    isMonthlyGoals,
+    isStorySummary,
+    isPictureDescription,
+    isShadowing,
+    targetVideoDuration: question?.videoDuration || question?.duration || 0,
+  };
+  const durationLimits = (dbDurationLimits && !isShadowing)
+    ? dbDurationLimits
+    : getDurationLimits(gateFlags, durationSettings);
   const MAX_SECONDS = durationLimits.maxSeconds;
 
   // Enumerate devices + restore any saved draft on mount
@@ -5086,6 +5163,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   useEffect(() => {
     if (shadowingRefVideo.current) {
       shadowingRefVideo.current.playbackRate = shadowPlaybackSpeed;
+      shadowingRefVideo.current.defaultPlaybackRate = shadowPlaybackSpeed;
     }
   }, [shadowPlaybackSpeed]);
 
@@ -5509,11 +5587,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           
           {/* Browser compatibility notice */}
           <div style={{
-            background: "rgba(109,40,217,0.06)", border: "1px solid rgba(109,40,217,0.2)",
+            background: isDark ? "rgba(109,40,217,0.06)" : "#f5f3ff",
+            border: isDark ? "1px solid rgba(109,40,217,0.2)" : "1px solid #ddd6fe",
             borderRadius: 10, padding: "0.75rem 1rem", marginBottom: "1.25rem",
-            fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5,
+            fontSize: "0.82rem", color: isDark ? "var(--text)" : "#334155", lineHeight: 1.5,
           }}>
-            💡 <strong style={{ color: "var(--primary)" }}>For best results:</strong> Use Chrome or Edge browsers. Recording uses advanced browser features that work best in modern browsers.
+            💡 <strong style={{ color: isDark ? "var(--primary)" : "#6d28d9" }}>For best results:</strong> Use Chrome or Edge browsers. Recording uses advanced browser features that work best in modern browsers.
           </div>
 
           {/* Monthly reflection reminder inside record card */}
@@ -5579,41 +5658,49 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
           {/* Shadowing activity reminder inside record card */}
           {isShadowing && (
             <div style={{
-              background: "linear-gradient(135deg, rgba(236,72,153,0.12), rgba(168,85,247,0.08))",
-              border: "1px solid rgba(236,72,153,0.35)",
+              background: isDark
+                ? "linear-gradient(135deg, rgba(236,72,153,0.12), rgba(168,85,247,0.08))"
+                : "linear-gradient(135deg, rgba(236,72,153,0.06), rgba(168,85,247,0.04))",
+              border: isDark ? "1px solid rgba(236,72,153,0.35)" : "1.5px solid rgba(236,72,153,0.35)",
               borderRadius: 14, padding: "1.1rem 1.25rem", marginBottom: "1.25rem",
-              fontSize: "0.86rem", color: "var(--text)", lineHeight: 1.6,
-              boxShadow: "0 6px 20px rgba(236,72,153,0.08)",
+              fontSize: "0.86rem", color: isDark ? "var(--text)" : "#1e293b", lineHeight: 1.6,
+              boxShadow: isDark ? "0 6px 20px rgba(236,72,153,0.08)" : "0 4px 14px rgba(236,72,153,0.06)",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.55rem" }}>
-                <span style={{ fontWeight: 800, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <span style={{ fontWeight: 800, color: isDark ? "#f472b6" : "#be185d", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
                   <span>🎧</span> In-Ear Shadowing Mode Ready
                 </span>
-                <span style={{ background: "rgba(52,211,153,0.15)", color: "#34d399", padding: "2px 8px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700 }}>
+                <span style={{
+                  background: isDark ? "rgba(52,211,153,0.15)" : "#dcfce7",
+                  color: isDark ? "#34d399" : "#15803d",
+                  border: isDark ? "1px solid rgba(52,211,153,0.3)" : "1px solid #86efac",
+                  padding: "2px 8px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700
+                }}>
                   ✨ Vocab Waived
                 </span>
               </div>
-              <p style={{ margin: "0 0 0.65rem 0", color: "#f1f5f9" }}>
-                <strong>Simultaneous Speech:</strong> The native reference audio will play continuously into your earphones while your camera and microphone record your speech. Speak along with the speaker in real time!
+              <p style={{ margin: "0 0 0.65rem 0", color: isDark ? "#f1f5f9" : "#1e293b" }}>
+                <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>Simultaneous Speech:</strong> The native reference audio will play continuously into your earphones while your camera and microphone record your speech. Speak along with the speaker in real time!
               </p>
 
               {/* Headphone Advice Banner */}
               <div style={{
-                background: "rgba(0,0,0,0.35)",
-                border: "1px solid rgba(236,72,153,0.25)",
+                background: isDark ? "rgba(0,0,0,0.35)" : "#ffffff",
+                border: isDark ? "1px solid rgba(236,72,153,0.25)" : "1.5px solid rgba(236,72,153,0.3)",
                 borderRadius: 10,
                 padding: "0.6rem 0.8rem",
                 marginBottom: "0.75rem",
                 fontSize: "0.78rem",
-                color: "#e2e8f0",
+                color: isDark ? "#e2e8f0" : "#334155",
                 display: "flex",
                 alignItems: "center",
                 gap: "0.6rem",
+                boxShadow: isDark ? "none" : "0 2px 6px rgba(0,0,0,0.03)",
               }}>
                 <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>🎧</span>
                 <div>
-                  <strong style={{ color: "#f472b6" }}>Please wear earphones or headphones:</strong>
-                  <div style={{ color: "rgba(255,255,255,0.75)", marginTop: "0.1rem" }}>
+                  <strong style={{ color: isDark ? "#f472b6" : "#be185d" }}>Please wear earphones or headphones:</strong>
+                  <div style={{ color: isDark ? "rgba(255,255,255,0.75)" : "#475569", marginTop: "0.1rem" }}>
                     This lets you clearly hear the speaker in real time without audio echoing into your microphone!
                   </div>
                 </div>
@@ -5626,13 +5713,14 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 justifyContent: "space-between",
                 flexWrap: "wrap",
                 gap: "0.6rem",
-                background: "rgba(255,255,255,0.04)",
+                background: isDark ? "rgba(255,255,255,0.04)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(236,72,153,0.2)",
                 padding: "0.55rem 0.75rem",
                 borderRadius: 8,
                 marginBottom: "0.75rem",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                  <span style={{ fontSize: "0.76rem", color: "#cbd5e1", fontWeight: 600 }}>In-Ear Volume:</span>
+                  <span style={{ fontSize: "0.76rem", color: isDark ? "#cbd5e1" : "#334155", fontWeight: 700 }}>In-Ear Volume:</span>
                   <div style={{ display: "flex", gap: "3px" }}>
                     {[0.5, 0.8, 1.0].map((v) => (
                       <button
@@ -5640,9 +5728,15 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                         type="button"
                         onClick={() => handleVolumeChange(v)}
                         style={{
-                          background: shadowVolume === v ? "linear-gradient(135deg, #ec4899, #8b5cf6)" : "rgba(255,255,255,0.08)",
-                          border: shadowVolume === v ? "none" : "1px solid rgba(255,255,255,0.15)",
-                          color: "#fff",
+                          background: shadowVolume === v
+                            ? "linear-gradient(135deg, #ec4899, #8b5cf6)"
+                            : (isDark ? "rgba(255,255,255,0.08)" : "#f1f5f9"),
+                          border: shadowVolume === v
+                            ? "none"
+                            : (isDark ? "1px solid rgba(255,255,255,0.15)" : "1px solid #cbd5e1"),
+                          color: shadowVolume === v
+                            ? "#fff"
+                            : (isDark ? "#e2e8f0" : "#334155"),
                           borderRadius: 5,
                           padding: "2px 7px",
                           fontSize: "0.68rem",
@@ -5689,14 +5783,17 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.3rem",
-                    background: testInEarPlaying ? "rgba(236,72,153,0.35)" : "rgba(255,255,255,0.08)",
-                    border: "1px solid rgba(236,72,153,0.4)",
-                    color: "#fff",
+                    background: testInEarPlaying
+                      ? (isDark ? "rgba(236,72,153,0.35)" : "#fce7f3")
+                      : (isDark ? "rgba(255,255,255,0.08)" : "#ffffff"),
+                    border: isDark ? "1px solid rgba(236,72,153,0.4)" : "1.5px solid #ec4899",
+                    color: isDark ? "#fff" : "#be185d",
                     borderRadius: 6,
                     padding: "3px 9px",
                     fontSize: "0.72rem",
                     fontWeight: 700,
                     cursor: "pointer",
+                    boxShadow: isDark ? "none" : "0 1px 3px rgba(236,72,153,0.15)",
                   }}
                 >
                   {testInEarPlaying ? "⏹️ Stop Test" : "▶ Test Sound (4s)"}
@@ -5705,13 +5802,28 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
 
               {/* Scoring breakdown badges */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", fontSize: "0.76rem" }}>
-                <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <span style={{
+                  padding: "3px 8px", borderRadius: 6,
+                  background: isDark ? "rgba(255,255,255,0.06)" : "#ffffff",
+                  border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e2e8f0",
+                  color: isDark ? "#e2e8f0" : "#334155",
+                }}>
                   🎯 <strong>≥85% active spoken time</strong>: Full 40 duration pts
                 </span>
-                <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <span style={{
+                  padding: "3px 8px", borderRadius: 6,
+                  background: isDark ? "rgba(255,255,255,0.06)" : "#ffffff",
+                  border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e2e8f0",
+                  color: isDark ? "#e2e8f0" : "#334155",
+                }}>
                   ⏱️ <strong>Target</strong>: {question?.videoDuration || 60} seconds
                 </span>
-                <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <span style={{
+                  padding: "3px 8px", borderRadius: 6,
+                  background: isDark ? "rgba(255,255,255,0.06)" : "#ffffff",
+                  border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e2e8f0",
+                  color: isDark ? "#e2e8f0" : "#334155",
+                }}>
                   🎙️ <strong>Delivery & Rhythm</strong>: 60 pts
                 </span>
               </div>
@@ -5824,25 +5936,25 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                background: "rgba(0,0,0,0.25)",
+                background: isDark ? "rgba(0,0,0,0.25)" : "#f8fafc",
                 padding: "5px 8px",
                 borderRadius: 6,
-                border: "1px solid rgba(255,255,255,0.08)",
+                border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e2e8f0",
                 flexWrap: "wrap",
               }}>
-                <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontWeight: 600 }}>Mic Level:</span>
-                <div style={{ flex: 1, minWidth: 60, height: 7, background: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                <span style={{ fontSize: "0.72rem", color: isDark ? "var(--muted)" : "#475569", fontWeight: 600 }}>Mic Level:</span>
+                <div style={{ flex: 1, minWidth: 60, height: 7, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
                   <div style={{
                     width: `${Math.min(100, micLevel * 2)}%`,
                     height: "100%",
-                    background: micLevel > 4 ? "linear-gradient(90deg, #10b981, #22c55e)" : "rgba(255,255,255,0.2)",
+                    background: micLevel > 4 ? "linear-gradient(90deg, #10b981, #22c55e)" : (isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"),
                     transition: "width 0.05s ease-out"
                   }} />
                 </div>
                 <span style={{
                   fontSize: "0.7rem",
                   fontWeight: 700,
-                  color: micLevel > 4 ? "#4ade80" : (micActive ? "#94a3b8" : "#fbbf24")
+                  color: micLevel > 4 ? (isDark ? "#4ade80" : "#16a34a") : (micActive ? (isDark ? "#94a3b8" : "#64748b") : (isDark ? "#fbbf24" : "#d97706"))
                 }}>
                   {micLevel > 4 ? "🎤 Active" : "Speak to test"}
                 </span>
@@ -5855,9 +5967,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   style={{
                     background: micTestStatus === "recording" 
                       ? "rgba(245, 158, 11, 0.25)" 
-                      : (micTestStatus === "playing" ? "rgba(34, 197, 94, 0.25)" : "rgba(124, 111, 255, 0.18)"),
-                    color: micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#4ade80" : "#a78bfa"),
-                    border: `1px solid ${micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#22c55e" : "rgba(124, 111, 255, 0.45)")}`,
+                      : (micTestStatus === "playing" ? "rgba(34, 197, 94, 0.25)" : (isDark ? "rgba(124, 111, 255, 0.18)" : "#f3e8ff")),
+                    color: micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? (isDark ? "#4ade80" : "#16a34a") : (isDark ? "#a78bfa" : "#6d28d9")),
+                    border: `1px solid ${micTestStatus === "recording" ? "#fbbf24" : (micTestStatus === "playing" ? "#22c55e" : (isDark ? "rgba(124, 111, 255, 0.45)" : "#c4b5fd"))}`,
                     padding: "2px 8px",
                     borderRadius: 6,
                     fontSize: "0.68rem",
@@ -5881,12 +5993,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 justifyContent: "space-between",
                 flexWrap: "wrap",
                 gap: "6px",
-                background: "rgba(255,255,255,0.03)",
+                background: isDark ? "rgba(255,255,255,0.03)" : "#f8fafc",
                 padding: "4px 8px",
                 borderRadius: 6,
-                border: "1px solid rgba(255,255,255,0.05)"
+                border: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid #e2e8f0"
               }}>
-                <span style={{ fontSize: "0.7rem", color: "var(--muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
+                <span style={{ fontSize: "0.7rem", color: isDark ? "var(--muted)" : "#475569", fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
                   <span>🎚️</span> Vocal Clarity &amp; Boost:
                 </span>
                 <div style={{ display: "flex", gap: "4px" }}>
@@ -5900,9 +6012,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       type="button"
                       onClick={() => setMicBoost(b.val)}
                       style={{
-                        background: micBoost === b.val ? "linear-gradient(135deg, #10b981, #059669)" : "rgba(255,255,255,0.06)",
-                        color: micBoost === b.val ? "#ffffff" : "var(--muted)",
-                        border: micBoost === b.val ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.1)",
+                        background: micBoost === b.val ? "linear-gradient(135deg, #10b981, #059669)" : (isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9"),
+                        color: micBoost === b.val ? "#ffffff" : (isDark ? "var(--muted)" : "#475569"),
+                        border: micBoost === b.val ? "1px solid #10b981" : (isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1"),
                         padding: "1px 7px",
                         borderRadius: 5,
                         fontSize: "0.66rem",
@@ -5927,7 +6039,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
               position: 'relative', zIndex: 10
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
-                <label className="form-label" style={{ margin: 0, fontSize: "0.85rem", color: "#f472b6" }}>
+                <label className="form-label" style={{ margin: 0, fontSize: "0.85rem", color: isDark ? "#f472b6" : "#be185d" }}>
                   🎧 Earphones / Audio Output
                 </label>
                 <span style={{ fontSize: "0.7rem", color: "var(--muted)" }}>In-ear reference speech destination</span>
@@ -6208,7 +6320,10 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                         const speeds = [0.8, 1, 1.2];
                         const nextSpeed = speeds[(speeds.indexOf(shadowPlaybackSpeed) + 1) % speeds.length];
                         setShadowPlaybackSpeed(nextSpeed);
-                        if (shadowingRefVideo.current) shadowingRefVideo.current.playbackRate = nextSpeed;
+                        if (shadowingRefVideo.current) {
+                          shadowingRefVideo.current.playbackRate = nextSpeed;
+                          shadowingRefVideo.current.defaultPlaybackRate = nextSpeed;
+                        }
                       }}
                       style={{
                         background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
