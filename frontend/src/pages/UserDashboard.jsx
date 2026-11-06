@@ -891,14 +891,12 @@ export default function UserDashboard() {
   useEffect(() => {
     if (isGuest && !hasRealUser) return; // only pure guests skip fetching
     const fetchData = () => {
-      Promise.all([
-        api.get("/dashboard/me"),
-        api.get("/live-sessions").catch(() => ({ data: [] })),
-      ]).then(([d, ls]) => {
-        applyDashboardData(d.data);
-        setCachedDashboard(d.data);
-        setLiveSessions((ls.data || []).filter(s => s.status === "live" || s.status === "scheduled"));
-      })
+      // Fetch primary dashboard immediately to clear loading state in <200ms
+      api.get("/dashboard/me")
+        .then(d => {
+          applyDashboardData(d.data);
+          setCachedDashboard(d.data);
+        })
         .catch(err => {
           if (err.response?.status === 401 && !user) {
             setData(buildGuestData());
@@ -907,6 +905,11 @@ export default function UserDashboard() {
           }
         })
         .finally(() => setLoading(false));
+
+      // Fetch live sessions concurrently without blocking dashboard render
+      api.get("/live-sessions")
+        .then(ls => setLiveSessions((ls.data || []).filter(s => s.status === "live" || s.status === "scheduled")))
+        .catch(() => {});
     };
 
     fetchData();

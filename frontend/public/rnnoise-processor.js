@@ -23,6 +23,7 @@ class RNNoiseProcessor extends AudioWorkletProcessor {
     this._inputLen  = 0;
     this._outputBuf = new Float32Array(4096);
     this._outputLen = 0;
+    this._primed    = false;
 
     this.port.onmessage = async (e) => {
       if (e.data?.type === "init") {
@@ -101,14 +102,20 @@ class RNNoiseProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // 3. Deliver exactly quantum (128) samples from output FIFO to WebAudio output
-    if (this._outputLen >= quantum) {
+    // 3. Priming: wait until at least 2 frames (960 samples = 20ms) are buffered before draining.
+    // Once primed, _outputLen strictly fluctuates between 576 and 960 samples, GUARANTEEING
+    // _outputLen >= 128 on EVERY SINGLE QUANTUM with zero underflows, zero silence insertion, and zero phase jumps.
+    if (!this._primed && this._outputLen >= FRAME_SIZE * 2) {
+      this._primed = true;
+    }
+
+    if (this._primed && this._outputLen >= quantum) {
       output.set(this._outputBuf.subarray(0, quantum));
       this._outputBuf.copyWithin(0, quantum, this._outputLen);
       this._outputLen -= quantum;
     } else {
-      // Initial buffer filling (~8-10ms warmup): pass through clean input with zero silence
-      output.set(input);
+      // During initial 20ms priming warmup, output silence
+      output.fill(0);
     }
 
     return true;

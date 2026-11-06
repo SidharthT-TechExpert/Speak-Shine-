@@ -3354,7 +3354,7 @@ function buildRecordingMediaConstraints(camId, micId, isShadowing = false) {
       // same words, AEC misidentifies the speaker's vocalization as an acoustic echo and cancels their voice!
       echoCancellation: !isShadowing,
       noiseSuppression: !isShadowing,
-      autoGainControl: true,
+      autoGainControl: !isShadowing,
       sampleRate: 48000,
       channelCount: 1,
     },
@@ -3375,8 +3375,8 @@ async function openRecordingStream(camId, micId, isShadowing = false) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: camId ? { deviceId: { ideal: camId } } : { facingMode: "user" },
         audio: micId
-          ? { deviceId: { ideal: micId }, echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: true }
-          : { echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: true },
+          ? { deviceId: { ideal: micId }, echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: !isShadowing }
+          : { echoCancellation: !isShadowing, noiseSuppression: !isShadowing, autoGainControl: !isShadowing },
       });
       const track = stream.getVideoTracks()[0];
       if (track) await resetCameraZoom(track);
@@ -4154,7 +4154,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [uploadEta, setUploadEta]     = useState(null); // seconds
   const [compressProgress, setCompressProgress] = useState(0);
   const [isPaused, setIsPaused]     = useState(false);
-  const [noiseCancel, setNoiseCancel] = useState(!isShadowing); // Disabled by default for shadowing to avoid speech suppression
+  const [noiseCancel, setNoiseCancel] = useState(false); // Default OFF for pure hardware fidelity; RNNoise FIFO is available on toggle
   const [backgroundBlur, setBackgroundBlur] = useState(false); // Background blur toggle
   const [blurStrength, setBlurStrength] = useState(20); // Blur strength in pixels (10-40)
   const [ncStatus, setNcStatus]     = useState("idle");
@@ -4329,16 +4329,22 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
         setAudioOutputs(outs);
 
         // Auto-select best microphone:
-        // Prioritize headset/buds, then real hardware microphones, avoiding virtual cables (Voicemeeter)
+        // Prioritize physical built-in or USB microphone arrays (keeps Bluetooth earphones in crystal-clear A2DP stereo mode)
         if (!micId && audioInputs.length > 0) {
+          const physicalMic = audioInputs.find(d => 
+            /array|realtek|built-in|internal|integrated|studio|usb|smart sound/i.test(d.label) &&
+            !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label)
+          );
+          const realMic = audioInputs.find(d => 
+            !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label) &&
+            !/headset|buds|earphone|airpod|bluetooth/i.test(d.label)
+          );
           const headsetMic = audioInputs.find(d => /headset|buds|earphone|airpod|bluetooth/i.test(d.label));
-          const realMic = audioInputs.find(d => !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label));
-          if (headsetMic) {
-            console.log("[DeviceSelection] Auto-selected headset microphone:", headsetMic.label);
-            setMicId(headsetMic.deviceId);
-          } else if (realMic) {
-            console.log("[DeviceSelection] Auto-selected physical microphone:", realMic.label);
-            setMicId(realMic.deviceId);
+          const nonVirtual = audioInputs.find(d => !/voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label));
+          const chosen = physicalMic || realMic || headsetMic || nonVirtual || audioInputs[0];
+          if (chosen) {
+            console.log("[DeviceSelection] Auto-selected optimal microphone:", chosen.label);
+            setMicId(chosen.deviceId);
           }
         }
 
@@ -4668,10 +4674,17 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
     // limit. ~1.1 Mbps video + 96 kbps audio ≈ 90 MB at 10 min, ~45 MB at 5 min.
     // Without this, the browser default (~2.5 Mbps) produced 130 MB+ files.
     let recorder;
-    const recorderOptions = { videoBitsPerSecond: 1_100_000, audioBitsPerSecond: 96_000 };
+    const preferredMime = typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+      ? "video/webm;codecs=vp8,opus"
+      : (typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : undefined);
+    const recorderOptions = {
+      ...(preferredMime ? { mimeType: preferredMime } : {}),
+      videoBitsPerSecond: 1_100_000,
+      audioBitsPerSecond: 160_000
+    };
     try {
       recorder = new MediaRecorder(stream, recorderOptions);
-      console.log(`[Recording] MediaRecorder with capped bitrate (1.1 Mbps video / 96 kbps audio)`);
+      console.log(`[Recording] MediaRecorder with studio audio (1.1 Mbps video / 160 kbps Opus)`);
     } catch (err) {
       // Some browsers reject the options object — fall back to the most basic config.
       console.warn(`[Recording] Bitrate options unsupported, falling back to basic:`, err);
@@ -5526,8 +5539,9 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                 {mics.map(d => {
                   const isHeadset = /headset|buds|earphone|airpod|bluetooth/i.test(d.label);
                   const isVirtual = /voicemeeter|vb-audio|virtual|cable|stereo mix/i.test(d.label);
+                  const isBuiltIn = /array|realtek|built-in|internal|integrated|studio|usb|smart sound/i.test(d.label) && !isVirtual;
                   const prefix = isHeadset ? "🎧 " : (isVirtual ? "🔌 " : "🎙️ ");
-                  const suffix = isHeadset ? " (Recommended for Earphones)" : (isVirtual ? " (Virtual Cable)" : "");
+                  const suffix = isBuiltIn ? " (Recommended - HD Audio)" : (isHeadset ? " (Bluetooth)" : (isVirtual ? " (Virtual Cable)" : ""));
                   return (
                     <option key={d.deviceId} value={d.deviceId}>
                       {prefix}{d.label || `Mic ${d.deviceId.slice(0,6)}`}{suffix}
@@ -5535,6 +5549,12 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   );
                 })}
               </select>
+
+              {isShadowing && mics.some(d => d.deviceId === micId && /headset|buds|earphone|bluetooth/i.test(d.label)) && (
+                <div style={{ marginTop: "0.35rem", fontSize: "0.72rem", color: "#fbbf24", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span>💡 Tip: For high-fidelity stereo in your earphones, select your laptop's Microphone Array.</span>
+                </div>
+              )}
 
               {/* Real-time Mic Level Visualizer */}
               <div style={{
