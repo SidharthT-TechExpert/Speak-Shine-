@@ -267,6 +267,7 @@ export default function VideoAnalysis() {
   const [isStorySummary, setIsStorySummary] = useState(() => Boolean(initToday?.contentType === "story_audio" || initToday?.isStorySummaryDay));
   const [isPictureDescription, setIsPictureDescription] = useState(() => Boolean(initToday?.contentType === "picture_description" || initToday?.isPictureDescriptionDay));
   const [isShadowing, setIsShadowing] = useState(() => initShadowing);
+  const [showPreviewScript, setShowPreviewScript] = useState(false); // Script turned OFF by default; toggle ON if needed
   const [shadowVideoSrcOverride, setShadowVideoSrcOverride] = useState("");
   const [shadowingVideoFailed, setShadowingVideoFailed] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
@@ -1242,7 +1243,7 @@ export default function VideoAnalysis() {
                         })}
                       </div>
 
-                      {/* Time & Speed */}
+                      {/* Time, Speed & Script Toggle */}
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
                         <span style={{ fontSize: "0.78rem", color: "#e2e8f0", fontFamily: "monospace", fontWeight: 600 }}>
                           {fmtTime(currentTime)} / {fmtTime(duration)}
@@ -1268,14 +1269,79 @@ export default function VideoAnalysis() {
                             </button>
                           ))}
                         </div>
+
+                        {/* Script / Subtitles Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => setShowPreviewScript(prev => !prev)}
+                          style={{
+                            background: showPreviewScript ? "rgba(236, 72, 153, 0.28)" : "rgba(255,255,255,0.1)",
+                            color: showPreviewScript ? "#f472b6" : "#cbd5e1",
+                            border: showPreviewScript ? "1px solid rgba(236, 72, 153, 0.55)" : "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "8px",
+                            padding: "3px 8px",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "3px",
+                          }}
+                          title={showPreviewScript ? "Hide Teleprompter Script" : "Show Teleprompter Script"}
+                        >
+                          {showPreviewScript ? "📝 Script: ON" : "📝 Script: OFF"}
+                        </button>
                       </div>
                     </div>
 
                     {/* Synchronized 5-Second Teleprompter */}
-                    {(todayQuestion.videoTranscript || todayQuestion.question) && (() => {
-                      const textToSplit = todayQuestion.videoTranscript || todayQuestion.question || "";
-                      const cues = buildTeleprompterCues(textToSplit, duration || todayQuestion.videoDuration || 60);
-                      if (!cues.length) return null;
+                    {(todayQuestion.videoTranscript || todayQuestion.question) && (
+                      !showPreviewScript ? (
+                        <div style={{
+                          marginTop: "0.75rem",
+                          background: "linear-gradient(135deg, rgba(17, 12, 34, 0.6) 0%, rgba(26, 16, 48, 0.5) 100%)",
+                          border: "1px dashed rgba(236, 72, 153, 0.3)",
+                          borderRadius: 14,
+                          padding: "0.85rem 1.15rem",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "0.75rem",
+                          flexWrap: "wrap",
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                            <span style={{ fontSize: "1.2rem" }}>🎧</span>
+                            <div>
+                              <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#f472b6" }}>Pure Ear Training Mode (Script Hidden)</div>
+                              <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>Focus on in-ear reference audio to train native shadowing reflexes.</div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowPreviewScript(true)}
+                            style={{
+                              background: "rgba(236, 72, 153, 0.16)",
+                              color: "#f472b6",
+                              border: "1px solid rgba(236, 72, 153, 0.45)",
+                              padding: "4px 12px",
+                              borderRadius: 8,
+                              fontSize: "0.74rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                            title="Turn on teleprompter script"
+                          >
+                            👁️ Show Teleprompter Script
+                          </button>
+                        </div>
+                      ) : (
+                        (() => {
+                          const textToSplit = todayQuestion.videoTranscript || todayQuestion.question || "";
+                          const cues = buildTeleprompterCues(textToSplit, duration || todayQuestion.videoDuration || 60);
+                          if (!cues.length) return null;
 
                       const activeIdx = cues.findIndex(c => currentTime >= c.start && currentTime < c.end);
                       const safeIdx = activeIdx !== -1 ? activeIdx : (currentTime >= (duration || 60) ? cues.length - 1 : 0);
@@ -1501,7 +1567,9 @@ export default function VideoAnalysis() {
                           </div>
                         </div>
                       );
-                    })()}
+                    })()
+                  )
+                )}
                   </div>
                 )}
 
@@ -4170,6 +4238,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
   const [shadowAudioBlocked, setShadowAudioBlocked] = useState(false);
   const [shadowVolume, setShadowVolume] = useState(0.85);
   const [testInEarPlaying, setTestInEarPlaying] = useState(false);
+  const [showTranscription, setShowTranscription] = useState(false); // Subtitles / transcription OFF by default per user request
   const shadowingRefVideo = useRef(null);
   const shadowingPreviewVideo = useRef(null);
 
@@ -5908,6 +5977,23 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       {shadowVideoMuted ? "🔇" : "🔊"}
                     </button>
 
+                    {/* Subtitles / Script Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowTranscription(prev => !prev)}
+                      style={{
+                        background: showTranscription ? "rgba(236,72,153,0.3)" : "rgba(255,255,255,0.12)",
+                        color: showTranscription ? "#f472b6" : "#ffffff",
+                        border: showTranscription ? "1px solid rgba(236,72,153,0.6)" : "1px solid rgba(255,255,255,0.2)",
+                        padding: "2px 7px", borderRadius: 4, fontSize: "0.66rem", fontWeight: 700, cursor: "pointer",
+                        display: "inline-flex", alignItems: "center", gap: "3px",
+                        transition: "all 0.15s ease",
+                      }}
+                      title={showTranscription ? "Hide Script / Subtitles" : "Show Script / Subtitles"}
+                    >
+                      {showTranscription ? "📝 Script: ON" : "📝 Script: OFF"}
+                    </button>
+
                     {/* Unblock/Force Play Button if browser blocked or paused */}
                     {(!shadowAudioPlaying || shadowAudioBlocked) && (
                       <button
@@ -5965,38 +6051,92 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   <span>{fmtTime(question?.videoDuration || 180)}</span>
                 </div>
 
-                {/* 5-Second Phrase Window */}
-                {(() => {
-                  const fullText = question?.videoTranscript || question?.question || "";
-                  const audioDuration = question?.videoDuration || durationLimits.fullScoreSeconds || 60;
-                  const cues = buildTeleprompterCues(fullText, audioDuration);
-                  if (!cues.length) return <div style={{ fontSize: "0.92rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
+                {/* 5-Second Phrase Window / Subtitles */}
+                {showTranscription ? (
+                  (() => {
+                    const fullText = question?.videoTranscript || question?.question || "";
+                    const audioDuration = question?.videoDuration || durationLimits.fullScoreSeconds || 60;
+                    const cues = buildTeleprompterCues(fullText, audioDuration);
+                    if (!cues.length) return <div style={{ fontSize: "0.92rem", color: "#ffffff", fontWeight: 600 }}>{fullText}</div>;
 
-                  const refTime = shadowAudioPlaying ? shadowAudioTime : elapsed;
-                  const activeIdx = cues.findIndex(c => refTime >= c.start && refTime < c.end);
-                  const safeIdx = activeIdx !== -1 ? activeIdx : (refTime >= audioDuration ? cues.length - 1 : 0);
-                  const curCue = cues[safeIdx] || cues[0];
-                  const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
-                  const cueProgress = curCue && curCue.duration > 0
-                    ? Math.min(1, Math.max(0, (refTime - curCue.start) / curCue.duration))
-                    : 0;
+                    const refTime = shadowAudioPlaying ? shadowAudioTime : elapsed;
+                    const activeIdx = cues.findIndex(c => refTime >= c.start && refTime < c.end);
+                    const safeIdx = activeIdx !== -1 ? activeIdx : (refTime >= audioDuration ? cues.length - 1 : 0);
+                    const curCue = cues[safeIdx] || cues[0];
+                    const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
+                    const cueProgress = curCue && curCue.duration > 0
+                      ? Math.min(1, Math.max(0, (refTime - curCue.start) / curCue.duration))
+                      : 0;
 
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                      <div style={{ fontSize: "1.06rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.85)" }}>
-                        {curCue.text}
-                      </div>
-                      <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.12s linear" }} />
-                      </div>
-                      {nextCue && (
-                        <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <span style={{ color: "#ec4899", fontWeight: 700 }}>Next: </span>{nextCue.text}
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                          <div style={{ fontSize: "1.06rem", color: "#ffffff", fontWeight: 700, lineHeight: 1.45, textShadow: "0 2px 8px rgba(0,0,0,0.85)" }}>
+                            {curCue.text}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowTranscription(false)}
+                            style={{
+                              background: "rgba(255,255,255,0.08)",
+                              color: "#cbd5e1",
+                              border: "1px solid rgba(255,255,255,0.15)",
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              fontSize: "0.62rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              flexShrink: 0,
+                            }}
+                            title="Hide Script"
+                          >
+                            Hide ✕
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                        <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${cueProgress * 100}%`, background: "linear-gradient(90deg, #ec4899, #a855f7)", transition: "width 0.12s linear" }} />
+                        </div>
+                        {nextCue && (
+                          <div style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <span style={{ color: "#ec4899", fontWeight: 700 }}>Next: </span>{nextCue.text}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "0.15rem 0.1rem",
+                    gap: "0.5rem"
+                  }}>
+                    <span style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.65)", fontStyle: "italic", display: "flex", alignItems: "center", gap: "5px" }}>
+                      <span>🎧</span> In-ear reference audio playing · Pure shadowing mode (script hidden)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowTranscription(true)}
+                      style={{
+                        background: "rgba(236, 72, 153, 0.18)",
+                        color: "#f472b6",
+                        border: "1px solid rgba(236, 72, 153, 0.45)",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      title="Turn on subtitles / transcription"
+                    >
+                      👁️ Show Script
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
