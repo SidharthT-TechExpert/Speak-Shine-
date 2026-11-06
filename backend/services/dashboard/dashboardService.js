@@ -254,6 +254,8 @@ export async function getTodayQuestionData() {
       isPictureDescription: isPicture,
       isShadowing: isShadowing,
       challengeType: isShadowing ? "shadowing_video" : undefined,
+      targetVideoDuration: status?.todayVideoDuration || 0,
+      videoDuration: status?.todayVideoDuration || 0,
     }, {
       ...(status || {}),
       durationShadowingMax: Math.max(180, Number(status?.durationShadowingMax) || 180),
