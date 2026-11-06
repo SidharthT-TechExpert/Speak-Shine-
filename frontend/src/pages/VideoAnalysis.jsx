@@ -2490,9 +2490,11 @@ export default function VideoAnalysis() {
         {/* Accomplishment celebration banner if today's task is already submitted */}
         {isTodaySubmitted && (
           <div style={{
-            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)",
-            border: "1px solid rgba(74, 222, 128, 0.35)",
-            boxShadow: "0 4px 20px rgba(16, 185, 129, 0.12)",
+            background: isDark
+              ? "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)"
+              : "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.06) 100%)",
+            border: isDark ? "1px solid rgba(74, 222, 128, 0.35)" : "1.5px solid rgba(16, 185, 129, 0.45)",
+            boxShadow: isDark ? "0 4px 20px rgba(16, 185, 129, 0.12)" : "0 4px 16px rgba(16, 185, 129, 0.08)",
             borderRadius: 14,
             padding: "1rem 1.35rem",
             marginBottom: "1.25rem",
@@ -2505,12 +2507,12 @@ export default function VideoAnalysis() {
             <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
               <span style={{ fontSize: "1.6rem" }}>🎉</span>
               <div>
-                <div style={{ fontSize: "0.98rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ fontSize: "0.98rem", fontWeight: 800, color: isDark ? "#ffffff" : "#065f46", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <span>Today's Speaking Challenge Accomplished!</span>
                   <span style={{
-                    background: "rgba(34, 197, 94, 0.2)",
-                    border: "1px solid rgba(74, 222, 128, 0.4)",
-                    color: "#86efac",
+                    background: isDark ? "rgba(34, 197, 94, 0.2)" : "#dcfce7",
+                    border: isDark ? "1px solid rgba(74, 222, 128, 0.4)" : "1px solid #86efac",
+                    color: isDark ? "#86efac" : "#15803d",
                     borderRadius: 999,
                     padding: "2px 8px",
                     fontSize: "0.68rem",
@@ -2520,7 +2522,7 @@ export default function VideoAnalysis() {
                     ✓ Submitted &amp; Verified
                   </span>
                 </div>
-                <div style={{ fontSize: "0.8rem", color: "#cbd5e1", marginTop: "2px" }}>
+                <div style={{ fontSize: "0.8rem", color: isDark ? "#cbd5e1" : "#047857", marginTop: "2px", fontWeight: isDark ? 400 : 500 }}>
                   Your attendance is marked and your streak is safe! You can record or upload additional takes below anytime for free practice.
                 </div>
               </div>
@@ -2549,10 +2551,10 @@ export default function VideoAnalysis() {
         <div id="video-studio-container" style={{
           display: "inline-flex",
           gap: "0.35rem",
-          background: "rgba(255, 255, 255, 0.03)",
+          background: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.04)",
           padding: 4,
           borderRadius: 12,
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(0, 0, 0, 0.08)",
           marginBottom: "1.25rem",
           scrollMarginTop: "90px",
         }}>
@@ -2591,9 +2593,11 @@ export default function VideoAnalysis() {
           </div>
         ) : !isQuestionActive ? (
           <div className="card" style={{
-            background: "linear-gradient(145deg, #130f24 0%, #17112c 100%)",
-            border: "1px solid rgba(249, 115, 22, 0.25)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            background: isDark
+              ? "linear-gradient(145deg, #130f24 0%, #17112c 100%)"
+              : "linear-gradient(145deg, #fff7ed 0%, #ffffff 100%)",
+            border: isDark ? "1px solid rgba(249, 115, 22, 0.25)" : "1.5px solid #fed7aa",
+            boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.35)" : "0 4px 20px rgba(249, 115, 22, 0.08)",
             borderRadius: 18,
             padding: "2.2rem 2rem",
             marginBottom: "1.75rem",
@@ -2618,9 +2622,9 @@ export default function VideoAnalysis() {
                   gap: "0.5rem",
                   padding: "0.35rem 0.85rem",
                   borderRadius: 9999,
-                  background: "rgba(249, 115, 22, 0.15)",
-                  border: "1px solid rgba(249, 115, 22, 0.4)",
-                  color: "#f97316",
+                  background: isDark ? "rgba(249, 115, 22, 0.15)" : "#ffedd5",
+                  border: isDark ? "1px solid rgba(249, 115, 22, 0.4)" : "1px solid #fdba74",
+                  color: isDark ? "#f97316" : "#c2410c",
                   fontSize: "0.78rem",
                   fontWeight: 800,
                   letterSpacing: "0.06em",
@@ -2630,31 +2634,32 @@ export default function VideoAnalysis() {
                   <span>🔒</span> Studio Locked · Daily Reset Period
                 </div>
 
-                <h2 style={{ fontSize: "1.65rem", fontWeight: 800, color: "#ffffff", margin: "0 0 0.5rem 0", lineHeight: 1.25 }}>
+                <h2 style={{ fontSize: "1.65rem", fontWeight: 800, color: isDark ? "#ffffff" : "#0f172a", margin: "0 0 0.5rem 0", lineHeight: 1.25 }}>
                   Recording &amp; Uploading Are Locked
                 </h2>
-                <p style={{ fontSize: "0.92rem", color: "#94a3b8", lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: "0.92rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.6, margin: 0 }}>
                   The midnight reset has cleared the previous challenge. Our AI curriculum engine is preparing today's mission, audio story, and vocabulary. Studio recording and video uploading will automatically unlock once the new mission is released.
                 </p>
               </div>
 
               {/* Countdown section */}
               <div style={{
-                background: "rgba(10, 8, 20, 0.65)",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                background: isDark ? "rgba(10, 8, 20, 0.65)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1.5px solid #fed7aa",
                 borderRadius: 16,
                 padding: "1.25rem 1.5rem",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 minWidth: 240,
+                boxShadow: isDark ? "none" : "0 4px 14px rgba(249, 115, 22, 0.08)",
               }}>
-                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#f97316", marginBottom: "0.25rem" }}>
+                <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: isDark ? "#f97316" : "#c2410c", marginBottom: "0.25rem" }}>
                   ⏳ Next Mission Drops In
                 </span>
                 <StudioDropCountdownTimer posterSendTime={posterSendTime} />
-                <span style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
-                  Unlocks today at <strong style={{ color: "#ffffff" }}>{formatDropTime(posterSendTime)} IST</strong>
+                <span style={{ fontSize: "0.78rem", color: isDark ? "#cbd5e1" : "#475569" }}>
+                  Unlocks today at <strong style={{ color: isDark ? "#ffffff" : "#0f172a" }}>{formatDropTime(posterSendTime)} IST</strong>
                 </span>
               </div>
             </div>
@@ -2668,46 +2673,49 @@ export default function VideoAnalysis() {
               marginBottom: "1.75rem",
             }}>
               <div style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
+                background: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #fed7aa",
                 borderRadius: 12,
                 padding: "1rem 1.15rem",
+                boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.03)",
               }}>
                 <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>🌙</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.25rem" }}>
                   Midnight Reset Active
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
                   The 12:00 AM reset has archived yesterday's mission. Streaks and leaderboard scores are now being finalized.
                 </div>
               </div>
 
               <div style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
+                background: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #fed7aa",
                 borderRadius: 12,
                 padding: "1rem 1.15rem",
+                boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.03)",
               }}>
                 <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>🎯</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.25rem" }}>
                   Fresh Mission Coming
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
                   A brand-new question, audio prompt, and curated vocabulary list will drop at {formatDropTime(posterSendTime)} IST.
                 </div>
               </div>
 
               <div style={{
-                background: "rgba(255, 255, 255, 0.02)",
-                border: "1px solid rgba(255, 255, 255, 0.05)",
+                background: isDark ? "rgba(255, 255, 255, 0.02)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255, 255, 255, 0.05)" : "1px solid #fed7aa",
                 borderRadius: 12,
                 padding: "1rem 1.15rem",
+                boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.03)",
               }}>
                 <div style={{ fontSize: "1.25rem", marginBottom: "0.35rem" }}>📊</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.25rem" }}>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isDark ? "#ffffff" : "#0f172a", marginBottom: "0.25rem" }}>
                   Review Past Feedback
                 </div>
-                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.5 }}>
+                <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
                   Take this rest window to review your previous speech evaluations, filler word analyses, and vocabulary mastery below.
                 </div>
               </div>
