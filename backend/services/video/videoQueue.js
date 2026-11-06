@@ -631,6 +631,11 @@ async function processJob(job) {
       });
     }
 
+    try {
+      const { invalidateLeaderboardCache } = await import("../dashboard/dashboardService.js");
+      invalidateLeaderboardCache();
+    } catch {}
+
     // Save scoreOutcome to the report so the UI can show the right message
     await VideoReport.findByIdAndUpdate(reportId, {
       "analysis.scoreOutcome": scoreOutcome,

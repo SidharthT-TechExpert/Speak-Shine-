@@ -23,30 +23,8 @@ export async function getTodayOverview(req, res) {
  */
 export async function getTodayQuestionOnly(req, res) {
   try {
-    const overview = await dashboardService.getTodayOverview();
-    const today = overview?.today || {};
-    res.json({
-      questionSent: today.questionSent ?? false,
-      topic: today.topic || null,
-      question: today.question || null,
-      category: today.category || null,
-      audioUrl: today.audioUrl || null,
-      imageUrl: today.imageUrl || null,
-      contentType: today.contentType || "question",
-      isShadowing: today.isShadowing ?? false,
-      videoUrl: today.videoUrl || null,
-      videoDuration: today.videoDuration || null,
-      videoTranscript: today.videoTranscript || null,
-      videoTitle: today.videoTitle || null,
-      vocabulary: today.vocabulary || [],
-      vocabWordCount: today.vocabWordCount ?? 0,
-      vocabRequiredCount: today.vocabRequiredCount ?? 0,
-      vocabLevel: today.vocabLevel || 'B2',
-      durationLimits: today.durationLimits || null,
-      durationSettings: today.durationSettings || null,
-      allowPrivateVideos: today.allowPrivateVideos ?? true,
-      enableBackgroundBlur: today.enableBackgroundBlur ?? false,
-    });
+    const today = await dashboardService.getTodayQuestionData();
+    res.json(today);
   } catch (error) {
     console.error("[Dashboard] Get today question error:", error.message);
     res.status(500).json({ error: error.message });

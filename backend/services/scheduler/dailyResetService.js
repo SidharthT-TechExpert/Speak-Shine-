@@ -170,6 +170,10 @@ export async function incrementSubmissionCounters() {
 export async function resetDailyFlags() {
   try {
     const result = await User.updateMany({}, { completed: false, fineChargedToday: false, todayScore: null });
+    try {
+      const { invalidateLeaderboardCache } = await import("../dashboard/dashboardService.js");
+      invalidateLeaderboardCache();
+    } catch {}
 
     return {
       reset: result.modifiedCount
