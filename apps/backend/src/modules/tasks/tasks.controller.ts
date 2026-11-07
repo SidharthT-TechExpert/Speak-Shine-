@@ -39,6 +39,13 @@ export class TasksController {
     return this.tasksService.getClassTasks(classId);
   }
 
+  @Roles(Role.TRAINER)
+  @Get('trainer/my-tasks')
+  @ApiOperation({ summary: 'List all tasks created by authenticated trainer' })
+  async getTrainerTasks(@CurrentUser('userId') trainerId: string) {
+    return this.tasksService.getTrainerTasks(trainerId);
+  }
+
   @Roles(Role.STUDENT)
   @Get('my')
   @ApiOperation({ summary: 'Get active tasks for student enrolled class' })

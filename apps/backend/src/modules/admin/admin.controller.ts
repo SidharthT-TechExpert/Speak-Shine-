@@ -56,4 +56,16 @@ export class AdminController {
   async listAllClasses() {
     return this.adminService.listAllClasses();
   }
+
+  @Get('students')
+  @ApiOperation({ summary: 'List all students across the platform' })
+  async listAllStudents() {
+    return this.adminService.listAllStudents();
+  }
+
+  @Get('transactions')
+  @ApiOperation({ summary: 'List all financial and wallet ledger transactions' })
+  async listAllTransactions() {
+    return this.adminService.listAllTransactions();
+  }
 }

@@ -41,6 +41,13 @@ export class ClassesController {
   }
 
   @Roles(Role.TRAINER)
+  @Get('my-students')
+  @ApiOperation({ summary: 'List all students enrolled in this trainer classes' })
+  async getTrainerAllStudents(@CurrentUser('userId') trainerId: string) {
+    return this.classesService.getTrainerAllStudents(trainerId);
+  }
+
+  @Roles(Role.TRAINER)
   @Get(':id')
   @ApiOperation({ summary: 'Get class details by ID' })
   async getClassDetails(

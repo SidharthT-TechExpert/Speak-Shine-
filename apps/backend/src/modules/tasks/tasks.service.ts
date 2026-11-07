@@ -60,6 +60,14 @@ export class TasksService {
       .lean();
   }
 
+  async getTrainerTasks(trainerId: string) {
+    return this.taskModel
+      .find({ trainerId: new Types.ObjectId(trainerId) })
+      .populate('classId', 'title classCode')
+      .sort({ dueDate: -1 })
+      .lean();
+  }
+
   async getStudentTasks(studentId: string) {
     const student = await this.userModel.findById(studentId).lean();
     if (!student || !student.classId) {

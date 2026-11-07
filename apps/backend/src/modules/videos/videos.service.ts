@@ -14,6 +14,7 @@ import {
 } from '../../database/schemas/video-report.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Task, TaskDocument } from '../../database/schemas/task.schema';
+import { Class, ClassDocument } from '../../database/schemas/class.schema';
 import { TaskSubmissionStatus } from '@speak-shine/shared-types';
 import { AiAnalysisService } from './ai-analysis.service';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
@@ -29,6 +30,7 @@ export class VideosService {
     private videoReportModel: Model<VideoReportDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
+    @InjectModel(Class.name) private classModel: Model<ClassDocument>,
     private configService: ConfigService,
     private aiAnalysisService: AiAnalysisService,
   ) {
@@ -174,5 +176,38 @@ export class VideosService {
     const report = await this.videoReportModel.findById(reportId).lean();
     if (!report) throw new NotFoundException('Report not found');
     return report;
+  }
+
+  async getMySubmissions(studentId: string) {
+    return this.videoReportModel
+      .find({ userId: new Types.ObjectId(studentId) })
+      .populate('taskId', 'title type dueDate')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async getTrainerSubmissions(trainerId: string) {
+    const trainerClasses = await this.classModel
+      .find({ trainerId: new Types.ObjectId(trainerId) })
+      .select('_id');
+    const classIds = trainerClasses.map((c) => c._id);
+
+    return this.videoReportModel
+      .find({ classId: { $in: classIds } })
+      .populate('userId', 'name email phone avatarUrl streak monthlyScore')
+      .populate('taskId', 'title type')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async getAllSubmissions() {
+    return this.videoReportModel
+      .find()
+      .populate('userId', 'name email phone role')
+      .populate('classId', 'title classCode')
+      .populate('taskId', 'title type')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
   }
 }

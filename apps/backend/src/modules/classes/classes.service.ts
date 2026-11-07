@@ -73,6 +73,20 @@ export class ClassesService {
       .lean();
   }
 
+  async getTrainerAllStudents(trainerId: string) {
+    const trainerClasses = await this.classModel
+      .find({ trainerId: new Types.ObjectId(trainerId) })
+      .select('_id');
+    const classIds = trainerClasses.map((c) => c._id);
+
+    return this.userModel
+      .find({ classId: { $in: classIds } })
+      .populate('classId', 'title classCode')
+      .select('name email phone streak monthlyScore walletBalance createdAt classId')
+      .sort({ streak: -1, monthlyScore: -1 })
+      .lean();
+  }
+
   async preEnrollStudent(
     classId: string,
     trainerId: string,

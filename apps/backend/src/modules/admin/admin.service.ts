@@ -116,4 +116,23 @@ export class AdminService {
       .sort({ createdAt: -1 })
       .lean();
   }
+
+  async listAllStudents() {
+    return this.userModel
+      .find({ role: Role.STUDENT })
+      .populate('classId', 'title classCode')
+      .populate('trainerId', 'name email')
+      .select('name email phone streak monthlyScore walletBalance createdAt classId trainerId')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async listAllTransactions() {
+    return this.walletTransactionModel
+      .find()
+      .populate('userId', 'name email role')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+  }
 }
