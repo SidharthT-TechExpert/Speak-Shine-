@@ -18,7 +18,12 @@ export class User {
   @Prop({ required: true })
   passwordHash: string;
 
-  @Prop({ required: true, enum: Role, default: Role.STUDENT })
+  @Prop({
+    required: true,
+    type: String,
+    enum: Object.values(Role),
+    default: Role.STUDENT,
+  })
   role: Role;
 
   @Prop({ default: true })
@@ -72,7 +77,5 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
-UserSchema.index({ email: 1 });
-UserSchema.index({ phone: 1 });
 UserSchema.index({ classId: 1 });
 UserSchema.index({ role: 1 });

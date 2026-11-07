@@ -21,11 +21,19 @@ __decorate([
     __metadata("design:type", mongoose_2.Types.ObjectId)
 ], WalletTransaction.prototype, "userId", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, enum: shared_types_1.TransactionType }),
+    (0, mongoose_1.Prop)({
+        required: true,
+        type: String,
+        enum: Object.values(shared_types_1.TransactionType),
+    }),
     __metadata("design:type", String)
 ], WalletTransaction.prototype, "type", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, enum: shared_types_1.TransactionCategory }),
+    (0, mongoose_1.Prop)({
+        required: true,
+        type: String,
+        enum: Object.values(shared_types_1.TransactionCategory),
+    }),
     __metadata("design:type", String)
 ], WalletTransaction.prototype, "category", void 0);
 __decorate([
@@ -43,7 +51,8 @@ __decorate([
 __decorate([
     (0, mongoose_1.Prop)({
         required: true,
-        enum: shared_types_1.TransactionStatus,
+        type: String,
+        enum: Object.values(shared_types_1.TransactionStatus),
         default: shared_types_1.TransactionStatus.COMPLETED,
     }),
     __metadata("design:type", String)

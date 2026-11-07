@@ -29,7 +29,8 @@ export class VideoReport {
 
   @Prop({
     required: true,
-    enum: TaskSubmissionStatus,
+    type: String,
+    enum: Object.values(TaskSubmissionStatus),
     default: TaskSubmissionStatus.PENDING,
   })
   status: TaskSubmissionStatus;
@@ -40,7 +41,6 @@ export class VideoReport {
   @Prop({ default: null })
   failureReason?: string;
 
-  // Auto-expire raw video files after 18 hours (retaining lightweight analysis)
   @Prop({ default: () => new Date(Date.now() + 18 * 60 * 60 * 1000) })
   expiresAt: Date;
 }

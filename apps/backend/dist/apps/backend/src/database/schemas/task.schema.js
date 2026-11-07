@@ -33,7 +33,12 @@ __decorate([
     __metadata("design:type", String)
 ], Task.prototype, "description", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, enum: shared_types_1.TaskType, default: shared_types_1.TaskType.DAILY }),
+    (0, mongoose_1.Prop)({
+        required: true,
+        type: String,
+        enum: Object.values(shared_types_1.TaskType),
+        default: shared_types_1.TaskType.DAILY,
+    }),
     __metadata("design:type", String)
 ], Task.prototype, "type", void 0);
 __decorate([

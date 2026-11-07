@@ -13,10 +13,18 @@ export class WalletTransaction {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ required: true, enum: TransactionType })
+  @Prop({
+    required: true,
+    type: String,
+    enum: Object.values(TransactionType),
+  })
   type: TransactionType;
 
-  @Prop({ required: true, enum: TransactionCategory })
+  @Prop({
+    required: true,
+    type: String,
+    enum: Object.values(TransactionCategory),
+  })
   category: TransactionCategory;
 
   @Prop({ required: true, min: 0 })
@@ -30,7 +38,8 @@ export class WalletTransaction {
 
   @Prop({
     required: true,
-    enum: TransactionStatus,
+    type: String,
+    enum: Object.values(TransactionStatus),
     default: TransactionStatus.COMPLETED,
   })
   status: TransactionStatus;

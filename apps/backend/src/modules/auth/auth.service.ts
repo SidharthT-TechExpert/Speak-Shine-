@@ -4,6 +4,9 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -16,6 +19,7 @@ import {
 } from '../../database/schemas/trainer-profile.schema';
 import { Class, ClassDocument } from '../../database/schemas/class.schema';
 import { Role, TrainerApprovalStatus } from '@speak-shine/shared-types';
+import { RedisService } from '../../common/services/redis.service';
 import { LoginDto } from './dto/login.dto';
 import { StudentRegisterDto } from './dto/student-register.dto';
 import { TrainerRegisterDto } from './dto/trainer-register.dto';
@@ -24,18 +28,38 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(TrainerProfile.name)
     private trainerProfileModel: Model<TrainerProfileDocument>,
     @InjectModel(Class.name) private classModel: Model<ClassDocument>,
     private jwtService: JwtService,
+    private redisService: RedisService,
   ) {}
+
+  private async checkPhoneOtpRateLimit(phone: string): Promise<void> {
+    const key = `otp:rate:${phone.replace(/\D/g, '')}`;
+    const count = await this.redisService.incrWithTtl(key, 3600); // 1-hour window
+    if (count > 3) {
+      const ttl = await this.redisService.getTtl(key);
+      const mins = Math.max(1, Math.ceil(ttl / 60));
+      throw new HttpException(
+        `Too many OTP requests for this number. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async dispatchOtp(phoneOrEmail: string, otp: string, purpose: string) {
+    this.logger.log(`📱 [OTP Dispatch - ${purpose}] To: ${phoneOrEmail} | Code: ${otp}`);
+    // In production, integrate WhatsApp Service with SMS fallback
+  }
 
   async login(loginDto: LoginDto) {
     const { identifier, password } = loginDto;
 
-    // Support login via either email or phone
     const user = await this.userModel.findOne({
       $or: [
         { email: identifier.toLowerCase().trim() },
@@ -110,7 +134,6 @@ export class AuthService {
       }
     }
 
-    // Check referral code
     let referrerDoc: UserDocument | null = null;
     if (dto.referralCode) {
       referrerDoc = await this.userModel.findOne({
@@ -200,15 +223,20 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
+    const identifier = dto.identifier.trim();
+    if (identifier.match(/^[0-9+\-\s]{8,15}$/)) {
+      await this.checkPhoneOtpRateLimit(identifier);
+    }
+
     const user = await this.userModel.findOne({
       $or: [
-        { email: dto.identifier.toLowerCase().trim() },
-        { phone: dto.identifier.trim() },
+        { email: identifier.toLowerCase() },
+        { phone: identifier },
       ],
     });
 
     if (!user) {
-      // Return success anyway to prevent user enumeration
+      // Silent success: Do not leak whether user exists (security hardening from main)
       return {
         message: 'If an account exists, a 6-digit verification code has been dispatched.',
       };
@@ -227,8 +255,7 @@ export class AuthService {
       },
     );
 
-    // In local/dev we log it; in production dispatched via email/SMS gateway
-    console.log(`[AuthService] Password Reset OTP for ${user.email}: ${otp}`);
+    await this.dispatchOtp(user.phone || user.email, otp, 'Password Reset');
 
     return {
       message: 'If an account exists, a 6-digit verification code has been dispatched.',

@@ -47,7 +47,8 @@ __decorate([
 __decorate([
     (0, mongoose_1.Prop)({
         required: true,
-        enum: shared_types_1.TaskSubmissionStatus,
+        type: String,
+        enum: Object.values(shared_types_1.TaskSubmissionStatus),
         default: shared_types_1.TaskSubmissionStatus.PENDING,
     }),
     __metadata("design:type", String)

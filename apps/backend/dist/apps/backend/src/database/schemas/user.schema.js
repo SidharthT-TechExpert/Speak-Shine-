@@ -33,7 +33,12 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "passwordHash", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, enum: shared_types_1.Role, default: shared_types_1.Role.STUDENT }),
+    (0, mongoose_1.Prop)({
+        required: true,
+        type: String,
+        enum: Object.values(shared_types_1.Role),
+        default: shared_types_1.Role.STUDENT,
+    }),
     __metadata("design:type", String)
 ], User.prototype, "role", void 0);
 __decorate([
@@ -100,8 +105,6 @@ exports.User = User = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], User);
 exports.UserSchema = mongoose_1.SchemaFactory.createForClass(User);
-exports.UserSchema.index({ email: 1 });
-exports.UserSchema.index({ phone: 1 });
 exports.UserSchema.index({ classId: 1 });
 exports.UserSchema.index({ role: 1 });
 //# sourceMappingURL=user.schema.js.map

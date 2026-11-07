@@ -23,7 +23,8 @@ __decorate([
 __decorate([
     (0, mongoose_1.Prop)({
         required: true,
-        enum: shared_types_1.TrainerApprovalStatus,
+        type: String,
+        enum: Object.values(shared_types_1.TrainerApprovalStatus),
         default: shared_types_1.TrainerApprovalStatus.PENDING_APPROVAL,
     }),
     __metadata("design:type", String)
@@ -60,6 +61,5 @@ exports.TrainerProfile = TrainerProfile = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], TrainerProfile);
 exports.TrainerProfileSchema = mongoose_1.SchemaFactory.createForClass(TrainerProfile);
-exports.TrainerProfileSchema.index({ userId: 1 });
 exports.TrainerProfileSchema.index({ approvalStatus: 1 });
 //# sourceMappingURL=trainer-profile.schema.js.map

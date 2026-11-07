@@ -13,6 +13,18 @@ import {
   WalletTransaction,
   WalletTransactionSchema,
 } from './schemas/wallet-transaction.schema';
+import {
+  LiveSession,
+  LiveSessionSchema,
+} from './schemas/live-session.schema';
+import {
+  HelpTicket,
+  HelpTicketSchema,
+} from './schemas/help-ticket.schema';
+import {
+  Notification,
+  NotificationSchema,
+} from './schemas/notification.schema';
 
 const SCHEMAS = [
   { name: User.name, schema: UserSchema },
@@ -21,6 +33,9 @@ const SCHEMAS = [
   { name: Task.name, schema: TaskSchema },
   { name: VideoReport.name, schema: VideoReportSchema },
   { name: WalletTransaction.name, schema: WalletTransactionSchema },
+  { name: LiveSession.name, schema: LiveSessionSchema },
+  { name: HelpTicket.name, schema: HelpTicketSchema },
+  { name: Notification.name, schema: NotificationSchema },
 ];
 
 @Global()

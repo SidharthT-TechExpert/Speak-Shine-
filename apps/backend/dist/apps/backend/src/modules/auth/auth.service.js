@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var AuthService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
@@ -22,12 +23,27 @@ const user_schema_1 = require("../../database/schemas/user.schema");
 const trainer_profile_schema_1 = require("../../database/schemas/trainer-profile.schema");
 const class_schema_1 = require("../../database/schemas/class.schema");
 const shared_types_1 = require("@speak-shine/shared-types");
-let AuthService = class AuthService {
-    constructor(userModel, trainerProfileModel, classModel, jwtService) {
+const redis_service_1 = require("../../common/services/redis.service");
+let AuthService = AuthService_1 = class AuthService {
+    constructor(userModel, trainerProfileModel, classModel, jwtService, redisService) {
         this.userModel = userModel;
         this.trainerProfileModel = trainerProfileModel;
         this.classModel = classModel;
         this.jwtService = jwtService;
+        this.redisService = redisService;
+        this.logger = new common_1.Logger(AuthService_1.name);
+    }
+    async checkPhoneOtpRateLimit(phone) {
+        const key = `otp:rate:${phone.replace(/\D/g, '')}`;
+        const count = await this.redisService.incrWithTtl(key, 3600);
+        if (count > 3) {
+            const ttl = await this.redisService.getTtl(key);
+            const mins = Math.max(1, Math.ceil(ttl / 60));
+            throw new common_1.HttpException(`Too many OTP requests for this number. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`, common_1.HttpStatus.TOO_MANY_REQUESTS);
+        }
+    }
+    async dispatchOtp(phoneOrEmail, otp, purpose) {
+        this.logger.log(`📱 [OTP Dispatch - ${purpose}] To: ${phoneOrEmail} | Code: ${otp}`);
     }
     async login(loginDto) {
         const { identifier, password } = loginDto;
@@ -167,10 +183,14 @@ let AuthService = class AuthService {
         };
     }
     async forgotPassword(dto) {
+        const identifier = dto.identifier.trim();
+        if (identifier.match(/^[0-9+\-\s]{8,15}$/)) {
+            await this.checkPhoneOtpRateLimit(identifier);
+        }
         const user = await this.userModel.findOne({
             $or: [
-                { email: dto.identifier.toLowerCase().trim() },
-                { phone: dto.identifier.trim() },
+                { email: identifier.toLowerCase() },
+                { phone: identifier },
             ],
         });
         if (!user) {
@@ -186,7 +206,7 @@ let AuthService = class AuthService {
                 resetPasswordExpiresAt: expiresAt,
             },
         });
-        console.log(`[AuthService] Password Reset OTP for ${user.email}: ${otp}`);
+        await this.dispatchOtp(user.phone || user.email, otp, 'Password Reset');
         return {
             message: 'If an account exists, a 6-digit verification code has been dispatched.',
         };
@@ -219,7 +239,7 @@ let AuthService = class AuthService {
     }
 };
 exports.AuthService = AuthService;
-exports.AuthService = AuthService = __decorate([
+exports.AuthService = AuthService = AuthService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
     __param(1, (0, mongoose_1.InjectModel)(trainer_profile_schema_1.TrainerProfile.name)),
@@ -227,6 +247,7 @@ exports.AuthService = AuthService = __decorate([
     __metadata("design:paramtypes", [mongoose_2.Model,
         mongoose_2.Model,
         mongoose_2.Model,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        redis_service_1.RedisService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

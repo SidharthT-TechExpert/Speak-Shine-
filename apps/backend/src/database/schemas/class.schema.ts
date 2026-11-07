@@ -18,7 +18,12 @@ export class Class {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   trainerId: Types.ObjectId;
 
-  @Prop({ required: true, enum: ClassStatus, default: ClassStatus.ACTIVE })
+  @Prop({
+    required: true,
+    type: String,
+    enum: Object.values(ClassStatus),
+    default: ClassStatus.ACTIVE,
+  })
   status: ClassStatus;
 
   @Prop({ default: 0 })
@@ -32,5 +37,4 @@ export class Class {
 }
 
 export const ClassSchema = SchemaFactory.createForClass(Class);
-ClassSchema.index({ classCode: 1 });
 ClassSchema.index({ trainerId: 1, status: 1 });

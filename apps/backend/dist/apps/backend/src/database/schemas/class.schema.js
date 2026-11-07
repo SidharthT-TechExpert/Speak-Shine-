@@ -33,7 +33,12 @@ __decorate([
     __metadata("design:type", mongoose_2.Types.ObjectId)
 ], Class.prototype, "trainerId", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, enum: shared_types_1.ClassStatus, default: shared_types_1.ClassStatus.ACTIVE }),
+    (0, mongoose_1.Prop)({
+        required: true,
+        type: String,
+        enum: Object.values(shared_types_1.ClassStatus),
+        default: shared_types_1.ClassStatus.ACTIVE,
+    }),
     __metadata("design:type", String)
 ], Class.prototype, "status", void 0);
 __decorate([
@@ -52,6 +57,5 @@ exports.Class = Class = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], Class);
 exports.ClassSchema = mongoose_1.SchemaFactory.createForClass(Class);
-exports.ClassSchema.index({ classCode: 1 });
 exports.ClassSchema.index({ trainerId: 1, status: 1 });
 //# sourceMappingURL=class.schema.js.map

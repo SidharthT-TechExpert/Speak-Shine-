@@ -11,7 +11,8 @@ export class TrainerProfile {
 
   @Prop({
     required: true,
-    enum: TrainerApprovalStatus,
+    type: String,
+    enum: Object.values(TrainerApprovalStatus),
     default: TrainerApprovalStatus.PENDING_APPROVAL,
   })
   approvalStatus: TrainerApprovalStatus;
@@ -39,5 +40,4 @@ export class TrainerProfile {
 }
 
 export const TrainerProfileSchema = SchemaFactory.createForClass(TrainerProfile);
-TrainerProfileSchema.index({ userId: 1 });
 TrainerProfileSchema.index({ approvalStatus: 1 });

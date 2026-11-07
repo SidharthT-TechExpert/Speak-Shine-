@@ -8,6 +8,9 @@ import { StudentsModule } from './modules/students/students.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { VideosModule } from './modules/videos/videos.module';
 import { WalletModule } from './modules/wallet/wallet.module';
+import { LiveSessionsModule } from './modules/live-sessions/live-sessions.module';
+import { HelpTicketsModule } from './modules/help-tickets/help-tickets.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { WalletModule } from './modules/wallet/wallet.module';
     TasksModule,
     VideosModule,
     WalletModule,
+    LiveSessionsModule,
+    HelpTicketsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

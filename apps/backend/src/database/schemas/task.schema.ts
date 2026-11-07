@@ -18,7 +18,12 @@ export class Task {
   @Prop({ required: true })
   description: string;
 
-  @Prop({ required: true, enum: TaskType, default: TaskType.DAILY })
+  @Prop({
+    required: true,
+    type: String,
+    enum: Object.values(TaskType),
+    default: TaskType.DAILY,
+  })
   type: TaskType;
 
   @Prop({ type: [String], default: [] })

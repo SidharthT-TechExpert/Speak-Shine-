@@ -17,6 +17,9 @@ const students_module_1 = require("./modules/students/students.module");
 const tasks_module_1 = require("./modules/tasks/tasks.module");
 const videos_module_1 = require("./modules/videos/videos.module");
 const wallet_module_1 = require("./modules/wallet/wallet.module");
+const live_sessions_module_1 = require("./modules/live-sessions/live-sessions.module");
+const help_tickets_module_1 = require("./modules/help-tickets/help-tickets.module");
+const notifications_module_1 = require("./modules/notifications/notifications.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,6 +38,9 @@ exports.AppModule = AppModule = __decorate([
             tasks_module_1.TasksModule,
             videos_module_1.VideosModule,
             wallet_module_1.WalletModule,
+            live_sessions_module_1.LiveSessionsModule,
+            help_tickets_module_1.HelpTicketsModule,
+            notifications_module_1.NotificationsModule,
         ],
     })
 ], AppModule);
