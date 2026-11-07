@@ -46,17 +46,20 @@ import {
   Zap,
   Target,
   Sliders,
-  Sparkle
+  Sparkle,
+  Heart,
+  MessageCircle,
+  Filter
 } from 'lucide-react';
 
 // ── Tab Navigation Keys ──
 type StudentTab =
   | 'mission'
   | 'studio'
+  | 'community'
   | 'cohort'
   | 'performance'
   | 'submissions'
-  | 'analysis'
   | 'live'
   | 'wallet'
   | 'doubts';
@@ -174,7 +177,6 @@ function MidnightCountdownTimer() {
       </div>
 
       <div className="flex items-center justify-center gap-2 sm:gap-3">
-        {/* Hours */}
         <div className="flex-1 bg-white/10 border border-white/15 rounded-xl p-2.5 sm:p-3 text-center">
           <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
             {t.hrs}
@@ -186,7 +188,6 @@ function MidnightCountdownTimer() {
 
         <span className="text-xl sm:text-2xl font-black text-white/50 pb-3 select-none">:</span>
 
-        {/* Minutes */}
         <div className="flex-1 bg-white/10 border border-white/15 rounded-xl p-2.5 sm:p-3 text-center">
           <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
             {t.mins}
@@ -198,7 +199,6 @@ function MidnightCountdownTimer() {
 
         <span className="text-xl sm:text-2xl font-black text-white/50 pb-3 select-none">:</span>
 
-        {/* Seconds */}
         <div className="flex-1 bg-white/10 border border-white/15 rounded-xl p-2.5 sm:p-3 text-center">
           <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
             {t.secs}
@@ -281,7 +281,6 @@ function AudioPromptWaveform({ promptText }: { promptText: string }) {
           {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
         </button>
 
-        {/* Dynamic Waveform Bars */}
         <div className="flex-1 flex items-center gap-1 h-10 px-2 bg-black/25 rounded-xl border border-white/10 overflow-hidden">
           {WAVE_PATTERN.map((h, i) => {
             const isCurrent = i === activeBar && isPlaying;
@@ -309,10 +308,8 @@ function AudioPromptWaveform({ promptText }: { promptText: string }) {
 // ── Interactive SVG Area Chart Component ──
 function TrajectoryAreaChart({
   scores,
-  selectedTab,
 }: {
   scores: { session: string; pts: number; date: string; isSundayBonus?: boolean }[];
-  selectedTab: 'points' | 'skills';
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
@@ -351,7 +348,6 @@ function TrajectoryAreaChart({
           </linearGradient>
         </defs>
 
-        {/* Horizontal grid lines */}
         {[6.0, 7.0, 8.0, 9.0, 10.0].map((val) => {
           const y = height - paddingY - ((val - minPts) / (maxPts - minPts)) * (height - 2 * paddingY);
           return (
@@ -372,13 +368,9 @@ function TrajectoryAreaChart({
           );
         })}
 
-        {/* Gradient Area fill */}
         <path d={areaD} fill="url(#purpleWaveGradient)" />
-
-        {/* Trend Polyline */}
         <path d={pathD} fill="none" stroke="#8b5cf6" strokeWidth="3" strokeLinecap="round" />
 
-        {/* Data points & Interactive Hover */}
         {points.map((p, i) => (
           <g
             key={i}
@@ -414,7 +406,6 @@ function TrajectoryAreaChart({
         ))}
       </svg>
 
-      {/* Floating Hover Tooltip */}
       {hoverIndex !== null && (
         <div
           className="absolute -top-12 bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg shadow-xl pointer-events-none transform -translate-x-1/2 transition-all flex items-center gap-2 border border-slate-700"
@@ -435,8 +426,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<StudentTab>('mission');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Selected Submission for Analysis Report
+  // Selected Submission for Detailed Analysis Modal
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string>('sub_1');
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
   // Video Studio State
   const [cameraActive, setCameraActive] = useState(false);
@@ -449,7 +441,6 @@ export default function App() {
 
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const timerIntervalRef = useRef<any>(null);
 
   // Vocabulary checklist planned state
@@ -461,6 +452,10 @@ export default function App() {
 
   // Performance center tab
   const [perfTab, setPerfTab] = useState<'points' | 'skills' | 'history'>('points');
+
+  // Community Feed filter tab
+  const [communityFilter, setCommunityFilter] = useState<'all' | 'top' | 'trainer' | 'my'>('all');
+  const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
 
   // Student Profile State (Strictly isolated to this student)
   const [student] = useState({
@@ -501,6 +496,133 @@ export default function App() {
     maxDuration: 90,
     prizePool: 50,
   });
+
+  // ── TENANT-ISOLATED COHORT COMMUNITY SUBMISSIONS (SHINE-9402 only) ──
+  const [cohortFeed, setCohortFeed] = useState([
+    {
+      id: 'feed_1',
+      studentId: 'std_aditi',
+      studentName: 'Aditi Patel',
+      avatar: 'AP',
+      isMe: false,
+      streak: 18,
+      classCode: 'SHINE-9402',
+      date: '45m ago',
+      duration: '1m 20s',
+      overallScore: 9.1,
+      fluency: 9.2,
+      grammar: 8.9,
+      confidence: 9.3,
+      vocabulary: 9.0,
+      transcript:
+        'Good morning, leadership. To accelerate our enterprise trajectory, our roadmap must synthesize cross-functional velocity with rigorous risk mitigation. By leveraging our modular platform, we eliminate technical debt while achieving sustainable scalability.',
+      feedback: 'Flawless signposting and executive posture! Used "Synthesize" and "Leveraging" with natural cadence.',
+      topVocab: ['Synthesize', 'Leveraging', 'Cross-functional', 'Sustainable scalability'],
+      reactions: { claps: 14, fire: 9, heart: 7, star: 5, userReacted: null as string | null },
+      comments: [
+        {
+          id: 'c_1',
+          author: 'Ananya Verma',
+          isTrainer: true,
+          avatar: 'AV',
+          timeAgo: '30m ago',
+          text: 'Masterclass in vocal pacing, Aditi! Your transition into risk governance was exceptionally crisp.',
+        },
+        {
+          id: 'c_2',
+          author: 'Rahul Sharma (You)',
+          isTrainer: false,
+          avatar: 'RS',
+          timeAgo: '15m ago',
+          text: 'Inspiring delivery! Really liked how you balanced velocity and risk.',
+        },
+      ],
+    },
+    {
+      id: 'sub_1',
+      studentId: 'std_rahul',
+      studentName: 'Rahul Sharma (You)',
+      avatar: 'RS',
+      isMe: true,
+      streak: 14,
+      classCode: 'SHINE-9402',
+      date: '2h ago',
+      duration: '1m 18s',
+      overallScore: 8.8,
+      fluency: 9.0,
+      grammar: 8.5,
+      confidence: 9.0,
+      vocabulary: 8.8,
+      transcript:
+        'Good morning, leadership team. Today, I am presenting a nuanced roadmap designed to leverage our digital architecture, streamline operations, and synthesize our product metrics into sustainable growth.',
+      feedback: 'Excellent vocal modulation and eye contact. Used "Nuanced" and "Leverage" naturally.',
+      topVocab: ['Nuanced', 'Leverage', 'Synthesize', 'Sustainable growth'],
+      reactions: { claps: 11, fire: 6, heart: 5, star: 3, userReacted: 'claps' as string | null },
+      comments: [
+        {
+          id: 'c_3',
+          author: 'Ananya Verma',
+          isTrainer: true,
+          avatar: 'AV',
+          timeAgo: '1h ago',
+          text: 'Great energy today Rahul. Focus on slowing down slightly during the financial sign-off segment.',
+        },
+      ],
+    },
+    {
+      id: 'feed_3',
+      studentId: 'std_kavita',
+      studentName: 'Kavita Menon',
+      avatar: 'KM',
+      isMe: false,
+      streak: 12,
+      classCode: 'SHINE-9402',
+      date: '3h ago',
+      duration: '1m 12s',
+      overallScore: 8.4,
+      fluency: 8.3,
+      grammar: 8.6,
+      confidence: 8.2,
+      vocabulary: 8.5,
+      transcript:
+        'In reconciling stakeholder requirements with engineering reality, our team will introduce transparent bi-weekly sprints to guarantee predictable feature releases.',
+      feedback: 'Clear problem-framing and confident tone. Work on expanding pause length after key transitions.',
+      topVocab: ['Reconciling', 'Predictable', 'Transparent sprints'],
+      reactions: { claps: 8, fire: 4, heart: 3, star: 2, userReacted: null as string | null },
+      comments: [
+        {
+          id: 'c_4',
+          author: 'Aditi Patel',
+          isTrainer: false,
+          avatar: 'AP',
+          timeAgo: '2h ago',
+          text: 'Loved the clarity on bi-weekly sprints Kavita! Very convincing.',
+        },
+      ],
+    },
+    {
+      id: 'feed_4',
+      studentId: 'std_vikram',
+      studentName: 'Vikram Joshi',
+      avatar: 'VJ',
+      isMe: false,
+      streak: 11,
+      classCode: 'SHINE-9402',
+      date: '4h ago',
+      duration: '1m 05s',
+      overallScore: 8.0,
+      fluency: 7.9,
+      grammar: 8.2,
+      confidence: 8.1,
+      vocabulary: 7.8,
+      transcript:
+        'Our priority for the upcoming quarter is optimizing core infrastructure reliability to support double-digit throughput expansion.',
+      feedback: 'Solid technical rationale. Try raising pitch inflection slightly at the conclusion.',
+      topVocab: ['Throughput', 'Reliability', 'Core infrastructure'],
+      reactions: { claps: 6, fire: 3, heart: 2, star: 1, userReacted: null as string | null },
+      comments: [],
+    },
+  ]);
 
   // Student's Submissions History (Data Isolated)
   const [mySubmissions, setMySubmissions] = useState([
@@ -715,7 +837,7 @@ export default function App() {
             setUploadProgress(null);
             setRecordedVideoUrl(null);
             setRecordSeconds(0);
-            setActiveTab('analysis');
+            setShowAnalysisModal(true);
           }, 800);
           return 100;
         }
@@ -738,6 +860,54 @@ export default function App() {
       ...prev,
       [word]: !prev[word],
     }));
+  };
+
+  // Reactions Handler for Cohort Community Feed
+  const handleToggleReaction = (feedId: string, reactionType: 'claps' | 'fire' | 'heart' | 'star') => {
+    setCohortFeed((prev) =>
+      prev.map((item) => {
+        if (item.id !== feedId) return item;
+        const currentReacted = item.reactions.userReacted;
+        const isSame = currentReacted === reactionType;
+
+        return {
+          ...item,
+          reactions: {
+            ...item.reactions,
+            [reactionType]: isSame ? item.reactions[reactionType] - 1 : item.reactions[reactionType] + 1,
+            userReacted: isSame ? null : reactionType,
+          },
+        };
+      })
+    );
+  };
+
+  // Add Comment to Cohort Video
+  const handleAddComment = (feedId: string) => {
+    const text = newCommentText[feedId];
+    if (!text || !text.trim()) return;
+
+    setCohortFeed((prev) =>
+      prev.map((item) => {
+        if (item.id !== feedId) return item;
+        return {
+          ...item,
+          comments: [
+            ...item.comments,
+            {
+              id: `c_${Date.now()}`,
+              author: 'Rahul Sharma (You)',
+              isTrainer: false,
+              avatar: 'RS',
+              timeAgo: 'Just now',
+              text: text.trim(),
+            },
+          ],
+        };
+      })
+    );
+
+    setNewCommentText((prev) => ({ ...prev, [feedId]: '' }));
   };
 
   // Join Class Form
@@ -769,6 +939,20 @@ export default function App() {
     ]);
     setNewDoubtText('');
   };
+
+  // ── STRICT TENANT DATA ISOLATION FILTER ──
+  // Only entries that strictly match the student's enrolled class code
+  const filteredCohortFeed = useMemo(() => {
+    let feed = cohortFeed.filter((item) => item.classCode === student.enrolledClass.classCode);
+    if (communityFilter === 'top') {
+      feed = feed.filter((item) => item.overallScore >= 8.5);
+    } else if (communityFilter === 'trainer') {
+      feed = feed.filter((item) => item.comments.some((c) => c.isTrainer));
+    } else if (communityFilter === 'my') {
+      feed = feed.filter((item) => item.isMe);
+    }
+    return feed;
+  }, [cohortFeed, student.enrolledClass.classCode, communityFilter]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
@@ -852,13 +1036,13 @@ export default function App() {
               </div>
             </div>
 
-            {/* Navigation Tabs */}
+            {/* Navigation Tabs (Converted Speech Analysis to Cohort Community) */}
             <nav className="space-y-1">
               {[
                 { id: 'mission', label: 'Dashboard & Mission', icon: Flame, badge: 'Live' },
                 { id: 'studio', label: 'AI Recording Studio', icon: Video },
-                { id: 'analysis', label: 'Speech Analysis', icon: Sparkles },
-                { id: 'cohort', label: 'My Cohort', icon: Users },
+                { id: 'community', label: 'Cohort Community', icon: MessageSquare, badge: 'Feed' },
+                { id: 'cohort', label: 'My Cohort Roster', icon: Users },
                 { id: 'performance', label: 'Fluency & Radar', icon: BarChart3 },
                 { id: 'submissions', label: 'My Submissions', icon: FileCheck },
                 { id: 'live', label: 'Live Classrooms', icon: Radio },
@@ -916,7 +1100,6 @@ export default function App() {
           {/* TAB: REDESIGNED STUDENT DASHBOARD & MISSION */}
           {activeTab === 'mission' && (
             <div className="space-y-6 max-w-6xl mx-auto">
-              {/* TOP GREETING & MOTIVATIONAL BANNER */}
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-slate-900 border border-purple-500/20 rounded-3xl p-5 sm:p-6">
                 <div>
                   <div className="text-xs font-bold uppercase tracking-widest text-amber-400 flex items-center gap-2 mb-1">
@@ -952,13 +1135,11 @@ export default function App() {
                 </div>
               </div>
 
-              {/* DAILY SPEAKING CHALLENGE HERO CARD (Matching main ModernDashboardView) */}
+              {/* DAILY SPEAKING CHALLENGE HERO CARD */}
               <div className="bg-gradient-to-br from-indigo-950 via-slate-950 to-purple-950 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-                {/* Glow Orb */}
                 <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
 
                 <div className="relative z-10 space-y-6">
-                  {/* Challenge Header & Timer */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     <div className="lg:col-span-2 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
@@ -982,7 +1163,6 @@ export default function App() {
                         {todayMission.prompt}
                       </p>
 
-                      {/* Scenario Checklist */}
                       <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
                         <div className="text-xs font-bold uppercase tracking-wider text-purple-300">
                           Key Signposts to Cover:
@@ -1000,11 +1180,9 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Right Column: Midnight Countdown Timer */}
                     <div className="space-y-4">
                       <MidnightCountdownTimer />
 
-                      {/* Duration Gauge */}
                       <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 space-y-2 text-white">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-300 flex items-center gap-1.5">
@@ -1016,9 +1194,9 @@ export default function App() {
                           </span>
                         </div>
                         <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
-                          <div className="w-1/3 bg-slate-700" title="Warm-up buffer" />
-                          <div className="w-1/2 bg-gradient-to-r from-emerald-500 to-amber-500" title="Valid scoring window" />
-                          <div className="w-1/6 bg-rose-500" title="Cutoff cap" />
+                          <div className="w-1/3 bg-slate-700" />
+                          <div className="w-1/2 bg-gradient-to-r from-emerald-500 to-amber-500" />
+                          <div className="w-1/6 bg-rose-500" />
                         </div>
                         <div className="flex justify-between text-[10px] text-slate-400 font-mono">
                           <span>0s</span>
@@ -1029,10 +1207,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Audio Cadence Waveform Player */}
                   <AudioPromptWaveform promptText={todayMission.prompt} />
 
-                  {/* Target Vocabulary Interactive Section */}
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
@@ -1093,7 +1269,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Actions & Launch Bar */}
                   <div className="pt-4 border-t border-white/15 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                       <Button
@@ -1106,19 +1281,19 @@ export default function App() {
                         <span>Record Challenge Video Now</span>
                       </Button>
                       <Button
-                        onClick={() => setActiveTab('studio')}
+                        onClick={() => setActiveTab('community')}
                         variant="outline"
                         size="lg"
                         className="w-full sm:w-auto flex items-center justify-center gap-2 text-white border-white/20 hover:bg-white/10"
                       >
-                        <UploadCloud className="w-4 h-4" />
-                        <span>Upload File</span>
+                        <Users className="w-4 h-4 text-purple-300" />
+                        <span>View Cohort Submissions</span>
                       </Button>
                     </div>
 
                     <div className="flex items-center gap-2 text-xs text-slate-300">
                       <Sparkles className="w-4 h-4 text-purple-400" />
-                      <span>Instant AI Evaluation & Feedback Report upon submission</span>
+                      <span>Instant AI Evaluation & Cohort Peer Feedback</span>
                     </div>
                   </div>
                 </div>
@@ -1188,7 +1363,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Horizontal Milestones Sprint Nodes */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   {[
                     { days: 3, label: '3d Rookie', icon: '🥉', state: 'unlocked' },
@@ -1233,7 +1407,6 @@ export default function App() {
                     </h4>
                   </div>
 
-                  {/* Tabs */}
                   <div className="flex items-center gap-1 bg-white/5 border border-white/10 p-1 rounded-xl self-start sm:self-auto">
                     {[
                       { id: 'points', label: 'Points Trajectory' },
@@ -1255,12 +1428,10 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Trajectory Area Chart View */}
                 {perfTab === 'points' && (
                   <div className="space-y-4">
-                    <TrajectoryAreaChart scores={scoreTrajectory} selectedTab="points" />
+                    <TrajectoryAreaChart scores={scoreTrajectory} />
 
-                    {/* Coach's 3 Performance Insights (Directly matching main ModernDashboardView) */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                       <div className="bg-emerald-950/30 border border-emerald-500/25 rounded-2xl p-4">
                         <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
@@ -1301,7 +1472,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 4-Skill Radar / Breakdown View */}
                 {perfTab === 'skills' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -1340,7 +1510,10 @@ export default function App() {
                         </p>
                       </div>
                       <Button
-                        onClick={() => setActiveTab('analysis')}
+                        onClick={() => {
+                          setSelectedSubmissionId('sub_1');
+                          setShowAnalysisModal(true);
+                        }}
                         variant="primary"
                         size="sm"
                         className="mt-4 self-start"
@@ -1351,7 +1524,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Submissions History Tab */}
                 {perfTab === 'history' && (
                   <div className="space-y-3">
                     {mySubmissions.map((sub) => (
@@ -1383,7 +1555,7 @@ export default function App() {
                           <Button
                             onClick={() => {
                               setSelectedSubmissionId(sub.id);
-                              setActiveTab('analysis');
+                              setShowAnalysisModal(true);
                             }}
                             variant="outline"
                             size="sm"
@@ -1463,6 +1635,295 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB: COHORT COMMUNITY FEED (CONVERTED FROM SPEECH ANALYSIS TAB) */}
+          {activeTab === 'community' && (
+            <div className="space-y-6 max-w-4xl mx-auto">
+              {/* Community Feed Banner */}
+              <div className="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-950 border border-purple-500/25 rounded-3xl p-6 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
+                        Daily Challenge Feed
+                      </span>
+                      <span className="text-xs font-bold text-purple-300">
+                        {todayMission.category} · {todayMission.cefrLevel}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-white">{todayMission.title}</h3>
+                  </div>
+
+                  <Button
+                    onClick={() => setActiveTab('studio')}
+                    variant="accent"
+                    size="sm"
+                    className="self-start sm:self-auto gap-2 shadow-md shadow-amber-500/20"
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>Submit Your Video</span>
+                  </Button>
+                </div>
+
+                {/* Strict Data Isolation Indicator */}
+                <div className="bg-white/5 border border-purple-500/20 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-purple-200">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span>
+                      <strong>Strict Cohort Isolation:</strong> Showing only submissions from your enrolled cohort{' '}
+                      <span className="text-amber-400 font-bold">{student.enrolledClass.classCode}</span> ({student.enrolledClass.title}).
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-semibold whitespace-nowrap">
+                    Coach: {student.enrolledClass.trainerName}
+                  </span>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
+                  {[
+                    { id: 'all', label: `All Cohort Videos (${cohortFeed.length})` },
+                    { id: 'top', label: 'Top Rated (8.5+)' },
+                    { id: 'trainer', label: 'Coach Feedback' },
+                    { id: 'my', label: 'My Submissions' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setCommunityFilter(f.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        communityFilter === f.id
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Feed Items (Strictly Scoped) */}
+              <div className="space-y-6">
+                {filteredCohortFeed.length === 0 ? (
+                  <Card className="p-8 text-center space-y-2 bg-slate-950/70 border-white/10">
+                    <div className="text-slate-400 text-sm font-semibold">No submissions match this filter.</div>
+                    <Button onClick={() => setCommunityFilter('all')} variant="outline" size="sm">
+                      Reset Filter
+                    </Button>
+                  </Card>
+                ) : (
+                  filteredCohortFeed.map((post) => (
+                    <div
+                      key={post.id}
+                      className={`bg-slate-950/80 border rounded-3xl p-6 space-y-4 shadow-xl transition-all ${
+                        post.isMe ? 'border-purple-400/40 ring-1 ring-purple-500/20' : 'border-white/10'
+                      }`}
+                    >
+                      {/* Author Header */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-700 to-indigo-600 text-white font-black text-sm flex items-center justify-center shadow-md">
+                            {post.avatar}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-sm sm:text-base text-white">
+                                {post.studentName}
+                              </span>
+                              {post.isMe && (
+                                <span className="text-[10px] bg-purple-500 text-white font-extrabold px-1.5 py-0.5 rounded">
+                                  YOU
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20 flex items-center gap-1">
+                                <Flame className="w-3 h-3 fill-amber-400" />
+                                <span>{post.streak}d streak</span>
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                              <span>{post.date}</span>
+                              <span>·</span>
+                              <span className="font-mono text-purple-300">{post.duration}</span>
+                              <span>·</span>
+                              <span className="text-[10px] bg-white/5 px-2 py-0.2 rounded border border-white/10">
+                                {post.classCode}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Overall Score Chip */}
+                        <div className="text-right">
+                          <div className="text-2xl font-black text-amber-400">{post.overallScore}</div>
+                          <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                            AI Score
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4-Metric Score Pill Bar */}
+                      <div className="grid grid-cols-4 gap-2 pt-1">
+                        {[
+                          { label: 'Fluency', score: post.fluency, color: 'text-purple-400' },
+                          { label: 'Grammar', score: post.grammar, color: 'text-emerald-400' },
+                          { label: 'Confidence', score: post.confidence, color: 'text-amber-400' },
+                          { label: 'Vocabulary', score: post.vocabulary, color: 'text-indigo-400' },
+                        ].map((m) => (
+                          <div
+                            key={m.label}
+                            className="bg-white/5 border border-white/10 rounded-xl p-2 text-center"
+                          >
+                            <div className="text-[10px] text-slate-400 font-semibold">{m.label}</div>
+                            <div className={`text-xs sm:text-sm font-extrabold ${m.color}`}>
+                              {m.score}/10
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Video Player Frame with Watermark */}
+                      <div className="relative aspect-video bg-black/60 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center group">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
+
+                        {/* Watermark for privacy protection */}
+                        <div className="absolute top-3 left-3 text-[10px] font-mono font-bold text-white/50 bg-black/50 px-2.5 py-1 rounded-md backdrop-blur-sm pointer-events-none">
+                          🔒 {post.classCode} · {post.studentName} · 24h Ephemeral
+                        </div>
+
+                        <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center text-white cursor-pointer group-hover:scale-110 transition-transform shadow-xl">
+                          <Play className="w-6 h-6 fill-white ml-0.5" />
+                        </div>
+
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white pointer-events-none">
+                          <span className="font-semibold">{todayMission.title}</span>
+                          <span className="font-mono text-purple-300 bg-black/60 px-2 py-0.5 rounded">
+                            {post.duration}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Speech Excerpt */}
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+                        <div className="text-xs font-bold uppercase tracking-wider text-purple-300">
+                          Speech Excerpt:
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-200 italic leading-relaxed">
+                          "{post.transcript}"
+                        </p>
+                      </div>
+
+                      {/* Top Vocabulary Tags & AI Feedback */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-slate-400">Used Vocab:</span>
+                          {post.topVocab.map((w) => (
+                            <span
+                              key={w}
+                              className="text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-md"
+                            >
+                              ⚡ {w}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Button to open speech analysis report modal */}
+                        <button
+                          onClick={() => {
+                            setSelectedSubmissionId(post.id === 'feed_1' ? 'sub_1' : post.id);
+                            setShowAnalysisModal(true);
+                          }}
+                          className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 underline underline-offset-4"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>View Full AI Analysis Report</span>
+                        </button>
+                      </div>
+
+                      {/* Interactive Reactions Bar (👏, 🔥, ❤️, 🌟) */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                        {[
+                          { key: 'claps', label: '👏', count: post.reactions.claps },
+                          { key: 'fire', label: '🔥', count: post.reactions.fire },
+                          { key: 'heart', label: '❤️', count: post.reactions.heart },
+                          { key: 'star', label: '🌟', count: post.reactions.star },
+                        ].map((rx) => {
+                          const isActive = post.reactions.userReacted === rx.key;
+                          return (
+                            <button
+                              key={rx.key}
+                              onClick={() => handleToggleReaction(post.id, rx.key as any)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                isActive
+                                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 scale-105'
+                                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                              }`}
+                            >
+                              <span>{rx.label}</span>
+                              <span className="font-mono text-[11px]">{rx.count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Coach & Peer Comments */}
+                      <div className="space-y-2 pt-2 border-t border-white/10">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Cohort Discussion & Coach Feedback ({post.comments.length})
+                        </div>
+
+                        {post.comments.map((cm) => (
+                          <div
+                            key={cm.id}
+                            className={`p-3 rounded-xl border text-xs space-y-1 ${
+                              cm.isTrainer
+                                ? 'bg-purple-950/40 border-purple-500/30'
+                                : 'bg-white/5 border-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white">{cm.author}</span>
+                                {cm.isTrainer && (
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded">
+                                    🎓 Coach
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-400">{cm.timeAgo}</span>
+                            </div>
+                            <p className="text-slate-300 leading-relaxed">{cm.text}</p>
+                          </div>
+                        ))}
+
+                        {/* Add Peer Encouragement Comment */}
+                        <div className="flex gap-2 pt-2">
+                          <input
+                            value={newCommentText[post.id] || ''}
+                            onChange={(e) =>
+                              setNewCommentText((prev) => ({ ...prev, [post.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddComment(post.id);
+                            }}
+                            placeholder="Add encouragement or constructive feedback..."
+                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-400"
+                          />
+                          <Button
+                            onClick={() => handleAddComment(post.id)}
+                            variant="primary"
+                            size="sm"
+                            className="px-3"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB: AI RECORDING STUDIO */}
           {activeTab === 'studio' && (
             <div className="space-y-6 max-w-4xl mx-auto">
@@ -1495,7 +1956,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Viewport Frame */}
               <div className="relative aspect-video bg-slate-950 rounded-3xl overflow-hidden border border-white/10 shadow-2xl flex items-center justify-center">
                 <video
                   ref={videoPreviewRef}
@@ -1524,7 +1984,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Live Recording HUD */}
                 {isRecording && (
                   <div className="absolute top-4 left-4 flex items-center gap-3 bg-slate-950/80 backdrop-blur-md border border-white/15 px-3 py-1.5 rounded-full shadow-lg">
                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
@@ -1537,7 +1996,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Upload Progress Overlay */}
                 {uploadProgress !== null && (
                   <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-4">
                     <UploadCloud className="w-12 h-12 text-purple-400 animate-bounce" />
@@ -1556,7 +2014,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Studio Recording Controls */}
               <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-slate-950/80 border border-white/10 rounded-2xl">
                 <div className="flex items-center gap-3">
                   {!isRecording ? (
@@ -1615,112 +2072,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB: SPEECH ANALYSIS REPORT */}
-          {activeTab === 'analysis' && (
-            <div className="space-y-6 max-w-4xl mx-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <Badge variant="info" className="mb-1">
-                    AI Speech Analysis Report
-                  </Badge>
-                  <h3 className="text-2xl font-extrabold text-white">{activeReport.taskTitle}</h3>
-                  <p className="text-xs text-slate-400">
-                    Recorded {activeReport.date} · Duration: {activeReport.duration}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <div className="text-2xl font-black text-amber-400">{activeReport.overallScore}/10</div>
-                    <div className="text-[10px] text-emerald-400 font-bold uppercase">Overall AI Score</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Rubric Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="p-4 bg-slate-950/70 border-white/10 text-white space-y-1">
-                  <div className="text-xs text-slate-400">Fluency & Cadence</div>
-                  <div className="text-xl font-bold text-purple-400">{activeReport.fluency}/10</div>
-                </Card>
-                <Card className="p-4 bg-slate-950/70 border-white/10 text-white space-y-1">
-                  <div className="text-xs text-slate-400">Grammar & Syntax</div>
-                  <div className="text-xl font-bold text-emerald-400">{activeReport.grammar}/10</div>
-                </Card>
-                <Card className="p-4 bg-slate-950/70 border-white/10 text-white space-y-1">
-                  <div className="text-xs text-slate-400">Vocabulary Range</div>
-                  <div className="text-xl font-bold text-amber-400">{activeReport.vocabulary}/10</div>
-                </Card>
-                <Card className="p-4 bg-slate-950/70 border-white/10 text-white space-y-1">
-                  <div className="text-xs text-slate-400">Visual Presence</div>
-                  <div className="text-xl font-bold text-indigo-400">{activeReport.eyeContact}/10</div>
-                </Card>
-              </div>
-
-              {/* Full Speech Transcript */}
-              <Card className="p-6 bg-slate-950/70 border-white/10 space-y-3">
-                <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                  <FileCheck className="w-4 h-4 text-purple-400" />
-                  <span>Speech Transcript</span>
-                </h4>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-mono bg-white/5 p-4 rounded-xl border border-white/10">
-                  "{activeReport.transcript}"
-                </p>
-              </Card>
-
-              {/* Grammar Corrections */}
-              <Card className="p-6 bg-slate-950/70 border-white/10 space-y-3">
-                <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Grammar Enhancements</span>
-                </h4>
-                {activeReport.grammarCorrections && activeReport.grammarCorrections.length > 0 ? (
-                  <div className="space-y-2">
-                    {activeReport.grammarCorrections.map((gc, i) => (
-                      <div key={i} className="bg-white/5 p-3 rounded-xl border border-white/10 text-xs space-y-1">
-                        <div className="text-rose-400 line-through">✗ {gc.original}</div>
-                        <div className="text-emerald-400 font-bold">✓ {gc.correction}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">Rule: {gc.rule}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-emerald-400 font-semibold">
-                    ✓ Clean delivery! No high-severity grammatical errors detected.
-                  </p>
-                )}
-              </Card>
-
-              {/* Presentation Coach Tips */}
-              <Card className="p-6 bg-slate-950/70 border-white/10 space-y-3">
-                <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>Coach's Delivery Advice</span>
-                </h4>
-                <ul className="space-y-2 text-xs text-slate-300">
-                  {activeReport.presentationTips.map((tip, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-amber-400 font-bold">⚡</span>
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <Button onClick={() => setActiveTab('studio')} variant="primary" size="md" className="gap-2">
-                  <Video className="w-4 h-4" />
-                  <span>Record Next Challenge</span>
-                </Button>
-                <Button onClick={() => setActiveTab('submissions')} variant="outline" size="md">
-                  Back to Submissions
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: MY COHORT */}
+          {/* TAB: MY COHORT ROSTER */}
           {activeTab === 'cohort' && (
             <div className="space-y-6 max-w-4xl mx-auto">
               <Card className="p-6 bg-slate-950/70 border-white/10 space-y-6">
@@ -1753,7 +2105,6 @@ export default function App() {
                 </div>
               </Card>
 
-              {/* Join new class code */}
               <Card className="p-6 bg-slate-950/70 border-white/10 space-y-4">
                 <h4 className="font-bold text-white text-sm">Switch or Join Another Class</h4>
                 <form onSubmit={handleSubmit(onJoinClass)} className="flex gap-3">
@@ -1775,7 +2126,7 @@ export default function App() {
             <div className="space-y-6 max-w-4xl mx-auto">
               <Card className="p-6 bg-slate-950/70 border-white/10 space-y-4">
                 <h3 className="text-lg font-bold text-white">Fluency & Delivery Radar</h3>
-                <TrajectoryAreaChart scores={scoreTrajectory} selectedTab="points" />
+                <TrajectoryAreaChart scores={scoreTrajectory} />
               </Card>
             </div>
           )}
@@ -1799,7 +2150,7 @@ export default function App() {
                       <Button
                         onClick={() => {
                           setSelectedSubmissionId(sub.id);
-                          setActiveTab('analysis');
+                          setShowAnalysisModal(true);
                         }}
                         variant="outline"
                         size="sm"
@@ -1911,6 +2262,115 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* ── SPEECH ANALYSIS REPORT MODAL (Accessible from anywhere) ── */}
+      {showAnalysisModal && (
+        <div
+          onClick={() => setShowAnalysisModal(false)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-950 border border-purple-500/30 rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowAnalysisModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="space-y-1">
+              <Badge variant="info" className="mb-1">
+                AI Speech Evaluation Report
+              </Badge>
+              <h3 className="text-2xl font-extrabold text-white">{activeReport.taskTitle}</h3>
+              <p className="text-xs text-slate-400">
+                Recorded {activeReport.date} · Duration: {activeReport.duration} · Scoped to Batch {student.enrolledClass.classCode}
+              </p>
+            </div>
+
+            {/* Score Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Card className="p-4 bg-white/5 border-white/10 text-white space-y-1 text-center">
+                <div className="text-[11px] text-slate-400 font-bold uppercase">Fluency</div>
+                <div className="text-2xl font-black text-purple-400">{activeReport.fluency}/10</div>
+              </Card>
+              <Card className="p-4 bg-white/5 border-white/10 text-white space-y-1 text-center">
+                <div className="text-[11px] text-slate-400 font-bold uppercase">Grammar</div>
+                <div className="text-2xl font-black text-emerald-400">{activeReport.grammar}/10</div>
+              </Card>
+              <Card className="p-4 bg-white/5 border-white/10 text-white space-y-1 text-center">
+                <div className="text-[11px] text-slate-400 font-bold uppercase">Vocabulary</div>
+                <div className="text-2xl font-black text-amber-400">{activeReport.vocabulary}/10</div>
+              </Card>
+              <Card className="p-4 bg-white/5 border-white/10 text-white space-y-1 text-center">
+                <div className="text-[11px] text-slate-400 font-bold uppercase">Visual Presence</div>
+                <div className="text-2xl font-black text-indigo-400">{activeReport.eyeContact}/10</div>
+              </Card>
+            </div>
+
+            {/* Speech Transcript */}
+            <Card className="p-5 bg-white/5 border-white/10 space-y-2">
+              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-purple-400" />
+                <span>Speech Transcript</span>
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-mono bg-black/40 p-4 rounded-xl border border-white/10">
+                "{activeReport.transcript}"
+              </p>
+            </Card>
+
+            {/* Grammar Enhancements */}
+            <Card className="p-5 bg-white/5 border-white/10 space-y-2">
+              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Grammar Enhancements</span>
+              </h4>
+              {activeReport.grammarCorrections && activeReport.grammarCorrections.length > 0 ? (
+                <div className="space-y-2">
+                  {activeReport.grammarCorrections.map((gc, i) => (
+                    <div key={i} className="bg-black/30 p-3 rounded-xl border border-white/10 text-xs space-y-1">
+                      <div className="text-rose-400 line-through">✗ {gc.original}</div>
+                      <div className="text-emerald-400 font-bold">✓ {gc.correction}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">Rule: {gc.rule}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-emerald-400 font-semibold">
+                  ✓ Clean delivery! No high-severity grammatical errors detected.
+                </p>
+              )}
+            </Card>
+
+            {/* Coach's Delivery Advice */}
+            <Card className="p-5 bg-white/5 border-white/10 space-y-2">
+              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Coach Ananya's Delivery Advice</span>
+              </h4>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                {activeReport.presentationTips.map((tip, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-amber-400 font-bold">⚡</span>
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button onClick={() => setShowAnalysisModal(false)} variant="outline" size="md">
+                Close Report
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
