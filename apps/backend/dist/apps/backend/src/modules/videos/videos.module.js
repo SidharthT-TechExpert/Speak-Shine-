@@ -10,14 +10,15 @@ exports.VideosModule = void 0;
 const common_1 = require("@nestjs/common");
 const videos_controller_1 = require("./videos.controller");
 const videos_service_1 = require("./videos.service");
+const ai_analysis_service_1 = require("./ai-analysis.service");
 let VideosModule = class VideosModule {
 };
 exports.VideosModule = VideosModule;
 exports.VideosModule = VideosModule = __decorate([
     (0, common_1.Module)({
         controllers: [videos_controller_1.VideosController],
-        providers: [videos_service_1.VideosService],
-        exports: [videos_service_1.VideosService],
+        providers: [videos_service_1.VideosService, ai_analysis_service_1.AiAnalysisService],
+        exports: [videos_service_1.VideosService, ai_analysis_service_1.AiAnalysisService],
     })
 ], VideosModule);
 //# sourceMappingURL=videos.module.js.map

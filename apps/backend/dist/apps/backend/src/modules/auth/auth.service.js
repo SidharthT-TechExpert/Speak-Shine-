@@ -121,7 +121,7 @@ let AuthService = AuthService_1 = class AuthService {
         const newUser = await this.userModel.create({
             name: dto.name.trim(),
             email: dto.email.toLowerCase().trim(),
-            phone: dto.phone?.trim() || null,
+            phone: dto.phone?.trim() || undefined,
             passwordHash,
             role: shared_types_1.Role.STUDENT,
             classId: classDoc ? classDoc._id : null,

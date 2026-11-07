@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -62,6 +63,19 @@ export class LiveSessionsService {
 
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
+
+    if (session.status === LiveSessionStatus.ENDED) {
+      throw new BadRequestException('This live session has already ended');
+    }
+
+    if (
+      user.role === Role.STUDENT &&
+      user.classId?.toString() !== session.classId.toString()
+    ) {
+      throw new ForbiddenException(
+        'You are not enrolled in the class for this live session',
+      );
+    }
 
     const isHost = user.role === Role.TRAINER || user.role === Role.ADMIN;
 

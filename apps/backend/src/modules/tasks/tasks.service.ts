@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Task, TaskDocument } from '../../database/schemas/task.schema';
 import { Class, ClassDocument } from '../../database/schemas/class.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { ClassStatus } from '@speak-shine/shared-types';
 import { CreateTaskDto } from './dto/create-task.dto';
 
 @Injectable()
@@ -25,6 +27,12 @@ export class TasksService {
     }
     if (cls.trainerId.toString() !== trainerId) {
       throw new ForbiddenException('You can only create tasks for classes you own');
+    }
+    if (cls.status !== ClassStatus.ACTIVE) {
+      throw new BadRequestException('Cannot create tasks for an inactive or archived class');
+    }
+    if (new Date(dto.dueDate) <= new Date()) {
+      throw new BadRequestException('Task due date must be in the future');
     }
 
     const task = await this.taskModel.create({

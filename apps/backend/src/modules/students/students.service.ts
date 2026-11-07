@@ -2,11 +2,13 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Class, ClassDocument } from '../../database/schemas/class.schema';
+import { ClassStatus } from '@speak-shine/shared-types';
 import { JoinClassDto } from './dto/join-class.dto';
 
 @Injectable()
@@ -35,6 +37,12 @@ export class StudentsService {
     if (!cls) {
       throw new NotFoundException(
         `Class with code "${dto.classCode}" does not exist`,
+      );
+    }
+
+    if (cls.status !== ClassStatus.ACTIVE) {
+      throw new BadRequestException(
+        'This class is no longer active for enrollment',
       );
     }
 

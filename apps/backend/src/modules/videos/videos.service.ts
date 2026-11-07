@@ -15,6 +15,7 @@ import {
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Task, TaskDocument } from '../../database/schemas/task.schema';
 import { TaskSubmissionStatus } from '@speak-shine/shared-types';
+import { AiAnalysisService } from './ai-analysis.service';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
 import { SubmitCompleteDto } from './dto/submit-complete.dto';
 
@@ -29,6 +30,7 @@ export class VideosService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
     private configService: ConfigService,
+    private aiAnalysisService: AiAnalysisService,
   ) {
     this.bucketName =
       this.configService.get<string>('R2_BUCKET_NAME') || 'speak-shine-videos';
@@ -54,6 +56,16 @@ export class VideosService {
   async generatePresignedUrls(userId: string, dto: PresignedUrlDto) {
     const user = await this.userModel.findById(userId).lean();
     if (!user) throw new NotFoundException('User not found');
+
+    if (dto.taskId) {
+      const task = await this.taskModel.findById(dto.taskId).lean();
+      if (!task) throw new NotFoundException('Task not found');
+      if (user.classId && task.classId.toString() !== user.classId.toString()) {
+        throw new ForbiddenException(
+          'Task does not belong to your enrolled class',
+        );
+      }
+    }
 
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(2, 8);
@@ -141,8 +153,15 @@ export class VideosService {
     }
 
     console.log(
-      `[VideosService] Video ${report._id} queued for BullMQ background analysis`,
+      `[VideosService] Video ${report._id} queued for background AI analysis`,
     );
+
+    // Asynchronously trigger AI evaluation
+    this.aiAnalysisService
+      .processSubmission(report._id.toString())
+      .catch((err) =>
+        console.error(`[AiAnalysisService] Async error: ${err.message}`),
+      );
 
     return {
       message: 'Video upload confirmed. Analysis has been queued.',

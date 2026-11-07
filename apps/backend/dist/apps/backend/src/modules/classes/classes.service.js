@@ -102,7 +102,7 @@ let ClassesService = class ClassesService {
         const newStudent = await this.userModel.create({
             name: dto.name.trim(),
             email: dto.email.toLowerCase().trim(),
-            phone: dto.phone?.trim() || null,
+            phone: dto.phone?.trim() || undefined,
             passwordHash,
             role: shared_types_1.Role.STUDENT,
             classId: cls._id,

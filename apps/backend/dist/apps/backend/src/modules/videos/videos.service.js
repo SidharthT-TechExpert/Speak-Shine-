@@ -23,12 +23,14 @@ const video_report_schema_1 = require("../../database/schemas/video-report.schem
 const user_schema_1 = require("../../database/schemas/user.schema");
 const task_schema_1 = require("../../database/schemas/task.schema");
 const shared_types_1 = require("@speak-shine/shared-types");
+const ai_analysis_service_1 = require("./ai-analysis.service");
 let VideosService = class VideosService {
-    constructor(videoReportModel, userModel, taskModel, configService) {
+    constructor(videoReportModel, userModel, taskModel, configService, aiAnalysisService) {
         this.videoReportModel = videoReportModel;
         this.userModel = userModel;
         this.taskModel = taskModel;
         this.configService = configService;
+        this.aiAnalysisService = aiAnalysisService;
         this.s3Client = null;
         this.bucketName =
             this.configService.get('R2_BUCKET_NAME') || 'speak-shine-videos';
@@ -50,6 +52,14 @@ let VideosService = class VideosService {
         const user = await this.userModel.findById(userId).lean();
         if (!user)
             throw new common_1.NotFoundException('User not found');
+        if (dto.taskId) {
+            const task = await this.taskModel.findById(dto.taskId).lean();
+            if (!task)
+                throw new common_1.NotFoundException('Task not found');
+            if (user.classId && task.classId.toString() !== user.classId.toString()) {
+                throw new common_1.ForbiddenException('Task does not belong to your enrolled class');
+            }
+        }
         const timestamp = Date.now();
         const randomSuffix = Math.random().toString(36).substring(2, 8);
         const videoKey = `videos/${userId}/${timestamp}_${randomSuffix}.mp4`;
@@ -122,7 +132,10 @@ let VideosService = class VideosService {
             }
             await user.save();
         }
-        console.log(`[VideosService] Video ${report._id} queued for BullMQ background analysis`);
+        console.log(`[VideosService] Video ${report._id} queued for background AI analysis`);
+        this.aiAnalysisService
+            .processSubmission(report._id.toString())
+            .catch((err) => console.error(`[AiAnalysisService] Async error: ${err.message}`));
         return {
             message: 'Video upload confirmed. Analysis has been queued.',
             reportId: report._id.toString(),
@@ -145,6 +158,7 @@ exports.VideosService = VideosService = __decorate([
     __metadata("design:paramtypes", [mongoose_2.Model,
         mongoose_2.Model,
         mongoose_2.Model,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        ai_analysis_service_1.AiAnalysisService])
 ], VideosService);
 //# sourceMappingURL=videos.service.js.map

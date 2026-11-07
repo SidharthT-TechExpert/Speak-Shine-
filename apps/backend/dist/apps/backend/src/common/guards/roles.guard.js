@@ -35,7 +35,8 @@ let RolesGuard = class RolesGuard {
             throw new common_1.ForbiddenException(`Access denied. Requires one of roles: [${requiredRoles.join(', ')}]`);
         }
         if (user.role === shared_types_1.Role.TRAINER) {
-            if (user.trainerApprovalStatus && user.trainerApprovalStatus !== shared_types_1.TrainerApprovalStatus.ACTIVE) {
+            if (!user.trainerApprovalStatus ||
+                user.trainerApprovalStatus !== shared_types_1.TrainerApprovalStatus.ACTIVE) {
                 throw new common_1.ForbiddenException('Trainer account is awaiting administrative approval or suspended');
             }
         }

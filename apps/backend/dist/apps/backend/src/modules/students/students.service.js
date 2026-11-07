@@ -18,6 +18,7 @@ const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../database/schemas/user.schema");
 const class_schema_1 = require("../../database/schemas/class.schema");
+const shared_types_1 = require("@speak-shine/shared-types");
 let StudentsService = class StudentsService {
     constructor(userModel, classModel) {
         this.userModel = userModel;
@@ -36,6 +37,9 @@ let StudentsService = class StudentsService {
         });
         if (!cls) {
             throw new common_1.NotFoundException(`Class with code "${dto.classCode}" does not exist`);
+        }
+        if (cls.status !== shared_types_1.ClassStatus.ACTIVE) {
+            throw new common_1.BadRequestException('This class is no longer active for enrollment');
         }
         student.classId = cls._id;
         student.trainerId = cls.trainerId;

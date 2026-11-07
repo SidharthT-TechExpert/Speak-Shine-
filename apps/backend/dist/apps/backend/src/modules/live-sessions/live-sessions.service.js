@@ -59,6 +59,13 @@ let LiveSessionsService = class LiveSessionsService {
         const user = await this.userModel.findById(userId);
         if (!user)
             throw new common_1.NotFoundException('User not found');
+        if (session.status === shared_types_1.LiveSessionStatus.ENDED) {
+            throw new common_1.BadRequestException('This live session has already ended');
+        }
+        if (user.role === shared_types_1.Role.STUDENT &&
+            user.classId?.toString() !== session.classId.toString()) {
+            throw new common_1.ForbiddenException('You are not enrolled in the class for this live session');
+        }
         const isHost = user.role === shared_types_1.Role.TRAINER || user.role === shared_types_1.Role.ADMIN;
         const at = new livekit_server_sdk_1.AccessToken(this.livekitApiKey, this.livekitApiSecret, {
             identity: user._id.toString(),

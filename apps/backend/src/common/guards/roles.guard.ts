@@ -39,7 +39,10 @@ export class RolesGuard implements CanActivate {
 
     // Special check: If user is TRAINER, ensure their approvalStatus is ACTIVE
     if (user.role === Role.TRAINER) {
-      if (user.trainerApprovalStatus && user.trainerApprovalStatus !== TrainerApprovalStatus.ACTIVE) {
+      if (
+        !user.trainerApprovalStatus ||
+        user.trainerApprovalStatus !== TrainerApprovalStatus.ACTIVE
+      ) {
         throw new ForbiddenException(
           'Trainer account is awaiting administrative approval or suspended',
         );

@@ -118,7 +118,7 @@ export class ClassesService {
     const newStudent = await this.userModel.create({
       name: dto.name.trim(),
       email: dto.email.toLowerCase().trim(),
-      phone: dto.phone?.trim() || null,
+      phone: dto.phone?.trim() || undefined,
       passwordHash,
       role: Role.STUDENT,
       classId: cls._id,

@@ -19,6 +19,7 @@ const mongoose_2 = require("mongoose");
 const task_schema_1 = require("../../database/schemas/task.schema");
 const class_schema_1 = require("../../database/schemas/class.schema");
 const user_schema_1 = require("../../database/schemas/user.schema");
+const shared_types_1 = require("@speak-shine/shared-types");
 let TasksService = class TasksService {
     constructor(taskModel, classModel, userModel) {
         this.taskModel = taskModel;
@@ -32,6 +33,12 @@ let TasksService = class TasksService {
         }
         if (cls.trainerId.toString() !== trainerId) {
             throw new common_1.ForbiddenException('You can only create tasks for classes you own');
+        }
+        if (cls.status !== shared_types_1.ClassStatus.ACTIVE) {
+            throw new common_1.BadRequestException('Cannot create tasks for an inactive or archived class');
+        }
+        if (new Date(dto.dueDate) <= new Date()) {
+            throw new common_1.BadRequestException('Task due date must be in the future');
         }
         const task = await this.taskModel.create({
             classId: cls._id,
