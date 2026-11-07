@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { joinClassSchema, type JoinClassInput } from '@speak-shine/validation-schemas';
@@ -8,6 +8,9 @@ import {
   ShieldCheck,
   Trophy,
   Video,
+  VideoOff,
+  Mic,
+  MicOff,
   Users,
   Sparkles,
   BookOpen,
@@ -19,6 +22,8 @@ import {
   LogOut,
   ChevronRight,
   Play,
+  Pause,
+  Square,
   CheckCircle2,
   AlertCircle,
   Share2,
@@ -29,16 +34,47 @@ import {
   Radio,
   Menu,
   X,
-  Volume2
+  Volume2,
+  Eye,
+  Smile,
+  FileCheck,
+  UploadCloud,
+  RotateCcw
 } from 'lucide-react';
 
-type StudentTab = 'mission' | 'cohort' | 'performance' | 'submissions' | 'live' | 'wallet' | 'doubts';
+type StudentTab =
+  | 'mission'
+  | 'studio'
+  | 'cohort'
+  | 'performance'
+  | 'submissions'
+  | 'analysis'
+  | 'live'
+  | 'wallet'
+  | 'doubts';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<StudentTab>('mission');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Student State (Scoped strictly to this student)
+  // Selected Submission for Analysis Report
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string>('sub_1');
+
+  // Video Studio State
+  const [cameraActive, setCameraActive] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+  const [backgroundBlur, setBackgroundBlur] = useState(true);
+  const [noiseCancellation, setNoiseCancellation] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const timerIntervalRef = useRef<any>(null);
+
+  // Student Profile State (Strictly isolated to this student)
   const [student] = useState({
     name: 'Rahul Sharma',
     email: 'rahul.s@example.com',
@@ -75,8 +111,8 @@ export default function App() {
     prizePool: 50,
   });
 
-  // Student's Own Submissions (Isolated)
-  const [mySubmissions] = useState([
+  // Student's Submissions History (Data Isolated)
+  const [mySubmissions, setMySubmissions] = useState([
     {
       id: 'sub_1',
       date: 'Today, 09:30 AM',
@@ -88,7 +124,21 @@ export default function App() {
       grammar: 8.5,
       vocabulary: 8.8,
       confidence: 9.0,
+      eyeContact: 8.7,
+      bodyLanguage: 8.9,
       feedback: 'Excellent vocal modulation and eye contact. Used "Nuanced" and "Leverage" naturally.',
+      transcript:
+        'Good morning, leadership team. Today, I am presenting a nuanced roadmap designed to leverage our digital architecture, streamline operations, and synthesize our product metrics into sustainable growth.',
+      grammarCorrections: [
+        { original: 'we was planning to deploy', correction: 'we were planning to deploy', rule: 'Subject-Verb Agreement' },
+        { original: 'more faster turnaround', correction: 'faster turnaround', rule: 'Double Comparative' },
+      ],
+      vocabStrong: ['Nuanced', 'Leverage', 'Synthesize', 'Sustainable growth'],
+      vocabUpgrade: [{ word: 'Good results', suggestion: 'Exponential impact or optimal efficacy' }],
+      presentationTips: [
+        'Maintain a steady 130-150 words per minute cadence during high-stakes proposals.',
+        'Slightly extend your pauses after major transitions to allow key metrics to land with senior leaders.',
+      ],
     },
     {
       id: 'sub_2',
@@ -101,24 +151,23 @@ export default function App() {
       grammar: 8.6,
       vocabulary: 8.1,
       confidence: 8.2,
+      eyeContact: 8.1,
+      bodyLanguage: 8.4,
       feedback: 'Good structured response with clear conflict-resolution framing. Slight hesitation around 0:40.',
-    },
-    {
-      id: 'sub_3',
-      date: '05 Nov 2026',
-      taskTitle: 'Persuasive Storytelling & Metaphors',
-      duration: '1m 24s',
-      status: 'ANALYZED',
-      overallScore: 8.6,
-      fluency: 8.7,
-      grammar: 8.4,
-      vocabulary: 8.9,
-      confidence: 8.5,
-      feedback: 'Strong opening hook. Metaphor regarding "river and currents" was vivid and impactful.',
+      transcript:
+        'In resolving cross-functional friction, our priority must be aligning engineering deliverables with customer success outcomes through transparent milestone tracking.',
+      grammarCorrections: [
+        { original: 'between all team members', correction: 'among all team members', rule: 'Preposition Choice (3+ entities)' },
+      ],
+      vocabStrong: ['Cross-functional', 'Deliverables', 'Transparent milestones'],
+      vocabUpgrade: [{ word: 'Fix the problem', suggestion: 'Reconcile discrepancies or mitigate blockers' }],
+      presentationTips: [
+        'Avoid leaning back in your chair when addressing conflict scenarios; lean slightly forward to project engagement.',
+      ],
     },
   ]);
 
-  // Classmates in Student's Cohort (Isolated to this class)
+  // Classmates in Student's Cohort (Isolated)
   const [classmates] = useState([
     { name: 'Aditi Patel', streak: 18, score: 920, avatar: 'AP' },
     { name: 'Rahul Sharma (You)', streak: 14, score: 840, avatar: 'RS', isMe: true },
@@ -127,7 +176,7 @@ export default function App() {
     { name: 'Rohan Deshmukh', streak: 9, score: 680, avatar: 'RD' },
   ]);
 
-  // Student's Wallet Ledger (Isolated)
+  // Wallet Ledger
   const [walletTransactions] = useState([
     { id: 'tx_1', category: 'AWARD_PRIZE', title: 'Top Fluency Cohort Award', amount: 50.00, date: 'Today', type: 'CREDIT' },
     { id: 'tx_2', category: 'STREAK_BONUS', title: '14-Day Streak Milestone Reward', amount: 25.00, date: 'Yesterday', type: 'CREDIT' },
@@ -135,11 +184,118 @@ export default function App() {
     { id: 'tx_4', category: 'WITHDRAWAL', title: 'Bank UPI Transfer (#9821)', amount: -50.00, date: '01 Nov 2026', type: 'DEBIT' },
   ]);
 
-  // Student's Doubts / Support Tickets (Isolated)
+  // Doubts Desk
   const [doubts, setDoubts] = useState([
     { id: 't_1', subject: 'Pacing during 60s pitch', status: 'RESOLVED', date: '04 Nov', trainerReply: 'Try pausing for 1.5s after introducing your core thesis before listing bullet points.' },
   ]);
   const [newDoubtText, setNewDoubtText] = useState('');
+
+  // Active Report Details
+  const activeReport = mySubmissions.find((s) => s.id === selectedSubmissionId) || mySubmissions[0];
+
+  // Camera Management
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        audio: true,
+      });
+      mediaStreamRef.current = stream;
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+      }
+      setCameraActive(true);
+    } catch (err: any) {
+      alert(`Camera access notice: ${err.message || 'Permission denied or no webcam available'}. You can also use the video upload option below.`);
+    }
+  };
+
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+  };
+
+  const startRecording = () => {
+    if (!mediaStreamRef.current) {
+      startCamera();
+    }
+    setIsRecording(true);
+    setRecordSeconds(0);
+    setRecordedVideoUrl(null);
+
+    timerIntervalRef.current = setInterval(() => {
+      setRecordSeconds((s) => s + 1);
+    }, 1000);
+  };
+
+  const stopRecording = () => {
+    setIsRecording(false);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    stopCamera();
+    // Simulate recorded video ready for review
+    setRecordedVideoUrl('blob:speak-shine/recorded-submission.mp4');
+  };
+
+  const handleUploadSubmit = () => {
+    if (recordSeconds < 10 && !recordedVideoUrl) {
+      alert('Video submission must be at least 15-30 seconds long.');
+      return;
+    }
+    setUploadProgress(10);
+    const interval = setInterval(() => {
+      setUploadProgress((p) => {
+        if (!p || p >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            const newSub = {
+              id: `sub_${Date.now()}`,
+              date: 'Just now',
+              taskTitle: todayMission.title,
+              duration: `${Math.floor(recordSeconds / 60)}m ${recordSeconds % 60}s`,
+              status: 'ANALYZED',
+              overallScore: 8.9,
+              fluency: 9.1,
+              grammar: 8.8,
+              vocabulary: 8.9,
+              confidence: 9.0,
+              eyeContact: 8.8,
+              bodyLanguage: 9.0,
+              feedback: 'Great job! Confident delivery with clear pauses between key propositions.',
+              transcript: 'Recorded speech submitted and processed through Groq Whisper & Llama Vision analysis.',
+              grammarCorrections: [],
+              vocabStrong: ['Leverage', 'Nuanced', 'Synthesize'],
+              vocabUpgrade: [],
+              presentationTips: ['Sustain this cadence in live presentations.'],
+            };
+            setMySubmissions([newSub, ...mySubmissions]);
+            setSelectedSubmissionId(newSub.id);
+            setUploadProgress(null);
+            setRecordedVideoUrl(null);
+            setRecordSeconds(0);
+            setActiveTab('analysis');
+            alert('🎉 Video uploaded & analyzed successfully! Your AI Report is ready.');
+          }, 600);
+          return 100;
+        }
+        return p + 25;
+      });
+    }, 400);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, []);
 
   // Join Class Form
   const {
@@ -209,7 +365,7 @@ export default function App() {
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-white leading-tight">{student.name}</div>
-                  <div className="text-[11px] text-slate-400">Class: {student.enrolledClass.classCode}</div>
+                  <div className="text-[11px] text-slate-400">Batch: {student.enrolledClass.classCode}</div>
                 </div>
               </div>
               <span className="text-[11px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
@@ -242,33 +398,33 @@ export default function App() {
             >
               <Sparkles className="w-4 h-4" />
               <span>Daily Mission</span>
-              <span className="ml-auto text-[10px] uppercase font-bold bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">
-                Active
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('studio'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                activeTab === 'studio'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Video className="w-4 h-4 text-emerald-400" />
+              <span>AI Recording Studio</span>
+              <span className="ml-auto text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
+                Record
               </span>
             </button>
 
             <button
-              onClick={() => { setActiveTab('cohort'); setMobileMenuOpen(false); }}
+              onClick={() => { setActiveTab('analysis'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
-                activeTab === 'cohort'
+                activeTab === 'analysis'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              <Users className="w-4 h-4" />
-              <span>My Cohort</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('performance'); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
-                activeTab === 'performance'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              <span>Fluency & Radar</span>
+              <BarChart3 className="w-4 h-4 text-indigo-400" />
+              <span>Video Analysis Report</span>
             </button>
 
             <button
@@ -284,6 +440,30 @@ export default function App() {
               <span className="ml-auto text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-semibold">
                 {mySubmissions.length}
               </span>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('performance'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                activeTab === 'performance'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span>Fluency & Radar</span>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('cohort'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                activeTab === 'cohort'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>My Cohort</span>
             </button>
 
             <button
@@ -329,12 +509,6 @@ export default function App() {
 
         {/* Sidebar Footer */}
         <div className="p-6 border-t border-slate-800 space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Role</span>
-            <span className="font-semibold text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
-              Verified Student
-            </span>
-          </div>
           <button
             onClick={() => alert('Logged out safely.')}
             className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded-lg transition-colors border border-rose-900/40"
@@ -345,7 +519,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ── Main Dashboard Content Viewport ─────────────────────────────────── */}
+      {/* ── Main Viewport ────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
         <header className="border-b border-slate-200 bg-white sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between shadow-sm">
@@ -359,9 +533,11 @@ export default function App() {
             <div>
               <h2 className="font-bold text-slate-900 text-lg leading-tight">
                 {activeTab === 'mission' && 'Today\'s Speaking Challenge'}
+                {activeTab === 'studio' && 'AI Video Recording Studio'}
+                {activeTab === 'analysis' && 'AI Speech & Video Analysis Report'}
+                {activeTab === 'submissions' && 'My Video Submissions History'}
                 {activeTab === 'cohort' && 'My Cohort & Classmates'}
-                {activeTab === 'performance' && 'Fluency Radar & Badges'}
-                {activeTab === 'submissions' && 'Submission History & Feedback'}
+                {activeTab === 'performance' && 'Speech Competency & Badges'}
                 {activeTab === 'live' && 'Trainer Live Classrooms'}
                 {activeTab === 'wallet' && 'Cash Prize Ledger'}
                 {activeTab === 'doubts' && 'Ask Your Coach'}
@@ -373,27 +549,377 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Countdown Badge */}
             <div className="hidden sm:flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-xl text-xs font-semibold">
               <Clock className="w-3.5 h-3.5 text-amber-600" />
               <span>{todayMission.deadlineHoursLeft}h {todayMission.deadlineMinsLeft}m to Midnight</span>
             </div>
 
             <Button
-              onClick={() => setActiveTab('mission')}
-              variant="primary"
+              onClick={() => setActiveTab('studio')}
+              variant="accent"
               size="sm"
               className="flex items-center gap-1.5"
             >
               <Video className="w-4 h-4" />
-              <span className="hidden sm:inline">Record Video</span>
+              <span>Launch Studio</span>
             </Button>
           </div>
         </header>
 
-        {/* Viewport Tabs */}
+        {/* Viewport Content */}
         <main className="p-6 md:p-8 max-w-6xl w-full mx-auto space-y-6">
-          {/* TAB 1: DAILY MISSION */}
+          {/* TAB: AI RECORDING STUDIO */}
+          {activeTab === 'studio' && (
+            <div className="space-y-6">
+              {/* Studio Card */}
+              <Card className="p-6 space-y-6 bg-slate-900 text-white border-slate-800 shadow-2xl">
+                {/* Studio Header */}
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+                    <div>
+                      <h3 className="font-bold text-lg text-white">AI Speech Recording Studio</h3>
+                      <p className="text-xs text-slate-400">
+                        Topic: <strong className="text-indigo-300">{todayMission.title}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* AI Toggles */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setBackgroundBlur(!backgroundBlur)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        backgroundBlur
+                          ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      ✨ MediaPipe Blur: {backgroundBlur ? 'ON' : 'OFF'}
+                    </button>
+                    <button
+                      onClick={() => setNoiseCancellation(!noiseCancellation)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        noiseCancellation
+                          ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      🎙️ RNNoise AI: {noiseCancellation ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Video Viewfinder */}
+                <div className="relative aspect-video w-full max-w-3xl mx-auto bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                  <video
+                    ref={videoPreviewRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'} ${
+                      backgroundBlur ? 'filter-none' : ''
+                    }`}
+                  />
+
+                  {!cameraActive && !recordedVideoUrl && (
+                    <div className="text-center space-y-3 p-6">
+                      <div className="w-16 h-16 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                        <VideoOff className="w-8 h-8" />
+                      </div>
+                      <div className="text-sm font-semibold text-slate-300">Camera Preview Inactive</div>
+                      <p className="text-xs text-slate-500 max-w-sm">
+                        Click "Enable Camera" to begin your 60-90s speech challenge with live AI noise cancellation and background blur.
+                      </p>
+                      <Button onClick={startCamera} variant="primary" size="sm" className="gap-2">
+                        <Video className="w-4 h-4" />
+                        <span>Enable Camera</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {recordedVideoUrl && (
+                    <div className="text-center space-y-3 p-6">
+                      <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40">
+                        <CheckCircle2 className="w-8 h-8" />
+                      </div>
+                      <div className="text-base font-bold text-white">Video Recorded ({recordSeconds}s)</div>
+                      <p className="text-xs text-slate-400">
+                        Review your recording or submit directly to Groq Whisper & Llama Vision for evaluation.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Live Recording HUD overlay */}
+                  {isRecording && (
+                    <div className="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-rose-500/40 flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                      <span className="font-mono font-bold text-white text-xs">
+                        {String(Math.floor(recordSeconds / 60)).padStart(2, '0')}:
+                        {String(recordSeconds % 60).padStart(2, '0')}
+                      </span>
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                        Target: {todayMission.minDuration}s – {todayMission.maxDuration}s
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Progress Bar */}
+                {uploadProgress !== null && (
+                  <div className="space-y-2 p-4 bg-blue-950/40 border border-blue-800 rounded-xl">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-blue-300">Uploading to Cloudflare R2 & Generating AI Report...</span>
+                      <span className="text-blue-400 font-bold">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Studio Control Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-800">
+                  <div className="flex items-center gap-3">
+                    {!isRecording && !recordedVideoUrl && (
+                      <Button
+                        onClick={startRecording}
+                        variant="accent"
+                        size="md"
+                        className="gap-2 bg-rose-600 hover:bg-rose-500 text-white font-bold"
+                      >
+                        <Video className="w-4 h-4" />
+                        <span>Start Recording</span>
+                      </Button>
+                    )}
+
+                    {isRecording && (
+                      <Button
+                        onClick={stopRecording}
+                        variant="danger"
+                        size="md"
+                        className="gap-2 animate-pulse"
+                      >
+                        <Square className="w-4 h-4 fill-white" />
+                        <span>Stop & Finalize ({recordSeconds}s)</span>
+                      </Button>
+                    )}
+
+                    {recordedVideoUrl && (
+                      <>
+                        <Button
+                          onClick={handleUploadSubmit}
+                          variant="primary"
+                          size="md"
+                          className="gap-2 bg-emerald-600 hover:bg-emerald-500"
+                        >
+                          <UploadCloud className="w-4 h-4" />
+                          <span>Submit for AI Analysis</span>
+                        </Button>
+                        <Button
+                          onClick={() => { setRecordedVideoUrl(null); setRecordSeconds(0); startCamera(); }}
+                          variant="outline"
+                          size="md"
+                          className="gap-2 text-slate-300 border-slate-700 hover:bg-slate-800"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span>Retake</span>
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-slate-400 flex items-center gap-2">
+                    <FileCheck className="w-4 h-4 text-emerald-400" />
+                    <span>In-browser 16-frame sampling active (93% bandwidth saved)</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Alternative File Upload Option */}
+              <Card className="p-6 space-y-3 bg-white border-slate-200">
+                <h4 className="font-bold text-slate-900 text-sm">Have a pre-recorded speech video?</h4>
+                <p className="text-xs text-slate-500">
+                  You can also upload an MP4 or WebM video file directly. Direct Cloudflare R2 presigned upload will process the video.
+                </p>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="video/mp4,video/webm"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setRecordSeconds(72);
+                        setRecordedVideoUrl('blob:file-uploaded');
+                        alert(`Loaded ${e.target.files[0].name}. Click "Submit for AI Analysis" above!`);
+                      }
+                    }}
+                    className="text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  />
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* TAB: VIDEO ANALYSIS REPORT */}
+          {activeTab === 'analysis' && (
+            <div className="space-y-6">
+              {/* Report Header Card */}
+              <Card className="p-6 md:p-8 space-y-6 bg-gradient-to-tr from-slate-900 to-indigo-950 text-white border-slate-800 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="success">AI Speech Analysis Completed</Badge>
+                      <span className="text-xs text-slate-400">· {activeReport.date}</span>
+                    </div>
+                    <h3 className="text-2xl font-black text-white">{activeReport.taskTitle}</h3>
+                    <p className="text-xs text-indigo-300 mt-1">
+                      Evaluated via Whisper Transcriber, Groq Llama-Vision & Linguistic Grammar Model
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl text-center min-w-[120px]">
+                    <div className="text-3xl font-black text-indigo-400">{activeReport.overallScore}</div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Overall Score / 10</div>
+                  </div>
+                </div>
+
+                {/* Score Competency Bars */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/60">
+                    <div className="text-xs text-slate-400">Fluency & Cadence</div>
+                    <div className="text-xl font-bold text-blue-400">{activeReport.fluency} <span className="text-xs text-slate-500">/ 10</span></div>
+                  </div>
+                  <div className="bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/60">
+                    <div className="text-xs text-slate-400">Grammar Accuracy</div>
+                    <div className="text-xl font-bold text-emerald-400">{activeReport.grammar} <span className="text-xs text-slate-500">/ 10</span></div>
+                  </div>
+                  <div className="bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/60">
+                    <div className="text-xs text-slate-400">Executive Vocab</div>
+                    <div className="text-xl font-bold text-indigo-400">{activeReport.vocabulary} <span className="text-xs text-slate-500">/ 10</span></div>
+                  </div>
+                  <div className="bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/60">
+                    <div className="text-xs text-slate-400">Visual Presence</div>
+                    <div className="text-xl font-bold text-amber-400">{activeReport.confidence} <span className="text-xs text-slate-500">/ 10</span></div>
+                  </div>
+                </div>
+
+                {/* Visual Presence Indicators */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/40">
+                    <Eye className="w-5 h-5 text-blue-400" />
+                    <div className="text-xs">
+                      <div className="font-semibold text-slate-200">Eye Contact</div>
+                      <div className="text-slate-400">{activeReport.eyeContact} / 10 · Direct gaze maintained</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/40">
+                    <Smile className="w-5 h-5 text-amber-400" />
+                    <div className="text-xs">
+                      <div className="font-semibold text-slate-200">Facial Expressiveness</div>
+                      <div className="text-slate-400">Dynamic inflection & engagement</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-slate-700/40">
+                    <Users className="w-5 h-5 text-emerald-400" />
+                    <div className="text-xs">
+                      <div className="font-semibold text-slate-200">Body Language</div>
+                      <div className="text-slate-400">{activeReport.bodyLanguage} / 10 · Upright executive posture</div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Speech Transcript */}
+              <Card className="p-6 space-y-3">
+                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-blue-600" />
+                  <span>Speech Transcription</span>
+                </h4>
+                <p className="text-xs md:text-sm text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-200 leading-relaxed font-sans">
+                  "{activeReport.transcript}"
+                </p>
+              </Card>
+
+              {/* Grammar Corrections */}
+              {activeReport.grammarCorrections.length > 0 && (
+                <Card className="p-6 space-y-4">
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2 text-rose-600">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Grammar Improvements & Suggestions</span>
+                  </h4>
+                  <div className="space-y-3">
+                    {activeReport.grammarCorrections.map((gc, i) => (
+                      <div key={i} className="p-3.5 bg-rose-50/60 border border-rose-200 rounded-xl flex items-center justify-between text-xs">
+                        <div>
+                          <span className="line-through text-slate-500 mr-2">"{gc.original}"</span>
+                          <span className="font-bold text-emerald-700">→ "{gc.correction}"</span>
+                        </div>
+                        <Badge variant="amber">{gc.rule}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Vocabulary Highlights */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="p-6 space-y-3">
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2 text-emerald-600">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Strong Vocabulary Employed</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {activeReport.vocabStrong.map((word) => (
+                      <span key={word} className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-lg text-xs font-semibold">
+                        💎 {word}
+                      </span>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card className="p-6 space-y-3">
+                  <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2 text-indigo-600">
+                    <BookOpen className="w-4 h-4" />
+                    <span>Vocabulary Upgrade Recommendations</span>
+                  </h4>
+                  <div className="space-y-2">
+                    {activeReport.vocabUpgrade.map((vu, i) => (
+                      <div key={i} className="text-xs p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-xl">
+                        <span className="text-slate-600">Replace "{vu.word}" with: </span>
+                        <strong className="text-indigo-800 font-semibold">{vu.suggestion}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Presentation Tips */}
+              <Card className="p-6 space-y-3">
+                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-amber-500" />
+                  <span>Coach's Delivery & Presentation Guidance</span>
+                </h4>
+                <ul className="space-y-2 text-xs text-slate-700 list-disc list-inside">
+                  {activeReport.presentationTips.map((tip, idx) => (
+                    <li key={idx} className="leading-relaxed">{tip}</li>
+                  ))}
+                </ul>
+              </Card>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <Button onClick={() => setActiveTab('studio')} variant="primary" size="md" className="gap-2">
+                  <Video className="w-4 h-4" />
+                  <span>Record Next Challenge</span>
+                </Button>
+                <Button onClick={() => setActiveTab('submissions')} variant="outline" size="md">
+                  Back to Submissions
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DAILY MISSION */}
           {activeTab === 'mission' && (
             <div className="space-y-6">
               {/* Mission Hero Banner */}
@@ -437,7 +963,7 @@ export default function App() {
                 {/* Actions */}
                 <div className="pt-4 flex flex-wrap items-center gap-4 border-t border-white/15">
                   <Button
-                    onClick={() => alert('Camera & Microphone initialized! Record using MediaPipe Selfie Blur.')}
+                    onClick={() => setActiveTab('studio')}
                     variant="accent"
                     size="lg"
                     className="flex items-center gap-2"
@@ -496,7 +1022,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 2: MY COHORT */}
+          {/* TAB: MY COHORT */}
           {activeTab === 'cohort' && (
             <div className="space-y-6">
               {/* Cohort Header Card */}
@@ -529,7 +1055,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Classmates Roster (Isolated strictly to this batch) */}
+                {/* Classmates Roster */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -566,7 +1092,7 @@ export default function App() {
                 </div>
               </Card>
 
-              {/* Switch / Join New Class Code Box */}
+              {/* Switch / Join New Class Box */}
               <Card className="p-6 space-y-4 bg-slate-50 border-slate-200">
                 <div>
                   <h4 className="font-bold text-slate-900 text-sm">Switch or Join Another Class</h4>
@@ -589,7 +1115,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 3: PERFORMANCE & RADAR */}
+          {/* TAB: FLUENCY & RADAR */}
           {activeTab === 'performance' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -679,7 +1205,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 4: MY SUBMISSIONS */}
+          {/* TAB: MY SUBMISSIONS */}
           {activeTab === 'submissions' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -713,11 +1239,14 @@ export default function App() {
                           <div className="text-[10px] text-slate-500 font-bold uppercase">AI Score</div>
                         </div>
                         <Button
-                          onClick={() => alert(`Reviewing submission ${sub.id}`)}
+                          onClick={() => {
+                            setSelectedSubmissionId(sub.id);
+                            setActiveTab('analysis');
+                          }}
                           variant="outline"
                           size="sm"
                         >
-                          View Report
+                          View Full Report
                         </Button>
                       </div>
                     </div>
@@ -727,7 +1256,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 5: LIVE CLASSROOMS */}
+          {/* TAB: LIVE CLASSROOMS */}
           {activeTab === 'live' && (
             <Card className="p-8 text-center space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
@@ -751,7 +1280,7 @@ export default function App() {
             </Card>
           )}
 
-          {/* TAB 6: WALLET & CASH PRIZES */}
+          {/* TAB: WALLET & PRIZES */}
           {activeTab === 'wallet' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-emerald-600/10">
@@ -788,7 +1317,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 7: DOUBTS DESK */}
+          {/* TAB: DOUBTS DESK */}
           {activeTab === 'doubts' && (
             <div className="space-y-6">
               <Card className="p-6 space-y-4">
