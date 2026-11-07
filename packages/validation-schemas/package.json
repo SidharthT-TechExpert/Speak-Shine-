@@ -1,0 +1,17 @@
+{
+  "name": "@speak-shine/validation-schemas",
+  "version": "1.0.0",
+  "description": "Shared Zod schemas for frontend and backend validation in Speak & Shine V2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@speak-shine/shared-types": "*",
+    "typescript": "^5.4.5"
+  }
+}

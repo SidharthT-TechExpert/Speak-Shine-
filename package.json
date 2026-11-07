@@ -1,10 +1,16 @@
 {
-  "name": "speak-shine-webapp",
+  "name": "speak-shine-monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "version": "1.0.0",
   "description": "Speak & Shine - AI-powered speech analysis platform",
   "main": "api/server.js",
   "type": "module",
   "scripts": {
+    "v2:backend:build": "npm run --prefix apps/backend build",
+    "v2:backend:start": "npm run --prefix apps/backend start",
     "start": "NODE_ENV=production node --max-old-space-size=4096 --expose-gc api/server.js",
     "start:api": "node api/server.js",
     "dev:backend": "node -e \"process.env.NODE_ENV='development'; import('./api/server.js')\"",
