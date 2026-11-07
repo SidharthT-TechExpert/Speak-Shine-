@@ -11,6 +11,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { LiveSessionsModule } from './modules/live-sessions/live-sessions.module';
 import { HelpTicketsModule } from './modules/help-tickets/help-tickets.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     LiveSessionsModule,
     HelpTicketsModule,
     NotificationsModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

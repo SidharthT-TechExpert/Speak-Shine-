@@ -1,30 +1,59 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+apps/*/dist/
+packages/*/dist/
+
+# Turborepo & Caches
+.turbo/
+.cache/
+.parcel-cache/
+
+# React Native & Expo
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment variables
 .env
 .env2
-.kiro/ 
-frontend/.env.local
-frontend/dist/
-# Video upload temporary files
-tmp/uploads/*
-!tmp/uploads/.gitkeep
-api/tmp/uploads/*
-!api/tmp/uploads/.gitkeep
+.env.local
+.env.*.local
 .env.production
-pem/
-*.pem
-# Ignore local env files for frontend/backend
-frontend/.env
-frontend/.env.local
-backend/.env
-# Local backend config override (do not commit)
-backend/config/dev.config.js
-# Infisical local cache and metadata
+!.env.example
+
+# Infisical
 .infisical/
 .infisical.local
 .infisical.env
-# Local dotenv overrides
-.env.local
-.env.*.local
-dev.md
-/auth/
-/.auth/
+
+# Temporary files & uploads
+tmp/
+scratch/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Certificates
+pem/
+*.pem
+auth/
+.auth/
