@@ -1,0 +1,46 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, v2-platform-rebuild]
+  pull_request:
+    branches: [main, v2-platform-rebuild]
+
+jobs:
+  validate:
+    name: Lint, Test & Build Monorepo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: npm ci
+
+      - name: Build Shared Packages
+        run: |
+          npm run build --prefix packages/shared-types
+          npm run build --prefix packages/validation-schemas
+          npm run build --prefix packages/ui-kit
+
+      - name: Run Test Suite
+        run: npm test
+
+      - name: Build Backend (NestJS)
+        run: npm run v2:backend:build
+
+      - name: Build Student Web
+        run: npm run build --prefix apps/web-student
+
+      - name: Build Trainer Web
+        run: npm run build --prefix apps/web-trainer
+
+      - name: Build Admin Web
+        run: npm run build --prefix apps/web-admin

@@ -1,0 +1,15 @@
+{
+  "short_name": "AdminPortal",
+  "name": "Speak & Shine Master Governance",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "display": "standalone"
+}

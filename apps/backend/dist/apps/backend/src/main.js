@@ -4,7 +4,7 @@ const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const helmet_1 = require("helmet");
-const cookie_parser_1 = require("cookie-parser");
+const cookieParser = require("cookie-parser");
 const app_module_1 = require("./app.module");
 const http_exception_filter_1 = require("./common/filters/http-exception.filter");
 const transform_interceptor_1 = require("./common/interceptors/transform.interceptor");
@@ -12,7 +12,7 @@ async function bootstrap() {
     const logger = new common_1.Logger('Bootstrap');
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.use((0, helmet_1.default)());
-    app.use((0, cookie_parser_1.default)());
+    app.use(cookieParser());
     app.setGlobalPrefix('api/v1');
     const allowedOrigins = [
         'https://speak-shine.online',
@@ -54,7 +54,7 @@ async function bootstrap() {
     const document = swagger_1.SwaggerModule.createDocument(app, swaggerConfig);
     swagger_1.SwaggerModule.setup('api/v1/docs', app, document);
     const port = process.env.PORT || 3001;
-    await app.listen(port);
+    await app.listen(port, '0.0.0.0');
     logger.log(`🚀 Speak & Shine V2 Backend running at http://localhost:${port}/api/v1`);
     logger.log(`📖 Swagger API Docs available at http://localhost:${port}/api/v1/docs`);
 }

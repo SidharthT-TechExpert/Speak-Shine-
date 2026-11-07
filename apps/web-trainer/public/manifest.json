@@ -1,0 +1,15 @@
+{
+  "short_name": "TrainerHub",
+  "name": "Speak & Shine Trainer Portal",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "display": "standalone"
+}

@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -71,7 +71,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/v1/docs', app, document);
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Speak & Shine V2 Backend running at http://localhost:${port}/api/v1`);
   logger.log(`📖 Swagger API Docs available at http://localhost:${port}/api/v1/docs`);
 }
