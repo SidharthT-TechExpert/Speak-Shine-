@@ -1048,14 +1048,24 @@ async function prepareReportAnalysis(report) {
     }
   }
 
-  if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription)) {
+  const picBdInconsistent = analysis && isPicTask && analysis.scoreBreakdown && analysis.scoreBreakdown.isPictureDescription && (
+    Math.abs((analysis.compositeScore || 0) - (
+      (analysis.scoreBreakdown.communication || 0) +
+      (analysis.scoreBreakdown.content || 0) +
+      (analysis.scoreBreakdown.vocabulary || 0) +
+      (analysis.scoreBreakdown.duration || 0) +
+      (analysis.scoreBreakdown.growth || 0)
+    )) > 1.0
+  );
+
+  if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription || picBdInconsistent)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
     const configuredPicWords = status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5;
     const configuredPicReq = status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 1;
     const effectivePicTotal = status?.todayVocabulary?.length || configuredPicWords;
     const effectivePicReq = Math.min(configuredPicReq, effectivePicTotal);
 
-    const { breakdown } = calculateCompositeScore({
+    const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
       maxDurationSeconds: status?.durationPictureFull ?? 180,
       vocabularyUsed: source.vocabularyUsed || [],
@@ -1066,7 +1076,30 @@ async function prepareReportAnalysis(report) {
       isPictureDescription: true,
       userHistory,
     });
-    analysis = { ...source, scoreBreakdown: breakdown };
+
+    const isSunday = Boolean(source.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
+    const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
+
+    source.compositeScore = score;
+    source.scoreBreakdown = breakdown;
+    source.sundayBonus = isSunday;
+    source.baseScore = score;
+    source.bonusScore = effectiveScore;
+
+    // Persist self-healed picture score
+    VideoReport.findByIdAndUpdate(report._id, {
+      $set: {
+        "analysis.compositeScore": score,
+        "analysis.scoreBreakdown": source.scoreBreakdown,
+        "analysis.sundayBonus": source.sundayBonus,
+        "analysis.baseScore": source.baseScore,
+        "analysis.bonusScore": source.bonusScore,
+        challengeType: "picture_description",
+        "analysis.challengeType": "picture_description",
+      }
+    }).catch(err => console.warn("[VideoService] Failed to persist healed picture score:", err.message));
+
+    analysis = source;
   }
 
   // Self-heal story summary tasks if they were missing topic relevance or marked as special day
@@ -1794,10 +1827,16 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     ? Math.round((Math.min(matchedWords.length, requiredCount) / requiredCount) * 10 * 10) / 10
     : report.analysis.vocabularyScore ?? null;
 
+  const isSunday = Boolean(report.analysis?.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
+  const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
+
   report.analysis.vocabularyUsed = matchedWords;
   report.analysis.vocabularyScore = vocabularyScore;
   report.analysis.compositeScore = score;
   report.analysis.scoreBreakdown = updatedBreakdown;
+  report.analysis.sundayBonus = isSunday;
+  report.analysis.baseScore = score;
+  report.analysis.bonusScore = effectiveScore;
   report.markModified("analysis");
   await report.save();
 
@@ -1806,8 +1845,19 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     try {
       await User.findOneAndUpdate(
         { phone: report.phone, "feedbackScores.date": { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-        { $set: { "feedbackScores.$.points": score } }
+        { $set: { "feedbackScores.$.points": effectiveScore, "feedbackScores.$.sundayBonus": isSunday } }
       );
+      const u = await User.findOne({ phone: report.phone });
+      if (u) {
+        const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+        const todayIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, "0")}-${String(nowIST.getDate()).padStart(2, "0")}`;
+        if (u.lastScoreDate === todayIST && u.todayScore != null) {
+          const diff = effectiveScore - u.todayScore;
+          if (diff > 0) {
+            await User.updateOne({ _id: u._id }, { $inc: { monthlyScore: diff }, $set: { todayScore: effectiveScore } });
+          }
+        }
+      }
     } catch {}
   }
 

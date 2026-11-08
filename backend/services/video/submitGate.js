@@ -374,16 +374,6 @@ export function calculateCompositeScore({
     const communicationBase = objectiveRhythm * 0.8 + languageScore * 0.2;
     const communicationScore = (communicationBase / 10) * 20 * speechMult;
 
-    // Check if off-topic
-    const isOffTopic = Boolean(analysis?.isOffTopic || (typeof contentRel === "number" && contentRel < 3.5));
-
-    // Content & Relevance: max 35 pts
-    // If off-topic, heavily penalize contentBase instead of letting coherence inflate it
-    const contentBase = isOffTopic
-      ? (Math.min(contentRel, 2.5) * 0.85 + coherence * 0.15)
-      : (coherence * 0.60 + contentRel * 0.40);
-    const contentScore = (contentBase / 10) * 35;
-
     // Vocabulary: max 10 pts
     const configuredTotalWords = Number(totalVocabWords) || 0;
     const requiredTargetWords = Math.max(1, Math.min(
@@ -395,16 +385,40 @@ export function calculateCompositeScore({
       ? Math.min(10, (usedTargetWords / requiredTargetWords) * 10)
       : (vocabulary / 10) * 10;
 
+    // Check if off-topic:
+    // A submission is off-topic ONLY if:
+    // 1) The AI explicitly marked isOffTopic: true, OR
+    // 2) AI isOffTopic was not explicitly false, AND contentRel is critically low (<= 1.5) with no target words used.
+    // When the speaker matched target vocabulary from today's prompt or AI confirmed isOffTopic: false,
+    // a brief or developing description is NOT off-topic (it is scored proportionally in Content & Relevance).
+    const hasTargetVocab = usedTargetWords > 0;
+    const isOffTopic = analysis?.isOffTopic === true || (
+      analysis?.isOffTopic !== false &&
+      !hasTargetVocab &&
+      typeof contentRel === "number" &&
+      contentRel <= 1.5
+    );
+
+    // Content & Relevance: max 35 pts
+    // If off-topic, heavily penalize contentBase instead of letting coherence inflate it
+    const contentBase = isOffTopic
+      ? (Math.min(contentRel, 2.5) * 0.85 + coherence * 0.15)
+      : (coherence * 0.60 + contentRel * 0.40);
+    let contentScore = (contentBase / 10) * 35;
+
     // Personal Growth: max 15 pts
     const currentComm = (fluency + grammar + confidence + vocabulary) / 4;
     const growthResult = calculateGrowthScore({
       currentCommScore: currentComm,
       history: userHistory,
     });
-    const growthScore = growthResult.growthScore;
+    let growthScore = growthResult.growthScore;
+    let commScorePart = communicationScore;
+    let durScorePart = durationScore;
+    let vocabScorePart = vocabularyScore;
 
     let total100 = Math.round(
-      (communicationScore + contentScore + vocabularyScore + durationScore + growthScore) * 100
+      (commScorePart + contentScore + vocabScorePart + durScorePart + growthScore) * 100
     ) / 100;
 
     // STRICT SECURITY GATE: Off-topic submissions cannot get high scores (>50)
@@ -414,14 +428,32 @@ export function calculateCompositeScore({
     }
     total100 = Math.min(100, Math.max(0, total100));
 
+    // CRITICAL: Guarantee mathematical consistency between total score and breakdown components.
+    // The sum of breakdown components MUST ALWAYS exactly equal total100.
+    const rawSum = Math.round((commScorePart + contentScore + vocabScorePart + durScorePart + growthScore) * 100) / 100;
+    if (rawSum > 0 && Math.abs(total100 - rawSum) > 0.05) {
+      const scale = total100 / rawSum;
+      commScorePart  = Math.round(commScorePart  * scale * 100) / 100;
+      contentScore   = Math.round(contentScore   * scale * 100) / 100;
+      vocabScorePart = Math.round(vocabScorePart * scale * 100) / 100;
+      durScorePart   = Math.round(durScorePart   * scale * 100) / 100;
+      growthScore    = Math.round(growthScore    * scale * 100) / 100;
+
+      const scaledSum = Math.round((commScorePart + contentScore + vocabScorePart + durScorePart + growthScore) * 100) / 100;
+      const diff = Math.round((total100 - scaledSum) * 100) / 100;
+      if (diff !== 0) {
+        commScorePart = Math.round((commScorePart + diff) * 100) / 100;
+      }
+    }
+
     return {
       score: total100,
       breakdown: {
-        communication:   Math.round(communicationScore * 100) / 100,
-        content:         Math.round(contentScore       * 100) / 100,
-        vocabulary:      Math.round(vocabularyScore    * 100) / 100,
-        duration:        Math.round(durationScore       * 100) / 100,
-        growth:          Math.round(growthScore         * 100) / 100,
+        communication:   Math.round(commScorePart  * 100) / 100,
+        content:         Math.round(contentScore   * 100) / 100,
+        vocabulary:      Math.round(vocabScorePart * 100) / 100,
+        duration:        Math.round(durScorePart   * 100) / 100,
+        growth:          Math.round(growthScore    * 100) / 100,
         maxGrowth:       15,
         growthDelta:     growthResult.growthDelta,
         baselineComm:    growthResult.baselineComm,
@@ -486,7 +518,7 @@ export function calculateCompositeScore({
     ? (0.5 + 0.5 * rangeScore) * 30
     : (actualDur / minDur) * 0.5 * 30;
 
-  const lengthScore = baseLengthScore * speechMultiplier;
+  let lengthScore = baseLengthScore * speechMultiplier;
 
   // ── Part 2: Vocabulary used (max 30 pts) ──────────────────────────────────
   const usedCount = Array.isArray(vocabularyUsed) ? vocabularyUsed.length : 0;
@@ -522,7 +554,7 @@ export function calculateCompositeScore({
     currentCommScore: commAvg,
     history: userHistory,
   });
-  const growthScore = growthResult.growthScore;
+  let growthScore = growthResult.growthScore;
 
   let topicScore = 0;
   let commScore = 0;
@@ -539,8 +571,14 @@ export function calculateCompositeScore({
   }
 
   // Check if submission is off-topic or answering yesterday's / wrong question
-  const isOffTopic = !isSpecialDay && Boolean(
-    analysis?.isOffTopic || (typeof effectiveTopicRelevance === "number" && effectiveTopicRelevance < 3.5)
+  const hasTargetVocab = usedCount > 0;
+  const isOffTopic = !isSpecialDay && (
+    analysis?.isOffTopic === true || (
+      analysis?.isOffTopic !== false &&
+      !hasTargetVocab &&
+      typeof effectiveTopicRelevance === "number" &&
+      effectiveTopicRelevance <= 1.5
+    )
   );
 
   let total100 = Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100;
@@ -551,6 +589,24 @@ export function calculateCompositeScore({
     total100 = Math.min(cap, Math.round(total100 * 0.55 * 100) / 100);
   }
   total100 = Math.min(100, Math.max(0, total100));
+
+  // CRITICAL: Guarantee mathematical consistency between total score and breakdown components.
+  // The sum of breakdown components MUST ALWAYS exactly equal total100.
+  const rawSum = Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100;
+  if (rawSum > 0 && Math.abs(total100 - rawSum) > 0.05) {
+    const scale = total100 / rawSum;
+    lengthScore    = Math.round(lengthScore    * scale * 100) / 100;
+    vocabUsedScore = Math.round(vocabUsedScore * scale * 100) / 100;
+    topicScore     = Math.round(topicScore     * scale * 100) / 100;
+    commScore      = Math.round(commScore      * scale * 100) / 100;
+    growthScore    = Math.round(growthScore    * scale * 100) / 100;
+
+    const scaledSum = Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100;
+    const diff = Math.round((total100 - scaledSum) * 100) / 100;
+    if (diff !== 0) {
+      lengthScore = Math.round((lengthScore + diff) * 100) / 100;
+    }
+  }
 
   return {
     score: total100,

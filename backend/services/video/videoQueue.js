@@ -405,6 +405,17 @@ async function processJob(job) {
       isPictureDescription: challengeType === "picture_description",
     };
 
+    // ── Compute effective score (with Sunday bonus) ONCE — reused by both
+    //    VideoReport, feedbackScores and monthlyScore/todayScore to guarantee they match ──
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const isSundayScore = compositeScore != null && nowIST.getDay() === 0;
+    const effectiveScore = (compositeScore != null && isSundayScore)
+      ? Math.round(compositeScore * 2 * 100) / 100
+      : compositeScore;
+    if (isSundayScore && compositeScore != null) {
+      console.log(`[Queue] 🎉 Sunday bonus! Score doubled: ${compositeScore.toFixed(1)} → ${effectiveScore.toFixed(1)} for ${phone}`);
+    }
+
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "completed",
       analysis: {
@@ -413,6 +424,9 @@ async function processJob(job) {
         vocabularyScore,
         compositeScore: result.analysis._compositeScore ?? null,
         scoreBreakdown: result.analysis._scoreBreakdown ?? null,
+        sundayBonus: isSundayScore,
+        baseScore: compositeScore,
+        bonusScore: effectiveScore,
         challengeType: gateFlags.isMonthlyReflection ? "monthly_reflection"
           : gateFlags.isPictureDescription ? "picture_description"
           : gateFlags.isStorySummary ? "story_summary"
@@ -423,17 +437,6 @@ async function processJob(job) {
     });
 
     const { fluency, grammar, confidence, vocabulary } = result.analysis;
-
-    // ── Compute effective score (with Sunday bonus) ONCE — reused by both
-    //    feedbackScores and monthlyScore/todayScore to guarantee they match ──
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const isSundayScore = compositeScore != null && nowIST.getDay() === 0;
-    const effectiveScore = (compositeScore != null && isSundayScore)
-      ? compositeScore * 2
-      : compositeScore;
-    if (isSundayScore && compositeScore != null) {
-      console.log(`[Queue] 🎉 Sunday bonus! Score doubled: ${compositeScore.toFixed(1)} → ${effectiveScore.toFixed(1)} for ${phone}`);
-    }
 
     if (fluency != null || grammar != null) {
       await User.findOneAndUpdate(
@@ -601,6 +604,7 @@ async function processJob(job) {
       await VideoReport.findByIdAndUpdate(reportId, {
         "analysis.sundayBonus": isSundayScore,
         "analysis.baseScore": compositeScore,
+        "analysis.bonusScore": effectiveScore,
       });
     }
 

@@ -181,7 +181,16 @@ function DetailedReport({ a }) {
       const totalVocabWords = bd.totalVocabWords || (isPictureBd || isStoryBd ? 3 : 5);
       improvementTips.push({ icon: "📚", label: "Use more vocab words",    detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`,                  gap: vocGap });
     }
-    if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
+    if (isPictureBd) {
+      if (topGap > 2 && !bd.isOffTopic) {
+        improvementTips.push({
+          icon: "🧠",
+          label: "Develop content",
+          detail: `+${topGap.toFixed(1)} pts possible — connect observations and explain the image in more depth`,
+          gap: topGap,
+        });
+      }
+    } else if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
       improvementTips.push({
         icon: isStoryBd ? "📖" : "🎯",
         label: isStoryBd ? "Cover key story points" : "Stay on topic",
@@ -243,6 +252,28 @@ function DetailedReport({ a }) {
         </div>
       )}
 
+      {/* ── Sunday bonus banner ── */}
+      {a.sundayBonus && (
+        <div style={{
+          marginBottom: "0.85rem",
+          padding: "0.75rem 0.95rem",
+          borderRadius: 10,
+          background: "linear-gradient(135deg, rgba(251,191,36,0.15), rgba(124,111,255,0.1))",
+          border: "1px solid rgba(251,191,36,0.45)",
+          display: "flex", alignItems: "center", gap: "0.65rem",
+        }}>
+          <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>🎉</span>
+          <div>
+            <div style={{ fontWeight: 800, color: "#fbbf24", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+              Sunday Bonus! Points Doubled
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
+              Base score: <strong>{Math.round(a.baseScore ?? cs ?? 0)} pts</strong> → Bonus score: <strong style={{ color: "#fbbf24" }}>{Math.round(a.bonusScore ?? (cs * 2))} pts</strong> added to monthly total! 🔥
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Today's Score Card ── */}
       {cs != null && (
         <div style={{
@@ -258,11 +289,25 @@ function DetailedReport({ a }) {
               <div style={{ fontSize: "0.65rem", color: "rgba(167,139,250,0.8)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.2rem" }}>
                 🏆 Score
               </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "2rem", fontWeight: 900, lineHeight: 1, color: cs >= 80 ? "#4ade80" : cs >= 60 ? "#a78bfa" : cs >= 40 ? "#fbbf24" : "#f87171" }}>
                   {Math.round(cs)}
                 </span>
                 <span style={{ fontSize: "0.85rem", color: "var(--muted)", fontWeight: 600 }}>/100 pts</span>
+                {a.sundayBonus && (
+                  <span style={{
+                    marginLeft: "0.35rem",
+                    padding: "0.15rem 0.5rem",
+                    borderRadius: 6,
+                    background: "rgba(251, 191, 36, 0.2)",
+                    border: "1px solid rgba(251, 191, 36, 0.4)",
+                    color: "#fbbf24",
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                  }}>
+                    🎉 Sunday 2x: {Math.round(a.bonusScore ?? (cs * 2))} pts
+                  </span>
+                )}
               </div>
             </div>
             <div style={{
