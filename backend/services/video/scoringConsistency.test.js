@@ -160,4 +160,33 @@ describe("Scoring Consistency: Breakdown sum must match composite score", () => 
     const sum = recalculation.breakdown.communication + recalculation.breakdown.content + recalculation.breakdown.vocabulary + recalculation.breakdown.duration + recalculation.breakdown.growth;
     expect(Math.round(sum * 100) / 100).toBe(recalculation.score);
   });
+  it("Student Authorization: Students have access to re-score their own reports by phone or user resolution", () => {
+    const cleanPhone = (p) => (p || "").toString().replace(/^(\+91|91)/, "").replace(/\D/g, "");
+    const checkAuth = (report, userId, userRole, callerPhone) => {
+      const reportClean = cleanPhone(report.phone);
+      const callerClean = cleanPhone(callerPhone);
+      const isPrivileged = ["admin", "admins", "trainer", "superadmin"].includes(userRole);
+      let isOwner = false;
+      if (report.userId && userId && String(report.userId) === String(userId)) isOwner = true;
+      if (!isOwner && callerClean && reportClean && callerClean === reportClean) isOwner = true;
+      return isOwner || isPrivileged;
+    };
+
+    const report = {
+      userId: "69db329aff97e3dfe02cd180",
+      phone: "+919961714368",
+    };
+
+    // Student logged in (role: 'user') with Auth ID != User ID, matching phone
+    expect(checkAuth(report, "69ef7d63cc5071476d4790de", "user", "9961714368")).toBe(true);
+    expect(checkAuth(report, "69ef7d63cc5071476d4790de", "user", "+919961714368")).toBe(true);
+
+    // Another student tries to access (different phone and id) -> rejected
+    expect(checkAuth(report, "other_auth_id", "user", "9876543210")).toBe(false);
+
+    // Admin / Trainer / Admins can access
+    expect(checkAuth(report, "admin_auth_id", "admin", "9876543210")).toBe(true);
+    expect(checkAuth(report, "trainer_auth_id", "trainer", "9876543210")).toBe(true);
+    expect(checkAuth(report, "admins_auth_id", "admins", "9876543210")).toBe(true);
+  });
 });

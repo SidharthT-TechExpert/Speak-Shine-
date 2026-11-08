@@ -589,7 +589,12 @@ export async function getReport(req, res) {
 export async function reEvaluateReport(req, res) {
   try {
     const { reportId } = req.params;
-    const result = await videoService.reEvaluateReport(reportId, req.user.id, req.user.role);
+    const result = await videoService.reEvaluateReport(
+      reportId,
+      req.user?.id,
+      req.user?.role,
+      req.user?.phone
+    );
     res.json(result);
   } catch (error) {
     if (error.statusCode) {

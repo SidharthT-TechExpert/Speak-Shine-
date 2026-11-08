@@ -2902,6 +2902,7 @@ export default function VideoAnalysis() {
                     ...prev,
                     analysis: newAnalysis,
                   }));
+                  loadMyReports();
                 }}
               />
             )}
@@ -7100,6 +7101,7 @@ function Section({ title, children }) {
 }
 
 function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, reportId, onReEvaluated }) {
+  const { isDark } = useTheme();
   const [reEvaluating, setReEvaluating] = useState(false);
   const [reEvalMsg, setReEvalMsg] = useState(null);
 
@@ -7400,9 +7402,15 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                     borderRadius: 10,
                     fontSize: "0.78rem",
                     fontWeight: 700,
-                    border: isShadowBd ? "1px solid rgba(236, 72, 153, 0.45)" : "1px solid rgba(167, 139, 250, 0.4)",
-                    background: isShadowBd ? "rgba(236, 72, 153, 0.15)" : "rgba(124, 111, 255, 0.15)",
-                    color: isShadowBd ? "#f472b6" : "#c4b5fd",
+                    border: isShadowBd
+                      ? (isDark ? "1px solid rgba(236, 72, 153, 0.45)" : "1.5px solid #ec4899")
+                      : (isDark ? "1px solid rgba(167, 139, 250, 0.4)" : "1.5px solid #7c3aed"),
+                    background: isShadowBd
+                      ? (isDark ? "rgba(236, 72, 153, 0.15)" : "#fdf2f8")
+                      : (isDark ? "rgba(124, 111, 255, 0.15)" : "#f5f3ff"),
+                    color: isShadowBd
+                      ? (isDark ? "#f472b6" : "#be185d")
+                      : (isDark ? "#c4b5fd" : "#6d28d9"),
                     cursor: reEvaluating ? "not-allowed" : "pointer",
                     display: "inline-flex",
                     alignItems: "center",

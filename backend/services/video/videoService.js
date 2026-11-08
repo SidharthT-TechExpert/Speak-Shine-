@@ -1778,7 +1778,7 @@ export async function retryVideoAnalysis(reportId, authId) {
 /**
  * Re-evaluate a report's vocabulary matching and composite score using the latest intelligent rules.
  */
-export async function reEvaluateReport(reportId, userId, userRole = "user") {
+export async function reEvaluateReport(reportId, userId, userRole = "user", callerPhone = null) {
   const report = await VideoReport.findById(reportId);
   if (!report) {
     const error = new Error("Report not found");
@@ -1786,9 +1786,60 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     throw error;
   }
 
-  // Allow report owner or privileged admin/trainer
-  const isOwner = String(report.userId) === String(userId) || (report.phone && report.phone === userId);
-  const isPrivileged = userRole === "admin" || userRole === "trainer" || userRole === "superadmin";
+  const cleanPhone = (p) => (p || "").toString().replace(/^(\+91|91)/, "").replace(/\D/g, "");
+  const reportClean = cleanPhone(report.phone);
+  const callerClean = cleanPhone(callerPhone);
+
+  // Check if privileged role (admins, admin, trainer, superadmin)
+  const isPrivileged = ["admin", "admins", "trainer", "superadmin"].includes(userRole);
+
+  // Allow student/owner to re-evaluate their own report
+  let isOwner = false;
+
+  // 1. Direct ID match
+  if (report.userId && userId && String(report.userId) === String(userId)) {
+    isOwner = true;
+  }
+
+  // 2. Direct caller phone match
+  if (!isOwner && callerClean && reportClean && callerClean === reportClean) {
+    isOwner = true;
+  }
+
+  // 3. Resolve caller via Auth / User models
+  if (!isOwner && (userId || callerClean)) {
+    try {
+      const Auth = (await import("../../../models/authSchema.js")).default;
+      const authDoc = userId ? await Auth.findById(userId).lean().catch(() => null) : null;
+      const authPhoneClean = cleanPhone(authDoc?.phone);
+
+      if (authPhoneClean && reportClean && authPhoneClean === reportClean) {
+        isOwner = true;
+      } else {
+        const phoneToLook = callerClean || authPhoneClean;
+        const phoneQueries = [];
+        if (phoneToLook) {
+          phoneQueries.push(phoneToLook, `+91${phoneToLook}`, `91${phoneToLook}`);
+        }
+
+        const userDoc = await User.findOne({
+          $or: [
+            ...(userId ? [{ _id: userId }] : []),
+            ...(phoneQueries.length > 0 ? [{ phone: { $in: phoneQueries } }] : []),
+          ],
+        }).lean().catch(() => null);
+
+        if (userDoc) {
+          if (String(report.userId) === String(userDoc._id) || (userDoc.phone && cleanPhone(userDoc.phone) === reportClean)) {
+            isOwner = true;
+          }
+        }
+      }
+    } catch (authErr) {
+      console.warn("[VideoService] Failed to resolve auth for report owner check:", authErr.message);
+    }
+  }
+
   if (!isOwner && !isPrivileged) {
     const error = new Error("Not authorized to re-evaluate this report");
     error.statusCode = 403;
