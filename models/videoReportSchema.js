@@ -123,7 +123,13 @@ const videoReportSchema = new mongoose.Schema({
       maxDescription:{ type: Number, default: null },
       maxConfidence: { type: Number, default: null },
       maxDuration:   { type: Number, default: null },
+      isOffTopic:    { type: Boolean, default: false },
+      offTopicReason:{ type: String, default: null },
     },
+    // Sunday 2x multiplier tracking
+    sundayBonus: { type: Boolean, default: false },
+    baseScore:   { type: Number, default: null },
+    bonusScore:  { type: Number, default: null },
     // Score outcome for re-submissions
     // "new"      — first submission today, score added
     // "improved" — re-submission that beat today's previous score

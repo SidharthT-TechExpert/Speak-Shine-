@@ -251,6 +251,7 @@ function DetailedReport({ a, challengeType, isDark: propIsDark }) {
       if (comGap > 2) improvementTips.push({ icon: "🗣️", label: "Improve communication", detail: `+${comGap.toFixed(1)} pts possible — work on fluency, grammar, confidence & eye contact`, gap: comGap });
       if (groGap > 2) improvementTips.push({ icon: "🌱", label: "Aim for personal growth", detail: `+${groGap.toFixed(1)} pts possible — speak with slightly clearer pacing and flow to beat your baseline`, gap: groGap });
     }
+
     improvementTips.sort((x, y) => y.gap - x.gap);
   }
 
@@ -305,6 +306,28 @@ function DetailedReport({ a, challengeType, isDark: propIsDark }) {
         </div>
       )}
 
+      {/* ── Sunday bonus banner ── */}
+      {a.sundayBonus && (
+        <div style={{
+          marginBottom: "0.85rem",
+          padding: "0.75rem 0.95rem",
+          borderRadius: 10,
+          background: "linear-gradient(135deg, rgba(251,191,36,0.15), rgba(124,111,255,0.1))",
+          border: "1px solid rgba(251,191,36,0.45)",
+          display: "flex", alignItems: "center", gap: "0.65rem",
+        }}>
+          <span style={{ fontSize: "1.3rem", flexShrink: 0 }}>🎉</span>
+          <div>
+            <div style={{ fontWeight: 800, color: "#fbbf24", fontSize: "0.85rem", marginBottom: "0.15rem" }}>
+              Sunday Bonus! Points Doubled
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
+              Base score: <strong>{Math.round(a.baseScore ?? cs ?? 0)} pts</strong> → Bonus score: <strong style={{ color: "#fbbf24" }}>{Math.round(a.bonusScore ?? (cs * 2))} pts</strong> added to monthly total! 🔥
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Today's Score Card ── */}
       {cs != null && (
         <div style={{
@@ -323,11 +346,25 @@ function DetailedReport({ a, challengeType, isDark: propIsDark }) {
               <div style={{ fontSize: "0.65rem", color: isDark ? "rgba(167,139,250,0.9)" : "#6d28d9", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.2rem" }}>
                 🏆 Score
               </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "2rem", fontWeight: 900, lineHeight: 1, color: cs >= 80 ? "#10b981" : cs >= 60 ? (isDark ? "#a78bfa" : "#7c3aed") : cs >= 40 ? "#f59e0b" : "#ef4444" }}>
                   {Math.round(cs)}
                 </span>
                 <span style={{ fontSize: "0.85rem", color: isDark ? "var(--muted)" : "#64748b", fontWeight: 600 }}>/100 pts</span>
+                {a.sundayBonus && (
+                  <span style={{
+                    marginLeft: "0.35rem",
+                    padding: "0.15rem 0.5rem",
+                    borderRadius: 6,
+                    background: isDark ? "rgba(251, 191, 36, 0.2)" : "rgba(217, 119, 6, 0.15)",
+                    border: isDark ? "1px solid rgba(251, 191, 36, 0.4)" : "1px solid rgba(217, 119, 6, 0.35)",
+                    color: isDark ? "#fbbf24" : "#b45309",
+                    fontSize: "0.72rem",
+                    fontWeight: 800,
+                  }}>
+                    🎉 Sunday 2x: {Math.round(a.bonusScore ?? (cs * 2))} pts
+                  </span>
+                )}
               </div>
             </div>
             <div style={{

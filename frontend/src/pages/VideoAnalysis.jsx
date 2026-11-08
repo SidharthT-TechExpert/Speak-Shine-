@@ -7280,7 +7280,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
               Sunday Bonus! Points Doubled
             </div>
             <div style={{ fontSize: "0.82rem", color: "var(--text)", lineHeight: 1.5 }}>
-              Base score: <strong>{Math.round(a.baseScore ?? 0)} pts</strong> → Bonus score: <strong style={{ color: "#fbbf24" }}>{Math.round(cs ?? 0)} pts</strong>.
+              Base score: <strong>{Math.round(a.baseScore ?? cs ?? 0)} pts</strong> → Bonus score: <strong style={{ color: "#fbbf24" }}>{Math.round(a.bonusScore ?? (cs * 2))} pts</strong>.
               Every Sunday submission earns double points! 🔥
             </div>
           </div>
@@ -7369,9 +7369,23 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
               <div style={{ fontSize: "0.68rem", color: "rgba(167,139,250,0.8)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.2rem" }}>
                 🏆 Today's Score
               </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "2.4rem", fontWeight: 900, color: cs >= 80 ? "#4ade80" : cs >= 60 ? "#a78bfa" : cs >= 40 ? "#fbbf24" : "#f87171", lineHeight: 1 }}>{Math.round(cs)}</span>
                 <span style={{ fontSize: "1rem", color: "var(--muted)", fontWeight: 600 }}>/100 pts</span>
+                {a.sundayBonus && (
+                  <span style={{
+                    marginLeft: "0.45rem",
+                    padding: "0.2rem 0.6rem",
+                    borderRadius: 8,
+                    background: "rgba(251, 191, 36, 0.2)",
+                    border: "1px solid rgba(251, 191, 36, 0.45)",
+                    color: "#fbbf24",
+                    fontSize: "0.78rem",
+                    fontWeight: 800,
+                  }}>
+                    🎉 Sunday 2x: {Math.round(a.bonusScore ?? (cs * 2))} pts
+                  </span>
+                )}
               </div>
             </div>
 

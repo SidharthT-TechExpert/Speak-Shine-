@@ -1106,14 +1106,24 @@ async function prepareReportAnalysis(report) {
     analysis = { ...source, compositeScore: score, scoreBreakdown: shadowBreakdown };
   }
 
-  if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription)) {
+  const picBdInconsistent = analysis && isPicTask && analysis.scoreBreakdown && analysis.scoreBreakdown.isPictureDescription && (
+    Math.abs((analysis.compositeScore || 0) - (
+      (analysis.scoreBreakdown.communication || 0) +
+      (analysis.scoreBreakdown.content || 0) +
+      (analysis.scoreBreakdown.vocabulary || 0) +
+      (analysis.scoreBreakdown.duration || 0) +
+      (analysis.scoreBreakdown.growth || 0)
+    )) > 1.0
+  );
+
+  if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription || picBdInconsistent)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
     const configuredPicWords = status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5;
     const configuredPicReq = status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 1;
     const effectivePicTotal = status?.todayVocabulary?.length || configuredPicWords;
     const effectivePicReq = Math.min(configuredPicReq, effectivePicTotal);
 
-    const { breakdown } = calculateCompositeScore({
+    const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
       maxDurationSeconds: status?.durationPictureFull ?? 180,
       vocabularyUsed: source.vocabularyUsed || [],
@@ -1124,7 +1134,30 @@ async function prepareReportAnalysis(report) {
       isPictureDescription: true,
       userHistory,
     });
-    analysis = { ...source, scoreBreakdown: breakdown };
+
+    const isSunday = Boolean(source.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
+    const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
+
+    source.compositeScore = score;
+    source.scoreBreakdown = breakdown;
+    source.sundayBonus = isSunday;
+    source.baseScore = score;
+    source.bonusScore = effectiveScore;
+
+    // Persist self-healed picture score
+    VideoReport.findByIdAndUpdate(report._id, {
+      $set: {
+        "analysis.compositeScore": score,
+        "analysis.scoreBreakdown": source.scoreBreakdown,
+        "analysis.sundayBonus": source.sundayBonus,
+        "analysis.baseScore": source.baseScore,
+        "analysis.bonusScore": source.bonusScore,
+        challengeType: "picture_description",
+        "analysis.challengeType": "picture_description",
+      }
+    }).catch(err => console.warn("[VideoService] Failed to persist healed picture score:", err.message));
+
+    analysis = source;
   }
 
   // Self-heal story summary tasks if they were missing topic relevance or marked as special day
@@ -1780,11 +1813,18 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     Boolean(status?.isShadowingDay);
 
   // 1. Re-match vocabulary with intelligent matcher (waived for shadowing)
-  const matchedWords = isShadowReport ? [] : matchVocabularyInTranscript(transcript, todayVocab, report.analysis);
+  // Preserve previously recognized target words so they are never lost if today's vocab is empty or changed
+  const previousWords = Array.isArray(report.analysis?.vocabularyUsed) ? report.analysis.vocabularyUsed : [];
+  const vocabToMatch = (Array.isArray(todayVocab) && todayVocab.length > 0) ? todayVocab : previousWords;
+  const newlyMatched = isShadowReport ? [] : matchVocabularyInTranscript(transcript, vocabToMatch, report.analysis);
+  const matchedWords = isShadowReport ? [] : Array.from(new Set([...previousWords, ...newlyMatched]));
 
-  // 2. Re-calculate composite score and score breakdown
-  let challengeType = report.challengeType || report.analysis?.challengeType || (
-    status?.isMonthlyReflectionDay ? "monthly_reflection"
+  // 2. Detect the authentic challenge type of this specific submission
+  const challengeType = report.challengeType || report.analysis?.challengeType || (
+    isShadowReport ? "shadowing_video"
+    : report.analysis?.scoreBreakdown?.isPictureDescription ? "picture_description"
+    : report.analysis?.scoreBreakdown?.isStorySummary ? "story_summary"
+    : status?.isMonthlyReflectionDay ? "monthly_reflection"
     : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio")) ? "picture_description"
     : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
     : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
@@ -1792,42 +1832,55 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     : "topic"
   );
 
-  const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-  const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
   const isShadow = isShadowReport || challengeType === "shadowing_video";
-  if (isShadow) {
-    challengeType = "shadowing_video";
-  }
+  const isPic = !isShadow && (challengeType === "picture_description" || report.analysis?.scoreBreakdown?.isPictureDescription === true);
+  const isStory = !isShadow && (challengeType === "story_summary" || report.analysis?.scoreBreakdown?.isStorySummary === true);
+
+  // 3. Preserve saved vocab totals or fall back to status settings
+  const savedTotal = report.analysis?.scoreBreakdown?.totalVocabWords;
+  const savedRequired = report.analysis?.scoreBreakdown?.requiredVocabWords;
   const configuredWordCount = isPic
     ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
     : isStory
     ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
     : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5);
   const configuredRequiredCount = isPic
-    ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
+    ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 1)
     : isStory
     ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
     : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
-  const effectiveTotalWords = isShadow ? 0 : (todayVocab.length > 0 ? todayVocab.length : configuredWordCount);
-  const effectiveRequiredWords = isShadow ? 0 : Math.min(configuredRequiredCount, effectiveTotalWords);
+
+  const effectiveTotalWords = isShadow ? 0 : (savedTotal || (todayVocab.length > 0 ? todayVocab.length : configuredWordCount));
+  const effectiveRequiredWords = isShadow ? 0 : (savedRequired || Math.min(configuredRequiredCount, effectiveTotalWords));
 
   const scoreGateFlags = {
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
     isShadowing: isShadow || false,
     challengeType: isShadow ? "shadowing_video" : challengeType,
-    isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-    isWeeklyReflection: status?.isWeeklyReflectionDay || false,
-    isMonthlyGoals: status?.isMonthlyGoalsDay || false,
+    isMonthlyReflection: challengeType === "monthly_reflection" || status?.isMonthlyReflectionDay || false,
+    isWeeklyReflection:  challengeType === "weekly_reflection" || status?.isWeeklyReflectionDay || false,
+    isMonthlyGoals:      challengeType === "monthly_goals" || status?.isMonthlyGoalsDay || false,
   };
   const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
 
+  // 4. Fetch user history EXCLUDING this specific submission to preserve authentic baseline
   const user = report.phone ? await User.findOne({ phone: report.phone }).lean() : null;
+  const userHistory = (user?.feedbackScores || []).filter(entry => {
+    if (!entry) return false;
+    if (report.submittedAt && entry.date) {
+      const entryTime = new Date(entry.date).getTime();
+      const reportTime = new Date(report.submittedAt).getTime();
+      if (Math.abs(entryTime - reportTime) < 60000) return false;
+    }
+    return true;
+  });
 
   const targetDur = isShadow
     ? Math.max(20, Math.min(180, Number(report.analysis?.targetVideoDuration) || Number(report.analysis?.scoreBreakdown?.targetDuration) || Number(status?.todayVideoDuration) || 85))
     : (status?.todayVideoDuration || 60);
 
+  // 5. Calculate composite score with mathematical consistency
   const { score, breakdown } = calculateCompositeScore({
     durationSeconds: report.videoDuration || 0,
     maxDurationSeconds: fullScoreSeconds,
@@ -1841,7 +1894,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     isShadowing: isShadow || false,
     targetVideoDuration: targetDur,
     targetVideoTranscript: status?.todayVideoTranscript || null,
-    userHistory: user?.feedbackScores || [],
+    userHistory,
   });
 
   if (isStory && report.analysis.topicRelevance == null) {
@@ -1889,41 +1942,73 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     maxGrowth: 15,
   };
 
-  const requiredCount = Math.min(configuredRequiredCount, todayVocab.length || 1);
-  const vocabularyScore = todayVocab.length > 0
+  const requiredCount = Math.min(configuredRequiredCount, effectiveTotalWords || 1);
+  const vocabularyScore = (effectiveTotalWords > 0)
     ? Math.round((Math.min(matchedWords.length, requiredCount) / requiredCount) * 10 * 10) / 10
     : report.analysis.vocabularyScore ?? null;
+
+  // 6. Sunday 2x multiplier
+  const isSunday = Boolean(report.analysis?.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
+  const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
 
   report.analysis.vocabularyUsed = matchedWords;
   report.analysis.vocabularyScore = vocabularyScore;
   report.analysis.compositeScore = score;
   report.analysis.scoreBreakdown = updatedBreakdown;
+  report.analysis.sundayBonus = isSunday;
+  report.analysis.baseScore = score;
+  report.analysis.bonusScore = effectiveScore;
+  report.challengeType = challengeType;
+  report.analysis.challengeType = challengeType;
   report.markModified("analysis");
   await report.save();
 
-  // Also update user's feedbackScores latest entry points if phone exists
+  // 7. Update User's todayScore, monthlyScore, and feedbackScores
   if (report.phone) {
     try {
+      const subTime = report.submittedAt ? new Date(report.submittedAt).getTime() : Date.now();
       await User.findOneAndUpdate(
-        { phone: report.phone, "feedbackScores.date": { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-        { $set: { "feedbackScores.$.points": score } }
+        {
+          phone: report.phone,
+          "feedbackScores.date": {
+            $gte: new Date(subTime - 24 * 60 * 60 * 1000),
+            $lte: new Date(subTime + 24 * 60 * 60 * 1000),
+          }
+        },
+        { $set: { "feedbackScores.$.points": effectiveScore, "feedbackScores.$.sundayBonus": isSunday } }
       );
-    } catch {}
+      const u = await User.findOne({ phone: report.phone });
+      if (u) {
+        const reportISTDate = new Date(subTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+        const nowIST = new Date(reportISTDate);
+        const reportDayKey = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, "0")}-${String(nowIST.getDate()).padStart(2, "0")}`;
+        if (u.lastScoreDate === reportDayKey && u.todayScore != null) {
+          const diff = effectiveScore - u.todayScore;
+          if (diff !== 0) {
+            await User.updateOne({ _id: u._id }, { $inc: { monthlyScore: diff }, $set: { todayScore: effectiveScore } });
+          }
+        }
+      }
+    } catch (userSyncErr) {
+      console.warn("[VideoService] Failed to sync user scores during re-evaluation:", userSyncErr.message);
+    }
   }
 
   const { analysis: reportAnalysis } = await prepareReportAnalysis(report);
 
+  const bonusMsg = isSunday ? ` (🎉 2x Sunday Bonus: ${effectiveScore} pts)` : "";
   const resultMessage = isShadow
     ? updatedBreakdown.isSilentAttempt
-      ? `Score re-evaluated: No audible speech detected in recording (-85.5dB). Score updated to 0/100 pts.`
-      : `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.`
-    : `Score re-evaluated! Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`;
+      ? "Score re-evaluated: No audible speech detected in recording (-85.5dB). Score updated to 0/100 pts."
+      : `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.${bonusMsg}`
+    : `Score re-evaluated: ${score} pts${bonusMsg}. Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`;
 
   return {
     success: true,
     message: resultMessage,
     matchedWords: isShadow ? [] : matchedWords,
     score,
+    effectiveScore,
     analysis: reportAnalysis,
   };
 }
