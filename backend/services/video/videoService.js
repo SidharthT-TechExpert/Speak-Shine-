@@ -1752,43 +1752,64 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   const transcript = report.analysis?.transcription || "";
 
   // 1. Re-match vocabulary with intelligent matcher
-  const matchedWords = matchVocabularyInTranscript(transcript, todayVocab, report.analysis);
+  // Preserve previously recognized target words so they are never lost if today's vocab is empty or changed
+  const previousWords = Array.isArray(report.analysis?.vocabularyUsed) ? report.analysis.vocabularyUsed : [];
+  const vocabToMatch = (Array.isArray(todayVocab) && todayVocab.length > 0) ? todayVocab : previousWords;
+  const newlyMatched = matchVocabularyInTranscript(transcript, vocabToMatch, report.analysis);
+  const matchedWords = Array.from(new Set([...previousWords, ...newlyMatched]));
 
-  // 2. Re-calculate composite score and score breakdown
+  // 2. Detect the authentic challenge type of this specific submission
   const challengeType = report.challengeType || report.analysis?.challengeType || (
-    status?.isMonthlyReflectionDay ? "monthly_reflection"
+    report.analysis?.scoreBreakdown?.isPictureDescription ? "picture_description"
+    : report.analysis?.scoreBreakdown?.isStorySummary ? "story_summary"
+    : status?.isMonthlyReflectionDay ? "monthly_reflection"
     : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio")) ? "picture_description"
     : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
     : status?.isMonthlyGoalsDay ? "monthly_goals"
     : "topic"
   );
 
-  const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-  const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+  const isPic = challengeType === "picture_description" || report.analysis?.scoreBreakdown?.isPictureDescription === true;
+  const isStory = challengeType === "story_summary" || report.analysis?.scoreBreakdown?.isStorySummary === true;
+
+  // 3. Preserve saved vocab totals or fall back to status settings
+  const savedTotal = report.analysis?.scoreBreakdown?.totalVocabWords;
+  const savedRequired = report.analysis?.scoreBreakdown?.requiredVocabWords;
   const configuredWordCount = isPic
     ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
     : isStory
     ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
     : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5);
   const configuredRequiredCount = isPic
-    ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
+    ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 1)
     : isStory
     ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
     : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
-  const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
-  const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+  const effectiveTotalWords = savedTotal || (todayVocab.length > 0 ? todayVocab.length : configuredWordCount);
+  const effectiveRequiredWords = savedRequired || Math.min(configuredRequiredCount, effectiveTotalWords);
 
   const scoreGateFlags = {
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
-    isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-    isWeeklyReflection: status?.isWeeklyReflectionDay || false,
-    isMonthlyGoals: status?.isMonthlyGoalsDay || false,
+    isMonthlyReflection: challengeType === "monthly_reflection",
+    isWeeklyReflection:  challengeType === "weekly_reflection",
+    isMonthlyGoals:      challengeType === "monthly_goals",
   };
   const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
 
+  // 4. Fetch user history EXCLUDING this specific submission to preserve authentic baseline
   const user = report.phone ? await User.findOne({ phone: report.phone }).lean() : null;
+  const userHistory = (user?.feedbackScores || []).filter(entry => {
+    if (!entry) return false;
+    if (report.submittedAt && entry.date) {
+      const entryTime = new Date(entry.date).getTime();
+      const reportTime = new Date(report.submittedAt).getTime();
+      if (Math.abs(entryTime - reportTime) < 60000) return false;
+    }
+    return true;
+  });
 
+  // 5. Calculate composite score with mathematical consistency
   const { score, breakdown } = calculateCompositeScore({
     durationSeconds: report.videoDuration || 0,
     maxDurationSeconds: fullScoreSeconds,
@@ -1799,7 +1820,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     analysis: report.analysis,
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
-    userHistory: user?.feedbackScores || [],
+    userHistory,
   });
 
   if (isStory && report.analysis.topicRelevance == null) {
@@ -1822,11 +1843,12 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
     maxGrowth: 15,
   };
 
-  const requiredCount = Math.min(configuredRequiredCount, todayVocab.length || 1);
-  const vocabularyScore = todayVocab.length > 0
+  const requiredCount = Math.min(configuredRequiredCount, effectiveTotalWords || 1);
+  const vocabularyScore = (effectiveTotalWords > 0)
     ? Math.round((Math.min(matchedWords.length, requiredCount) / requiredCount) * 10 * 10) / 10
     : report.analysis.vocabularyScore ?? null;
 
+  // 6. Sunday 2x multiplier
   const isSunday = Boolean(report.analysis?.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
   const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
 
@@ -1837,37 +1859,51 @@ export async function reEvaluateReport(reportId, userId, userRole = "user") {
   report.analysis.sundayBonus = isSunday;
   report.analysis.baseScore = score;
   report.analysis.bonusScore = effectiveScore;
+  report.challengeType = challengeType;
+  report.analysis.challengeType = challengeType;
   report.markModified("analysis");
   await report.save();
 
-  // Also update user's feedbackScores latest entry points if phone exists
+  // 7. Update User's todayScore, monthlyScore, and feedbackScores
   if (report.phone) {
     try {
+      const subTime = report.submittedAt ? new Date(report.submittedAt).getTime() : Date.now();
       await User.findOneAndUpdate(
-        { phone: report.phone, "feedbackScores.date": { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        {
+          phone: report.phone,
+          "feedbackScores.date": {
+            $gte: new Date(subTime - 24 * 60 * 60 * 1000),
+            $lte: new Date(subTime + 24 * 60 * 60 * 1000),
+          }
+        },
         { $set: { "feedbackScores.$.points": effectiveScore, "feedbackScores.$.sundayBonus": isSunday } }
       );
       const u = await User.findOne({ phone: report.phone });
       if (u) {
-        const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-        const todayIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, "0")}-${String(nowIST.getDate()).padStart(2, "0")}`;
-        if (u.lastScoreDate === todayIST && u.todayScore != null) {
+        const reportISTDate = new Date(subTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+        const nowIST = new Date(reportISTDate);
+        const reportDayKey = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, "0")}-${String(nowIST.getDate()).padStart(2, "0")}`;
+        if (u.lastScoreDate === reportDayKey && u.todayScore != null) {
           const diff = effectiveScore - u.todayScore;
-          if (diff > 0) {
+          if (diff !== 0) {
             await User.updateOne({ _id: u._id }, { $inc: { monthlyScore: diff }, $set: { todayScore: effectiveScore } });
           }
         }
       }
-    } catch {}
+    } catch (userSyncErr) {
+      console.warn("[VideoService] Failed to sync user scores during re-evaluation:", userSyncErr.message);
+    }
   }
 
   const { analysis: reportAnalysis } = await prepareReportAnalysis(report);
 
+  const bonusMsg = isSunday ? ` (🎉 2x Sunday Bonus: ${effectiveScore} pts)` : "";
   return {
     success: true,
-    message: `Score re-evaluated! Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`,
+    message: `Score re-evaluated: ${score} pts${bonusMsg}. Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`,
     matchedWords,
     score,
+    effectiveScore,
     analysis: reportAnalysis,
   };
 }

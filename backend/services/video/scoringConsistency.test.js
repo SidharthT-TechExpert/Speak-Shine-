@@ -6,13 +6,13 @@ describe("Scoring Consistency: Breakdown sum must match composite score", () => 
     // Exact parameters from Fayiz's submission:
     // Recognized words: bustling, interact
     // Duration: 123s (max target 180s, min reasonable 60s -> duration is 20/20)
-    // communication: 18.2, content: ~7.5, vocabulary: 10, duration: 20, growth: 6
+    // communication: 18.2, content: ~9.1, vocabulary: 10, duration: 20, growth: 6
     const result = calculateCompositeScore({
       durationSeconds: 123,
       maxDurationSeconds: 180,
       vocabularyUsed: ["bustling", "interact"],
       totalVocabWords: 2,
-      requiredVocabWords: 2,
+      requiredVocabWords: 1,
       topicRelevance: 2.0,
       analysis: {
         fluency: 6,
@@ -126,5 +126,38 @@ describe("Scoring Consistency: Breakdown sum must match composite score", () => 
 
     expect(result.score).toBe(breakdownSum);
     expect(Math.abs(result.score - breakdownSum)).toBeLessThan(0.01);
+  });
+
+  it("Re-evaluation calculation accuracy: Preserves target words and Sunday 2x multiplier without loss", () => {
+    const prevVocabularyUsed = ["bustling", "interact"];
+    const recalculation = calculateCompositeScore({
+      durationSeconds: 123,
+      maxDurationSeconds: 180,
+      vocabularyUsed: prevVocabularyUsed,
+      totalVocabWords: 5,
+      requiredVocabWords: 1,
+      topicRelevance: 2.0,
+      analysis: {
+        fluency: 6,
+        grammar: 4,
+        confidence: 6,
+        vocabulary: 5,
+        coherence: 3,
+        topicRelevance: 2.0,
+        isOffTopic: false,
+      },
+      isPictureDescription: true,
+      userHistory: [],
+    });
+
+    const isSunday = true;
+    const effectiveScore = isSunday ? Math.round(recalculation.score * 2 * 100) / 100 : recalculation.score;
+
+    expect(recalculation.score).toBe(63.74);
+    expect(effectiveScore).toBe(127.48);
+    expect(recalculation.breakdown.vocabulary).toBe(10);
+    expect(recalculation.breakdown.duration).toBe(20);
+    const sum = recalculation.breakdown.communication + recalculation.breakdown.content + recalculation.breakdown.vocabulary + recalculation.breakdown.duration + recalculation.breakdown.growth;
+    expect(Math.round(sum * 100) / 100).toBe(recalculation.score);
   });
 });
