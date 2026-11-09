@@ -40,7 +40,7 @@ describe("Scoring Consistency: Breakdown sum must match composite score", () => 
     const bd = result.breakdown;
     expect(bd.isOffTopic).toBe(false);
     expect(bd.duration).toBe(20);
-    expect(bd.vocabulary).toBe(10);
+    expect(bd.vocabulary).toBe(20);
 
     const breakdownSum = Math.round(
       (bd.communication + bd.content + bd.vocabulary + bd.duration + bd.growth) * 100
@@ -153,9 +153,9 @@ describe("Scoring Consistency: Breakdown sum must match composite score", () => 
     const isSunday = true;
     const effectiveScore = isSunday ? Math.round(recalculation.score * 2 * 100) / 100 : recalculation.score;
 
-    expect(recalculation.score).toBe(63.74);
-    expect(effectiveScore).toBe(127.48);
-    expect(recalculation.breakdown.vocabulary).toBe(10);
+    expect(recalculation.score).toBe(71.14);
+    expect(effectiveScore).toBe(142.28);
+    expect(recalculation.breakdown.vocabulary).toBe(20);
     expect(recalculation.breakdown.duration).toBe(20);
     const sum = recalculation.breakdown.communication + recalculation.breakdown.content + recalculation.breakdown.vocabulary + recalculation.breakdown.duration + recalculation.breakdown.growth;
     expect(Math.round(sum * 100) / 100).toBe(recalculation.score);

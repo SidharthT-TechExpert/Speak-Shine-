@@ -483,58 +483,86 @@ export default function ModernDashboardView({
   const vocabLevel = today.vocabLevel || "B2";
   const cefrInfo = getCefrInfo(vocabLevel);
 
-  const defaultVocabulary = [
-    { word: "Inevitable", meaning: "Certain to happen; unavoidable", example: "With regular practice, rapid improvement in speaking fluency is inevitable.", bonus: "+10 pts" },
-    { word: "Serendipity", meaning: "Finding valuable things not sought", example: "The serendipity of meeting her at the wrong delivery turned into a lasting friendship.", bonus: "+10 pts" },
-    { word: "Reluctant", meaning: "Unwilling and hesitant", example: "He was reluctant to speak at first, but gained confidence quickly.", bonus: "+10 pts" },
-    { word: "Articulate", meaning: "Able to express thoughts clearly", example: "She was articulate and confident during the discussion.", bonus: "+10 pts" },
-    { word: "Perseverance", meaning: "Continued effort despite difficulties", example: "Through perseverance, he mastered speaking English with high confidence.", bonus: "+10 pts" },
+  const defaultExpressions = [
+    {
+      expression: "What I find interesting is...",
+      word: "What I find interesting is...",
+      meaning: "Used to introduce something that attracts your attention",
+      usage: "When discussing an interesting aspect of a subject",
+      example: "What I find interesting is how technology has changed the way we communicate.",
+      bonus: "+10 pts"
+    },
+    {
+      expression: "To be completely honest...",
+      word: "To be completely honest...",
+      meaning: "Used to share an honest, authentic thought or admission",
+      usage: "When offering a candid, genuine personal reflection",
+      example: "To be completely honest, I was nervous before delivering my first speech.",
+      bonus: "+10 pts"
+    },
+    {
+      expression: "The reason why I say this is...",
+      word: "The reason why I say this is...",
+      meaning: "Used to explain the reasoning behind your opinion",
+      usage: "When supporting your statement with clear reasons or evidence",
+      example: "The reason why I say this is because regular practice builds natural confidence.",
+      bonus: "+10 pts"
+    },
+    {
+      expression: "On top of that...",
+      word: "On top of that...",
+      meaning: "Used to add an extra supporting point or detail",
+      usage: "When elaborating with additional facts or experiences",
+      example: "On top of that, speaking in English daily expanded my vocabulary effortlessly.",
+      bonus: "+10 pts"
+    },
+    {
+      expression: "At the end of the day...",
+      word: "At the end of the day...",
+      meaning: "Used to emphasize the ultimate, most important conclusion",
+      usage: "When summarizing your overall thought or takeaway",
+      example: "At the end of the day, consistent effort matters more than perfection.",
+      bonus: "+10 pts"
+    },
   ];
 
   const vocabList = (today.vocabulary && today.vocabulary.length > 0)
     ? today.vocabulary.slice(0, targetWordCount).map((v, i) => {
-        let word = "";
+        let expression = "";
         let meaning = "";
+        let usage = "";
         let example = "";
         if (typeof v === "string") {
           const parts = v.split(/\s*[-—:]\s*/);
-          word = parts[0]?.trim() || defaultVocabulary[i]?.word || `Word ${i + 1}`;
-          meaning = parts[1]?.trim() || defaultVocabulary[i]?.meaning || "";
+          expression = parts[0]?.trim() || defaultExpressions[i]?.expression || `Expression ${i + 1}`;
+          meaning = parts[1]?.trim() || defaultExpressions[i]?.meaning || "";
           if (parts.length >= 3) {
             example = parts.slice(2).join(" — ").trim();
           }
         } else if (v && typeof v === "object") {
-          word = v.word || v.Word || v.term || defaultVocabulary[i]?.word || `Word ${i + 1}`;
-          meaning = v.meaning || v.Meaning || v.definition || defaultVocabulary[i]?.meaning || "";
-          example = v.example || v.Example || v.sentence || v.sampleSentence || "";
+          expression = v.expression || v.word || v.Word || v.term || defaultExpressions[i]?.expression || `Expression ${i + 1}`;
+          meaning = v.meaning || v.Meaning || v.definition || defaultExpressions[i]?.meaning || "";
+          usage = v.usage || v.situation || v.context || defaultExpressions[i]?.usage || "";
+          example = v.example || v.Example || v.sentence || v.sampleSentence || defaultExpressions[i]?.example || "";
         }
 
         if (!example) {
-          const wLower = (word || "").toLowerCase();
-          const defaults = {
-            miscommunication: "The miscommunication caused the package to be delivered to the wrong address.",
-            serendipity: "The serendipity of meeting her at the wrong delivery turned into a lasting friendship.",
-            reconcile: "They reconciled after the mix-up, and their friendship grew stronger.",
-            inevitable: "With regular practice, rapid improvement in speaking fluency is inevitable.",
-            reluctant: "He was reluctant to speak at first, but gained confidence quickly.",
-            articulate: "She was able to articulate her ideas clearly during the presentation.",
-            perseverance: "Through perseverance and daily speaking drills, he mastered clear pronunciation.",
-            cohesion: "Using linking words gave great cohesion to her story summary.",
-            thrilling: "That thrilling adventure was an unforgettable experience.",
-            intrepid: "An intrepid mindset helps overcome unexpected obstacles.",
-            trek: "Our morning trek across the hills offered breathtaking views.",
-          };
-          example = defaults[wLower] || defaultVocabulary[i]?.example || (word ? `The speaker used "${word}" clearly in the speaking response.` : "");
+          example = defaultExpressions[i]?.example || (expression ? `The speaker used "${expression}" naturally in their response.` : "");
+        }
+        if (!usage) {
+          usage = defaultExpressions[i]?.usage || "When speaking naturally about this topic";
         }
 
         return {
-          word,
+          expression,
+          word: expression, // backward compatibility
           meaning,
+          usage,
           example,
           bonus: "+10 pts",
         };
       })
-    : defaultVocabulary.slice(0, targetWordCount);
+    : defaultExpressions.slice(0, targetWordCount);
 
   const [plannedWords, setPlannedWords] = useState(() => {
     try {
@@ -571,13 +599,14 @@ export default function ModernDashboardView({
   const [speakingVocabIndex, setSpeakingVocabIndex] = useState(null);
   const vocabAudioRef = useRef(null);
 
-  const handleSpeakVocab = (rawWord, rawMeaning, rawExample, idx) => {
+  const handleSpeakVocab = (rawWord, rawMeaning, rawUsage, rawExample, idx) => {
     if (!rawWord) return;
     const wordClean = (rawWord || "").trim();
     const meaningClean = (rawMeaning || "").trim();
     const exampleClean = (rawExample || "").trim();
 
-    let textToSpeak = wordClean;
+    // Natural native narration: Expression -> Meaning -> Natural example sentence
+    let textToSpeak = wordClean.replace(/\.{2,}/g, "").trim();
     if (meaningClean) {
       textToSpeak += `. ${meaningClean}`;
     }
@@ -1854,7 +1883,7 @@ export default function ModernDashboardView({
                     {vocabList && vocabList.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", alignItems: "center" }}>
                         <span style={{ fontSize: "0.7rem", color: isDark ? "#64748b" : "#475569", fontWeight: 700, marginRight: "4px" }}>
-                          VOCABULARY:
+                          TARGET EXPRESSIONS:
                         </span>
                         {vocabList.map((v, i) => (
                           <span
@@ -1872,7 +1901,7 @@ export default function ModernDashboardView({
                               gap: "3px",
                             }}
                           >
-                            <span>✓</span> {v.word}
+                            <span>✓</span> {v.expression || v.word}
                           </span>
                         ))}
                       </div>
@@ -2185,7 +2214,7 @@ export default function ModernDashboardView({
                     display: "flex", alignItems: "center", justifyContent: "center"
                   }}>2</span>
                   <span style={{ fontSize: "0.74rem", fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
-                    Pick 1–2 Target Words
+                    Pick 1–2 Target Expressions
                   </span>
                 </div>
                 <span style={{ color: isDark ? "#475569" : "#cbd5e1", fontSize: "0.8rem" }}>→</span>
@@ -2620,7 +2649,7 @@ export default function ModernDashboardView({
                     <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
                       <span style={{ fontSize: "0.95rem" }}>✨</span>
                       <span style={{ fontSize: "0.95rem", fontWeight: 700, letterSpacing: "-0.01em", color: isDark ? "#ffffff" : "#0f172a" }}>
-                        Today's Vocabulary
+                        Today's English Expressions
                       </span>
                     </div>
                     <span style={{
@@ -2642,6 +2671,26 @@ export default function ModernDashboardView({
                     </span>
                   </div>
 
+                  {/* Speaking Challenge Banner */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "0.5rem",
+                    background: isDark ? "rgba(56, 189, 248, 0.1)" : "rgba(2, 132, 199, 0.08)",
+                    border: isDark ? "1px solid rgba(56, 189, 248, 0.25)" : "1px solid rgba(2, 132, 199, 0.2)",
+                    borderRadius: 10,
+                    padding: "0.5rem 0.75rem",
+                    marginBottom: "0.65rem",
+                    fontSize: "0.75rem",
+                    color: isDark ? "#bae6fd" : "#0369a1",
+                    lineHeight: 1.45,
+                  }}>
+                    <span style={{ fontSize: "0.95rem", flexShrink: 0, marginTop: "1px" }}>💡</span>
+                    <div>
+                      <strong>Speaking Challenge:</strong> Naturally weave these expressions into your speech. Create your own original sentences rather than memorizing the examples to build spontaneous fluency!
+                    </div>
+                  </div>
+
                   {/* Row 2: Target Requirement & Bonus Points */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.55rem" }}>
                     <span style={{
@@ -2653,7 +2702,7 @@ export default function ModernDashboardView({
                       gap: "4px",
                     }}>
                       <span>🎯</span>
-                      <span>Use at least <strong>{Math.min(targetRequiredCount, vocabList.length)} of {vocabList.length}</strong> words</span>
+                      <span>Use at least <strong>{Math.min(targetRequiredCount, vocabList.length)} of {vocabList.length}</strong> expressions</span>
                     </span>
                     <span style={{
                       fontSize: "0.68rem",
@@ -2664,7 +2713,7 @@ export default function ModernDashboardView({
                     </span>
                   </div>
 
-                  {/* Row 3: Keyword Buttons */}
+                  {/* Row 3: Keyword Expression Buttons */}
                   <div style={{
                     display: "flex",
                     flexWrap: "wrap",
@@ -2675,6 +2724,7 @@ export default function ModernDashboardView({
                       const isPlanned = !!plannedWords[i];
                       const isSpeaking = speakingVocabIndex === i;
                       const isSelected = selectedVocabIndex === i;
+                      const text = v.expression || v.word;
                       return (
                         <button
                           key={i}
@@ -2682,12 +2732,12 @@ export default function ModernDashboardView({
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedVocabIndex(prev => prev === i ? null : i);
-                            handleSpeakVocab(v.word, v.meaning, v.example, i);
+                            handleSpeakVocab(text, v.meaning, v.usage, v.example, i);
                           }}
-                          title={`${v.word}: ${v.meaning || "Click to view details & hear pronunciation"}`}
+                          title={`${text}: ${v.meaning || "Click to view details & hear pronunciation"}`}
                           style={{
                             flex: 1,
-                            minWidth: "105px",
+                            minWidth: "125px",
                             background: isSelected
                               ? (isDark ? "rgba(168, 85, 247, 0.22)" : "rgba(124, 58, 237, 0.12)")
                               : isPlanned
@@ -2725,7 +2775,7 @@ export default function ModernDashboardView({
                             {isPlanned ? "✓" : "✦"}
                           </span>
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {v.word}
+                            {text}
                           </span>
                           <span style={{ fontSize: "0.68rem", opacity: 0.75, flexShrink: 0 }}>
                             {isSpeaking ? "🔊" : "🔈"}
@@ -2745,7 +2795,7 @@ export default function ModernDashboardView({
                       fontSize: "0.68rem",
                       color: isDark ? "#94a3b8" : "#64748b",
                     }}>
-                      <span>💡 Tap any word to hear pronunciation · Pick 1–2 to weave into your speech</span>
+                      <span>💡 Tap any expression to hear pronunciation &amp; usage · Weave 1–2 into your speech</span>
                       <button
                         type="button"
                         onClick={() => setShowAllVocabDetails(true)}
@@ -2766,7 +2816,7 @@ export default function ModernDashboardView({
                     </div>
                   )}
 
-                  {/* Expanded Full Vocabulary Cards (Old View Details) */}
+                  {/* Expanded Full Expression Cards */}
                   {(selectedVocabIndex !== null || showAllVocabDetails) && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginTop: "0.75rem" }}>
                       {(showAllVocabDetails ? vocabList.slice(0, 5) : (selectedVocabIndex !== null && vocabList[selectedVocabIndex] ? [vocabList[selectedVocabIndex]] : [])).map((v, idx) => {
@@ -2774,6 +2824,7 @@ export default function ModernDashboardView({
                         const originalIndex = showAllVocabDetails ? idx : selectedVocabIndex;
                         const isPlanned = !!plannedWords[originalIndex];
                         const isSpeaking = speakingVocabIndex === originalIndex;
+                        const text = v.expression || v.word;
 
                         return (
                           <div
@@ -2795,7 +2846,7 @@ export default function ModernDashboardView({
                             }}
                           >
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                              {/* Header row: badge + word + buttons */}
+                              {/* Header row: badge + expression + buttons */}
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
                                   <div className="vocab-num-badge" style={{
@@ -2815,11 +2866,11 @@ export default function ModernDashboardView({
                                   </div>
                                   <span className="vocab-word-title" style={{
                                     fontWeight: 800,
-                                    fontSize: "1rem",
+                                    fontSize: "0.98rem",
                                     color: isDark ? "#c4b5fd" : "#6d28d9",
                                     letterSpacing: "-0.01em",
                                   }}>
-                                    {v.word}
+                                    {text}
                                   </span>
                                 </div>
 
@@ -2828,7 +2879,7 @@ export default function ModernDashboardView({
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleSpeakVocab(v.word, v.meaning, v.example, originalIndex);
+                                      handleSpeakVocab(text, v.meaning, v.usage, v.example, originalIndex);
                                     }}
                                     className="vocab-listen-btn"
                                     title="Listen to pronunciation & example sentence"
@@ -2895,6 +2946,18 @@ export default function ModernDashboardView({
                                 </div>
                               )}
 
+                              {/* Usage */}
+                              {v.usage && (
+                                <div className="vocab-usage-text" style={{
+                                  fontSize: "0.8rem",
+                                  lineHeight: 1.45,
+                                  color: isDark ? "#cbd5e1" : "#475569",
+                                  paddingLeft: "2px",
+                                }}>
+                                  <span style={{ color: isDark ? "#38bdf8" : "#0284c7", fontWeight: 700 }}>Usage:</span> {v.usage}
+                                </div>
+                              )}
+
                               {/* Example sentence */}
                               {v.example && (
                                 <div className="vocab-example-bubble" style={{
@@ -2952,7 +3015,7 @@ export default function ModernDashboardView({
                             padding: "2px 6px",
                           }}
                         >
-                          {showAllVocabDetails ? "Show single word view" : "View all 5 words details ▾"}
+                          {showAllVocabDetails ? "Show single expression view" : `View all ${vocabList.length} expressions details ▾`}
                         </button>
                       </div>
                     </div>

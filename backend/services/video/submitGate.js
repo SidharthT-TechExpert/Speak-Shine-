@@ -570,8 +570,8 @@ export function calculateCompositeScore({
   }
 
   // ── Picture Description: five-category weighted formula ──────────────────
-  // Communication 20 | Content & Relevance 35 |
-  // Vocabulary 10 | Duration 20 | Personal Growth 15 = 100.
+  // Communication 20 | Content & Relevance 25 |
+  // Target Expressions 20 | Duration 20 | Personal Growth 15 = 100.
   if (isPictureDescription || challengeType === "picture_description") {
     const statsObj = analysis._stats || analysis.stats || {};
     const rawSpeechRatio = statsObj?.rhythm?.speechRatio;
@@ -626,7 +626,7 @@ export function calculateCompositeScore({
     const communicationBase = objectiveRhythm * 0.8 + languageScore * 0.2;
     const communicationScore = (communicationBase / 10) * 20 * speechMult;
 
-    // Vocabulary: max 10 pts
+    // Expressions / Vocabulary: max 20 pts (scaled from 10)
     const configuredTotalWords = Number(totalVocabWords) || 0;
     const requiredTargetWords = Math.max(1, Math.min(
       Number(requiredVocabWords) || 1,
@@ -634,8 +634,8 @@ export function calculateCompositeScore({
     ));
     const usedTargetWords = Array.isArray(vocabularyUsed) ? vocabularyUsed.length : 0;
     const vocabularyScore = configuredTotalWords > 0
-      ? Math.min(10, (usedTargetWords / requiredTargetWords) * 10)
-      : (vocabulary / 10) * 10;
+      ? Math.min(20, (usedTargetWords / requiredTargetWords) * 20)
+      : (vocabulary / 10) * 20;
 
     // Check if off-topic:
     // A submission is off-topic ONLY if:
@@ -651,12 +651,11 @@ export function calculateCompositeScore({
       contentRel <= 1.5
     );
 
-    // Content & Relevance: max 35 pts
-    // If off-topic, heavily penalize contentBase instead of letting coherence inflate it
+    // Content & Relevance: max 25 pts (rebalanced from 35)
     const contentBase = isOffTopic
       ? (Math.min(contentRel, 2.5) * 0.85 + coherence * 0.15)
       : (coherence * 0.60 + contentRel * 0.40);
-    let contentScore = (contentBase / 10) * 35;
+    let contentScore = (contentBase / 10) * 25;
 
     // Personal Growth: max 15 pts
     const currentComm = (fluency + grammar + confidence + vocabulary) / 4;
@@ -711,8 +710,8 @@ export function calculateCompositeScore({
         baselineComm:    growthResult.baselineComm,
         isCalibration:   growthResult.isCalibration,
         maxCommunication: 20,
-        maxContent:       35,
-        maxVocabulary:    10,
+        maxContent:       25,
+        maxVocabulary:    20,
         maxDuration:      20,
         speechMultiplier: Math.round(speechMult * 100),
         requiredVocabWords: requiredTargetWords,
@@ -766,13 +765,15 @@ export function calculateCompositeScore({
   const rangeScore = maxDur > minDur
     ? Math.max(0, (actualDur - minDur) / (maxDur - minDur))
     : 1;
+  const maxLength = isStoryTask ? 20 : 30;
   const baseLengthScore = actualDur >= minDur
-    ? (0.5 + 0.5 * rangeScore) * 30
-    : (actualDur / minDur) * 0.5 * 30;
+    ? (0.5 + 0.5 * rangeScore) * maxLength
+    : (actualDur / minDur) * 0.5 * maxLength;
 
   let lengthScore = baseLengthScore * speechMultiplier;
 
-  // ── Part 2: Vocabulary used (max 30 pts) ──────────────────────────────────
+  // ── Part 2: Vocabulary used (max 20 pts for story, 30 pts for normal) ──────
+  const maxVocab = isStoryTask ? 20 : 30;
   const usedCount = Array.isArray(vocabularyUsed) ? vocabularyUsed.length : 0;
   const total = totalVocabWords > 0 ? totalVocabWords : 0;
   const required = requiredVocabWords > 0
@@ -780,16 +781,16 @@ export function calculateCompositeScore({
     : total;
   let vocabUsedScore;
   if (total === 0) {
-    vocabUsedScore = 30;
+    vocabUsedScore = maxVocab;
   } else if (usedCount === 0) {
     vocabUsedScore = 0;
   } else if (usedCount >= required) {
-    vocabUsedScore = 30;
+    vocabUsedScore = maxVocab;
   } else {
     const rangeScore = required > 1
       ? (usedCount - 1) / (required - 1)
       : 1;
-    vocabUsedScore = (0.5 + 0.5 * rangeScore) * 30;
+    vocabUsedScore = (0.5 + 0.5 * rangeScore) * maxVocab;
   }
 
   // ── Part 3 & 4: Communication & Topic ─────────────────────────────────────
@@ -810,14 +811,18 @@ export function calculateCompositeScore({
 
   let topicScore = 0;
   let commScore = 0;
-  const maxTopic = isSpecialDay ? 0 : 15;
-  const maxComm  = isSpecialDay ? 25 : 10;
+  const maxTopic = isStoryTask ? 25 : (isSpecialDay ? 0 : 15);
+  const maxComm  = isStoryTask ? 20 : (isSpecialDay ? 25 : 10);
 
-  if (isSpecialDay) {
+  if (isStoryTask) {
+    // Story task Option 1: topic 25 pts, comm 20 pts
+    topicScore = (Math.max(0, Math.min(10, effectiveTopicRelevance)) / 10) * 25;
+    commScore  = (commAvg / 10) * 20;
+  } else if (isSpecialDay) {
     // Special day (no topic): comm gets 25 pts
     commScore = (commAvg / 10) * 25;
   } else {
-    // Normal / Story task: topic 15 pts, comm 10 pts
+    // Normal task: topic 15 pts, comm 10 pts
     topicScore = (Math.max(0, Math.min(10, effectiveTopicRelevance)) / 10) * 15;
     commScore  = (commAvg / 10) * 10;
   }
@@ -886,8 +891,8 @@ export function calculateCompositeScore({
       isSpecialDay,
       isStorySummary:  isStoryTask,
       isPictureDescription: false,
-      maxLength:       30,
-      maxVocab:        30,
+      maxLength,
+      maxVocab,
       maxTopic,
       maxComm,
     },
@@ -980,12 +985,36 @@ function levenshteinDist(a, b) {
 }
 
 /**
- * Match vocabulary words against a transcript with morphological, multi-word,
- * hyphenation, and stem-aware tolerance.
- * Returns array of matched word strings.
+ * Normalizes contractions in English text to standard full form for flexible phrase matching.
+ */
+function normalizeContractions(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/\bi'm\b/g, "i am")
+    .replace(/\bit's\b/g, "it is")
+    .replace(/\bthat's\b/g, "that is")
+    .replace(/\bwhat's\b/g, "what is")
+    .replace(/\bthere's\b/g, "there is")
+    .replace(/\bi've\b/g, "i have")
+    .replace(/\bwe've\b/g, "we have")
+    .replace(/\byou've\b/g, "you have")
+    .replace(/\bthey've\b/g, "they have")
+    .replace(/\bdon't\b/g, "do not")
+    .replace(/\bdoesn't\b/g, "does not")
+    .replace(/\bdidn't\b/g, "did not")
+    .replace(/\bcan't\b/g, "cannot")
+    .replace(/\bwon't\b/g, "will not")
+    .replace(/\bi'd\b/g, "i would")
+    .replace(/\bi'll\b/g, "i will");
+}
+
+/**
+ * Match vocabulary words or English expressions against a transcript with
+ * morphological, multi-word, contraction, and phrase-aware tolerance.
+ * Returns array of matched expression/word strings.
  *
  * @param {string}   transcript  - full spoken text
- * @param {Array<{word: string}|string>} vocabWords - today's vocabulary list
+ * @param {Array<{word?: string, expression?: string}|string>} vocabWords - today's expressions/vocabulary list
  * @param {Object}   [extraAnalysis] - optional analysis object with vocabularyHighlights
  * @returns {string[]}
  */
@@ -995,6 +1024,7 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
   const rawLower = transcript.toLowerCase();
   const cleanTranscript = rawLower.replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ");
   const cleanSpaced = cleanTranscript.replace(/-/g, " ");
+  const normTranscript = normalizeContractions(cleanSpaced);
   const transcriptWords = cleanSpaced.split(/\s+/).filter((w) => w.length > 0);
 
   // Collect AI-detected strong vocabulary words if available
@@ -1005,14 +1035,20 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
   const matched = [];
 
   for (const item of vocabWords) {
-    const rawWord = typeof item === "string" ? item : (item?.word || item?.term || item?.name || "");
-    const cleanWord = (rawWord || "").trim().toLowerCase();
+    const rawTarget = typeof item === "string" ? item : (item?.expression || item?.word || item?.term || item?.name || "");
+    const cleanWord = (rawTarget || "")
+      .replace(/\.{2,}/g, "")
+      .replace(/…/g, "")
+      .replace(/[.,!?;:"'(){}\[\]]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
     if (!cleanWord) continue;
 
-    const displayWord = typeof item === "string" ? item.trim() : (item?.word || cleanWord).trim();
+    const displayWord = typeof item === "string" ? item.trim() : (item?.expression || item?.word || cleanWord).trim();
     let isFound = false;
 
-    // Check if AI strong highlights explicitly caught this word
+    // Check if AI strong highlights explicitly caught this word/expression
     if (strongHighlights.length > 0) {
       if (strongHighlights.some((h) => h === cleanWord || h.includes(cleanWord) || cleanWord.includes(h))) {
         isFound = true;
@@ -1020,27 +1056,58 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
     }
 
     if (!isFound) {
-      // Multi-word phrase (e.g. "time management", "self-discipline", "problem solving")
-      if (cleanWord.includes(" ") || cleanWord.includes("-")) {
-        const phraseSpaced = cleanWord.replace(/[-_]/g, " ").replace(/\s+/g, " ");
-        const phraseHyphen = cleanWord.replace(/[\s_]/g, "-");
+      // Expression / Multi-word phrase (e.g. "what i find interesting is", "time management", "self-discipline")
+      if (cleanWord.includes(" ") || cleanWord.includes("-") || cleanWord.includes("/")) {
+        // Split on "/" if phrase offers choices like "in the foreground / background"
+        const phraseVariants = cleanWord.includes("/")
+          ? cleanWord.split("/").map(p => p.trim()).filter(Boolean)
+          : [cleanWord];
 
-        if (
-          cleanTranscript.includes(phraseSpaced) ||
-          cleanTranscript.includes(phraseHyphen) ||
-          cleanSpaced.includes(phraseSpaced) ||
-          rawLower.includes(cleanWord)
-        ) {
-          isFound = true;
-        } else {
-          // Check stem phrase: e.g. "problem solving" vs "problem solved" / "problem solver"
-          const parts = phraseSpaced.split(" ");
-          if (parts.length === 2) {
-            const stem0 = getWordStem(parts[0]);
-            const stem1 = getWordStem(parts[1]);
-            const phraseRegex = new RegExp(`\\b${stem0}[a-z]*\\s+${stem1}[a-z]*\\b`, "i");
-            if (phraseRegex.test(cleanSpaced)) {
+        for (const variant of phraseVariants) {
+          if (isFound) break;
+          const phraseSpaced = variant.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+          const phraseHyphen = variant.replace(/[\s_]/g, "-").trim();
+          const normPhrase = normalizeContractions(phraseSpaced);
+
+          if (
+            cleanTranscript.includes(phraseSpaced) ||
+            cleanTranscript.includes(phraseHyphen) ||
+            cleanSpaced.includes(phraseSpaced) ||
+            normTranscript.includes(normPhrase) ||
+            rawLower.includes(phraseSpaced)
+          ) {
+            isFound = true;
+            break;
+          }
+
+          // Regex matching with flexible whitespace and optional conversational fillers
+          // (e.g. "what I [really|personally] find interesting is")
+          const phraseWords = phraseSpaced.split(/\s+/).filter(Boolean);
+          if (phraseWords.length >= 2) {
+            const fillerGroup = "(?:\\s+(?:really|personally|honestly|actually|just|also|quite|very))?";
+            const regexParts = phraseWords.map((pw, pIdx) => {
+              const stem = getWordStem(pw);
+              const stemPattern = stem && stem.length >= 3 ? `${stem}[a-z]*` : pw;
+              return pIdx === 0 ? `\\b${stemPattern}` : `${fillerGroup}\\s+${stemPattern}`;
+            });
+            const fullRegex = new RegExp(`${regexParts.join("")}\\b`, "i");
+            if (fullRegex.test(cleanSpaced) || fullRegex.test(normTranscript)) {
               isFound = true;
+              break;
+            }
+
+            // For longer expressions (3+ words), check if the core sub-phrase (>= 3 words) was spoken
+            if (phraseWords.length >= 3) {
+              const headSub = phraseWords.slice(0, Math.max(3, phraseWords.length - 1)).join(" ");
+              if (cleanSpaced.includes(headSub) || normTranscript.includes(normalizeContractions(headSub))) {
+                isFound = true;
+                break;
+              }
+              const tailSub = phraseWords.slice(1).join(" ");
+              if (cleanSpaced.includes(tailSub) || normTranscript.includes(normalizeContractions(tailSub))) {
+                isFound = true;
+                break;
+              }
             }
           }
         }

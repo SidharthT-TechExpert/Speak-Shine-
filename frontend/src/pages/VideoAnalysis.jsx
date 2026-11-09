@@ -480,15 +480,29 @@ export default function VideoAnalysis() {
   const [vocabDropdownOpen, setVocabDropdownOpen] = useState(false);
   const vocabAudioRef = useRef(null);
 
-  const handleSpeakVocab = (rawWord, rawMeaning, rawExample, idx) => {
+  const handleSpeakVocab = (rawWord, rawMeaning, rawUsageOrExample, idxOrExample, maybeIdx) => {
     if (!rawWord) return;
     const wordClean = (rawWord || "").trim();
     const meaningClean = (rawMeaning || "").trim();
-    const exampleClean = (rawExample || "").trim();
+    let usageClean = "";
+    let exampleClean = "";
+    let idx = null;
+
+    if (typeof maybeIdx === "number") {
+      usageClean = (rawUsageOrExample || "").trim();
+      exampleClean = (idxOrExample || "").trim();
+      idx = maybeIdx;
+    } else {
+      exampleClean = (rawUsageOrExample || "").trim();
+      idx = idxOrExample;
+    }
 
     let textToSpeak = wordClean;
     if (meaningClean) {
       textToSpeak += `. ${meaningClean}`;
+    }
+    if (usageClean) {
+      textToSpeak += `. Use it: ${usageClean}`;
     }
     if (exampleClean) {
       textToSpeak += `. For example: ${exampleClean}`;
@@ -1022,17 +1036,19 @@ export default function VideoAnalysis() {
             ? todayVocabulary.slice(0, vocabWordCount || todayVocabulary.length).map((v, i) => {
                 let word = "";
                 let meaning = "";
+                let usage = "";
                 let example = "";
                 if (typeof v === "string") {
                   const parts = v.split(/\s*[-—:]\s*/);
-                  word = parts[0]?.trim() || `Word ${i + 1}`;
+                  word = parts[0]?.trim() || `Expression ${i + 1}`;
                   meaning = parts[1]?.trim() || "";
                   if (parts.length >= 3) {
                     example = parts.slice(2).join(" — ").trim();
                   }
                 } else if (v && typeof v === "object") {
-                  word = v.word || v.Word || v.term || `Word ${i + 1}`;
+                  word = v.expression || v.word || v.Word || v.term || `Expression ${i + 1}`;
                   meaning = v.meaning || v.Meaning || v.definition || v.desc || "";
+                  usage = v.usage || v.Usage || "";
                   example = v.example || v.Example || v.sentence || v.sampleSentence || "";
                 }
 
@@ -1048,12 +1064,14 @@ export default function VideoAnalysis() {
                     perseverance: "Through perseverance and daily speaking drills, he mastered clear pronunciation.",
                     cohesion: "Using linking words gave great cohesion to her story summary.",
                   };
-                  example = defaults[wLower] || (word ? `The speaker used the word "${word}" naturally in the story summary.` : "");
+                  example = defaults[wLower] || (word ? `The speaker used "${word}" naturally in the speaking practice.` : "");
                 }
 
                 return {
                   word,
+                  expression: word,
                   meaning,
+                  usage,
                   example,
                   bonus: i === 1 ? "+15 pts" : "+10 pts",
                 };
@@ -1962,7 +1980,7 @@ export default function VideoAnalysis() {
                             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                               <span style={{ fontSize: "0.9rem" }}>✨</span>
                               <span style={{ fontSize: "0.74rem", fontWeight: 800, letterSpacing: "0.06em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase" }}>
-                                TODAY'S VOCABULARY
+                                TODAY'S TARGET EXPRESSIONS
                               </span>
                             </div>
                             <span style={{
@@ -1995,7 +2013,7 @@ export default function VideoAnalysis() {
                               gap: "4px",
                             }}>
                               <span>🎯</span>
-                              <span>Use at least <strong>{Math.min(vocabRequiredCount || 1, normalizedVocab.length)} of {normalizedVocab.length}</strong> words</span>
+                              <span>Use at least <strong>{Math.min(vocabRequiredCount || 1, normalizedVocab.length)} of {normalizedVocab.length}</strong> expressions</span>
                             </span>
                             <span style={{
                               fontSize: "0.66rem",
@@ -2006,7 +2024,7 @@ export default function VideoAnalysis() {
                               padding: "1px 7px",
                               borderRadius: 6,
                             }}>
-                              +10 pts each
+                              {isPictureDescription || isStorySummary ? "+20 pts max" : "+10 pts each"}
                             </span>
                           </div>
                         </>
@@ -2031,9 +2049,9 @@ export default function VideoAnalysis() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedVocabIndex(prev => prev === i ? null : i);
-                              handleSpeakVocab(v.word, v.meaning, v.example, i);
+                              handleSpeakVocab(v.expression || v.word, v.meaning, v.usage, v.example, i);
                             }}
-                            title={`${v.word}: ${v.meaning || "Click to view details & hear pronunciation"}`}
+                            title={`${v.expression || v.word}: ${v.meaning || "Click to view details & hear pronunciation"}`}
                             style={{
                               flex: 1,
                               minWidth: "105px",
@@ -2074,7 +2092,7 @@ export default function VideoAnalysis() {
                               {isPlanned ? "✓" : "✦"}
                             </span>
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {v.word}
+                              {v.expression || v.word}
                             </span>
                             <span style={{ fontSize: "0.68rem", opacity: 0.75, flexShrink: 0 }}>
                               {isSpeaking ? "🔊" : "🔈"}
@@ -2094,7 +2112,7 @@ export default function VideoAnalysis() {
                         fontSize: "0.68rem",
                         color: isDark ? "#94a3b8" : "#64748b",
                       }}>
-                        <span>💡 Click any word to hear pronunciation &amp; see details</span>
+                        <span>💡 Click any expression to hear pronunciation &amp; see details</span>
                         <button
                           type="button"
                           onClick={() => setShowAllVocabDetails(true)}
@@ -2168,7 +2186,7 @@ export default function VideoAnalysis() {
                                       color: isDark ? "#c4b5fd" : "#6d28d9",
                                       letterSpacing: "-0.01em",
                                     }}>
-                                      {v.word}
+                                      {v.expression || v.word}
                                     </span>
                                   </div>
 
@@ -2177,7 +2195,7 @@ export default function VideoAnalysis() {
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleSpeakVocab(v.word, v.meaning, v.example, originalIndex);
+                                        handleSpeakVocab(v.expression || v.word, v.meaning, v.usage, v.example, originalIndex);
                                       }}
                                       className="vocab-listen-btn"
                                       title="Listen to pronunciation & example sentence"
@@ -2244,6 +2262,18 @@ export default function VideoAnalysis() {
                                   </div>
                                 )}
 
+                                {/* Usage */}
+                                {v.usage && (
+                                  <div className="vocab-usage-text" style={{
+                                    fontSize: "0.80rem",
+                                    lineHeight: 1.45,
+                                    color: isDark ? "#cbd5e1" : "#334155",
+                                    paddingLeft: "2px",
+                                  }}>
+                                    <span style={{ color: isDark ? "#60a5fa" : "#2563eb", fontWeight: 700 }}>When to use:</span> {v.usage}
+                                  </div>
+                                )}
+
                                 {/* Example sentence */}
                                 {v.example && (
                                   <div className="vocab-example-bubble" style={{
@@ -2301,7 +2331,7 @@ export default function VideoAnalysis() {
                               padding: "2px 6px",
                             }}
                           >
-                            {showAllVocabDetails ? "Show single word view" : "View all 5 words details ▾"}
+                            {showAllVocabDetails ? "Show single expression view" : `View all ${normalizedVocab.length} expressions details ▾`}
                           </button>
                         </div>
                       </div>
@@ -2638,7 +2668,7 @@ export default function VideoAnalysis() {
                   Recording &amp; Uploading Are Locked
                 </h2>
                 <p style={{ fontSize: "0.92rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.6, margin: 0 }}>
-                  The midnight reset has cleared the previous challenge. Our AI curriculum engine is preparing today's mission, audio story, and vocabulary. Studio recording and video uploading will automatically unlock once the new mission is released.
+                  The midnight reset has cleared the previous challenge. Our AI curriculum engine is preparing today's mission, audio story, and expressions. Studio recording and video uploading will automatically unlock once the new mission is released.
                 </p>
               </div>
 
@@ -2700,7 +2730,7 @@ export default function VideoAnalysis() {
                   Fresh Mission Coming
                 </div>
                 <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
-                  A brand-new question, audio prompt, and curated vocabulary list will drop at {formatDropTime(posterSendTime)} IST.
+                  A brand-new question, audio prompt, and curated expressions list will drop at {formatDropTime(posterSendTime)} IST.
                 </div>
               </div>
 
@@ -2716,7 +2746,7 @@ export default function VideoAnalysis() {
                   Review Past Feedback
                 </div>
                 <div style={{ fontSize: "0.78rem", color: isDark ? "#94a3b8" : "#475569", lineHeight: 1.5 }}>
-                  Take this rest window to review your previous speech evaluations, filler word analyses, and vocabulary mastery below.
+                  Take this rest window to review your previous speech evaluations, filler word analyses, and expression mastery below.
                 </div>
               </div>
             </div>
@@ -3629,20 +3659,20 @@ function SubmitGatePanel({ gate }) {
   );
 }
 
-// ── Vocabulary Words Component ───────────────────────────────────────────────
+// ── Expressions Component ──────────────────────────────────────────────────
 // compact=true → chips only (used during active recording)
-// compact=false (default) → full card with word + meaning + example
-function VocabularyWords({ words, compact = false, requiredCount, totalCount, isPictureDescription = false }) {
+// compact=false (default) → full card with expression + meaning + usage + example
+function VocabularyWords({ words, compact = false, requiredCount, totalCount, isPictureDescription = false, isStorySummary = false }) {
   if (!words || words.length === 0) return null;
   const required = requiredCount ?? 3;
   const total = totalCount ?? words.length;
-  const maxPts = isPictureDescription ? 10 : 30;
+  const maxPts = isPictureDescription || isStorySummary ? 20 : 30;
   const hint = total > required
-    ? `Use at least ${required} of today's ${total} vocabulary words in your video!`
-    : "Try to use these words in your video today!";
+    ? `Use at least ${required} of today's ${total} expressions in your video!`
+    : "Try to use these expressions in your video today!";
   const fullHint = total > required
-    ? `Use at least ${required} of today's ${total} vocabulary words naturally in your speaking video!`
-    : "Try to use these words naturally in your speaking video today!";
+    ? `Use at least ${required} of today's ${total} expressions naturally in your speaking video!`
+    : "Try to use these expressions naturally in your speaking video today!";
 
   const [speakingIndex, setSpeakingIndex] = useState(null);
   const [ttsWarning, setTtsWarning] = useState(null);
@@ -3681,34 +3711,50 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
   };
 
   const parseVocabItem = (item) => {
-    if (!item) return { word: "", meaning: "", example: "" };
+    if (!item) return { word: "", meaning: "", usage: "", example: "" };
     if (typeof item === "string") {
       const parts = item.split(/\s*[-—:]\s*/);
       if (parts.length >= 2) {
         return {
           word: parts[0].trim(),
           meaning: parts.slice(1).join(" — ").trim(),
+          usage: "",
           example: "",
         };
       }
-      return { word: item.trim(), meaning: "", example: "" };
+      return { word: item.trim(), meaning: "", usage: "", example: "" };
     }
-    const word = item.word || item.Word || item.term || item.name || "";
+    const word = item.expression || item.word || item.Word || item.term || item.name || "";
     const meaning = item.meaning || item.Meaning || item.definition || item.desc || "";
+    const usage = item.usage || item.Usage || "";
     const example = item.example || item.Example || item.sentence || "";
-    return { word, meaning, example };
+    return { word, meaning, usage, example };
   };
 
-  const handleSpeak = (rawWord, rawMeaning, rawExample, idx) => {
+  const handleSpeak = (rawWord, rawMeaning, rawUsageOrExample, idxOrExample, maybeIdx) => {
     if (!rawWord) return;
     const wordClean = (rawWord || "").trim();
     const meaningClean = (rawMeaning || "").trim();
-    const exampleClean = (rawExample || "").trim();
+    let usageClean = "";
+    let exampleClean = "";
+    let idx = null;
+
+    if (typeof maybeIdx === "number") {
+      usageClean = (rawUsageOrExample || "").trim();
+      exampleClean = (idxOrExample || "").trim();
+      idx = maybeIdx;
+    } else {
+      exampleClean = (rawUsageOrExample || "").trim();
+      idx = idxOrExample;
+    }
 
     // Construct full spoken narrative
     let textToSpeak = wordClean;
     if (meaningClean) {
       textToSpeak += `. ${meaningClean}`;
+    }
+    if (usageClean) {
+      textToSpeak += `. Use it: ${usageClean}`;
     }
     if (exampleClean) {
       textToSpeak += `. For example: ${exampleClean}`;
@@ -3803,7 +3849,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
           fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase",
           letterSpacing: "0.1em", color: "rgba(124,111,255,0.9)", marginBottom: "0.65rem",
         }}>
-          📚 TODAY'S VOCABULARY CHALLENGE
+          🎯 TODAY'S EXPRESSIONS CHALLENGE
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
           {words.map((rawItem, i) => {
@@ -3831,17 +3877,17 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
     );
   }
 
-  // Full card — word + meaning + example
+  // Full card — expression + meaning + usage + example
   return (
     <div className="vocab-container-pro" style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontSize: "1.1rem" }}>📚</span>
+          <span style={{ fontSize: "1.1rem" }}>🎯</span>
           <span style={{
             fontSize: "0.74rem", fontWeight: 800, textTransform: "uppercase",
             letterSpacing: "0.1em", color: "#c4b5fd",
           }}>
-            Today's Vocabulary Challenge
+            Today's Expressions Challenge
           </span>
         </div>
         <div style={{
@@ -3851,7 +3897,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
           color: "#c4b5fd",
           padding: "2px 8px", borderRadius: 99,
         }}>
-          🎯 Goal: {required} / {total} words (+{maxPts} pts)
+          🎯 Goal: {required} / {total} expressions (+{maxPts} pts)
         </div>
       </div>
 
@@ -3899,6 +3945,12 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
                     )}
                   </div>
 
+                  {w.usage && (
+                    <div style={{ fontSize: "0.80rem", color: "rgba(226, 232, 240, 0.85)", margin: "0.2rem 0", paddingLeft: "2px" }}>
+                      <span style={{ color: "#60a5fa", fontWeight: 700 }}>When to use:</span> {w.usage}
+                    </div>
+                  )}
+
                   {w.example && (
                     <div className="vocab-example-bubble">
                       💬 <span style={{ fontStyle: "italic" }}>"{w.example}"</span>
@@ -3909,7 +3961,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
                 <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexShrink: 0, marginTop: "2px" }}>
                   <button
                     type="button"
-                    onClick={() => handleSpeak(w.word, w.meaning, w.example, i)}
+                    onClick={() => handleSpeak(w.word, w.meaning, w.usage, w.example, i)}
                     className="vocab-listen-btn"
                     title="Listen to full pronunciation and example sentence"
                     style={isSpeaking ? { background: "var(--primary)", color: "#fff", transform: "scale(1.15)" } : {}}
@@ -3928,7 +3980,7 @@ function VocabularyWords({ words, compact = false, requiredCount, totalCount, is
                       cursor: "pointer",
                       transition: "all 0.15s ease",
                     }}
-                    title="Mark if you plan to use this word in your recording"
+                    title="Mark if you plan to use this expression in your recording"
                   >
                     {plannedWords[i] ? "✓ Planned" : "+ Plan to use"}
                   </button>
@@ -5677,7 +5729,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                   border: isDark ? "1px solid rgba(52,211,153,0.3)" : "1px solid #86efac",
                   padding: "2px 8px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700
                 }}>
-                  ✨ Vocab Waived
+                  ✨ Expressions Waived
                 </span>
               </div>
               <p style={{ margin: "0 0 0.65rem 0", color: isDark ? "#f1f5f9" : "#1e293b" }}>
@@ -6762,16 +6814,16 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
             {isShadowing && (
               <div style={{ borderTop: "1px solid var(--border2)", paddingTop: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
                 <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
-                  ✨ Vocabulary requirement waived for Shadowing Activity
+                  ✨ Expression requirement waived for Shadowing Activity
                 </span>
               </div>
             )}
 
-            {/* Vocabulary chips — visible during recording */}
+            {/* Expression chips — visible during recording */}
             {!isShadowing && vocabulary.length > 0 && (
               <div style={{ borderTop: "1px solid var(--border2)", paddingTop: "0.75rem" }}>
                 <div style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(124,111,255,0.8)", marginBottom: "0.5rem" }}>
-                  📚 Use at least {Math.min(vocabRequiredCount, vocabulary.length)} of {vocabWordCount || vocabulary.length} words
+                  🎯 Use at least {Math.min(vocabRequiredCount, vocabulary.length)} of {vocabWordCount || vocabulary.length} expressions
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
                   {vocabulary.map((w, i) => (
@@ -6784,7 +6836,7 @@ function RecordCard({ onAnalysisStarted, question, isMonthlyReflection, isWeekly
                       fontWeight: 700,
                       color: "#c4b5fd",
                     }}>
-                      {w.word}
+                      {w.expression || w.word || (typeof w === "string" ? w : "")}
                     </span>
                   ))}
                 </div>
@@ -7179,8 +7231,8 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
     } else if (isPictureBd) {
       // Picture Description tips
       const comGap  = (bd.maxCommunication || 20) - (bd.communication || 0);
-      const conGap  = (bd.maxContent       || 35) - (bd.content       || 0);
-      const vocGap  = (bd.maxVocabulary    || 10) - (bd.vocabulary    || 0);
+      const conGap  = (bd.maxContent       || 25) - (bd.content       || 0);
+      const vocGap  = (bd.maxVocabulary    || 20) - (bd.vocabulary    || 0);
       const durGap  = (bd.maxDuration      || 20) - (bd.duration      || 0);
       if (bd.speechMultiplier != null && bd.speechMultiplier < 85) {
         improvementTips.push({ icon: "🎙️", label: "Improve communication", detail: `Speech ratio was ${bd.speechRatio ?? "?"}% — keep a steady speaking flow`, gap: comGap });
@@ -7190,15 +7242,15 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       if (vocGap > 1.5) {
         const requiredVocabWords = bd.requiredVocabWords || 1;
         const totalVocabWords = bd.totalVocabWords || 3;
-        improvementTips.push({ icon: "📚", label: "Use more vocab words",  detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`, gap: vocGap });
+        improvementTips.push({ icon: "🎯", label: "Use more target expressions",  detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} expressions`, gap: vocGap });
       }
       if (durGap > 0.5) improvementTips.push({ icon: "⏱️", label: "Make a complete attempt", detail: `+${durGap.toFixed(1)} pts possible — speak for a reasonable amount of time`, gap: durGap });
     } else {
       // Normal / Story summary tips
-      const lenGap  = (bd.maxLength  || 30) - (bd.length   || 0);
-      const vocGap  = (bd.maxVocab   || 30) - (bd.vocabUsed || 0);
-      const topGap  = (bd.maxTopic   || 15) - (bd.topic     || 0);
-      const comGap  = (bd.maxComm    || 10) - (bd.comm      || 0);
+      const lenGap  = (bd.maxLength  || (isStoryBd ? 20 : 30)) - (bd.length   || 0);
+      const vocGap  = (bd.maxVocab   || (isStoryBd ? 20 : 30)) - (bd.vocabUsed || 0);
+      const topGap  = (bd.maxTopic   || (isStoryBd ? 25 : 15)) - (bd.topic     || 0);
+      const comGap  = (bd.maxComm    || (isStoryBd ? 20 : 10)) - (bd.comm      || 0);
       if (bd.speechMultiplier != null && bd.speechMultiplier < 85) {
         improvementTips.push({ icon: "🎙️", label: "Speak more actively", detail: `Your speech ratio was ${bd.speechRatio ?? "?"}% — keep talking throughout the video for full duration points`, gap: lenGap });
       } else if (lenGap > 2) {
@@ -7207,7 +7259,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       if (vocGap > 1.5) {
         const requiredVocabWords = bd.requiredVocabWords || (isStoryBd ? 1 : 3);
         const totalVocabWords = bd.totalVocabWords || (isStoryBd ? 3 : 5);
-        improvementTips.push({ icon: "📚", label: "Use more vocab words", detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} vocabulary words`, gap: vocGap });
+        improvementTips.push({ icon: "🎯", label: "Use more target expressions", detail: `+${vocGap.toFixed(1)} pts possible — use at least ${requiredVocabWords} of today's ${totalVocabWords} expressions`, gap: vocGap });
       }
       if (!bd.isSpecialDay && topGap > 1 && !bd.isOffTopic) {
         improvementTips.push({
@@ -7417,7 +7469,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                     gap: "0.35rem",
                     transition: "all 0.15s ease",
                   }}
-                  title={isShadowBd ? "Recalculate shadowing speech ratio, rhythm & fluency score" : "Re-run vocabulary detection and recalculate score"}
+                  title={isShadowBd ? "Recalculate shadowing speech ratio, rhythm & fluency score" : "Re-run expression detection and recalculate score"}
                 >
                   {reEvaluating ? (
                     <>
@@ -7519,8 +7571,8 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                 }] : []),
               ] : isPictureBd ? [
                 { label: `🗣️ Communication`, earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
-                { label: `🧠 Content & Relevance`,      earned: bd.content       || 0, max: bd.maxContent       || 35, color: "#a78bfa" },
-                { label: `📚 Vocabulary`,               earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 10, color: "#34d399" },
+                { label: `🧠 Content & Relevance`,      earned: bd.content       || 0, max: bd.maxContent       || 25, color: "#a78bfa" },
+                { label: `🎯 Target Expressions`,       earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 20, color: "#34d399" },
                 { label: `⏱️ Duration`,                 earned: bd.duration      || 0, max: bd.maxDuration      || 20, color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",
@@ -7536,10 +7588,10 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                     : `${bd.growthDelta.toFixed(1)} vs baseline`,
                 }] : []),
               ] : [
-                { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || 30, color: "#60a5fa" },
-                { label: "📚 Vocab used",    earned: bd.vocabUsed || 0, max: bd.maxVocab   || 30, color: "#a78bfa" },
-                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "🎯 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || 15, color: "#34d399" }] : []),
-                { label: "🗣️ Communication", earned: bd.comm     || 0, max: bd.maxComm    || (bd.isSpecialDay ? 25 : 10), color: "#fbbf24" },
+                { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || (isStoryBd ? 20 : 30), color: "#60a5fa" },
+                { label: "🎯 Expressions used", earned: bd.vocabUsed || 0, max: bd.maxVocab   || (isStoryBd ? 20 : 30), color: "#a78bfa" },
+                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "📖 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || (isStoryBd ? 25 : 15), color: "#34d399" }] : []),
+                { label: "🗣️ Communication", earned: bd.comm     || 0, max: bd.maxComm    || (bd.isSpecialDay ? 25 : (isStoryBd ? 20 : 10)), color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",
                   earned: bd.growth || 0,
@@ -7591,7 +7643,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                   ) : bd.isOffTopic ? (
                     <>🚨 <strong>Off-Topic Shadowing:</strong> {bd.offTopicReason || "Your speech did not match today's assigned shadowing audio."}</>
                   ) : (
-                    <>✨ <strong>Shadowing Activity:</strong> Scored on active speech ratio (40 pts) and delivery &amp; rhythm (60 pts). Vocabulary and personal growth requirements are waived.</>
+                    <>✨ <strong>Shadowing Activity:</strong> Scored on active speech ratio (40 pts) and delivery &amp; rhythm (60 pts). Expression and personal growth requirements are waived.</>
                   )}
                 </div>
               )}
@@ -7609,7 +7661,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                   flexWrap: "wrap",
                   fontSize: "0.74rem",
                 }}>
-                  <span style={{ color: "#c4b5fd", fontWeight: 700 }}>🎯 Target Words Recognized:</span>
+                  <span style={{ color: "#c4b5fd", fontWeight: 700 }}>🎯 Target Expressions Recognized:</span>
                   {a.vocabularyUsed.map((w, i) => (
                     <span key={i} style={{
                       background: "rgba(74, 222, 128, 0.15)",
@@ -7729,7 +7781,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
 
       <Section title="🗣️ Speech Scores">
         {[{ icon: "🗣️", label: "Fluency", v: a.fluency }, { icon: "📚", label: "Grammar", v: a.grammar },
-          { icon: "🔥", label: "Confidence", v: a.confidence }, { icon: "🧠", label: "Vocabulary", v: a.vocabulary }]
+          { icon: "🔥", label: "Confidence", v: a.confidence }, { icon: "🧠", label: "Expressions", v: a.vocabulary }]
           .map(({ icon, label, v }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.6rem" }}>
               <span style={{ width: "110px", color: "var(--muted)" }}>{icon} {label}</span>
@@ -7814,9 +7866,9 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
       )}
 
       {(a.vocabularyHighlights?.strong?.length > 0 || a.vocabularyHighlights?.weak?.length > 0) && (
-        <Section title="📖 Vocabulary">
-          {a.vocabularyHighlights.strong?.length > 0 && <p style={{ marginBottom: "0.4rem" }}>💎 Good words used: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>}
-          {a.vocabularyHighlights.weak?.length > 0   && <p>📖 Words to upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>}
+        <Section title="💬 Expressions &amp; Phrasing">
+          {a.vocabularyHighlights.strong?.length > 0 && <p style={{ marginBottom: "0.4rem" }}>💎 Good expressions used: <strong>{a.vocabularyHighlights.strong.join(", ")}</strong></p>}
+          {a.vocabularyHighlights.weak?.length > 0   && <p>📖 Expressions to upgrade: <strong>{a.vocabularyHighlights.weak.join(", ")}</strong></p>}
         </Section>
       )}
 

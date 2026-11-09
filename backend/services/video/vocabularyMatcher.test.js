@@ -54,4 +54,40 @@ describe("matchVocabularyInTranscript", () => {
     const matches = matchVocabularyInTranscript(transcript, sampleVocab);
     expect(matches).toContain("collaborate");
   });
+
+  it("should match English conversational expressions with trailing ellipsis and punctuation", () => {
+    const expressions = [
+      { expression: "What I find interesting is...", meaning: "Introduce something interesting" },
+      { expression: "To be completely honest...", meaning: "Share candid opinion" },
+      { expression: "On top of that...", meaning: "Add extra point" },
+      { expression: "At the end of the day...", meaning: "Concluding thought" },
+    ];
+    const transcript = "What I find interesting is that technology connects us all. To be completely honest, I used to struggle with speaking, but on top of that, daily practice made a difference. At the end of the day, consistency wins.";
+    const matches = matchVocabularyInTranscript(transcript, expressions);
+    expect(matches).toContain("What I find interesting is...");
+    expect(matches).toContain("To be completely honest...");
+    expect(matches).toContain("On top of that...");
+    expect(matches).toContain("At the end of the day...");
+    expect(matches.length).toBe(4);
+  });
+
+  it("should match expressions with contractions and conversational fillers", () => {
+    const expressions = [
+      { expression: "What I find interesting is...", meaning: "Introduce something interesting" },
+      { expression: "It turned out that...", meaning: "Reveal result" },
+    ];
+    const transcript = "What I really find interesting is how much we learn each day, and it's turned out that small habits matter most.";
+    const matches = matchVocabularyInTranscript(transcript, expressions);
+    expect(matches).toContain("What I find interesting is...");
+    expect(matches).toContain("It turned out that...");
+  });
+
+  it("should match slashed options such as in the foreground / background", () => {
+    const expressions = [
+      { expression: "In the foreground / background...", meaning: "Spatial position" },
+    ];
+    const transcript = "In the foreground, we can clearly see two colleagues presenting their project.";
+    const matches = matchVocabularyInTranscript(transcript, expressions);
+    expect(matches).toContain("In the foreground / background...");
+  });
 });

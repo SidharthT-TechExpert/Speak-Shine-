@@ -673,8 +673,8 @@ TASK: Analyze this spoken English and return ONLY a valid JSON object with this 
   "rhythmNote": "<1 sentence about speaking rhythm and pace consistency, or null if rhythm data unavailable>",
   "cefrLevel": "<estimated CEFR level: A1/A2/B1/B2/C1/C2>",
   "vocabularyHighlights": {
-    "strong": ["<good word/phrase they used>"],
-    "weak": ["<basic word they could upgrade>"]
+    "strong": ["<good conversational expression, phrase, or word they used>"],
+    "weak": ["<basic phrasing or expression they could upgrade>"]
   },
   "overallComment": "<2-3 sentence personalized summary of their performance>"
 }
@@ -685,10 +685,10 @@ SCORING GUIDE:
 - grammar: correctness of tenses, articles, prepositions, sentence structure
 - confidence: assertiveness, clarity, not trailing off
   → Stat-based anchor: ${confidenceAnchor}/10 (adjust ±1-2 based on transcript tone)
-- vocabulary: range and appropriateness of words used
+- vocabulary: range and naturalness of English expressions, conversational sentence starters, and vocabulary
 - coherence: logical organisation, connected ideas, and ability to develop observations (especially for picture descriptions)
 - cefrLevel: assess the OVERALL spoken English level using ALL of these signals together:
-    VOCABULARY: word range, precision, idioms, collocations
+    EXPRESSIONS & VOCABULARY: phrase range, natural sentence starters, conversational idioms, precision
     GRAMMAR: tense variety, clause complexity, passive/conditional use, article/preposition accuracy
     SENTENCE STRUCTURE: simple vs compound vs complex sentences, subordination, discourse connectors
     CEFR RUBRIC:

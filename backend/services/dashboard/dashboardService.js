@@ -243,7 +243,13 @@ export async function getTodayQuestionData() {
           isPicture ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
             : isStory ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
             : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
-        )
+        ).map(v => ({
+          expression: v.expression || v.word || "",
+          word:       v.word || v.expression || "",
+          meaning:    v.meaning || "",
+          usage:      v.usage || "",
+          example:    v.example || "",
+        }))
       : [],
     vocabWordCount: isShadowing ? 0 : isPicture ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5) : isStory ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5) : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5),
     vocabRequiredCount: isShadowing ? 0 : isPicture ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3) : isStory ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3) : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3),
@@ -353,7 +359,13 @@ export async function getTodayOverview() {
               : activeStoryTask(status)
               ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
               : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5)
-          )
+          ).map(v => ({
+            expression: v.expression || v.word || "",
+            word:       v.word || v.expression || "",
+            meaning:    v.meaning || "",
+            usage:      v.usage || "",
+            example:    v.example || "",
+          }))
         : [],
       vocabWordCount: activeShadowingTask(status)
         ? 0
