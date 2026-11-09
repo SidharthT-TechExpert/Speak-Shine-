@@ -260,17 +260,18 @@ export function generateSVGPoster({
     ).join("\n    ");
   }
 
-  // 3. VOCABULARY Card
+  // 3. EXPRESSIONS Card
   const hasVocab = Array.isArray(vocabulary) && vocabulary.length > 0;
   const wordsToRender = hasVocab ? vocabulary.slice(0, 5) : [];
   
-  // Calculate vocabulary card height
+  // Calculate expression card height
   let vocabItemsH = 0;
   const vocabRenderData = wordsToRender.map(w => {
+    const text = w.expression || w.word || "";
     const exLines = wrapLines(w.example ? `"${w.example}"` : "", 52);
     const itemH = 34 + exLines.length * 22 + 10;
     vocabItemsH += itemH + 10;
-    return { ...w, exLines, itemH };
+    return { ...w, text, exLines, itemH };
   });
 
   const VOCAB_CARD_H = hasVocab ? (50 + vocabItemsH + 34) : 0;
@@ -306,10 +307,10 @@ export function generateSVGPoster({
         <rect width="${INNER - 32}" height="${w.itemH}" rx="10"
           fill="rgba(255,255,255,0.03)" stroke="rgba(124,111,255,0.18)" stroke-width="1"/>
         
-        <!-- Word and definition -->
-        <text x="16" y="24" font-size="17" font-weight="700" fill="#a78bfa"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(w.word)}</text>
-        <text x="${16 + w.word.length * 10 + 12}" y="24" font-size="14" font-style="italic" fill="#94a3b8"
+        <!-- Expression and definition -->
+        <text x="16" y="24" font-size="16" font-weight="700" fill="#a78bfa"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(w.text)}</text>
+        <text x="${16 + Math.min(280, w.text.length * 9) + 12}" y="24" font-size="13" font-style="italic" fill="#94a3b8"
           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">— ${esc(w.meaning)}</text>
         
         <!-- Example sentence -->
@@ -410,20 +411,20 @@ export function generateSVGPoster({
     ${qContentSvg}
   </g>
 
-  <!-- ═══ VOCABULARY CHALLENGE CONTAINER CARD ═══ -->
+  <!-- ═══ EXPRESSION CHALLENGE CONTAINER CARD ═══ -->
   ${hasVocab ? `
   <rect x="${PAD}" y="${vocabY}" width="${INNER}" height="${VOCAB_CARD_H}" rx="16"
     fill="rgba(14, 16, 38, 0.7)" stroke="rgba(124, 111, 255, 0.3)" stroke-width="1.2"/>
   
   <text x="${PAD + 24}" y="${vocabY + 32}"
     font-size="12" fill="#818cf8" font-weight="800" letter-spacing="1.5"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">◆ TODAY&apos;S VOCABULARY CHALLENGE</text>
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">◆ TODAY&apos;S ENGLISH EXPRESSIONS CHALLENGE</text>
   
   ${vocabRows}
 
   <text x="${PAD + 24}" y="${vocabY + VOCAB_CARD_H - 18}"
     font-size="13" fill="#94a3b8" font-weight="500"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">★ Use at least ${vocabRequiredCount} of today&apos;s ${wordsToRender.length} vocabulary words naturally in your speaking video!</text>
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">★ Naturally incorporate at least ${vocabRequiredCount} of today&apos;s ${wordsToRender.length} expressions in your speech!</text>
   ` : ''}
 
   <!-- ═══ FOOTER CTA BUTTON ═══ -->

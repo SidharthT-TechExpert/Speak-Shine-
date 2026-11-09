@@ -185,12 +185,12 @@ export const DEFAULT_MONTHLY_GOALS_QUESTIONS = [
 ];
 
 export const CEFR_LEVEL_MAP = {
-  A1: { label: "A1 Beginner", desc: "Basic words", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", border: "rgba(56, 189, 248, 0.35)" },
-  A2: { label: "A2 Elementary", desc: "Practical words", color: "#34d399", bg: "rgba(52, 211, 153, 0.12)", border: "rgba(52, 211, 153, 0.35)" },
-  B1: { label: "B1 Intermediate", desc: "Conversational words", color: "#fbbf24", bg: "rgba(251, 191, 36, 0.12)", border: "rgba(251, 191, 36, 0.35)" },
-  B2: { label: "B2 Upper-Intermediate", desc: "Rich, professional words", color: "#c084fc", bg: "rgba(192, 132, 252, 0.12)", border: "rgba(192, 132, 252, 0.35)" },
-  C1: { label: "C1 Advanced", desc: "Fluent expressions", color: "#f472b6", bg: "rgba(244, 114, 182, 0.12)", border: "rgba(244, 114, 182, 0.35)" },
-  C2: { label: "C2 Proficient", desc: "Complex vocabulary", color: "#fb7185", bg: "rgba(251, 113, 133, 0.12)", border: "rgba(251, 113, 133, 0.35)" },
+  A1: { label: "A1 Beginner", desc: "Basic everyday phrases", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", border: "rgba(56, 189, 248, 0.35)" },
+  A2: { label: "A2 Elementary", desc: "Practical conversational phrases", color: "#34d399", bg: "rgba(52, 211, 153, 0.12)", border: "rgba(52, 211, 153, 0.35)" },
+  B1: { label: "B1 Intermediate", desc: "Natural conversational expressions", color: "#fbbf24", bg: "rgba(251, 191, 36, 0.12)", border: "rgba(251, 191, 36, 0.35)" },
+  B2: { label: "B2 Upper-Intermediate", desc: "Fluent, rich expressions", color: "#c084fc", bg: "rgba(192, 132, 252, 0.12)", border: "rgba(192, 132, 252, 0.35)" },
+  C1: { label: "C1 Advanced", desc: "Nuanced idiomatic expressions", color: "#f472b6", bg: "rgba(244, 114, 182, 0.12)", border: "rgba(244, 114, 182, 0.35)" },
+  C2: { label: "C2 Proficient", desc: "Eloquent rhetorical expressions", color: "#fb7185", bg: "rgba(251, 113, 133, 0.12)", border: "rgba(251, 113, 133, 0.35)" },
 };
 
 export function getCefrInfo(level = "B2") {
@@ -268,7 +268,7 @@ export function getQuestionUIConfig(type, today = {}) {
         rules: [
           { text: "Describe subjects, actions & atmosphere with natural expression", highlight: true },
           { text: `Minimum 60 seconds (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})` },
-          { text: `Weave in at least ${reqCount} target vocabulary word${reqCount > 1 ? "s" : ""} (${vocabLevel})` },
+          { text: `Weave in at least ${reqCount} target expression${reqCount > 1 ? "s" : ""} naturally (${vocabLevel})` },
         ],
         hasAudio: false,
         hasImage: Boolean(today.imageUrl),
@@ -292,7 +292,7 @@ export function getQuestionUIConfig(type, today = {}) {
         rules: [
           { text: "Listen to the complete audio story first to catch the main turning point", highlight: true },
           { text: `Minimum 60 seconds speaking (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})` },
-          { text: `Retell in your own words using at least ${reqCount} target word${reqCount > 1 ? "s" : ""}` },
+          { text: `Retell in your own words using at least ${reqCount} target expression${reqCount > 1 ? "s" : ""}` },
         ],
         hasAudio: Boolean(today.audioUrl),
         hasImage: false,
@@ -364,8 +364,8 @@ export function getQuestionUIConfig(type, today = {}) {
         uploadButtonLabel: "Upload video",
         rules: [
           { text: `Minimum 60 seconds continuous speaking (${limits.fullScoreLabel} for full points, max ${limits.maxLabel})`, highlight: true },
-          { text: `Try integrating at least ${reqCount} of today's ${totalCount} target words (${vocabLevel})` },
-          { text: "No need for scripted perfection — speak naturally from the heart" },
+          { text: `Try integrating at least ${reqCount} of today's ${totalCount} target expressions (${vocabLevel})` },
+          { text: "Form your own spontaneous sentences — no need to memorize examples" },
         ],
         hasAudio: Boolean(today.audioUrl),
         hasImage: false,

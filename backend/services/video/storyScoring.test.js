@@ -26,11 +26,11 @@ describe("Story Task Composite Scoring", () => {
     expect(result.score).toBeGreaterThan(0);
     expect(result.breakdown.isStorySummary).toBe(true);
     expect(result.breakdown.isSpecialDay).toBe(false);
-    expect(result.breakdown.topic).toBeCloseTo((8 / 10) * 15, 1);
-    expect(result.breakdown.maxTopic).toBe(15);
-    expect(result.breakdown.maxComm).toBe(10);
-    expect(result.breakdown.maxLength).toBe(30);
-    expect(result.breakdown.maxVocab).toBe(30);
+    expect(result.breakdown.topic).toBeCloseTo((8 / 10) * 25, 1);
+    expect(result.breakdown.maxTopic).toBe(25);
+    expect(result.breakdown.maxComm).toBe(20);
+    expect(result.breakdown.maxLength).toBe(20);
+    expect(result.breakdown.maxVocab).toBe(20);
     expect(result.breakdown.maxGrowth).toBe(15);
   });
 
@@ -60,7 +60,10 @@ describe("Story Task Composite Scoring", () => {
     expect(result.breakdown.isSpecialDay).toBe(false);
     expect(result.breakdown.isStorySummary).toBe(true);
     expect(result.breakdown.topic).toBeGreaterThan(0);
-    expect(result.breakdown.maxTopic).toBe(15);
+    expect(result.breakdown.maxTopic).toBe(25);
+    expect(result.breakdown.maxComm).toBe(20);
+    expect(result.breakdown.maxLength).toBe(20);
+    expect(result.breakdown.maxVocab).toBe(20);
   });
 
   it("should keep special days (monthly reflection) without topic as 3-part score", () => {
@@ -116,8 +119,8 @@ describe("Story Task Composite Scoring", () => {
 
     expect(result.breakdown.isPictureDescription).toBe(true);
     expect(result.breakdown.maxCommunication).toBe(20);
-    expect(result.breakdown.maxContent).toBe(35);
-    expect(result.breakdown.maxVocabulary).toBe(10);
+    expect(result.breakdown.maxContent).toBe(25);
+    expect(result.breakdown.maxVocabulary).toBe(20);
     expect(result.breakdown.maxDuration).toBe(20);
     expect(result.breakdown.maxGrowth).toBe(15);
   });

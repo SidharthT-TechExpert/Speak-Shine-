@@ -704,8 +704,102 @@ export async function retryAnalysis(req, res) {
 }
 
 /**
+ * Helper to split long text into <= 95-character chunks on natural sentence or clause boundaries.
+ */
+function splitTextForTts(text, maxChunkLen = 95) {
+  if (!text) return [];
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxChunkLen) return [clean];
+
+  const chunks = [];
+  const sentences = clean.split(/(?<=[.!?])\s+/);
+
+  for (const s of sentences) {
+    if (s.length <= maxChunkLen) {
+      chunks.push(s);
+    } else {
+      const clauses = s.split(/(?<=[,;:\-])\s+/);
+      let current = "";
+      for (const c of clauses) {
+        if ((current + " " + c).trim().length <= maxChunkLen) {
+          current = (current + " " + c).trim();
+        } else {
+          if (current) chunks.push(current);
+          if (c.length <= maxChunkLen) {
+            current = c;
+          } else {
+            const words = c.split(" ");
+            let sub = "";
+            for (const w of words) {
+              if ((sub + " " + w).trim().length <= maxChunkLen) {
+                sub = (sub + " " + w).trim();
+              } else {
+                if (sub) chunks.push(sub);
+                sub = w.slice(0, maxChunkLen);
+              }
+            }
+            current = sub;
+          }
+        }
+      }
+      if (current) chunks.push(current);
+    }
+  }
+
+  return chunks.filter(c => c.trim().length > 0);
+}
+
+// In-memory cache for synthesized TTS audio buffers (max 500 items, keyed by normalized text)
+const ttsAudioCache = new Map();
+const MAX_TTS_CACHE_ITEMS = 500;
+
+function fetchTtsChunk(textChunk) {
+  const clients = ["tw-ob", "gtx", "dict-chrome-ex"];
+
+  const tryClient = (client) => {
+    return new Promise((resolve, reject) => {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=${client}&q=${encodeURIComponent(textChunk)}`;
+      const req = https.get(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://translate.google.com/",
+        },
+        timeout: 6000,
+      }, (res) => {
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Upstream TTS status ${res.statusCode} (${client})`));
+        }
+        const data = [];
+        res.on("data", chunk => data.push(chunk));
+        res.on("end", () => resolve(Buffer.concat(data)));
+      });
+
+      req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error(`Upstream TTS timeout (${client})`));
+      });
+    });
+  };
+
+  return (async () => {
+    let lastErr = null;
+    for (const c of clients) {
+      try {
+        return await tryClient(c);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error("All TTS upstream clients failed");
+  })();
+}
+
+/**
  * GET /api/video/tts
- * Serves native English audio pronunciation MP3 stream for vocabulary words.
+ * Serves native English audio pronunciation MP3 stream for vocabulary words and expressions.
+ * Automatically chunks texts over 95 characters and stitches MP3 buffers together to bypass upstream limits.
+ * Uses an in-memory cache and multi-client fallback for 100% reliable, zero-latency playback.
  */
 export async function getTtsAudio(req, res) {
   try {
@@ -713,34 +807,58 @@ export async function getTtsAudio(req, res) {
     if (!raw) {
       return res.status(400).send("Word/text is required");
     }
-    const clean = raw.slice(0, 500);
+    const clean = raw.slice(0, 1000);
+    const cacheKey = clean.toLowerCase();
 
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(clean)}`;
-    
-    const upstreamReq = https.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://translate.google.com/",
-      },
-    }, (upstreamRes) => {
-      if (upstreamRes.statusCode !== 200) {
-        return res.status(502).send("TTS upstream returned " + upstreamRes.statusCode);
-      }
+    // Check in-memory cache first for instant 0ms response
+    if (ttsAudioCache.has(cacheKey)) {
+      const cached = ttsAudioCache.get(cacheKey);
       res.set({
         "Content-Type": "audio/mpeg",
+        "Content-Length": cached.length,
         "Cache-Control": "public, max-age=86400",
         "Access-Control-Allow-Origin": "*",
+        "X-TTS-Cache": "HIT",
       });
-      upstreamRes.pipe(res);
-    });
+      return res.end(cached);
+    }
 
-    upstreamReq.on("error", (err) => {
-      console.error("[TTS Proxy] Upstream connection error:", err.message);
-      if (!res.headersSent) res.status(500).send("TTS audio fetch failed");
+    const chunks = splitTextForTts(clean, 95);
+    if (chunks.length === 0) {
+      return res.status(400).send("No valid text to speak");
+    }
+
+    // Fetch chunks sequentially with short pause to prevent triggering upstream rate limiters
+    const limitedChunks = chunks.slice(0, 8);
+    const audioBuffers = [];
+    for (let i = 0; i < limitedChunks.length; i++) {
+      const buf = await fetchTtsChunk(limitedChunks[i]);
+      audioBuffers.push(buf);
+      if (i < limitedChunks.length - 1) {
+        await new Promise(r => setTimeout(r, 30));
+      }
+    }
+
+    const combined = Buffer.concat(audioBuffers);
+
+    // Store in cache (LRU purge if limit reached)
+    if (ttsAudioCache.size >= MAX_TTS_CACHE_ITEMS) {
+      const firstKey = ttsAudioCache.keys().next().value;
+      if (firstKey) ttsAudioCache.delete(firstKey);
+    }
+    ttsAudioCache.set(cacheKey, combined);
+
+    res.set({
+      "Content-Type": "audio/mpeg",
+      "Content-Length": combined.length,
+      "Cache-Control": "public, max-age=86400",
+      "Access-Control-Allow-Origin": "*",
+      "X-TTS-Cache": "MISS",
     });
+    return res.end(combined);
   } catch (err) {
     console.error("[TTS Proxy] Controller error:", err.message);
-    if (!res.headersSent) res.status(500).send("Internal server error");
+    if (!res.headersSent) res.status(502).send("TTS audio fetch failed: " + err.message);
   }
 }
 

@@ -816,11 +816,17 @@ export async function sendDailyPosterToGroup(options = {}) {
       }).catch(e => console.warn("[WhatsApp] Could not update Status on poster success:", e.message));
     };
 
-    // Format vocabulary lines if present
+    // Format expression lines if present
     let vocabSection = "";
     if (Array.isArray(vocabulary) && vocabulary.length > 0) {
-      const vocabList = vocabulary.map(v => `• *${v.word}*: ${v.meaning}`).join("\n");
-      vocabSection = `\n🎯 *Focus Vocabulary (Use at least ${vocabReq} in your video):*\n${vocabList}\n`;
+      const exprList = vocabulary.map(v => {
+        const text = v.expression || v.word;
+        let line = `• *${text}*: ${v.meaning}`;
+        if (v.usage) line += `\n  _Usage:_ ${v.usage}`;
+        if (v.example) line += `\n  _Example:_ "${v.example}"`;
+        return line;
+      }).join("\n\n");
+      vocabSection = `\n🎯 *Target English Expressions (Use at least ${vocabReq} in your video):*\n${exprList}\n\n💡 *Speaking Challenge:* Incorporate these expressions into your own natural sentences rather than memorizing the examples!\n`;
     }
 
     console.log(`[WhatsApp] 📦 Preparing dispatch for "${topic}" (Type: ${contentType})...`);

@@ -34,12 +34,14 @@ const statusSchema = new mongoose.Schema({
   lastPosterError: { type: String, default: null },
   lastPosterAttemptAt: { type: Date, default: null },
   recentCategories: { type: [String], default: [] },
-  // Daily vocabulary words (configurable count, related to today's question)
+  // Daily conversational expressions (configurable count, related to today's question)
   todayVocabulary: {
     type: [{
-      word:    { type: String, required: true },
-      meaning: { type: String, required: true },
-      example: { type: String, required: true },
+      expression: { type: String, default: "" },
+      word:       { type: String, default: "" }, // alias for backward compatibility
+      meaning:    { type: String, default: "" },
+      usage:      { type: String, default: "" },
+      example:    { type: String, default: "" },
     }],
     default: [],
   },
