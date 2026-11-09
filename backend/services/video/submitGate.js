@@ -961,6 +961,30 @@ const IRREGULAR_VOCAB_MAP = {
   adaptability: ["adaptable", "adaptation", "adapted", "adapting", "adapt"],
 };
 
+// Phonetic homophone variations Whisper commonly produces under low audio quality or noise
+const PHONETIC_HOMOPHONE_MAP = {
+  where: "(?:where|wear)",
+  wear: "(?:where|wear)",
+  there: "(?:there|their|they're)",
+  their: "(?:there|their|they're)",
+  to: "(?:to|too|two)",
+  too: "(?:to|too|two)",
+  two: "(?:to|too|two)",
+  for: "(?:for|four)",
+  four: "(?:for|four)",
+  hear: "(?:hear|here)",
+  here: "(?:hear|here)",
+  by: "(?:by|buy|bye)",
+  buy: "(?:by|buy|bye)",
+  eye: "(?:eye|i)",
+  see: "(?:see|sea)",
+  know: "(?:know|no)",
+  right: "(?:right|write)",
+  whole: "(?:whole|hole)",
+  peace: "(?:peace|piece)",
+  weather: "(?:weather|whether)",
+};
+
 function levenshteinDist(a, b) {
   if (a === b) return 0;
   if (!a.length) return b.length;
@@ -1080,14 +1104,16 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
             break;
           }
 
-          // Regex matching with flexible whitespace and optional conversational fillers
-          // (e.g. "what I [really|personally] find interesting is")
+          // Regex matching with flexible whitespace, pauses, conversational fillers, and hesitation sounds
+          // (e.g. "what I ... [really|um|uh] find interesting is")
           const phraseWords = phraseSpaced.split(/\s+/).filter(Boolean);
           if (phraseWords.length >= 2) {
-            const fillerGroup = "(?:\\s+(?:really|personally|honestly|actually|just|also|quite|very))?";
+            const fillerGroup = "(?:\\s+(?:really|personally|honestly|actually|just|also|quite|very|um|uh|er|like|you know|sort of|kind of))?";
             const regexParts = phraseWords.map((pw, pIdx) => {
-              const stem = getWordStem(pw);
-              const stemPattern = stem && stem.length >= 3 ? `${stem}[a-z]*` : pw;
+              const pwClean = pw.toLowerCase();
+              const homo = PHONETIC_HOMOPHONE_MAP[pwClean];
+              const stem = getWordStem(pwClean);
+              const stemPattern = homo || (stem && stem.length >= 3 ? `${stem}[a-z]*` : pwClean);
               return pIdx === 0 ? `\\b${stemPattern}` : `${fillerGroup}\\s+${stemPattern}`;
             });
             const fullRegex = new RegExp(`${regexParts.join("")}\\b`, "i");
