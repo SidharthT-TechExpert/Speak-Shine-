@@ -82,12 +82,26 @@ describe("matchVocabularyInTranscript", () => {
     expect(matches).toContain("It turned out that...");
   });
 
-  it("should match slashed options such as in the foreground / background", () => {
+  it("should match expressions spoken with long pauses and hesitation fillers (um, uh)", () => {
     const expressions = [
-      { expression: "In the foreground / background...", meaning: "Spatial position" },
+      { expression: "From where I stand, I think...", meaning: "Personal viewpoint" },
+      { expression: "What I find interesting is...", meaning: "Introduce something interesting" },
     ];
-    const transcript = "In the foreground, we can clearly see two colleagues presenting their project.";
+    // Long pauses indicated by ellipses/commas and hesitation sounds
+    const transcript = "Well... from where... um... I stand... uh... I think we made the right choice. Also, what I... like... find interesting is the result.";
     const matches = matchVocabularyInTranscript(transcript, expressions);
-    expect(matches).toContain("In the foreground / background...");
+    expect(matches).toContain("From where I stand, I think...");
+    expect(matches).toContain("What I find interesting is...");
+    expect(matches.length).toBe(2);
+  });
+
+  it("should tolerate phonetic Whisper homophone slips due to audio quality (wear vs where, to vs too)", () => {
+    const expressions = [
+      { expression: "From where I stand, I think...", meaning: "Personal viewpoint" },
+    ];
+    // Whisper transcribed 'where' as 'wear' due to acoustic ambiguity/background noise
+    const transcript = "From wear I stand, I think the solution is straightforward.";
+    const matches = matchVocabularyInTranscript(transcript, expressions);
+    expect(matches).toContain("From where I stand, I think...");
   });
 });
