@@ -219,14 +219,15 @@ export async function fetchAutomatedStoryFromRss(targetDuration = 90) {
         continue;
       }
 
-      // Filter and score episodes based on how close their net story length is to targetDuration
-      // In LibriVox, raw audio includes ~15-20s of intro/outro
-      const episodesWithDuration = episodes.filter(ep => ep.durationSec && ep.durationSec >= 50);
+      // Filter and score episodes based on how close their net story length is to targetDuration.
+      // Net story length = raw duration minus ~18s intro/outro. Minimum net story must be at least 55 seconds (or targetDuration - 20s).
+      const minStorySec = Math.max(55, Math.min(65, targetDuration - 20));
+      const episodesWithDuration = episodes.filter(ep => ep.durationSec && (ep.durationSec - 18) >= minStorySec);
 
       if (episodesWithDuration.length > 0) {
         // Sort by closeness to targetDuration (estimated net story = raw - 18s)
         const scoredEpisodes = episodesWithDuration.map(ep => {
-          const estimatedStorySec = Math.max(30, ep.durationSec - 18);
+          const estimatedStorySec = Math.max(45, ep.durationSec - 18);
           const diff = Math.abs(estimatedStorySec - targetDuration);
           return { ...ep, estimatedStorySec, diff };
         });
@@ -327,6 +328,7 @@ async function transcribeAudioWithWhisper(audioFilePath) {
   form.append("response_format", "verbose_json");
   form.append("timestamp_granularities[]", "word");
   form.append("timestamp_granularities[]", "segment");
+  form.append("prompt", "The following is an English spoken audio recording of a classic moral fable story.");
   form.append("temperature", "0.0");
 
   console.log(`[StorySlicer] 🎙️ Calling Groq Whisper Large v3 for audio transcription...`);
@@ -411,19 +413,36 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
 /**
  * Detects whether a segment contains an outro or ending credit
  */
-export function isOutroSegment(text) {
+export function isOutroSegment(text, title = "") {
   if (!text) return false;
   const lower = text.toLowerCase().trim();
   const compact = lower.replace(/[^a-z0-9]/g, "");
-  return (
+
+  if (
     /^\s*end\s+of\b/i.test(lower) ||
     /\brecorded\s+by\b/i.test(lower) ||
     /\bread\s+by\b/i.test(lower) ||
     /\breading\s+by\b/i.test(lower) ||
     /thank\s+you\s+for\s+listening/i.test(lower) ||
     /^\s*the\s+end\.?\s*$/i.test(lower) ||
-    compact.includes("librivoxorg")
-  );
+    compact.includes("librivox") ||
+    compact.includes("aesopsfables") ||
+    compact.includes("fablesofaesop")
+  ) {
+    return true;
+  }
+
+  // Isolated title repetition by reader at the very end
+  if (title) {
+    const cleanT = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cleanT.length > 3) {
+      if (compact === cleanT || (compact.length > 5 && cleanT.includes(compact)) || (cleanT.length > 5 && compact.includes(cleanT))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -499,7 +518,7 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
     // Identify end sentence: strip backwards past any outro / credit sentence
     let endIndex = sentences.length - 1;
     for (let i = sentences.length - 1; i >= Math.max(0, sentences.length - 6); i--) {
-      if (isOutroSegment(sentences[i].text)) {
+      if (isOutroSegment(sentences[i].text, title)) {
         endIndex = i - 1;
       } else {
         break;
@@ -598,7 +617,7 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
   // 2. Identify end index: trim backwards past any outro segments
   let endIndex = validSegments.length - 1;
   for (let i = validSegments.length - 1; i >= Math.max(0, validSegments.length - 4); i--) {
-    if (isOutroSegment(validSegments[i].text)) {
+    if (isOutroSegment(validSegments[i].text, title)) {
       endIndex = i - 1;
     } else {
       break;
