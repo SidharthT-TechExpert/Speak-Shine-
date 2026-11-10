@@ -7,6 +7,7 @@ import {
   isIntroOrDisclaimerSegment,
   isOutroSegment,
   findOptimalStoryWindow,
+  isNarrativeStorySentence,
   FALLBACK_STORIES
 } from "./storyFeedIngestionService.js";
 
@@ -196,12 +197,29 @@ describe("storyFeedIngestionService - Option A Precision Slicing & Intro Trimmin
     });
 
     it("detects ads, sponsors, and spelled-out narrator domains in isIntroOrDisclaimerSegment", () => {
+      expect(isIntroOrDisclaimerSegment("This is a LibraryVox recording.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("All LibraryVox recordings are in the public domain.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("This episode is sponsored by Audible.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("Support us on Patreon for bonus content.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("Use promo code SHINE for 20% off.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("Dunkelberg.com.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("D-U-N-K-E-L-B-E-R-G.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("Visit LibriVox.org for free audiobooks.")).toBe(true);
+    });
+
+    it("accurately identifies narrative story sentences vs isolated title headers and reader credits", () => {
+      // Narrative story sentences
+      expect(isNarrativeStorySentence("An archer went up into the hills to get some sport with his bow.")).toBe(true);
+      expect(isNarrativeStorySentence("A trumpeter marched into battle in the van of the army.")).toBe(true);
+      expect(isNarrativeStorySentence("Two frogs were companions and lived in a deep pond.")).toBe(true);
+
+      // Intro / headers / credits / outros
+      expect(isNarrativeStorySentence("This is a LibraryVox recording.")).toBe(false);
+      expect(isNarrativeStorySentence("Recorded by Melanie, Worcestershire, UK.")).toBe(false);
+      expect(isNarrativeStorySentence("Aesop's Fables.")).toBe(false);
+      expect(isNarrativeStorySentence("The Archer and the Lion.")).toBe(false);
+      expect(isNarrativeStorySentence("The Trumpeter Taken Prisoner.")).toBe(false);
+      expect(isNarrativeStorySentence("End of The Archer and the Lion.")).toBe(false);
     });
   });
 

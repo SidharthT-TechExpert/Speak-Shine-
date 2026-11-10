@@ -421,6 +421,22 @@ export async function generateScrapedStoryNow(req, res) {
 }
 
 /**
+ * POST /api/questions/clean-story-transcript
+ * Trims narrator preambles, LibriVox ads, and outro credits from a story transcript.
+ */
+export async function cleanStoryTranscriptController(req, res) {
+  try {
+    const { text, title } = req.body || {};
+    const { cleanNarrativeTranscript } = await import("../services/ai/storyFeedIngestionService.js");
+    const cleanedTranscript = cleanNarrativeTranscript(text, title);
+    res.json({ success: true, cleanedTranscript });
+  } catch (error) {
+    console.error("[Questions] Clean transcript error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
  * POST /api/questions/generate-picture
  * Generates a Picture Description challenge (Groq metadata + Pexels image).
  * Returns title, instructions, difficulty, speakingDuration, imageUrl,

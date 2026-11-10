@@ -108,36 +108,57 @@ export function cleanStoryTitle(rawTitle) {
 
 /**
  * Clean transcript of any introductory narrator preamble or outro text.
- * Ensures the transcript contains ONLY the story itself.
+ * Ensures the transcript contains ONLY the authentic story itself.
  */
 export function cleanNarrativeTranscript(text, title = "") {
   if (!text) return "";
   let clean = text.trim();
 
-  // Strip leading LibriVox / narrator introductory preambles and website spellings
-  clean = clean.replace(
-    /^(?:this\s+is\s+a\s+librivox\s+recording[\s\S]*?(?:librivox\.org\.?|dunkelberg\.com\.?|[a-z]-[a-z]-[a-z][^.]*\.?)|today's\s+reading\s+by\s+[^.]+\.?|read(?:ing)?\s+by\s+[^.]+\.?|recorded\s+by\s+[^.]+\.?(?:,\s*florida|,\s*texas)?\.?|fables\s+of\s+aesop\.?|aesop's\s+fables\.?)\s*/gi,
-    ""
-  );
+  // 1. Initial quick trim for trailing outro phrases that might lack end punctuation
+  clean = clean.replace(/\s*end\s+of\s+.*$/i, "");
+  clean = clean.replace(/\s*thank\s+you\s+for\s+listening.*$/i, "");
+  clean = clean.replace(/\s*the\s+end\.?\s*$/i, "");
 
-  clean = clean.replace(
-    /^(?:recorded\s+by\s+[^.]+\.?,?\s*(?:florida|texas|usa)?\.?\s*|dunkelberg(?:\.com)?\.?\s*|[a-z](?:-[a-z])+\.?\s*|aesop's\s+fables\.?\s*)+/gi,
-    ""
-  );
+  // 2. Parse text into natural sentence units using punctuation (. ! ?)
+  const sentenceRegex = /[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g;
+  let matches = clean.match(sentenceRegex) || [clean];
+  matches = matches.map(s => s.trim()).filter(Boolean);
 
-  // Strip standalone title announcement at start if present
-  if (title) {
-    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const titleRegex = new RegExp(`^${escapedTitle}\\.?\\s*`, "i");
-    clean = clean.replace(titleRegex, "");
+  // 3. Advance start index past all intro / disclaimer / non-narrative / title sentences
+  let startIdx = 0;
+  let foundNarrative = false;
+  for (let i = 0; i < Math.min(matches.length, 12); i++) {
+    if (isNarrativeStorySentence(matches[i])) {
+      startIdx = i;
+      foundNarrative = true;
+      break;
+    }
   }
 
-  // Strip trailing outro ("End of...", "Recorded by...", "Thank you for listening")
-  clean = clean.replace(/\s*end\s+of\s+.*$/i, "");
-  clean = clean.replace(/\s*recorded\s+by\s+.*$/i, "");
-  clean = clean.replace(/\s*read\s+by\s+.*$/i, "");
-  clean = clean.replace(/\s*thank\s+you\s+for\s+listening.*$/i, "");
-  clean = clean.replace(/\s*the\s+end\.?\s*$/i.test(clean) ? /\s*the\s+end\.?\s*$/i : /^$/, "");
+  if (!foundNarrative) {
+    for (let i = 0; i < Math.min(matches.length, 8); i++) {
+      if (isIntroOrDisclaimerSegment(matches[i], title)) {
+        startIdx = i + 1;
+      } else {
+        startIdx = i;
+        break;
+      }
+    }
+  }
+
+  // 4. Trim backwards past any outro / credit / non-narrative sentences
+  let endIdx = matches.length - 1;
+  for (let i = matches.length - 1; i >= Math.max(startIdx, matches.length - 6); i--) {
+    if (isOutroSegment(matches[i], title)) {
+      endIdx = i - 1;
+    } else {
+      break;
+    }
+  }
+
+  if (startIdx <= endIdx) {
+    return matches.slice(startIdx, endIdx + 1).join(" ").trim();
+  }
 
   return clean.trim();
 }
@@ -367,6 +388,7 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
   // Known disclaimer, narrator preamble, sponsor, ad keywords
   if (
     compact.includes("librivox") ||
+    compact.includes("libraryvox") ||
     compact.includes("publicdomain") ||
     compact.includes("volunteer") ||
     compact.includes("recordedby") ||
@@ -392,18 +414,33 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
     compact.includes("dotorg") ||
     compact.includes("dotcom") ||
     /^(?:[a-z]-)+[a-z]\.?$/i.test(lower) ||
-    /^(?:chapter\s+\d+|fable\s+\d+|volume\s+\d+|section\s+\d+)/i.test(lower)
+    /^(?:chapter\s+\d+|fable\s+\d+|volume\s+\d+|section\s+\d+)/i.test(lower) ||
+    /^(?:all\s+libr(?:i|ary)vox\s+recordings)/i.test(lower) ||
+    /^(?:this\s+is\s+a\s+libr(?:i|ary)vox)/i.test(lower) ||
+    /^(?:recorded\s+in\s+\d{4})/i.test(lower) ||
+    /^(?:recorded\s+by)/i.test(lower)
   ) {
     return true;
   }
 
   // Isolated title repetition by reader right before story starts
   if (title) {
-    const cleanT = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanT = cleanStoryTitle(title).toLowerCase().replace(/[^a-z0-9]/g, "");
     if (cleanT.length > 3) {
       if (compact === cleanT || (compact.length > 5 && cleanT.includes(compact)) || (cleanT.length > 5 && compact.includes(cleanT))) {
         return true;
       }
+    }
+  }
+
+  // Standalone title format check (e.g. "The Archer and the Lion.", "The Trumpeter Taken Prisoner.")
+  // If it's a short sentence (<= 7 words) without any narrative action verb
+  const words = lower.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 7) {
+    const isTitlePattern = /^(?:the|a|an)\s+[a-z]+(?:\s+(?:and|&|in|of|the|a|an)\s+[a-z]+){0,4}\.?$/i.test(lower);
+    const hasVerb = /\b(?:went|was|were|had|lived|saw|decided|marched|pounced|met|shot|challenged|travelled|traveled|stole|began|loved|thought|said|asked|gathered|dropped|called|walked|found|set|came|stood|fled|took|became)\b/i.test(lower);
+    if (isTitlePattern && !hasVerb) {
+      return true;
     }
   }
 
@@ -426,6 +463,7 @@ export function isOutroSegment(text, title = "") {
     /thank\s+you\s+for\s+listening/i.test(lower) ||
     /^\s*the\s+end\.?\s*$/i.test(lower) ||
     compact.includes("librivox") ||
+    compact.includes("libraryvox") ||
     compact.includes("aesopsfables") ||
     compact.includes("fablesofaesop")
   ) {
@@ -434,7 +472,7 @@ export function isOutroSegment(text, title = "") {
 
   // Isolated title repetition by reader at the very end
   if (title) {
-    const cleanT = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanT = cleanStoryTitle(title).toLowerCase().replace(/[^a-z0-9]/g, "");
     if (cleanT.length > 3) {
       if (compact === cleanT || (compact.length > 5 && cleanT.includes(compact)) || (cleanT.length > 5 && compact.includes(cleanT))) {
         return true;
@@ -443,6 +481,26 @@ export function isOutroSegment(text, title = "") {
   }
 
   return false;
+}
+
+/**
+ * Determines whether a sentence is a genuine story narrative sentence
+ * (has storytelling verbs, narrative openers, and isn't a preamble, outro, or title header).
+ */
+export function isNarrativeStorySentence(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase().trim();
+  if (isIntroOrDisclaimerSegment(lower)) return false;
+  if (isOutroSegment(lower)) return false;
+
+  const words = lower.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length < 4) return false;
+
+  const hasVerb = /\b(?:went|was|were|had|lived|saw|decided|marched|pounced|met|shot|challenged|travelled|traveled|stole|began|loved|thought|said|asked|gathered|dropped|called|walked|found|set|came|stood|fled|took|became|flew|crept|leaped|jumped|cried|replied|answered|warned|noticed|heard|wished|hoped|swallowed|bitten|bit|caught|spoke|spake|roamed|wandered|carried|struck|chanced|ran|laid|crawled|swam)\b/i.test(lower);
+
+  const hasOpener = /^(?:once|one|a|an|the|there|two|three|in|long\s+ago|when|while|as|a\s+certain)\s+/i.test(lower);
+
+  return hasVerb && (hasOpener || words.length >= 6);
 }
 
 /**
@@ -500,13 +558,24 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
   if (words.length > 0) {
     const sentences = groupWordsIntoSentences(words);
 
-    // Identify start sentence: advance past all intro / disclaimer / sponsor / title sentences
+    // Identify start sentence: advance forward past ALL intro, disclaimer, narrator credits,
+    // and title header sentences until we reach the first genuine narrative story sentence!
     let startIndex = 0;
-    for (let i = 0; i < Math.min(sentences.length, 12); i++) {
-      if (isIntroOrDisclaimerSegment(sentences[i].text, title)) {
-        startIndex = i + 1;
-      } else {
-        if (i >= startIndex) {
+    let foundNarrativeStart = false;
+    for (let i = 0; i < Math.min(sentences.length, 20); i++) {
+      if (isNarrativeStorySentence(sentences[i].text)) {
+        startIndex = i;
+        foundNarrativeStart = true;
+        break;
+      }
+    }
+
+    // Fallback if no narrative opener matched: scan forward skipping any known intro segment
+    if (!foundNarrativeStart) {
+      for (let i = 0; i < Math.min(sentences.length, 12); i++) {
+        if (isIntroOrDisclaimerSegment(sentences[i].text, title)) {
+          startIndex = i + 1;
+        } else {
           startIndex = i;
           break;
         }
@@ -515,11 +584,20 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
 
     if (startIndex >= sentences.length) startIndex = 0;
 
-    // Identify end sentence: strip backwards past any outro / credit sentence
+    // Identify end sentence: strip backwards past any outro, credit, or trailing title sentence
     let endIndex = sentences.length - 1;
-    for (let i = sentences.length - 1; i >= Math.max(0, sentences.length - 6); i--) {
-      if (isOutroSegment(sentences[i].text, title)) {
-        endIndex = i - 1;
+    for (let i = sentences.length - 1; i >= Math.max(startIndex, sentences.length - 8); i--) {
+      if (isOutroSegment(sentences[i].text, title) || !isNarrativeStorySentence(sentences[i].text)) {
+        if (isOutroSegment(sentences[i].text, title)) {
+          endIndex = i - 1;
+        } else {
+          const wCount = sentences[i].text.split(/\s+/).length;
+          if (wCount <= 5) {
+            endIndex = i - 1;
+          } else {
+            break;
+          }
+        }
       } else {
         break;
       }
@@ -546,8 +624,9 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
     const fullDuration = Math.round(fullEnd - fullStart);
     const fullTranscript = cleanNarrativeTranscript(storySentences.map(s => s.text).join(" ").trim(), title);
 
-    // If complete narrative is within targetDuration + 20s, keep full story!
-    if (fullDuration <= (targetDuration + 20)) {
+    // If complete narrative is within targetDuration + 30s, keep full story!
+    // Stories should ALWAYS start from the first sentence of the story (fullStart).
+    if (fullDuration <= (targetDuration + 30)) {
       return {
         startTime: fullStart,
         endTime: fullEnd,
@@ -556,36 +635,23 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
       };
     }
 
-    // Otherwise find the continuous sentence window closest to targetDuration
-    let bestWindow = null;
-    let bestDiff = Infinity;
-
-    for (let i = 0; i < storySentences.length; i++) {
-      for (let j = i; j < storySentences.length; j++) {
-        const winDuration = Math.round(storySentences[j].end - storySentences[i].start);
-        const diff = Math.abs(winDuration - targetDuration);
-
-        if (diff < bestDiff && winDuration >= (targetDuration - 25) && winDuration <= (targetDuration + 30)) {
-          bestDiff = diff;
-          bestWindow = {
-            startTime: storySentences[i].start,
-            endTime: storySentences[j].end,
-            duration: winDuration,
-            transcript: cleanNarrativeTranscript(storySentences.slice(i, j + 1).map(s => s.text).join(" ").trim(), title)
-          };
-        }
+    // If narrative is longer, always start from sentence 0 and accumulate complete sentences
+    let bestCutIndex = storySentences.length - 1;
+    for (let k = 0; k < storySentences.length; k++) {
+      const dur = Math.round(storySentences[k].end - fullStart);
+      if (dur >= targetDuration - 10) {
+        bestCutIndex = k;
+        break;
       }
     }
 
-    if (bestWindow) {
-      return bestWindow;
-    }
-
+    const selectedSentences = storySentences.slice(0, bestCutIndex + 1);
+    const sliceEnd = selectedSentences[selectedSentences.length - 1].end;
     return {
       startTime: fullStart,
-      endTime: fullEnd,
-      duration: fullDuration,
-      transcript: fullTranscript
+      endTime: sliceEnd,
+      duration: Math.round(sliceEnd - fullStart),
+      transcript: cleanNarrativeTranscript(selectedSentences.map(s => s.text).join(" ").trim(), title)
     };
   }
 
@@ -601,14 +667,23 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
 
   const validSegments = segments.filter(s => s.text && s.text.trim().length > 1);
 
-  // 1. Identify start index: advance past all intro / disclaimer / reader preamble segments
+  // 1. Identify start index: advance forward past ALL intro / disclaimer / reader preambles
   let startIndex = 0;
-  for (let i = 0; i < Math.min(validSegments.length, 8); i++) {
-    if (isIntroOrDisclaimerSegment(validSegments[i].text, title)) {
-      startIndex = i + 1;
-    } else {
-      // Check if this segment looks like actual story narrative
-      if (/(?:a|an|the|once|one|two|there|long|when|in|a certain)\s+/i.test(validSegments[i].text)) {
+  let foundNarrativeSeg = false;
+  for (let i = 0; i < Math.min(validSegments.length, 12); i++) {
+    if (isNarrativeStorySentence(validSegments[i].text)) {
+      startIndex = i;
+      foundNarrativeSeg = true;
+      break;
+    }
+  }
+
+  if (!foundNarrativeSeg) {
+    for (let i = 0; i < Math.min(validSegments.length, 8); i++) {
+      if (isIntroOrDisclaimerSegment(validSegments[i].text, title)) {
+        startIndex = i + 1;
+      } else {
+        startIndex = i;
         break;
       }
     }
@@ -616,7 +691,7 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
 
   // 2. Identify end index: trim backwards past any outro segments
   let endIndex = validSegments.length - 1;
-  for (let i = validSegments.length - 1; i >= Math.max(0, validSegments.length - 4); i--) {
+  for (let i = validSegments.length - 1; i >= Math.max(startIndex, validSegments.length - 6); i--) {
     if (isOutroSegment(validSegments[i].text, title)) {
       endIndex = i - 1;
     } else {
