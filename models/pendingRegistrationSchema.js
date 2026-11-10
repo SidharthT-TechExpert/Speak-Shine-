@@ -9,6 +9,7 @@ const pendingRegistrationSchema = new mongoose.Schema({
   name:         { type: String, required: true },
   password:     { type: String, required: true },               // argon2 hash
   referralCode: { type: String, default: null },               // referral code of inviter
+  referrerName: { type: String, default: null },               // name of inviter decoded from referralCode
   createdAt:    { type: Date, default: Date.now },
 });
 

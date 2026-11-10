@@ -4701,11 +4701,15 @@ export default function AdminDashboard() {
                         <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "rgba(99, 102, 241, 0.15)", color: "#a5b4fc", border: "1px solid rgba(99, 102, 241, 0.3)" }}>
                           ⏳ Awaiting Approval
                         </span>
-                        {p.referralCode && (
+                        {p.referrerName ? (
+                          <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                            🤝 Referred By: {p.referrerName}
+                          </span>
+                        ) : p.referralCode ? (
                           <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
                             🎟️ Ref: {p.referralCode}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <div className="admin-user-phone-wrap" style={{ marginTop: "0.15rem" }}>
                         <span className="admin-user-phone">📱 {p.phone}</span>

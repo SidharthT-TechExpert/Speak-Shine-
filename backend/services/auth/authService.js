@@ -863,12 +863,17 @@ export async function submitRegistration(verifyToken, name, password, referralCo
 
   // Validate referral code if provided
   let validReferralCode = null;
+  let referrerName = null;
   if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
-    const check = await validateReferralCode(referralCode.trim());
-    if (!check?.valid) {
+    const cleanCode = referralCode.trim();
+    const inviter = await User.findOne({
+      referralCode: { $regex: new RegExp(`^${cleanCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    }).select("name phone referralCode").lean();
+    if (!inviter) {
       throw new Error("Invalid referral code. Please check the code or leave it blank.");
     }
-    validReferralCode = check.code;
+    validReferralCode = inviter.referralCode;
+    referrerName = inviter.name || null;
   }
 
   // Block duplicates
@@ -886,6 +891,7 @@ export async function submitRegistration(verifyToken, name, password, referralCo
       name: name.trim(),
       password: hashed,
       referralCode: validReferralCode,
+      referrerName: referrerName,
       createdAt: new Date(),
     },
     { upsert: true, new: true }
@@ -907,7 +913,9 @@ export async function submitRegistration(verifyToken, name, password, referralCo
       `👤 *Name:* ${name.trim()}`,
       `📱 *Phone:* ${cleanDisplayPhone}`,
     ];
-    if (validReferralCode) {
+    if (referrerName) {
+      alertLines.push(`🤝 *Referred By:* ${referrerName}`);
+    } else if (validReferralCode) {
       alertLines.push(`🎟️ *Referral Code:* ${validReferralCode}`);
     }
     alertLines.push(`⏰ *Time:* ${timeStr}`);
@@ -945,11 +953,22 @@ export async function submitRegistration(verifyToken, name, password, referralCo
  */
 export async function listPendingRegistrations() {
   const pending = await PendingRegistration.find().sort({ createdAt: -1 }).lean();
+
+  // For any pending records missing stored referrerName, decode from User collection
+  const unresolvedCodes = [...new Set(pending.filter(p => p.referralCode && !p.referrerName).map(p => p.referralCode))];
+  let fallbackMap = new Map();
+  if (unresolvedCodes.length > 0) {
+    try {
+      const inviters = await User.find({ referralCode: { $in: unresolvedCodes } }).select("name referralCode").lean();
+      fallbackMap = new Map(inviters.map(u => [u.referralCode, u.name]));
+    } catch {}
+  }
   return pending.map(p => ({
     id: p._id,
     phone: p.phone,
     name: p.name,
     referralCode: p.referralCode || null,
+    referrerName: p.referrerName || (p.referralCode ? fallbackMap.get(p.referralCode) : null) || null,
     createdAt: p.createdAt,
 
   }));
