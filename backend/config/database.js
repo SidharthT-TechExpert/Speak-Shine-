@@ -15,6 +15,7 @@ export const connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, MONGO_OPTIONS);
     console.log("✅ MongoDB Connected");
     await dropLegacyQuestionIndexes();
+    await dropLegacyPendingRegistrationTTLIndex();
   } catch (err) {
     console.log("❌ DB initial connection error:", err.message);
     // Retry after 5 seconds
@@ -34,6 +35,26 @@ async function dropLegacyQuestionIndexes() {
       if ((idx.name === "question_1" || idx.name === "topic_1") && !idx.partialFilterExpression) {
         console.log(`[DB] Dropping legacy global unique index on questions: ${idx.name}`);
         await coll.dropIndex(idx.name);
+      }
+    }
+  } catch (err) {
+    // Non-critical, ignore if collection does not exist yet or index already dropped
+  }
+}
+
+/**
+ * Drops legacy 24h TTL index on pendingregistrations collection so registrations
+ * are no longer auto-deleted after 24 hours.
+ */
+async function dropLegacyPendingRegistrationTTLIndex() {
+  try {
+    const coll = mongoose.connection.collection("pendingregistrations");
+    const indexes = await coll.indexes();
+    for (const idx of indexes) {
+      if (idx.name === "createdAt_1" && idx.expireAfterSeconds !== undefined) {
+        console.log(`[DB] Dropping legacy 24h TTL index on pendingregistrations: ${idx.name} (expireAfterSeconds: ${idx.expireAfterSeconds})`);
+        await coll.dropIndex(idx.name);
+        console.log(`[DB] ✅ Successfully dropped TTL index on pendingregistrations`);
       }
     }
   } catch (err) {

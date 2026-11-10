@@ -891,11 +891,54 @@ export async function submitRegistration(verifyToken, name, password, referralCo
     { upsert: true, new: true }
   );
 
+  // Notify admin via WhatsApp on configured personal number (non-blocking)
+  try {
+    const rawDigits = String(phone).replace(/\D/g, "");
+    const cleanDisplayPhone = rawDigits.length === 10 ? `+91 ${rawDigits}` : `+${rawDigits}`;
+    const timeStr = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const alertLines = [
+      `🎉 *New Student Registration Received*`,
+      ``,
+      `👤 *Name:* ${name.trim()}`,
+      `📱 *Phone:* ${cleanDisplayPhone}`,
+    ];
+    if (validReferralCode) {
+      alertLines.push(`🎟️ *Referral Code:* ${validReferralCode}`);
+    }
+    alertLines.push(`⏰ *Time:* ${timeStr}`);
+    alertLines.push(``);
+    alertLines.push(`👉 Review & approve in Admin Dashboard (Registrations tab).`);
+
+    const alertMsg = alertLines.join("\n");
+
+    import("../whatsapp/whatsappService.js")
+      .then(({ sendAdminDirectMessage }) => sendAdminDirectMessage(alertMsg))
+      .then((res) => {
+        if (res?.success) {
+          console.log(`[Auth] 📲 Admin WhatsApp notification sent for new registration: ${name.trim()} (${cleanDisplayPhone})`);
+        } else {
+          console.log(`[Auth] ℹ️ WhatsApp notification skipped/failed: ${res?.message || "unknown"}`);
+        }
+      })
+      .catch((waErr) => {
+        console.warn("[Auth] Failed to send WhatsApp alert for new registration:", waErr?.message || waErr);
+      });
+  } catch (notifyErr) {
+    console.warn("[Auth] Error preparing registration WhatsApp alert:", notifyErr?.message || notifyErr);
+  }
+
   return {
     success: true,
-    message: "Registration submitted! An admin will review and approve your account within 24 hours.",
+    message: "Registration submitted! An admin will review and approve your account shortly.",
   };
 }
+
+
 
 /**
  * Admin — list all pending registrations
@@ -908,7 +951,7 @@ export async function listPendingRegistrations() {
     name: p.name,
     referralCode: p.referralCode || null,
     createdAt: p.createdAt,
-    expiresAt: new Date(new Date(p.createdAt).getTime() + 24 * 60 * 60 * 1000),
+
   }));
 }
 
