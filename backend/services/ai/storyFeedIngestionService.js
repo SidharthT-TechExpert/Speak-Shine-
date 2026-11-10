@@ -779,9 +779,8 @@ async function sliceAudioFile(inputPath, startTime, endTime, outputPath) {
     "-ss", String(Number(startTime).toFixed(2)),
     "-to", String(Number(endTime).toFixed(2)),
     "-i", inputPath,
-    "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
     "-c:a", "libmp3lame",
-    "-b:a", "96k",
+    "-b:a", "192k",
     "-ar", "44100",
     outputPath
   ]);
@@ -1000,12 +999,36 @@ export async function processStoryAudioIntoChallenge(storyItem, options = {}) {
     console.log(`[StorySlicer] 🤖 Generating summary guide and metadata with LLM...`);
     const metadata = await extractStoryMetadataWithLLM(window.transcript, storyItem.title);
 
+    // Auto-generate authentic human studio voice audio via ElevenLabs
+    let humanVoiceAudioUrl = finalAudioUrl;
+    let voiceRecommendation = null;
+    try {
+      const { generateAndUploadStoryAudio } = await import("./storyAudioService.js");
+      const { analyzeStoryVoice } = await import("./storyVoiceAnalyzer.js");
+      voiceRecommendation = await analyzeStoryVoice(window.transcript);
+      console.log(`[StorySlicer] 🎙️ Generating authentic human studio voice via ElevenLabs (${voiceRecommendation?.voiceName || "Adam"})...`);
+      const ttsResult = await generateAndUploadStoryAudio(
+        window.transcript,
+        metadata.topic || cleanStoryTitle(storyItem.title),
+        voiceRecommendation?.voiceId,
+        voiceRecommendation?.voiceSettings
+      );
+      if (ttsResult && ttsResult.audioUrl) {
+        humanVoiceAudioUrl = ttsResult.audioUrl;
+        console.log(`[StorySlicer] ✅ Real human studio audio generated: ${humanVoiceAudioUrl}`);
+      }
+    } catch (ttsErr) {
+      console.warn(`[StorySlicer] ℹ️ ElevenLabs studio voice generation skipped (${ttsErr.message}), using sliced native audio`);
+    }
+
     return {
       success: true,
       topic: metadata.topic || cleanStoryTitle(storyItem.title),
       theme: metadata.theme,
       duration: window.duration,
-      audioUrl: finalAudioUrl,
+      audioUrl: humanVoiceAudioUrl,
+      nativeAudioUrl: finalAudioUrl,
+      voiceRecommendation,
       storyTranscript: window.transcript,
       summaryGuide: metadata.summaryGuide,
       question: metadata.question,

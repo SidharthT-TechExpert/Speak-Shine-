@@ -181,7 +181,7 @@ export default function ManualQuestionsPanel() {
       const res = await api.post("/questions/generate-scraped-story", { targetDuration }, {
         timeout: 120000 // 2 minutes timeout for audio download, whisper transcribing, slicing, and LLM summary extraction
       });
-      const { topic, title, storyTranscript, audioUrl, summaryGuide, question, duration } = res.data;
+      const { topic, title, storyTranscript, audioUrl, summaryGuide, question, duration, voiceRecommendation: vRec } = res.data;
       setForm(f => ({
         ...f,
         topic: topic || title || f.topic,
@@ -194,7 +194,11 @@ export default function ManualQuestionsPanel() {
       const durationLabel = duration ? ` (${duration}s - Target ${targetDuration}s)` : "";
       notify(`📻 English story sliced cleanly${durationLabel}! Intro trimmed.`);
       if (storyTranscript) {
-        handleAnalyzeVoice(storyTranscript);
+        if (vRec) {
+        setVoiceRecommendation(vRec);
+        if (vRec.voiceId) setSelectedVoiceId(vRec.voiceId);
+      }
+      handleAnalyzeVoice(storyTranscript);
       }
     } catch (err) {
       console.error("[ManualQuestionsPanel] Scrape story error:", err);
