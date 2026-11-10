@@ -399,6 +399,21 @@ export async function getStoryVoices(req, res) {
 }
 
 /**
+ * POST /api/questions/generate-scraped-story
+ * Scrapes 1-2 minute authentic English short story audio from RSS, slices, transcribes, and extracts key summary points.
+ */
+export async function generateScrapedStoryNow(req, res) {
+  try {
+    const { generateScrapedStoryChallenge } = await import("../services/ai/storyFeedIngestionService.js");
+    const challenge = await generateScrapedStoryChallenge(req.body || {});
+    res.json({ success: true, ...challenge });
+  } catch (error) {
+    console.error("[Questions] Scraped story generation error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
  * POST /api/questions/generate-picture
  * Generates a Picture Description challenge (Groq metadata + Pexels image).
  * Returns title, instructions, difficulty, speakingDuration, imageUrl,

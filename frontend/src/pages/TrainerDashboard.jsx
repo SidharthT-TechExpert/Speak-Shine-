@@ -865,6 +865,7 @@ function ManualQuestionsPanel() {
   });
   const [saving, setSaving] = useState(false);
   const [generatingStory, setGeneratingStory] = useState(false);
+  const [scrapingStory, setScrapingStory] = useState(false);
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [generatingPicture, setGeneratingPicture] = useState(false);
   const [voiceRecommendation, setVoiceRecommendation] = useState(null);
@@ -912,6 +913,32 @@ function ManualQuestionsPanel() {
         return getNextMonthLast();
       default:
         return getTodayDate();
+    }
+  };
+
+  const handleScrapeStory = async () => {
+    setScrapingStory(true);
+    try {
+      const res = await api.post("/questions/generate-scraped-story", {}, {
+        timeout: 120000 // 2 minutes timeout for audio download, whisper transcribing, slicing, and LLM summary extraction
+      });
+      const { topic, title, storyTranscript, audioUrl, summaryGuide, question, duration } = res.data;
+      setForm(f => ({
+        ...f,
+        topic: topic || title || f.topic,
+        question: question || f.question,
+        storyTranscript: storyTranscript || f.storyTranscript,
+        audioUrl: audioUrl || f.audioUrl,
+        summaryGuide: Array.isArray(summaryGuide) ? summaryGuide.join("\n") : summaryGuide || f.summaryGuide,
+      }));
+      const durationLabel = duration ? ` (${duration}s)` : "";
+      notify(`📻 English story scraped & sliced${durationLabel}! Transcript and key points loaded.`);
+    } catch (err) {
+      console.error("[TrainerDashboard] Scrape story error:", err);
+      const errMsg = err.response?.data?.error || (err.code === "ECONNABORTED" ? "Request timed out while downloading and processing story audio. Please try again." : err.message) || "Story scraping failed";
+      notify(errMsg, "error");
+    } finally {
+      setScrapingStory(false);
     }
   };
 
@@ -1395,15 +1422,52 @@ function ManualQuestionsPanel() {
             </div>
             {form.setupType === "story_summary" && (
               <>
-                <div style={{ marginBottom: "0.75rem" }}>
+                {/* 1-Click Automated RSS Story Scraping & Slicing */}
+                <div style={{
+                  marginBottom: "0.85rem",
+                  padding: "0.85rem 1rem",
+                  borderRadius: 12,
+                  background: "linear-gradient(135deg, rgba(2, 132, 199, 0.12), rgba(99, 102, 241, 0.08))",
+                  border: "1px solid rgba(2, 132, 199, 0.35)"
+                }}>
                   <button
                     type="button"
                     className="btn-primary"
-                    disabled={generatingStory}
+                    disabled={scrapingStory || generatingStory}
+                    onClick={handleScrapeStory}
+                    style={{
+                      width: "100%",
+                      marginBottom: "0.45rem",
+                      background: "linear-gradient(135deg, #0284c7, #4f46e5)",
+                      border: "none",
+                      padding: "0.75rem 1rem",
+                      fontWeight: 800,
+                      fontSize: "0.92rem",
+                      borderRadius: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      boxShadow: "0 4px 15px rgba(2, 132, 199, 0.35)",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {scrapingStory ? "📻 Auto-Scraping Story & Slicing (1–2 min)…" : "📻 1-Click Auto-Scrape English Story (1–2 min RSS)"}
+                  </button>
+                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
+                    Grabs authentic public domain English stories &amp; fables from RSS, slices strictly between 1–2 minutes, transcribes with Whisper, and auto-derives key summary points!
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "0.75rem" }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={generatingStory || scrapingStory}
                     onClick={handleGenerateStory}
                     style={{ width: "100%", marginBottom: "0.5rem", background: "linear-gradient(135deg,#0f766e,#0d9488)" }}
                   >
-                    {generatingStory ? "✨ Generating story…" : "✨ AI Generate Story"}
+                    {generatingStory ? "✨ Generating story…" : "✨ AI Generate Story (Custom LLM)"}
                   </button>
                   <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
                     Generates a natural listening story with human pacing, key summary points, and matches the best character voice.
