@@ -114,14 +114,14 @@ export function cleanNarrativeTranscript(text, title = "") {
   if (!text) return "";
   let clean = text.trim();
 
-  // Strip leading LibriVox / narrator introductory preambles
+  // Strip leading LibriVox / narrator introductory preambles and website spellings
   clean = clean.replace(
-    /^(?:this\s+is\s+a\s+librivox\s+recording[\s\S]*?librivox\.org\.?|today's\s+reading\s+by\s+[^.]+\.?|read(?:ing)?\s+by\s+[^.]+\.?|recorded\s+by\s+[^.]+\.?(?:,\s*florida)?\.?|fables\s+of\s+aesop\.?|aesop's\s+fables\.?)\s*/gi,
+    /^(?:this\s+is\s+a\s+librivox\s+recording[\s\S]*?(?:librivox\.org\.?|dunkelberg\.com\.?|[a-z]-[a-z]-[a-z][^.]*\.?)|today's\s+reading\s+by\s+[^.]+\.?|read(?:ing)?\s+by\s+[^.]+\.?|recorded\s+by\s+[^.]+\.?(?:,\s*florida|,\s*texas)?\.?|fables\s+of\s+aesop\.?|aesop's\s+fables\.?)\s*/gi,
     ""
   );
 
   clean = clean.replace(
-    /^(?:recorded\s+by\s+[^.]+\.?,?\s*(?:florida|usa)?\.?\s*|aesop's\s+fables\.?\s*)+/gi,
+    /^(?:recorded\s+by\s+[^.]+\.?,?\s*(?:florida|texas|usa)?\.?\s*|dunkelberg(?:\.com)?\.?\s*|[a-z](?:-[a-z])+\.?\s*|aesop's\s+fables\.?\s*)+/gi,
     ""
   );
 
@@ -132,10 +132,12 @@ export function cleanNarrativeTranscript(text, title = "") {
     clean = clean.replace(titleRegex, "");
   }
 
-  // Strip trailing outro ("End of...", "Recorded by...")
+  // Strip trailing outro ("End of...", "Recorded by...", "Thank you for listening")
   clean = clean.replace(/\s*end\s+of\s+.*$/i, "");
   clean = clean.replace(/\s*recorded\s+by\s+.*$/i, "");
   clean = clean.replace(/\s*read\s+by\s+.*$/i, "");
+  clean = clean.replace(/\s*thank\s+you\s+for\s+listening.*$/i, "");
+  clean = clean.replace(/\s*the\s+end\.?\s*$/i.test(clean) ? /\s*the\s+end\.?\s*$/i : /^$/, "");
 
   return clean.trim();
 }
@@ -323,6 +325,8 @@ async function transcribeAudioWithWhisper(audioFilePath) {
   form.append("file", fs.createReadStream(audioFilePath));
   form.append("model", "whisper-large-v3");
   form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "word");
+  form.append("timestamp_granularities[]", "segment");
   form.append("temperature", "0.0");
 
   console.log(`[StorySlicer] 🎙️ Calling Groq Whisper Large v3 for audio transcription...`);
@@ -351,26 +355,41 @@ async function transcribeAudioWithWhisper(audioFilePath) {
 }
 
 /**
- * Detects whether a segment contains a standard LibriVox or intro/disclaimer
+ * Detects whether a segment or sentence contains intro, disclaimer, narrator, or ad text.
  */
 export function isIntroOrDisclaimerSegment(text, title = "") {
   if (!text) return false;
   const lower = text.toLowerCase().trim();
+  const compact = lower.replace(/[^a-z0-9]/g, "");
 
-  // Known disclaimer keywords
+  // Known disclaimer, narrator preamble, sponsor, ad keywords
   if (
-    lower.includes("librivox") ||
-    lower.includes("public domain") ||
-    lower.includes("volunteer") ||
-    lower.includes("recorded by") ||
-    lower.includes("recording by") ||
-    lower.includes("read by") ||
-    lower.includes("reading by") ||
-    lower.includes("today's reading") ||
-    lower.includes("for more information") ||
-    lower.includes("please visit") ||
-    lower.includes("fables of aesop") ||
-    lower.includes("aesop's fables") ||
+    compact.includes("librivox") ||
+    compact.includes("publicdomain") ||
+    compact.includes("volunteer") ||
+    compact.includes("recordedby") ||
+    compact.includes("recordingby") ||
+    compact.includes("readby") ||
+    compact.includes("readingby") ||
+    compact.includes("todaysreading") ||
+    compact.includes("formoreinformation") ||
+    compact.includes("pleasevisit") ||
+    compact.includes("fablesofaesop") ||
+    compact.includes("aesopsfables") ||
+    compact.includes("sponsor") ||
+    compact.includes("sponsored") ||
+    compact.includes("advertisement") ||
+    compact.includes("broughttoyou") ||
+    compact.includes("patreon") ||
+    compact.includes("promocode") ||
+    compact.includes("subscribe") ||
+    compact.includes("dunkelberg") ||
+    compact.includes("willmccoy") ||
+    compact.endsWith("org") ||
+    compact.endsWith("com") ||
+    compact.includes("dotorg") ||
+    compact.includes("dotcom") ||
+    /^(?:[a-z]-)+[a-z]\.?$/i.test(lower) ||
     /^(?:chapter\s+\d+|fable\s+\d+|volume\s+\d+|section\s+\d+)/i.test(lower)
   ) {
     return true;
@@ -378,10 +397,11 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
 
   // Isolated title repetition by reader right before story starts
   if (title) {
-    const cleanT = title.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-    const cleanSeg = lower.replace(/[^a-z0-9 ]/g, "").trim();
-    if (cleanSeg === cleanT || (cleanSeg.length > 5 && cleanT.includes(cleanSeg))) {
-      return true;
+    const cleanT = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cleanT.length > 3) {
+      if (compact === cleanT || (compact.length > 5 && cleanT.includes(compact)) || (cleanT.length > 5 && compact.includes(cleanT))) {
+        return true;
+      }
     }
   }
 
@@ -394,23 +414,163 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
 export function isOutroSegment(text) {
   if (!text) return false;
   const lower = text.toLowerCase().trim();
+  const compact = lower.replace(/[^a-z0-9]/g, "");
   return (
     /^\s*end\s+of\b/i.test(lower) ||
     /\brecorded\s+by\b/i.test(lower) ||
     /\bread\s+by\b/i.test(lower) ||
     /\breading\s+by\b/i.test(lower) ||
     /thank\s+you\s+for\s+listening/i.test(lower) ||
-    /^\s*the\s+end\.?\s*$/i.test(lower)
+    /^\s*the\s+end\.?\s*$/i.test(lower) ||
+    compact.includes("librivoxorg")
   );
 }
 
 /**
- * Find optimal story segment:
- * 1. Strictly strips narrator introduction preambles and outros.
- * 2. Matches the target duration set by the admin (targetDuration).
- * 3. Snaps cleanly to sentence boundaries.
+ * Group raw Whisper words into natural sentence units using punctuation (. ! ?)
+ * or long audio pauses (>=0.85s gap between words).
  */
-export function findOptimalStoryWindow(segments, targetDuration = 90, title = "") {
+export function groupWordsIntoSentences(words) {
+  if (!words || words.length === 0) return [];
+  const sentences = [];
+  let curWords = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    curWords.push(w);
+
+    const hasPunct = /[.!?]$/.test(w.word.trim());
+    const nextW = words[i + 1];
+    const isPause = nextW && (nextW.start - w.end) >= 0.85;
+
+    if (hasPunct || isPause || i === words.length - 1) {
+      const sentenceText = curWords.map(item => item.word).join(" ").trim();
+      sentences.push({
+        text: sentenceText,
+        start: curWords[0].start,
+        end: curWords[curWords.length - 1].end,
+        duration: curWords[curWords.length - 1].end - curWords[0].start,
+        words: [...curWords]
+      });
+      curWords = [];
+    }
+  }
+
+  return sentences;
+}
+
+/**
+ * Find optimal story segment:
+ * 1. Strictly strips narrator introduction preambles, ads, LibriVox disclaimers, and title repeats.
+ * 2. Uses word-level timestamps when available for millisecond-level precision.
+ * 3. Matches the target duration set by the admin (targetDuration).
+ * 4. Snaps cleanly to complete sentence boundaries.
+ */
+export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration = 90, title = "") {
+  let words = [];
+  let segments = [];
+
+  if (Array.isArray(transcriptionOrSegments)) {
+    segments = transcriptionOrSegments;
+  } else if (transcriptionOrSegments && typeof transcriptionOrSegments === "object") {
+    words = transcriptionOrSegments.words || [];
+    segments = transcriptionOrSegments.segments || [];
+  }
+
+  // 1. If words are available, use sentence grouping with exact word timestamps
+  if (words.length > 0) {
+    const sentences = groupWordsIntoSentences(words);
+
+    // Identify start sentence: advance past all intro / disclaimer / sponsor / title sentences
+    let startIndex = 0;
+    for (let i = 0; i < Math.min(sentences.length, 12); i++) {
+      if (isIntroOrDisclaimerSegment(sentences[i].text, title)) {
+        startIndex = i + 1;
+      } else {
+        if (i >= startIndex) {
+          startIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (startIndex >= sentences.length) startIndex = 0;
+
+    // Identify end sentence: strip backwards past any outro / credit sentence
+    let endIndex = sentences.length - 1;
+    for (let i = sentences.length - 1; i >= Math.max(0, sentences.length - 6); i--) {
+      if (isOutroSegment(sentences[i].text)) {
+        endIndex = i - 1;
+      } else {
+        break;
+      }
+    }
+
+    if (endIndex < startIndex) {
+      endIndex = sentences.length - 1;
+    }
+
+    const storySentences = sentences.slice(startIndex, endIndex + 1);
+    if (storySentences.length === 0) {
+      const firstW = words[0];
+      const lastW = words[words.length - 1];
+      return {
+        startTime: firstW.start,
+        endTime: lastW.end,
+        duration: Math.round(lastW.end - firstW.start),
+        transcript: cleanNarrativeTranscript(words.map(w => w.word).join(" "), title)
+      };
+    }
+
+    const fullStart = storySentences[0].start;
+    const fullEnd = storySentences[storySentences.length - 1].end;
+    const fullDuration = Math.round(fullEnd - fullStart);
+    const fullTranscript = cleanNarrativeTranscript(storySentences.map(s => s.text).join(" ").trim(), title);
+
+    // If complete narrative is within targetDuration + 20s, keep full story!
+    if (fullDuration <= (targetDuration + 20)) {
+      return {
+        startTime: fullStart,
+        endTime: fullEnd,
+        duration: fullDuration,
+        transcript: fullTranscript
+      };
+    }
+
+    // Otherwise find the continuous sentence window closest to targetDuration
+    let bestWindow = null;
+    let bestDiff = Infinity;
+
+    for (let i = 0; i < storySentences.length; i++) {
+      for (let j = i; j < storySentences.length; j++) {
+        const winDuration = Math.round(storySentences[j].end - storySentences[i].start);
+        const diff = Math.abs(winDuration - targetDuration);
+
+        if (diff < bestDiff && winDuration >= (targetDuration - 25) && winDuration <= (targetDuration + 30)) {
+          bestDiff = diff;
+          bestWindow = {
+            startTime: storySentences[i].start,
+            endTime: storySentences[j].end,
+            duration: winDuration,
+            transcript: cleanNarrativeTranscript(storySentences.slice(i, j + 1).map(s => s.text).join(" ").trim(), title)
+          };
+        }
+      }
+    }
+
+    if (bestWindow) {
+      return bestWindow;
+    }
+
+    return {
+      startTime: fullStart,
+      endTime: fullEnd,
+      duration: fullDuration,
+      transcript: fullTranscript
+    };
+  }
+
+  // Fallback to segment-based windowing if words are absent
   if (!segments || segments.length === 0) {
     return {
       startTime: 0,
@@ -530,8 +690,8 @@ async function sliceAudioFile(inputPath, startTime, endTime, outputPath) {
   const duration = Math.max(1, endTime - startTime);
   await execFileAsync("ffmpeg", [
     "-y",
-    "-ss", String(startTime),
-    "-to", String(endTime),
+    "-ss", String(Number(startTime).toFixed(2)),
+    "-to", String(Number(endTime).toFixed(2)),
     "-i", inputPath,
     "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
     "-c:a", "libmp3lame",
@@ -720,7 +880,7 @@ export async function processStoryAudioIntoChallenge(storyItem, options = {}) {
     const transcription = await transcribeAudioWithWhisper(whisperFile);
 
     console.log(`[StorySlicer] 🎯 Finding story window near target duration (${targetDuration}s)...`);
-    const window = findOptimalStoryWindow(transcription.segments, targetDuration, storyItem.title);
+    const window = findOptimalStoryWindow(transcription, targetDuration, storyItem.title);
 
     console.log(`[StorySlicer] ✂️ Slicing clean narrative audio (${window.duration}s from ${window.startTime.toFixed(1)}s to ${window.endTime.toFixed(1)}s)...`);
     await sliceAudioFile(rawFile, window.startTime, window.endTime, slicedFile);

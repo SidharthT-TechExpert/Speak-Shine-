@@ -161,6 +161,48 @@ describe("storyFeedIngestionService - Option A Precision Slicing & Intro Trimmin
       expect(window.transcript).not.toContain("End of The Cat");
       expect(window.transcript.startsWith("A cat pounced on a cock")).toBe(true);
     });
+
+    it("uses word-level timestamps to cut 22s untranscribed intro when chunk 0 start is 0.0s", () => {
+      // Real Whisper edge case: chunk 0 covers 0.0-29.98s, but speech only starts at 22.1s!
+      const transcription = {
+        segments: [
+          { start: 0.0, end: 29.98, text: "Once upon a time the oxen determined to be revenged upon the butchers." }
+        ],
+        words: [
+          { word: "Once", start: 22.1, end: 22.12 },
+          { word: "upon", start: 22.12, end: 22.5 },
+          { word: "a", start: 22.5, end: 22.7 },
+          { word: "time", start: 22.7, end: 23.2 },
+          { word: "the", start: 23.2, end: 23.5 },
+          { word: "oxen", start: 23.5, end: 24.1 },
+          { word: "determined", start: 24.1, end: 25.0 },
+          { word: "to", start: 25.0, end: 25.3 },
+          { word: "be", start: 25.3, end: 25.6 },
+          { word: "revenged", start: 25.6, end: 26.4 },
+          { word: "upon", start: 26.4, end: 26.8 },
+          { word: "the", start: 26.8, end: 27.1 },
+          { word: "butchers.", start: 27.1, end: 27.9 },
+          { word: "End", start: 30.0, end: 30.4 },
+          { word: "of", start: 30.4, end: 30.7 },
+          { word: "The", start: 30.7, end: 31.0 },
+          { word: "Oxen.", start: 31.0, end: 31.5 }
+        ]
+      };
+
+      const window = findOptimalStoryWindow(transcription, 90, "The Oxen and The Butchers");
+      expect(window.startTime).toBe(22.1); // Precision starts at word 0 (22.1s), NOT segment 0 (0.0s)!
+      expect(window.endTime).toBe(27.9); // Cuts outro!
+      expect(window.transcript).toBe("Once upon a time the oxen determined to be revenged upon the butchers.");
+    });
+
+    it("detects ads, sponsors, and spelled-out narrator domains in isIntroOrDisclaimerSegment", () => {
+      expect(isIntroOrDisclaimerSegment("This episode is sponsored by Audible.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Support us on Patreon for bonus content.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Use promo code SHINE for 20% off.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Dunkelberg.com.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("D-U-N-K-E-L-B-E-R-G.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Visit LibriVox.org for free audiobooks.")).toBe(true);
+    });
   });
 
   describe("FALLBACK_STORIES verification", () => {
