@@ -379,7 +379,8 @@ export function getQuestionUIConfig(type, today = {}) {
  */
 export function buildTeleprompterCues(transcript, totalDuration = 60) {
   if (!transcript || typeof transcript !== "string") return [];
-  const validDuration = Number(totalDuration) > 0 ? Number(totalDuration) : 60;
+  const parsedDur = typeof totalDuration === "string" ? parseFloat(totalDuration) : Number(totalDuration);
+  const validDuration = (parsedDur && !isNaN(parsedDur) && parsedDur > 0) ? parsedDur : 60;
 
   // Split on sentence boundaries (. ! ?)
   const rawSentences = transcript

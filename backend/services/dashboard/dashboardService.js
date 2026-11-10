@@ -237,6 +237,10 @@ export async function getTodayQuestionData() {
     videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
     videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
     videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
+    storyTranscript: isQuestionSentToday ? (status?.todayStoryTranscript || null) : null,
+    todayStoryTranscript: isQuestionSentToday ? (status?.todayStoryTranscript || null) : null,
+    summaryGuide: isQuestionSentToday ? (status?.todaySummaryGuide || null) : null,
+    todaySummaryGuide: isQuestionSentToday ? (status?.todaySummaryGuide || null) : null,
     vocabulary: (isQuestionSentToday && !isShadowing)
       ? (status?.todayVocabulary || []).slice(
           0,
@@ -342,6 +346,10 @@ export async function getTodayOverview() {
       videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
       videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
       videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
+    storyTranscript: isQuestionSentToday ? (status?.todayStoryTranscript || null) : null,
+    todayStoryTranscript: isQuestionSentToday ? (status?.todayStoryTranscript || null) : null,
+    summaryGuide: isQuestionSentToday ? (status?.todaySummaryGuide || null) : null,
+    todaySummaryGuide: isQuestionSentToday ? (status?.todaySummaryGuide || null) : null,
       isMonthlyReflection: isQuestionSentToday && Boolean(status?.isMonthlyReflectionDay),
       isWeeklyReflection: isQuestionSentToday && Boolean(status?.isWeeklyReflectionDay),
       isMonthlyGoals: isQuestionSentToday && Boolean(status?.isMonthlyGoalsDay),
@@ -646,6 +654,10 @@ export async function getUserProfile(phone) {
       videoDuration: isQuestionSentToday ? (status?.todayVideoDuration || null) : null,
       videoTranscript: isQuestionSentToday ? (status?.todayVideoTranscript || null) : null,
       videoTitle: isQuestionSentToday ? (status?.todayVideoTitle || status?.todayTopic || null) : null,
+    storyTranscript: isQuestionSentToday ? (status?.todayStoryTranscript || null) : null,
+    todayStoryTranscript: isQuestionSentToday ? (status?.todayStoryTranscript || null) : null,
+    summaryGuide: isQuestionSentToday ? (status?.todaySummaryGuide || null) : null,
+    todaySummaryGuide: isQuestionSentToday ? (status?.todaySummaryGuide || null) : null,
       // Picture description image data (only populated on picture description days)
       imageUrl:             isQuestionSentToday ? (status?.todayImageUrl || null) : null,
       imageSource:          isQuestionSentToday ? (status?.todayImageSource || null) : null,
