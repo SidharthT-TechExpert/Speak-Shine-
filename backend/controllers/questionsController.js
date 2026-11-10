@@ -331,13 +331,19 @@ export async function generateStoryNow(req, res) {
     const { generateListeningStory } = await import("../services/ai/storyGenerator.js");
     const Status = (await import("../../models/statusSchema.js")).default;
     const status = await Status.findOne().lean();
-    const wordCount = status?.storyWordCount ?? 200;
+
+    const targetDuration = Number(req.body?.targetDuration);
+    const wordCount = Number(req.body?.wordCount) ||
+      (targetDuration ? Math.round((targetDuration / 60) * 130) : null) ||
+      status?.storyWordCount || 200;
     const usedThemes = status?.usedStoryThemes || [];
-    const level = status?.storyLevel || "B1";
+    const level = req.body?.level || status?.storyLevel || "B2";
+
+    console.log(`[Questions] AI generating story with wordCount: ${wordCount} (~${Math.round(wordCount / 130 * 60)}s), level: ${level}`);
     const story = await generateListeningStory({ wordCount, usedThemes, level });
     // Track used theme to avoid repeats
     await Status.updateOne({}, { $addToSet: { usedStoryThemes: story.theme } }, { upsert: true });
-    res.json({ success: true, ...story });
+    res.json({ success: true, ...story, targetDuration: Math.round(wordCount / 130 * 60) });
   } catch (error) {
     console.error("[Questions] Story generation error:", error.message);
     res.status(500).json({ error: error.message });

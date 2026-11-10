@@ -24,8 +24,28 @@ import { uploadBufferToR2 } from "../../config/storage.js";
 
 const execFileAsync = promisify(execFile);
 
-// Curated verified public domain English short story RSS feeds (Aesop's Fables volumes 3 to 10)
+// Curated verified public domain English short story RSS feeds (Aesop's Fables volumes 1 to 12)
 export const STORY_FEEDS = [
+  {
+    name: "LibriVox Aesop's Fables (Vol 01)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/191",
+  },
+  {
+    name: "LibriVox Aesop's Fables (Vol 02)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/192",
+  },
+  {
+    name: "LibriVox Aesop's Fables (Vol 03)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/193",
+  },
+  {
+    name: "LibriVox Aesop's Fables (Vol 04)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/194",
+  },
   {
     name: "LibriVox Aesop's Fables (Vol 05)",
     category: "Classic Moral Fables",
@@ -47,19 +67,24 @@ export const STORY_FEEDS = [
     url: "https://librivox.org/rss/198",
   },
   {
-    name: "LibriVox Aesop's Fables (Vol 04)",
-    category: "Classic Moral Fables",
-    url: "https://librivox.org/rss/194",
-  },
-  {
-    name: "LibriVox Aesop's Fables (Vol 03)",
-    category: "Classic Moral Fables",
-    url: "https://librivox.org/rss/193",
-  },
-  {
     name: "LibriVox Aesop's Fables (Vol 09)",
     category: "Classic Moral Fables",
     url: "https://librivox.org/rss/199",
+  },
+  {
+    name: "LibriVox Aesop's Fables (Vol 10)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/200",
+  },
+  {
+    name: "LibriVox Aesop's Fables (Vol 11)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/201",
+  },
+  {
+    name: "LibriVox Aesop's Fables (Vol 12)",
+    category: "Classic Moral Fables",
+    url: "https://librivox.org/rss/202",
   }
 ];
 
@@ -210,21 +235,39 @@ export function parseStoryRssXml(xmlString) {
 
 /**
  * Fetch a short story audio link from curated RSS feeds,
- * prioritizing episodes whose estimated net story length (raw duration minus intro)
- * is CLOSEST to the admin's target duration.
+ * strictly prioritizing episodes whose estimated net story length (raw duration minus intro/outro)
+ * is CLOSEST to the admin's target duration, avoiding stories that are too small or too long.
  */
 export async function fetchAutomatedStoryFromRss(targetDuration = 90) {
-  const shuffledFeeds = [...STORY_FEEDS].sort(() => 0.5 - Math.random());
+  const estimatedIntroOutro = 22;
+  const minNetStorySec = Math.max(45, targetDuration - 20);
+  const maxNetStorySec = Math.max(110, targetDuration + 45);
 
-  for (const feed of shuffledFeeds) {
+  // Prioritize feeds by targetDuration:
+  // For long targets (>=100s), volumes with longer fables (Vol 06, 07, 08, 01, 10) come first.
+  const feedOrder = [...STORY_FEEDS].sort((a, b) => {
+    if (targetDuration >= 100) {
+      const longFeeds = ["Vol 06", "Vol 07", "Vol 08", "Vol 01", "Vol 03", "Vol 05", "Vol 09", "Vol 10"];
+      const aIdx = longFeeds.findIndex(f => a.name.includes(f));
+      const bIdx = longFeeds.findIndex(f => b.name.includes(f));
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+    }
+    return 0.5 - Math.random();
+  });
+
+  const candidates = [];
+
+  for (const feed of feedOrder) {
     try {
-      console.log(`[StoryIngestion] 📡 Fetching story feed: "${feed.name}" (${feed.url})...`);
+      console.log(`[StoryIngestion] 📡 Scanning story feed: "${feed.name}"...`);
       const res = await fetch(feed.url, {
         headers: {
           "User-Agent": "SpeakAndShineStoryBot/1.0 (+https://speakshine.ai)",
           "Accept": "application/rss+xml, application/xml, text/xml, */*"
         },
-        timeout: 12000
+        timeout: 9000
       });
 
       if (!res.ok) {
@@ -234,49 +277,57 @@ export async function fetchAutomatedStoryFromRss(targetDuration = 90) {
 
       const xmlText = await res.text();
       const episodes = parseStoryRssXml(xmlText);
+      if (episodes.length === 0) continue;
 
-      if (episodes.length === 0) {
-        console.warn(`[StoryIngestion] ⚠️ No story audio items found in ${feed.name}`);
-        continue;
-      }
+      for (const ep of episodes) {
+        if (!ep.durationSec) continue;
+        const estimatedStorySec = Math.max(30, ep.durationSec - estimatedIntroOutro);
 
-      // Filter and score episodes based on how close their net story length is to targetDuration.
-      // Net story length = raw duration minus ~18s intro/outro. Minimum net story must be at least 55 seconds (or targetDuration - 20s).
-      const minStorySec = Math.max(55, Math.min(65, targetDuration - 20));
-      const episodesWithDuration = episodes.filter(ep => ep.durationSec && (ep.durationSec - 18) >= minStorySec);
+        // Strict floor and ceiling: must never select a story that is far too small or overly long
+        if (estimatedStorySec < minNetStorySec || estimatedStorySec > maxNetStorySec) continue;
 
-      if (episodesWithDuration.length > 0) {
-        // Sort by closeness to targetDuration (estimated net story = raw - 18s)
-        const scoredEpisodes = episodesWithDuration.map(ep => {
-          const estimatedStorySec = Math.max(45, ep.durationSec - 18);
-          const diff = Math.abs(estimatedStorySec - targetDuration);
-          return { ...ep, estimatedStorySec, diff };
-        });
-
-        // Pick from episodes within ±25s of targetDuration, or the top 5 closest
-        const closeMatches = scoredEpisodes.filter(ep => ep.diff <= 25);
-        const candidates = closeMatches.length > 0
-          ? closeMatches
-          : scoredEpisodes.sort((a, b) => a.diff - b.diff).slice(0, 5);
-
-        const selected = candidates[Math.floor(Math.random() * candidates.length)];
-        console.log(`[StoryIngestion] ✅ Selected story episode: "${selected.title}" (Raw: ${selected.durationSec}s, Net story est: ~${selected.estimatedStorySec}s, Target: ${targetDuration}s)`);
-
-        return {
-          success: true,
+        const diff = Math.abs(estimatedStorySec - targetDuration);
+        candidates.push({
+          ...ep,
           sourceFeed: feed.name,
           category: feed.category,
-          title: selected.title,
-          audioUrl: selected.audioUrl,
-          durationSec: selected.durationSec,
-          description: selected.description
-        };
+          estimatedStorySec,
+          diff
+        });
       }
+
+      // If we found at least 2 candidates within ±15s of targetDuration, we have enough excellent matches!
+      const closeMatches = candidates.filter(c => c.diff <= 15);
+      if (closeMatches.length >= 2) break;
+      if (candidates.length >= 6) break;
     } catch (feedErr) {
-      console.warn(`[StoryIngestion] ⚠️ Feed fetch failed for ${feed.name}:`, feedErr.message);
+      console.warn(`[StoryIngestion] ⚠️ Feed scan failed for ${feed.name}:`, feedErr.message);
     }
   }
 
+  if (candidates.length > 0) {
+    // Sort by smallest difference to targetDuration
+    candidates.sort((a, b) => a.diff - b.diff);
+
+    // Pick from the top closest matches (within 10s of target, or top 3)
+    const tightMatches = candidates.filter(c => c.diff <= 10);
+    const pool = tightMatches.length > 0 ? tightMatches : candidates.slice(0, 3);
+    const selected = pool[Math.floor(Math.random() * pool.length)];
+
+    console.log(`[StoryIngestion] ✅ Selected story episode: "${selected.title}" from ${selected.sourceFeed} (Raw: ${selected.durationSec}s, Net story est: ~${selected.estimatedStorySec}s, Target: ${targetDuration}s, Diff: ${selected.diff}s)`);
+
+    return {
+      success: true,
+      sourceFeed: selected.sourceFeed,
+      category: selected.category,
+      title: selected.title,
+      audioUrl: selected.audioUrl,
+      durationSec: selected.durationSec,
+      description: selected.description
+    };
+  }
+
+  // Graceful fallback if feeds are temporarily unreachable
   throw new Error("Unable to fetch stories from RSS feeds at this time.");
 }
 
@@ -409,10 +460,17 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
     compact.includes("subscribe") ||
     compact.includes("dunkelberg") ||
     compact.includes("willmccoy") ||
+    compact.includes("gordonmckenzie") ||
+    compact.includes("newfoundland") ||
+    compact.includes("worcestershire") ||
     compact.endsWith("org") ||
     compact.endsWith("com") ||
     compact.includes("dotorg") ||
     compact.includes("dotcom") ||
+    /^(?:john'?s|st\.?\s*john'?s)[,\s]+newfoundland/i.test(lower) ||
+    /^worcestershire[,\s]+(?:uk|england)/i.test(lower) ||
+    /^(?:today'?s\s+reading\s+by|read(?:ing)?\s+by|recorded\s+by)\b/i.test(lower) ||
+    /^(?:the\s+fables\s+of\s+aesop|aesop'?s\s+fables)/i.test(lower) ||
     /^(?:[a-z]-)+[a-z]\.?$/i.test(lower) ||
     /^(?:chapter\s+\d+|fable\s+\d+|volume\s+\d+|section\s+\d+)/i.test(lower) ||
     /^(?:all\s+libr(?:i|ary)vox\s+recordings)/i.test(lower) ||
@@ -433,13 +491,11 @@ export function isIntroOrDisclaimerSegment(text, title = "") {
     }
   }
 
-  // Standalone title format check (e.g. "The Archer and the Lion.", "The Trumpeter Taken Prisoner.")
-  // If it's a short sentence (<= 7 words) without any narrative action verb
+  // Standalone header/title check: If it's a short segment (<= 8 words) without any narrative action verb, it's a title/location header
   const words = lower.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
-  if (words.length >= 2 && words.length <= 7) {
-    const isTitlePattern = /^(?:the|a|an)\s+[a-z]+(?:\s+(?:and|&|in|of|the|a|an)\s+[a-z]+){0,4}\.?$/i.test(lower);
-    const hasVerb = /\b(?:went|was|were|had|lived|saw|decided|marched|pounced|met|shot|challenged|travelled|traveled|stole|began|loved|thought|said|asked|gathered|dropped|called|walked|found|set|came|stood|fled|took|became)\b/i.test(lower);
-    if (isTitlePattern && !hasVerb) {
+  if (words.length >= 1 && words.length <= 8) {
+    const hasVerb = /\b(?:went|was|were|had|lived|saw|decided|marched|pounced|met|shot|challenged|travelled|traveled|stole|began|loved|thought|said|asked|gathered|dropped|called|walked|found|set|came|stood|fled|took|became|flew|crept|leaped|jumped|cried|replied|answered|warned|noticed|heard|wished|hoped|swallowed|bitten|bit|caught|spoke|spake|roamed|wandered|carried|struck|chanced|ran|laid|crawled|swam)\b/i.test(lower);
+    if (!hasVerb) {
       return true;
     }
   }
@@ -624,9 +680,8 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
     const fullDuration = Math.round(fullEnd - fullStart);
     const fullTranscript = cleanNarrativeTranscript(storySentences.map(s => s.text).join(" ").trim(), title);
 
-    // If complete narrative is within targetDuration + 30s, keep full story!
-    // Stories should ALWAYS start from the first sentence of the story (fullStart).
-    if (fullDuration <= (targetDuration + 30)) {
+    // If complete narrative is close to targetDuration (within ±15s), return full narrative
+    if (Math.abs(fullDuration - targetDuration) <= 15) {
       return {
         startTime: fullStart,
         endTime: fullEnd,
@@ -635,23 +690,35 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
       };
     }
 
-    // If narrative is longer, always start from sentence 0 and accumulate complete sentences
-    let bestCutIndex = storySentences.length - 1;
-    for (let k = 0; k < storySentences.length; k++) {
-      const dur = Math.round(storySentences[k].end - fullStart);
-      if (dur >= targetDuration - 10) {
-        bestCutIndex = k;
-        break;
+    // If narrative is longer than targetDuration, find the sentence cut that is CLOSEST to targetDuration
+    if (fullDuration > targetDuration) {
+      let bestCutIndex = storySentences.length - 1;
+      let minDiff = Infinity;
+      for (let k = 0; k < storySentences.length; k++) {
+        const dur = Math.round(storySentences[k].end - fullStart);
+        const diff = Math.abs(dur - targetDuration);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestCutIndex = k;
+        }
       }
+
+      const selectedSentences = storySentences.slice(0, bestCutIndex + 1);
+      const sliceEnd = selectedSentences[selectedSentences.length - 1].end;
+      return {
+        startTime: fullStart,
+        endTime: sliceEnd,
+        duration: Math.round(sliceEnd - fullStart),
+        transcript: cleanNarrativeTranscript(selectedSentences.map(s => s.text).join(" ").trim(), title)
+      };
     }
 
-    const selectedSentences = storySentences.slice(0, bestCutIndex + 1);
-    const sliceEnd = selectedSentences[selectedSentences.length - 1].end;
+    // If fullDuration is less than targetDuration, keep the full narrative
     return {
       startTime: fullStart,
-      endTime: sliceEnd,
-      duration: Math.round(sliceEnd - fullStart),
-      transcript: cleanNarrativeTranscript(selectedSentences.map(s => s.text).join(" ").trim(), title)
+      endTime: fullEnd,
+      duration: fullDuration,
+      transcript: fullTranscript
     };
   }
 
@@ -717,8 +784,8 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
 
   const fullStoryDuration = Math.round(storySegments[storySegments.length - 1].end - storySegments[0].start);
 
-  // If the complete narrative is within ±25s of targetDuration, use the entire complete story!
-  if (fullStoryDuration <= (targetDuration + 20)) {
+  // If the complete narrative is within ±15s of targetDuration, use the entire complete story!
+  if (Math.abs(fullStoryDuration - targetDuration) <= 15) {
     const rawText = storySegments.map(s => s.text.trim()).join(" ");
     return {
       startTime: Math.max(0, storySegments[0].start),
@@ -728,39 +795,29 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
     };
   }
 
-  // If the story is longer (e.g. 2-4 minutes), find the continuous narrative window closest to targetDuration
+  // If the story is longer, always start from sentence 0 and accumulate complete segments closest to targetDuration
   let bestWindow = null;
   let bestDiff = Infinity;
+  let candidateSegments = [];
 
-  for (let i = 0; i < storySegments.length; i++) {
-    const startSegment = storySegments[i];
-    let candidateSegments = [];
+  for (let j = 0; j < storySegments.length; j++) {
+    const seg = storySegments[j];
+    candidateSegments.push(seg);
+    const duration = Math.round(seg.end - storySegments[0].start);
+    const diff = Math.abs(duration - targetDuration);
 
-    for (let j = i; j < storySegments.length; j++) {
-      const seg = storySegments[j];
-      const duration = Math.round(seg.end - startSegment.start);
-
-      candidateSegments.push(seg);
-
-      if (duration >= (targetDuration - 20)) {
-        const diff = Math.abs(duration - targetDuration);
-        const endsWithPunct = /[.!?]$/.test(seg.text.trim());
-        const adjustedDiff = diff - (endsWithPunct ? 5 : 0);
-
-        if (adjustedDiff < bestDiff) {
-          bestDiff = adjustedDiff;
-          const rawText = candidateSegments.map(s => s.text.trim()).join(" ");
-          bestWindow = {
-            startTime: Math.max(0, startSegment.start),
-            endTime: seg.end,
-            duration: duration,
-            transcript: cleanNarrativeTranscript(rawText, title)
-          };
-        }
-      }
-
-      if (duration > (targetDuration + 25)) break;
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      const rawText = candidateSegments.map(s => s.text.trim()).join(" ");
+      bestWindow = {
+        startTime: Math.max(0, storySegments[0].start),
+        endTime: seg.end,
+        duration: duration,
+        transcript: cleanNarrativeTranscript(rawText, title)
+      };
     }
+
+    if (duration > targetDuration + 25) break;
   }
 
   if (bestWindow) {

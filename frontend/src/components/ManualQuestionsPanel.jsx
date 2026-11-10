@@ -208,7 +208,8 @@ export default function ManualQuestionsPanel() {
   const handleGenerateStory = async () => {
     setGeneratingStory(true);
     try {
-      const res = await api.post("/questions/generate-story");
+      const targetDuration = form.storyDuration || 90;
+      const res = await api.post("/questions/generate-story", { targetDuration, level: "B2" });
       const { topic, story, summaryGuide, question, voiceRecommendation: vRec } = res.data;
       setForm(f => ({
         ...f,

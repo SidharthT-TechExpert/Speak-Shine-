@@ -305,15 +305,61 @@ async function publishAutoPictureDescription() {
  */
 export async function publishAutoSaturdayStory() {
   try {
+    const status = await Status.findOne().lean();
+    const wordCount = status?.storyWordCount ?? 200;
+    // Derive targetDuration from wordCount (130 wpm speaking pace)
+    const targetDuration = Math.round((wordCount / 130) * 60) || 92;
+    const storyLevel = status?.storyLevel || status?.cefrLevel || "B2";
+    const usedThemes = status?.usedStoryThemes || [];
+
+    // 1. Try automated authentic RSS story scraping matching target duration
+    try {
+      const { generateScrapedStoryChallenge } = await import("../ai/storyFeedIngestionService.js");
+      console.log(`[QuestionScheduler] 📻 Attempting automated authentic RSS story scrape (Target: ${targetDuration}s, based on ${wordCount} words setting)...`);
+      const challenge = await generateScrapedStoryChallenge({ targetDuration });
+
+      if (challenge && challenge.audioUrl && challenge.storyTranscript) {
+        await Status.updateOne({}, {
+          $set: {
+            questionSentToday: true,
+            questionPublishedDate: getTodayISTDate(),
+            isStorySummaryDay: true,
+            isMonthlyReflectionDay: false,
+            isMonthlyGoalsDay: false,
+            todayContentType: "story_audio",
+            todayTopic: challenge.topic,
+            todayQuestion: challenge.question || "Listen to this short story and record a 1-minute video summary in your own words. Explain what happened and the moral lesson.",
+            todayCategory: STORY_SUMMARY_CATEGORY,
+            todayAudioUrl: challenge.audioUrl,
+            todayStoryTranscript: challenge.storyTranscript,
+            todaySummaryGuide: Array.isArray(challenge.summaryGuide) ? challenge.summaryGuide.join("\n") : (challenge.summaryGuide || ""),
+            todayPosterImage: null,
+            todayVocabulary: challenge.vocabulary || [],
+          }
+        }, { upsert: true });
+
+        console.log(`[QuestionScheduler] ✅ Scraped story summary published: "${challenge.topic}" (${challenge.duration}s, target: ${targetDuration}s)`);
+        await ensureTodayVocabulary().catch(err =>
+          console.warn("[QuestionScheduler] Vocabulary generation failed (non-fatal):", err.message)
+        );
+        await dispatchPosterToWhatsApp({
+          topic: challenge.topic,
+          question: challenge.question || "Listen to this short story and record a 1-minute video summary in your own words.",
+          category: STORY_SUMMARY_CATEGORY,
+          contentType: "story_audio"
+        });
+        return { published: true, type: "story_summary", topic: challenge.topic, source: "auto_scraped" };
+      }
+    } catch (scrapeErr) {
+      console.warn("[QuestionScheduler] ⚠️ RSS story scrape failed, falling back to AI generated story:", scrapeErr.message);
+    }
+
+    // 2. Fallback to AI-generated story with matching wordCount and level
     const { generateListeningStory } = await import("../ai/storyGenerator.js");
     const { generateAndUploadStoryAudio } = await import("../ai/storyAudioService.js");
 
-    const status = await Status.findOne().lean();
-    const wordCount = status?.storyWordCount ?? 200;
-    const usedThemes = status?.usedStoryThemes || [];
-
-    console.log("[QuestionScheduler] 🎧 Auto-generating Saturday story…");
-    const story = await generateListeningStory({ wordCount, usedThemes });
+    console.log(`[QuestionScheduler] 🎧 Auto-generating AI story (Word count: ${wordCount} ≈ ${targetDuration}s, Level: ${storyLevel})…`);
+    const story = await generateListeningStory({ wordCount, usedThemes, level: storyLevel });
 
     // Generate and upload audio with character-adapted voice
     const audioResult = await generateAndUploadStoryAudio(

@@ -205,6 +205,20 @@ describe("storyFeedIngestionService - Option A Precision Slicing & Intro Trimmin
       expect(isIntroOrDisclaimerSegment("Dunkelberg.com.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("D-U-N-K-E-L-B-E-R-G.")).toBe(true);
       expect(isIntroOrDisclaimerSegment("Visit LibriVox.org for free audiobooks.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("John's, Newfoundland.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("St. John's, Newfoundland.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Worcestershire, UK.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("The Owl and the Birds.")).toBe(true);
+    });
+
+    it("cleans John's, Newfoundland reader header and Aesop collection title from story transcript", () => {
+      const text = "John's, Newfoundland. Aesop's Fables. The Owl and the Birds. The owl is a very wise bird, and once, long ago, when the first oak sprouted in the forest, she called all the other birds together and said to them, You see this tiny tree? End of The Owl and the Birds.";
+      const cleaned = cleanNarrativeTranscript(text, "The Owl and the Birds");
+      expect(cleaned).not.toContain("John's");
+      expect(cleaned).not.toContain("Newfoundland");
+      expect(cleaned).not.toContain("Aesop's Fables");
+      expect(cleaned).not.toContain("End of");
+      expect(cleaned.startsWith("The owl is a very wise bird")).toBe(true);
     });
 
     it("accurately identifies narrative story sentences vs isolated title headers and reader credits", () => {
