@@ -239,14 +239,16 @@ export function parseStoryRssXml(xmlString) {
  * is CLOSEST to the admin's target duration, avoiding stories that are too small or too long.
  */
 export async function fetchAutomatedStoryFromRss(targetDuration = 90) {
-  const estimatedIntroOutro = 22;
-  const minNetStorySec = Math.max(45, targetDuration - 20);
-  const maxNetStorySec = Math.max(110, targetDuration + 45);
+  const estimatedIntroOutro = 20;
+  // A story must be preserved completely from beginning to moral, so the candidate's complete net duration
+  // must match targetDuration closely (within ~15-18s)
+  const minNetStorySec = Math.max(40, targetDuration - 15);
+  const maxNetStorySec = targetDuration + 18;
 
   // Prioritize feeds by targetDuration:
-  // For long targets (>=100s), volumes with longer fables (Vol 06, 07, 08, 01, 10) come first.
+  // For long targets (>=105s), volumes with longer fables (Vol 06, 07, 08, 01, 10) come first.
   const feedOrder = [...STORY_FEEDS].sort((a, b) => {
-    if (targetDuration >= 100) {
+    if (targetDuration >= 105) {
       const longFeeds = ["Vol 06", "Vol 07", "Vol 08", "Vol 01", "Vol 03", "Vol 05", "Vol 09", "Vol 10"];
       const aIdx = longFeeds.findIndex(f => a.name.includes(f));
       const bIdx = longFeeds.findIndex(f => b.name.includes(f));
@@ -395,7 +397,10 @@ async function transcribeAudioWithWhisper(audioFilePath) {
   }
 
   const form = new FormData();
-  form.append("file", fs.createReadStream(audioFilePath));
+  form.append("file", fs.readFileSync(audioFilePath), {
+    filename: "audio.mp3",
+    contentType: "audio/mpeg"
+  });
   form.append("model", "whisper-large-v3");
   form.append("response_format", "verbose_json");
   form.append("timestamp_granularities[]", "word");
@@ -403,14 +408,18 @@ async function transcribeAudioWithWhisper(audioFilePath) {
   form.append("prompt", "The following is an English spoken audio recording of a classic moral fable story.");
   form.append("temperature", "0.0");
 
+  const buffer = form.getBuffer();
+  const headers = {
+    Authorization: `Bearer ${groqKey}`,
+    ...form.getHeaders(),
+    "Content-Length": String(buffer.length)
+  };
+
   console.log(`[StorySlicer] 🎙️ Calling Groq Whisper Large v3 for audio transcription...`);
   const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${groqKey}`,
-      ...form.getHeaders()
-    },
-    body: form,
+    headers,
+    body: buffer,
     timeout: 45000
   });
 
@@ -680,40 +689,8 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
     const fullDuration = Math.round(fullEnd - fullStart);
     const fullTranscript = cleanNarrativeTranscript(storySentences.map(s => s.text).join(" ").trim(), title);
 
-    // If complete narrative is close to targetDuration (within ±15s), return full narrative
-    if (Math.abs(fullDuration - targetDuration) <= 15) {
-      return {
-        startTime: fullStart,
-        endTime: fullEnd,
-        duration: fullDuration,
-        transcript: fullTranscript
-      };
-    }
-
-    // If narrative is longer than targetDuration, find the sentence cut that is CLOSEST to targetDuration
-    if (fullDuration > targetDuration) {
-      let bestCutIndex = storySentences.length - 1;
-      let minDiff = Infinity;
-      for (let k = 0; k < storySentences.length; k++) {
-        const dur = Math.round(storySentences[k].end - fullStart);
-        const diff = Math.abs(dur - targetDuration);
-        if (diff < minDiff) {
-          minDiff = diff;
-          bestCutIndex = k;
-        }
-      }
-
-      const selectedSentences = storySentences.slice(0, bestCutIndex + 1);
-      const sliceEnd = selectedSentences[selectedSentences.length - 1].end;
-      return {
-        startTime: fullStart,
-        endTime: sliceEnd,
-        duration: Math.round(sliceEnd - fullStart),
-        transcript: cleanNarrativeTranscript(selectedSentences.map(s => s.text).join(" ").trim(), title)
-      };
-    }
-
-    // If fullDuration is less than targetDuration, keep the full narrative
+    // Stories must ALWAYS be preserved completely from the first sentence to the final moral/conclusion!
+    // Never truncate a story mid-plot or mid-sentence.
     return {
       startTime: fullStart,
       endTime: fullEnd,
@@ -783,48 +760,6 @@ export function findOptimalStoryWindow(transcriptionOrSegments, targetDuration =
   }
 
   const fullStoryDuration = Math.round(storySegments[storySegments.length - 1].end - storySegments[0].start);
-
-  // If the complete narrative is within ±15s of targetDuration, use the entire complete story!
-  if (Math.abs(fullStoryDuration - targetDuration) <= 15) {
-    const rawText = storySegments.map(s => s.text.trim()).join(" ");
-    return {
-      startTime: Math.max(0, storySegments[0].start),
-      endTime: storySegments[storySegments.length - 1].end,
-      duration: fullStoryDuration,
-      transcript: cleanNarrativeTranscript(rawText, title)
-    };
-  }
-
-  // If the story is longer, always start from sentence 0 and accumulate complete segments closest to targetDuration
-  let bestWindow = null;
-  let bestDiff = Infinity;
-  let candidateSegments = [];
-
-  for (let j = 0; j < storySegments.length; j++) {
-    const seg = storySegments[j];
-    candidateSegments.push(seg);
-    const duration = Math.round(seg.end - storySegments[0].start);
-    const diff = Math.abs(duration - targetDuration);
-
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      const rawText = candidateSegments.map(s => s.text.trim()).join(" ");
-      bestWindow = {
-        startTime: Math.max(0, storySegments[0].start),
-        endTime: seg.end,
-        duration: duration,
-        transcript: cleanNarrativeTranscript(rawText, title)
-      };
-    }
-
-    if (duration > targetDuration + 25) break;
-  }
-
-  if (bestWindow) {
-    return bestWindow;
-  }
-
-  // Final fallback
   const rawText = storySegments.map(s => s.text.trim()).join(" ");
   return {
     startTime: Math.max(0, storySegments[0].start),
