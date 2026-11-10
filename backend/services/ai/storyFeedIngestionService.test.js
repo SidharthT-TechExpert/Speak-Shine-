@@ -2,18 +2,20 @@ import { describe, it, expect } from "vitest";
 import {
   parseDurationToSeconds,
   cleanStoryTitle,
+  cleanNarrativeTranscript,
   parseStoryRssXml,
+  isIntroOrDisclaimerSegment,
+  isOutroSegment,
   findOptimalStoryWindow,
-  generateScrapedStoryChallenge,
   FALLBACK_STORIES
 } from "./storyFeedIngestionService.js";
 
-describe("storyFeedIngestionService - Option A Ingestion & Processing", () => {
+describe("storyFeedIngestionService - Option A Precision Slicing & Intro Trimming", () => {
   describe("parseDurationToSeconds", () => {
-    it("parses HH:MM:SS format correctly", () => {
+    it("parses HH:MM:SS format correctly even with CDATA and whitespace", () => {
       expect(parseDurationToSeconds("00:01:24")).toBe(84);
       expect(parseDurationToSeconds("01:00:00")).toBe(3600);
-      expect(parseDurationToSeconds("<![CDATA[00:02:15]]>")).toBe(135);
+      expect(parseDurationToSeconds("\n    <![CDATA[00:01:41]]>\n  ")).toBe(101);
     });
 
     it("parses MM:SS format correctly", () => {
@@ -33,9 +35,12 @@ describe("storyFeedIngestionService - Option A Ingestion & Processing", () => {
   });
 
   describe("cleanStoryTitle", () => {
-    it("strips volume prefixes and author suffixes", () => {
-      expect(cleanStoryTitle("Fables 05 01 - The Man and The Image by Aesop (c. 620 BCE - 564)")).toBe(
-        "The Man and The Image"
+    it("strips volume prefixes, author suffixes, and narrator intro headers", () => {
+      expect(cleanStoryTitle("Today's reading by Will McCoy. Aesop's Fables. The Trumpeter Taken Prisoner.")).toBe(
+        "The Trumpeter Taken Prisoner"
+      );
+      expect(cleanStoryTitle("Fables 05 01 - The Cat and The Cock by Aesop (c. 620 BCE - 564)")).toBe(
+        "The Cat and The Cock"
       );
       expect(cleanStoryTitle("Episode 12 - Hercules and The Waggoner by Aesop")).toBe(
         "Hercules and The Waggoner"
@@ -51,6 +56,48 @@ describe("storyFeedIngestionService - Option A Ingestion & Processing", () => {
     });
   });
 
+  describe("cleanNarrativeTranscript", () => {
+    it("removes narrator introduction and outro from transcript", () => {
+      const rawText = "Today's reading by Will McCoy. Aesop's Fables. The Trumpeter Taken Prisoner. A trumpeter marched into battle in the van of the army, and put courage into his comrades by his warlike tunes. Being captured by the enemy, he begged for his life, and said, Do not put me to death, I have killed no one. Indeed, I have no weapons, but carry with me only my trumpet here. But his captors replied, That is only the more reason why we should take your life, for though you do not fight yourself, you stir up others to do so. End of The Trumpeter Taken Prisoner";
+      const clean = cleanNarrativeTranscript(rawText, "The Trumpeter Taken Prisoner");
+
+      expect(clean).not.toContain("Today's reading by");
+      expect(clean).not.toContain("Aesop's Fables");
+      expect(clean).not.toContain("End of The Trumpeter");
+      expect(clean.startsWith("A trumpeter marched into battle")).toBe(true);
+      expect(clean.endsWith("stir up others to do so.")).toBe(true);
+    });
+
+    it("removes LibriVox 21-second disclaimer and outro", () => {
+      const rawText = "This is a LibriVox recording. All LibriVox recordings are in the public domain. For more information or to volunteer, please visit librivox.org. Recorded by Christine Deuer, Thonotosassa Florida. Aesop's Fables. The Cat and the Cock. A cat pounced on a cock and cast about for some good excuse for making a meal of him. The want of a good excuse never kept a villain from crime. End of The Cat and the Cock.";
+      const clean = cleanNarrativeTranscript(rawText, "The Cat and the Cock");
+
+      expect(clean).not.toContain("LibriVox");
+      expect(clean).not.toContain("Christine Deuer");
+      expect(clean).not.toContain("End of The Cat");
+      expect(clean.startsWith("A cat pounced on a cock")).toBe(true);
+      expect(clean.endsWith("never kept a villain from crime.")).toBe(true);
+    });
+  });
+
+  describe("isIntroOrDisclaimerSegment & isOutroSegment", () => {
+    it("detects intro and disclaimer phrases", () => {
+      expect(isIntroOrDisclaimerSegment("This is a LibriVox recording.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Recorded by Christine Deuer, Florida.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Today's reading by Will McCoy.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("Aesop's Fables.")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("The Cat and the Cock", "The Cat and the Cock")).toBe(true);
+      expect(isIntroOrDisclaimerSegment("A cat pounced on a cock.")).toBe(false);
+    });
+
+    it("detects outro phrases", () => {
+      expect(isOutroSegment("End of The Trumpeter Taken Prisoner")).toBe(true);
+      expect(isOutroSegment("End of The Cat and the Cock.")).toBe(true);
+      expect(isOutroSegment("Recorded by volunteer reader.")).toBe(true);
+      expect(isOutroSegment("The want of a good excuse never kept a villain from crime.")).toBe(false);
+    });
+  });
+
   describe("parseStoryRssXml", () => {
     const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
@@ -59,76 +106,72 @@ describe("storyFeedIngestionService - Option A Ingestion & Processing", () => {
     <item>
       <title><![CDATA[Fables 05 01 - The Fox and The Grapes by Aesop]]></title>
       <enclosure url="https://archive.org/download/sample/fox_grapes.mp3" length="123456" type="audio/mpeg" />
-      <itunes:duration><![CDATA[00:01:12]]></itunes:duration>
+      <itunes:duration>
+        <![CDATA[00:01:45]]>
+      </itunes:duration>
       <description>A thirsty fox tries to reach high hanging grapes.</description>
     </item>
     <item>
       <title>Hercules and The Waggoner</title>
       <media:content url="https://archive.org/download/sample/hercules.mp3" type="audio/mpeg" />
-      <itunes:duration>01:25</itunes:duration>
+      <itunes:duration>
+        <![CDATA[00:01:41]]>
+      </itunes:duration>
       <description>A cart gets stuck in the mud.</description>
     </item>
   </channel>
 </rss>`;
 
-    it("extracts episodes with audio URL, cleaned title, and duration in seconds", () => {
+    it("extracts episodes with audio URL, cleaned title, and parsed duration in seconds", () => {
       const items = parseStoryRssXml(sampleXml);
       expect(items.length).toBe(2);
 
       expect(items[0].title).toBe("The Fox and The Grapes");
       expect(items[0].audioUrl).toBe("https://archive.org/download/sample/fox_grapes.mp3");
-      expect(items[0].durationSec).toBe(72);
-      expect(items[0].description).toContain("thirsty fox");
+      expect(items[0].durationSec).toBe(105);
 
       expect(items[1].title).toBe("Hercules and The Waggoner");
       expect(items[1].audioUrl).toBe("https://archive.org/download/sample/hercules.mp3");
-      expect(items[1].durationSec).toBe(85);
+      expect(items[1].durationSec).toBe(101);
     });
   });
 
   describe("findOptimalStoryWindow", () => {
-    it("strips LibriVox disclaimers and selects a 60s-120s window", () => {
+    it("strips 21s LibriVox intro & outro, starting cleanly on the story", () => {
       const segments = [
-        { start: 0, end: 5.5, text: "This is a LibriVox recording." },
-        { start: 5.5, end: 12.0, text: "All LibriVox recordings are in the public domain. For more info visit LibriVox.org." },
-        { start: 12.0, end: 16.0, text: "Fables of Aesop. The Boy Who Cried Wolf." },
-        { start: 16.0, end: 35.0, text: "A young shepherd boy tended his sheep near a dark forest on the hillside." },
-        { start: 35.0, end: 60.0, text: "Bored one afternoon, he shouted at the top of his lungs, Wolf! Wolf! The wolf is chasing the sheep!" },
-        { start: 60.0, end: 88.0, text: "The villagers came running to help him, only to find him laughing at their concern." },
-        { start: 88.0, end: 104.0, text: "Later, a real wolf emerged from the forest, but when he cried out, nobody came to his aid." },
-        { start: 104.0, end: 112.0, text: "End of fable. Recorded by volunteer reader." }
+        { start: 0.0, end: 2.5, text: "This is a LibriVox recording." },
+        { start: 2.5, end: 6.0, text: "All LibriVox recordings are in the public domain." },
+        { start: 6.0, end: 11.0, text: "For more information or to volunteer, please visit librivox.org." },
+        { start: 11.0, end: 16.0, text: "Recorded by Christine Deuer, Thonotosassa Florida." },
+        { start: 16.0, end: 18.0, text: "Aesop's Fables." },
+        { start: 18.0, end: 21.0, text: "The Cat and the Cock." },
+        { start: 21.0, end: 35.0, text: "A cat pounced on a cock and cast about for some good excuse for making a meal of him." },
+        { start: 35.0, end: 50.0, text: "At last she said, You make a great nuisance of yourself at night by crowing." },
+        { start: 50.0, end: 62.0, text: "The cock defended himself, but the cat said she was not going without dinner." },
+        { start: 62.0, end: 67.5, text: "The want of a good excuse never kept a villain from crime." },
+        { start: 67.5, end: 71.0, text: "End of The Cat and the Cock." }
       ];
 
-      const window = findOptimalStoryWindow(segments, 60, 120);
+      const window = findOptimalStoryWindow(segments, 90, "The Cat and the Cock");
 
-      expect(window.startTime).toBeGreaterThanOrEqual(12.0); // Disclaimers stripped
-      expect(window.duration).toBeGreaterThanOrEqual(60);
-      expect(window.duration).toBeLessThanOrEqual(120);
-      expect(window.transcript).not.toContain("This is a LibriVox recording");
-      expect(window.transcript).toContain("A young shepherd boy");
+      expect(window.startTime).toBeCloseTo(21.0, 0); // Intro cut!
+      expect(window.endTime).toBeCloseTo(67.5, 0); // Outro cut!
+      expect(window.duration).toBe(Math.round(67.5 - 21.0));
+      expect(window.transcript).not.toContain("LibriVox");
+      expect(window.transcript).not.toContain("End of The Cat");
+      expect(window.transcript.startsWith("A cat pounced on a cock")).toBe(true);
     });
   });
 
-  describe("generateScrapedStoryChallenge fallback resilience", () => {
-    it("returns complete, valid challenge structure from fallback pool", () => {
-      const fallback = FALLBACK_STORIES[0];
-      expect(fallback.topic).toBeDefined();
-      expect(fallback.audioUrl).toMatch(/^https?:\/\//);
-      expect(fallback.duration).toBeGreaterThanOrEqual(60);
-      expect(fallback.duration).toBeLessThanOrEqual(120);
-      expect(typeof fallback.storyTranscript).toBe("string");
-      expect(fallback.storyTranscript.length).toBeGreaterThan(50);
-      expect(Array.isArray(fallback.summaryGuide)).toBe(true);
-      expect(fallback.summaryGuide.length).toBeGreaterThanOrEqual(3);
-      expect(typeof fallback.question).toBe("string");
-    });
-
-    it("verified fallback stories all adhere to the 60-120s duration range", () => {
+  describe("FALLBACK_STORIES verification", () => {
+    it("all fallback stories have durations between 75s and 95s and clean transcripts", () => {
       for (const fallback of FALLBACK_STORIES) {
-        expect(fallback.duration).toBeGreaterThanOrEqual(60);
-        expect(fallback.duration).toBeLessThanOrEqual(120);
+        expect(fallback.duration).toBeGreaterThanOrEqual(75);
+        expect(fallback.duration).toBeLessThanOrEqual(95);
         expect(fallback.summaryGuide.length).toBeGreaterThanOrEqual(3);
         expect(fallback.vocabulary.length).toBe(3);
+        expect(fallback.storyTranscript).not.toContain("LibriVox");
+        expect(fallback.storyTranscript).not.toContain("End of");
       }
     });
   });

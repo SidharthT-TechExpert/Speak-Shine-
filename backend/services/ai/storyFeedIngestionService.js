@@ -1,12 +1,15 @@
 /**
  * storyFeedIngestionService.js
  *
- * Automated English Short Story Scraping & Audio Processing (Option A):
- * 1. Scrapes authentic public domain English short story / fable RSS feeds (LibriVox Aesop's Fables, Classic Fables).
- * 2. Downloads audio and transcribes with Groq Whisper Large v3 to obtain word & sentence timestamps.
- * 3. Strips introductory disclaimers and slices a coherent 1-2 minute (60s–120s) English story segment.
- * 4. Slices with FFmpeg and uploads high-fidelity MP3 to Cloudflare R2.
- * 5. Uses Groq LLM to automatically derive key summary points (summaryGuide), focus vocabulary, and the challenge question.
+ * Automated English Short Story Scraping & Precision Audio Slicing (Option A):
+ * 1. Scrapes authentic public domain English short story / fable RSS feeds (LibriVox Aesop's Fables).
+ * 2. Matches the admin-configured target duration (derived from admin settings storyWordCount or explicit target).
+ * 3. Transcribes with Groq Whisper Large v3 to obtain word & sentence timestamps.
+ * 4. Strips narrator introductory preambles (e.g. "This is a LibriVox recording...", "Today's reading by...")
+ *    and outro credits ("End of The Trumpeter...", "Recorded by...").
+ * 5. Slices strictly from the first sentence of the story to the final moral sentence with FFmpeg.
+ * 6. Normalizes loudness and saves locally to frontend/public/story-audio/ and Cloudflare R2.
+ * 7. Automatically extracts key summary points (summaryGuide) with LLM.
  */
 
 import fs from "fs";
@@ -61,14 +64,16 @@ export const STORY_FEEDS = [
 ];
 
 /**
- * Parse duration string (HH:MM:SS or MM:SS or seconds) to total seconds
+ * Parse duration string (HH:MM:SS, MM:SS, or seconds with CDATA/whitespace) to total seconds
  */
 export function parseDurationToSeconds(durationStr) {
   if (!durationStr) return null;
-  const str = String(durationStr).replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+  const str = String(durationStr)
+    .replace(/<!\[CDATA\[|\]\]>/g, "")
+    .trim();
   if (/^\d+$/.test(str)) return parseInt(str, 10);
 
-  const parts = str.split(":").map(p => parseInt(p, 10));
+  const parts = str.split(":").map(p => parseInt(p.trim(), 10));
   if (parts.some(isNaN)) return null;
 
   if (parts.length === 3) {
@@ -81,21 +86,62 @@ export function parseDurationToSeconds(durationStr) {
 }
 
 /**
- * Clean raw story title (strips narrator credits, author tags, volume headers)
+ * Clean raw story title (strips narrator credits, volume headers, episode tags)
  */
 export function cleanStoryTitle(rawTitle) {
   if (!rawTitle) return "Classic English Short Story";
   let title = String(rawTitle).replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+  
+  // Strip "Today's reading by ...", "Recorded by ...", etc.
+  title = title.replace(/^(?:today's\s+reading\s+by|read(?:ing)?\s+by|recorded\s+by)\s+[^.]+\.?\s*/i, "");
+  // Strip "Aesop's Fables." or "Fables of Aesop."
+  title = title.replace(/^(?:aesop's\s+fables|fables\s+of\s+aesop)\.?\s*/i, "");
   // Strip "Fables 05 01 - ", "Episode 12 - ", etc.
   title = title.replace(/^(?:fables?\s*\d+\s*\d*\s*[-–:]\s*|episode\s*\d+\s*[-–:]\s*|\d+[\s.-]+)/i, "");
   // Strip "by Aesop..." or "(c. 620 BCE - 564)"
   title = title.replace(/\s*by\s+aesop.*$/i, "");
   title = title.replace(/\s*\([^)]*\)\s*$/g, "");
+  // Strip trailing punctuation
+  title = title.replace(/[.\s–-]+$/, "");
   return title.trim() || "Classic English Short Story";
 }
 
 /**
- * Extracts episodes from an RSS XML string using regex
+ * Clean transcript of any introductory narrator preamble or outro text.
+ * Ensures the transcript contains ONLY the story itself.
+ */
+export function cleanNarrativeTranscript(text, title = "") {
+  if (!text) return "";
+  let clean = text.trim();
+
+  // Strip leading LibriVox / narrator introductory preambles
+  clean = clean.replace(
+    /^(?:this\s+is\s+a\s+librivox\s+recording[\s\S]*?librivox\.org\.?|today's\s+reading\s+by\s+[^.]+\.?|read(?:ing)?\s+by\s+[^.]+\.?|recorded\s+by\s+[^.]+\.?(?:,\s*florida)?\.?|fables\s+of\s+aesop\.?|aesop's\s+fables\.?)\s*/gi,
+    ""
+  );
+
+  clean = clean.replace(
+    /^(?:recorded\s+by\s+[^.]+\.?,?\s*(?:florida|usa)?\.?\s*|aesop's\s+fables\.?\s*)+/gi,
+    ""
+  );
+
+  // Strip standalone title announcement at start if present
+  if (title) {
+    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const titleRegex = new RegExp(`^${escapedTitle}\\.?\\s*`, "i");
+    clean = clean.replace(titleRegex, "");
+  }
+
+  // Strip trailing outro ("End of...", "Recorded by...")
+  clean = clean.replace(/\s*end\s+of\s+.*$/i, "");
+  clean = clean.replace(/\s*recorded\s+by\s+.*$/i, "");
+  clean = clean.replace(/\s*read\s+by\s+.*$/i, "");
+
+  return clean.trim();
+}
+
+/**
+ * Extracts episodes from an RSS XML string using robust regex
  */
 export function parseStoryRssXml(xmlString) {
   const items = [];
@@ -115,7 +161,8 @@ export function parseStoryRssXml(xmlString) {
       if (mediaMatch) audioUrl = mediaMatch[1].trim();
     }
 
-    const durationMatch = itemXml.match(/<itunes:duration>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/itunes:duration>/i);
+    // Flexible itunes:duration match allowing newlines and CDATA
+    const durationMatch = itemXml.match(/<itunes:duration>[\s\S]*?(?:<!\[CDATA\[)?\s*(\d{1,2}:\d{2}(?::\d{2})?|\d+)\s*(?:\]\]>)?[\s\S]*?<\/itunes:duration>/i);
     const durationStr = durationMatch ? durationMatch[1].trim() : null;
     const durationSec = parseDurationToSeconds(durationStr);
 
@@ -139,10 +186,11 @@ export function parseStoryRssXml(xmlString) {
 }
 
 /**
- * Fetch a fresh short story audio link from curated RSS feeds.
- * Targets stories that are ideally 50s - 150s (perfect for 60s - 120s slicing).
+ * Fetch a short story audio link from curated RSS feeds,
+ * prioritizing episodes whose estimated net story length (raw duration minus intro)
+ * is CLOSEST to the admin's target duration.
  */
-export async function fetchAutomatedStoryFromRss() {
+export async function fetchAutomatedStoryFromRss(targetDuration = 90) {
   const shuffledFeeds = [...STORY_FEEDS].sort(() => 0.5 - Math.random());
 
   for (const feed of shuffledFeeds) {
@@ -169,22 +217,37 @@ export async function fetchAutomatedStoryFromRss() {
         continue;
       }
 
-      // Filter for episodes close to the 1-2 minute mark (45s to 180s)
-      const idealStories = episodes.filter(ep => ep.durationSec && ep.durationSec >= 45 && ep.durationSec <= 160);
-      const candidates = idealStories.length > 0 ? idealStories : episodes.slice(0, 10);
+      // Filter and score episodes based on how close their net story length is to targetDuration
+      // In LibriVox, raw audio includes ~15-20s of intro/outro
+      const episodesWithDuration = episodes.filter(ep => ep.durationSec && ep.durationSec >= 50);
 
-      const selected = candidates[Math.floor(Math.random() * candidates.length)];
-      console.log(`[StoryIngestion] ✅ Selected story episode: "${selected.title}" (~${selected.durationSec || "unknown"}s)`);
+      if (episodesWithDuration.length > 0) {
+        // Sort by closeness to targetDuration (estimated net story = raw - 18s)
+        const scoredEpisodes = episodesWithDuration.map(ep => {
+          const estimatedStorySec = Math.max(30, ep.durationSec - 18);
+          const diff = Math.abs(estimatedStorySec - targetDuration);
+          return { ...ep, estimatedStorySec, diff };
+        });
 
-      return {
-        success: true,
-        sourceFeed: feed.name,
-        category: feed.category,
-        title: selected.title,
-        audioUrl: selected.audioUrl,
-        durationSec: selected.durationSec,
-        description: selected.description
-      };
+        // Pick from episodes within ±25s of targetDuration, or the top 5 closest
+        const closeMatches = scoredEpisodes.filter(ep => ep.diff <= 25);
+        const candidates = closeMatches.length > 0
+          ? closeMatches
+          : scoredEpisodes.sort((a, b) => a.diff - b.diff).slice(0, 5);
+
+        const selected = candidates[Math.floor(Math.random() * candidates.length)];
+        console.log(`[StoryIngestion] ✅ Selected story episode: "${selected.title}" (Raw: ${selected.durationSec}s, Net story est: ~${selected.estimatedStorySec}s, Target: ${targetDuration}s)`);
+
+        return {
+          success: true,
+          sourceFeed: feed.name,
+          category: feed.category,
+          title: selected.title,
+          audioUrl: selected.audioUrl,
+          durationSec: selected.durationSec,
+          description: selected.description
+        };
+      }
     } catch (feedErr) {
       console.warn(`[StoryIngestion] ⚠️ Feed fetch failed for ${feed.name}:`, feedErr.message);
     }
@@ -237,7 +300,7 @@ async function prepareAudioForWhisper(inputPath, outputPath) {
   await execFileAsync("ffmpeg", [
     "-y",
     "-i", inputPath,
-    "-t", "300",
+    "-t", "360",
     "-vn",
     "-ar", "16000",
     "-ac", "1",
@@ -288,95 +351,161 @@ async function transcribeAudioWithWhisper(audioFilePath) {
 }
 
 /**
- * Detects whether a segment contains a standard LibriVox or intro/outro disclaimer
+ * Detects whether a segment contains a standard LibriVox or intro/disclaimer
  */
-function isDisclaimerSegment(text) {
+export function isIntroOrDisclaimerSegment(text, title = "") {
   if (!text) return false;
-  const lower = text.toLowerCase();
-  return (
+  const lower = text.toLowerCase().trim();
+
+  // Known disclaimer keywords
+  if (
     lower.includes("librivox") ||
     lower.includes("public domain") ||
     lower.includes("volunteer") ||
-    lower.includes("read by") ||
     lower.includes("recorded by") ||
     lower.includes("recording by") ||
-    lower.includes("end of fable") ||
-    lower.includes("end of chapter") ||
-    lower.includes("this recording is in")
+    lower.includes("read by") ||
+    lower.includes("reading by") ||
+    lower.includes("today's reading") ||
+    lower.includes("for more information") ||
+    lower.includes("please visit") ||
+    lower.includes("fables of aesop") ||
+    lower.includes("aesop's fables") ||
+    /^(?:chapter\s+\d+|fable\s+\d+|volume\s+\d+|section\s+\d+)/i.test(lower)
+  ) {
+    return true;
+  }
+
+  // Isolated title repetition by reader right before story starts
+  if (title) {
+    const cleanT = title.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+    const cleanSeg = lower.replace(/[^a-z0-9 ]/g, "").trim();
+    if (cleanSeg === cleanT || (cleanSeg.length > 5 && cleanT.includes(cleanSeg))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Detects whether a segment contains an outro or ending credit
+ */
+export function isOutroSegment(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase().trim();
+  return (
+    /^\s*end\s+of\b/i.test(lower) ||
+    /\brecorded\s+by\b/i.test(lower) ||
+    /\bread\s+by\b/i.test(lower) ||
+    /\breading\s+by\b/i.test(lower) ||
+    /thank\s+you\s+for\s+listening/i.test(lower) ||
+    /^\s*the\s+end\.?\s*$/i.test(lower)
   );
 }
 
 /**
- * Find optimal 60s - 120s story segment, stripping disclaimers and snapping to sentence boundaries
+ * Find optimal story segment:
+ * 1. Strictly strips narrator introduction preambles and outros.
+ * 2. Matches the target duration set by the admin (targetDuration).
+ * 3. Snaps cleanly to sentence boundaries.
  */
-export function findOptimalStoryWindow(segments, minSeconds = 60, maxSeconds = 120) {
+export function findOptimalStoryWindow(segments, targetDuration = 90, title = "") {
   if (!segments || segments.length === 0) {
     return {
       startTime: 0,
-      endTime: 75,
-      duration: 75,
+      endTime: targetDuration,
+      duration: targetDuration,
       transcript: "Listen to the story and share a summary in your own words."
     };
   }
 
-  // Filter out empty / pure noise segments
-  const validSegments = segments.filter(s => s.text && s.text.trim().length > 2);
+  const validSegments = segments.filter(s => s.text && s.text.trim().length > 1);
 
-  // Find where the story actually begins (first segment after LibriVox/intro disclaimer)
+  // 1. Identify start index: advance past all intro / disclaimer / reader preamble segments
   let startIndex = 0;
-  for (let i = 0; i < Math.min(validSegments.length, 6); i++) {
-    if (isDisclaimerSegment(validSegments[i].text)) {
+  for (let i = 0; i < Math.min(validSegments.length, 8); i++) {
+    if (isIntroOrDisclaimerSegment(validSegments[i].text, title)) {
       startIndex = i + 1;
+    } else {
+      // Check if this segment looks like actual story narrative
+      if (/(?:a|an|the|once|one|two|there|long|when|in|a certain)\s+/i.test(validSegments[i].text)) {
+        break;
+      }
     }
   }
 
-  const storySegments = validSegments.slice(startIndex);
+  // 2. Identify end index: trim backwards past any outro segments
+  let endIndex = validSegments.length - 1;
+  for (let i = validSegments.length - 1; i >= Math.max(0, validSegments.length - 4); i--) {
+    if (isOutroSegment(validSegments[i].text)) {
+      endIndex = i - 1;
+    } else {
+      break;
+    }
+  }
+
+  // Ensure valid range
+  if (startIndex > endIndex) {
+    startIndex = 0;
+    endIndex = validSegments.length - 1;
+  }
+
+  const storySegments = validSegments.slice(startIndex, endIndex + 1);
   if (storySegments.length === 0) {
     return {
       startTime: validSegments[0].start,
       endTime: validSegments[validSegments.length - 1].end,
       duration: Math.round(validSegments[validSegments.length - 1].end - validSegments[0].start),
-      transcript: validSegments.map(s => s.text.trim()).join(" ")
+      transcript: cleanNarrativeTranscript(validSegments.map(s => s.text.trim()).join(" "), title)
     };
   }
 
-  // Find continuous narrative window between minSeconds and maxSeconds (target ~75s to 95s)
+  const fullStoryDuration = Math.round(storySegments[storySegments.length - 1].end - storySegments[0].start);
+
+  // If the complete narrative is within ±25s of targetDuration, use the entire complete story!
+  if (fullStoryDuration <= (targetDuration + 20)) {
+    const rawText = storySegments.map(s => s.text.trim()).join(" ");
+    return {
+      startTime: Math.max(0, storySegments[0].start),
+      endTime: storySegments[storySegments.length - 1].end,
+      duration: fullStoryDuration,
+      transcript: cleanNarrativeTranscript(rawText, title)
+    };
+  }
+
+  // If the story is longer (e.g. 2-4 minutes), find the continuous narrative window closest to targetDuration
   let bestWindow = null;
-  let bestScore = -1;
+  let bestDiff = Infinity;
 
   for (let i = 0; i < storySegments.length; i++) {
     const startSegment = storySegments[i];
     let candidateSegments = [];
-    let currentDuration = 0;
 
     for (let j = i; j < storySegments.length; j++) {
       const seg = storySegments[j];
-      const duration = seg.end - startSegment.start;
-
-      if (duration > maxSeconds + 5) break;
-
-      // Don't include outro disclaimers in the candidate
-      if (isDisclaimerSegment(seg.text)) break;
+      const duration = Math.round(seg.end - startSegment.start);
 
       candidateSegments.push(seg);
-      currentDuration = duration;
 
-      if (currentDuration >= (minSeconds - 5) && currentDuration <= maxSeconds) {
-        const fullText = candidateSegments.map(s => s.text.trim()).join(" ");
-        const endsWithPunct = /[.!?]$/.test(candidateSegments[candidateSegments.length - 1].text.trim());
-        const durationScore = 100 - Math.abs(currentDuration - 85);
-        const score = durationScore + (endsWithPunct ? 25 : 0) + (candidateSegments.length >= 3 ? 10 : 0);
+      if (duration >= (targetDuration - 20)) {
+        const diff = Math.abs(duration - targetDuration);
+        const endsWithPunct = /[.!?]$/.test(seg.text.trim());
+        const adjustedDiff = diff - (endsWithPunct ? 5 : 0);
 
-        if (score > bestScore) {
-          bestScore = score;
+        if (adjustedDiff < bestDiff) {
+          bestDiff = adjustedDiff;
+          const rawText = candidateSegments.map(s => s.text.trim()).join(" ");
           bestWindow = {
             startTime: Math.max(0, startSegment.start),
             endTime: seg.end,
-            duration: Math.round(currentDuration),
-            transcript: fullText
+            duration: duration,
+            transcript: cleanNarrativeTranscript(rawText, title)
           };
         }
       }
+
+      if (duration > (targetDuration + 25)) break;
     }
   }
 
@@ -384,28 +513,13 @@ export function findOptimalStoryWindow(segments, minSeconds = 60, maxSeconds = 1
     return bestWindow;
   }
 
-  // Fallback: take all non-disclaimer story segments capped at maxSeconds
-  const cleanStory = storySegments.filter(s => !isDisclaimerSegment(s.text));
-  const startTime = cleanStory.length > 0 ? cleanStory[0].start : 0;
-  let endTime = startTime + 75;
-  let transcript = "";
-
-  if (cleanStory.length > 0) {
-    const candidate = [];
-    for (const seg of cleanStory) {
-      if (seg.end - startTime > maxSeconds) break;
-      candidate.push(seg);
-      endTime = seg.end;
-    }
-    transcript = candidate.map(s => s.text.trim()).join(" ");
-  }
-
-  const duration = Math.max(Math.round(endTime - startTime), minSeconds);
+  // Final fallback
+  const rawText = storySegments.map(s => s.text.trim()).join(" ");
   return {
-    startTime,
-    endTime,
-    duration,
-    transcript: transcript || "A wise fable about patience, honesty, and understanding the true value of actions."
+    startTime: Math.max(0, storySegments[0].start),
+    endTime: storySegments[storySegments.length - 1].end,
+    duration: fullStoryDuration,
+    transcript: cleanNarrativeTranscript(rawText, title)
   };
 }
 
@@ -417,7 +531,7 @@ async function sliceAudioFile(inputPath, startTime, endTime, outputPath) {
   await execFileAsync("ffmpeg", [
     "-y",
     "-ss", String(startTime),
-    "-t", String(duration),
+    "-to", String(endTime),
     "-i", inputPath,
     "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
     "-c:a", "libmp3lame",
@@ -434,7 +548,7 @@ async function sliceAudioFile(inputPath, startTime, endTime, outputPath) {
 export async function extractStoryMetadataWithLLM(transcript, rawTitle = "") {
   const apiKey = getTextKey();
   if (apiKey) {
-    const prompt = `Analyze this English short story (about 1-2 minutes long) for an English speaking practice task where students listen and record a 1-minute summary video.
+    const prompt = `Analyze this English short story narrative for an English speaking practice task where students listen and record a summary video.
 
 Story Transcript:
 """
@@ -445,8 +559,8 @@ Raw Title: "${rawTitle}"
 
 Respond ONLY with a valid JSON object with these exact keys:
 {
-  "topic": "Clean, attractive story title (e.g. 'The Boy Who Cried Wolf')",
-  "theme": "Theme or moral (e.g. 'Honesty and Trust')",
+  "topic": "Clean, attractive story title (e.g. 'Hercules and The Waggoner')",
+  "theme": "Theme or moral (e.g. 'Effort and Self-Reliance')",
   "summaryGuide": [
     "1. Key introduction of character(s) and initial situation.",
     "2. The central action, turning point, or dilemma.",
@@ -484,7 +598,7 @@ Respond ONLY with a valid JSON object with these exact keys:
           const parsed = JSON.parse(rawContent);
           if (parsed.topic && Array.isArray(parsed.summaryGuide)) {
             return {
-              topic: parsed.topic.trim(),
+              topic: cleanStoryTitle(parsed.topic.trim()),
               theme: parsed.theme || "Life Lessons",
               summaryGuide: parsed.summaryGuide.map(p => String(p).trim()),
               vocabulary: Array.isArray(parsed.vocabulary) ? parsed.vocabulary : [],
@@ -523,33 +637,14 @@ Respond ONLY with a valid JSON object with these exact keys:
 }
 
 /**
- * Verified fallback public domain English stories (1 to 2 minutes)
+ * Verified fallback public domain English stories (75s - 95s)
  */
 export const FALLBACK_STORIES = [
-  {
-    topic: "The Man and The Wooden Image",
-    theme: "Self-Reliance & Resourcefulness",
-    duration: 65,
-    audioUrl: "https://archive.org/download/aesop_fables_volume_five_librivox/fables_05_01_aesop_64kb.mp3",
-    storyTranscript: "A poor man had a wooden image of a sacred deity, to which he prayed daily for prosperity. Yet, despite all his devotion, he grew steadily poorer and fell into severe hardship. In bitter frustration, he seized the image by its legs and struck its head forcefully against the stone wall. To his great astonishment, the hollow head cracked open, and a hidden hoard of glittering gold coins tumbled across the floor. Gathering up the treasure, the man smiled wryly and remarked: 'What a strange idol you are! While I honored you with prayer, you offered me nothing; but once I broke you, you granted me riches beyond my dreams.'",
-    summaryGuide: [
-      "1. A struggling poor man prayed daily to a wooden image for wealth, but remained poor.",
-      "2. In despair, he struck the statue against the wall, shattering its head.",
-      "3. Hidden gold coins poured out from inside the broken image.",
-      "4. Moral: Waiting passively rarely brings answers; decisive action often reveals unexpected opportunities."
-    ],
-    vocabulary: [
-      { word: "prosperity", definition: "The state of being successful, flourishing, or having good fortune." },
-      { word: "frustration", definition: "A feeling of dissatisfaction or anger resulting from unresolved problems." },
-      { word: "resourcefulness", definition: "The ability to overcome difficulties with creative thinking." }
-    ],
-    question: "Listen to the 1-minute story and record a video summary in your own words. Explain the man's dilemma, what happened to the statue, and the lesson learned."
-  },
   {
     topic: "Hercules and The Waggoner",
     theme: "Effort Before Expectation",
     duration: 85,
-    audioUrl: "https://archive.org/download/aesop_fables_volume_five_librivox/fables_05_02_aesop_64kb.mp3",
+    audioUrl: "/story-audio/hercules-and-the-waggoner.mp3",
     storyTranscript: "A carter was driving his heavy wagon along a muddy country lane after a stormy night. The wheels sank deep into the mire, and the horses could pull no further. Instead of putting his own shoulder to the wheel, the waggoner dropped to his knees in the mud and began praying loudly to Hercules, begging the mighty hero to descend and lift his wagon free. Suddenly, Hercules appeared in the clouds and called out sternly: 'Lazy fellow! Put your shoulder to the wheel, urge on your bullocks, and push with all your strength. Never pray to the gods for help until you have first done everything within your own power!'",
     summaryGuide: [
       "1. A waggoner's heavy cart got trapped deep in mud on a country road.",
@@ -568,7 +663,7 @@ export const FALLBACK_STORIES = [
     topic: "The Bundle of Sticks",
     theme: "Strength in Unity",
     duration: 78,
-    audioUrl: "https://archive.org/download/aesop_fables_volume_five_librivox/fables_05_05_aesop_64kb.mp3",
+    audioUrl: "/story-audio/the-bundle-of-sticks.mp3",
     storyTranscript: "An old father had several sons who were continually quarreling among themselves. No matter how much he urged them to live in harmony, his words went unheeded. One day, he called them together and presented a tightly bound bundle of sticks. 'I will give a silver coin to whichever of you can break this bundle in two,' the father promised. Each son tried with all his might, straining their arms, but the bundle would not yield. The father then untied the cord and handed them the sticks one by one. Effortlessly, each son snapped the single sticks across their knees. The father smiled and said: 'Behold the power of unity! As long as you remain united, no enemy can overcome you; but when you divide, you will be broken as easily as these sticks.'",
     summaryGuide: [
       "1. An aging father grew worried about his constantly quarreling sons.",
@@ -582,6 +677,25 @@ export const FALLBACK_STORIES = [
       { word: "unbreakable", definition: "Impossible to break, shatter, or defeat." }
     ],
     question: "Listen to this classic fable and record a 1-minute video summary. Explain the demonstration the father gave to his sons and the enduring message of unity."
+  },
+  {
+    topic: "The Farmer and His Sons",
+    theme: "The Value of Honest Labor",
+    duration: 92,
+    audioUrl: "/story-audio/the-farmer-and-his-sons.mp3",
+    storyTranscript: "A hardworking farmer, being on the point of death and wishing to impart wisdom to his sons, called them to his bedside. 'My boys,' he whispered, 'a great treasure lies hidden for you in the vineyard.' The sons eagerly begged him to tell them the exact spot, but the old man died before saying another word. As soon as the burial was over, the sons seized their spades and hoes and dug up every square inch of the vineyard grounds. They found no buried gold or silver, but the soil had been loosened so thoroughly that that autumn the vines produced an extraordinary, bountiful vintage of grapes. The harvest sold for a fortune, and the sons realized that the hidden treasure their wise father had spoken of was the enduring reward of honest labor.",
+    summaryGuide: [
+      "1. An aging farmer told his sons that a great treasure was buried in the family vineyard.",
+      "2. The sons dug through every inch of the land searching for hidden gold, finding none.",
+      "3. The deep turning of the soil caused the vineyard to yield an unprecedented harvest of grapes.",
+      "4. Moral: Honest industry and dedication are the truest and most lasting treasure."
+    ],
+    vocabulary: [
+      { word: "vineyard", definition: "A plantation of grapevines, typically producing wine grapes." },
+      { word: "bountiful", definition: "Large in quantity; abundant and generous." },
+      { word: "industry", definition: "Hard work, diligence, and energetic effort." }
+    ],
+    question: "Listen to this story and record a 1-minute video summary in your own words. Explain what the sons searched for, what they actually discovered, and the father's true lesson."
   }
 ];
 
@@ -589,6 +703,7 @@ export const FALLBACK_STORIES = [
  * Downloads, slices, transcribes, and extracts metadata for a story episode.
  */
 export async function processStoryAudioIntoChallenge(storyItem, options = {}) {
+  const targetDuration = Number(options.targetDuration) || 90;
   const tmpDir = os.tmpdir();
   const rawFile = path.join(tmpDir, `story-raw-${Date.now()}.mp3`);
   const whisperFile = path.join(tmpDir, `story-whisper-${Date.now()}.mp3`);
@@ -604,28 +719,36 @@ export async function processStoryAudioIntoChallenge(storyItem, options = {}) {
     console.log(`[StorySlicer] 🧠 Transcribing with Whisper Large v3...`);
     const transcription = await transcribeAudioWithWhisper(whisperFile);
 
-    console.log(`[StorySlicer] 🎯 Finding optimal 60s–120s story narrative window...`);
-    const window = findOptimalStoryWindow(transcription.segments, 60, 120);
+    console.log(`[StorySlicer] 🎯 Finding story window near target duration (${targetDuration}s)...`);
+    const window = findOptimalStoryWindow(transcription.segments, targetDuration, storyItem.title);
 
-    console.log(`[StorySlicer] ✂️ Slicing clean story audio (${window.duration}s)...`);
+    console.log(`[StorySlicer] ✂️ Slicing clean narrative audio (${window.duration}s from ${window.startTime.toFixed(1)}s to ${window.endTime.toFixed(1)}s)...`);
     await sliceAudioFile(rawFile, window.startTime, window.endTime, slicedFile);
 
-    // Upload sliced MP3 to Cloudflare R2
-    const audioBuffer = await fs.promises.readFile(slicedFile);
-    const r2Key = `story-audio/scraped-${Date.now()}.mp3`;
-
-    console.log(`[StorySlicer] ☁️ Uploading sliced story to Cloudflare R2 (${r2Key})...`);
-    let finalAudioUrl = "";
-    try {
-      const uploadRes = await uploadBufferToR2(audioBuffer, r2Key, "audio/mpeg");
-      finalAudioUrl = uploadRes.url || (process.env.R2_PUBLIC_URL ? `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}` : "");
-    } catch (r2Err) {
-      console.warn(`[StorySlicer] ⚠️ R2 upload notice:`, r2Err.message);
-      finalAudioUrl = storyItem.audioUrl;
+    // Save locally to frontend/public/story-audio/ so it's guaranteed playable in dev & prod
+    const publicAudioDir = path.join(process.cwd(), "frontend/public/story-audio");
+    if (!fs.existsSync(publicAudioDir)) {
+      fs.mkdirSync(publicAudioDir, { recursive: true });
     }
+    const localFileName = `story-${Date.now()}.mp3`;
+    const localFilePath = path.join(publicAudioDir, localFileName);
+    await fs.promises.copyFile(slicedFile, localFilePath);
 
-    if (!finalAudioUrl) {
-      finalAudioUrl = process.env.R2_PUBLIC_URL ? `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}` : storyItem.audioUrl;
+    let finalAudioUrl = `/story-audio/${localFileName}`;
+
+    // Also upload sliced MP3 to Cloudflare R2 if configured
+    try {
+      const audioBuffer = await fs.promises.readFile(slicedFile);
+      const r2Key = `story-audio/scraped-${Date.now()}.mp3`;
+      console.log(`[StorySlicer] ☁️ Uploading sliced story to Cloudflare R2 (${r2Key})...`);
+      const uploadRes = await uploadBufferToR2(audioBuffer, r2Key, "audio/mpeg");
+      if (uploadRes && uploadRes.url) {
+        finalAudioUrl = uploadRes.url;
+      } else if (process.env.R2_PUBLIC_URL) {
+        finalAudioUrl = `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}`;
+      }
+    } catch (r2Err) {
+      console.warn(`[StorySlicer] ℹ️ R2 upload skipped (${r2Err.message}), serving sliced audio via local URL: ${finalAudioUrl}`);
     }
 
     console.log(`[StorySlicer] 🤖 Generating summary guide and metadata with LLM...`);
@@ -653,17 +776,18 @@ export async function processStoryAudioIntoChallenge(storyItem, options = {}) {
 }
 
 /**
- * Main entry point: Generates a 1-2 minute English story challenge from RSS.
- * Automatically falls back to curated public domain stories if offline.
+ * Main entry point: Generates a story challenge matching target duration from RSS.
+ * Automatically falls back to verified public domain stories if offline.
  */
 export async function generateScrapedStoryChallenge(options = {}) {
+  const targetDuration = Number(options.targetDuration) || 90;
   try {
-    console.log("[StoryFeed] 📻 Starting automated RSS story scraping & slicing (1–2 min)...");
-    const storyItem = await fetchAutomatedStoryFromRss();
+    console.log(`[StoryFeed] 📻 Starting automated RSS story scraping & slicing (Target: ~${targetDuration}s)...`);
+    const storyItem = await fetchAutomatedStoryFromRss(targetDuration);
     if (storyItem && storyItem.audioUrl) {
-      const challenge = await processStoryAudioIntoChallenge(storyItem, options);
+      const challenge = await processStoryAudioIntoChallenge(storyItem, { targetDuration });
       if (challenge && challenge.audioUrl && challenge.storyTranscript) {
-        console.log(`[StoryFeed] ✅ Successfully scraped & sliced story: "${challenge.topic}" (${challenge.duration}s)`);
+        console.log(`[StoryFeed] ✅ Successfully scraped & sliced story: "${challenge.topic}" (${challenge.duration}s, target: ${targetDuration}s)`);
         return challenge;
       }
     }
@@ -671,8 +795,9 @@ export async function generateScrapedStoryChallenge(options = {}) {
     console.warn("[StoryFeed] ⚠️ Automated RSS story scraping failed, using curated fallback story:", err.message);
   }
 
-  // Fallback to verified 1-2 minute public domain English stories
-  const fallback = FALLBACK_STORIES[Math.floor(Math.random() * FALLBACK_STORIES.length)];
+  // Fallback to verified public domain English stories closest to targetDuration
+  const sorted = [...FALLBACK_STORIES].sort((a, b) => Math.abs(a.duration - targetDuration) - Math.abs(b.duration - targetDuration));
+  const fallback = sorted[0] || FALLBACK_STORIES[0];
   return {
     success: true,
     ...fallback,

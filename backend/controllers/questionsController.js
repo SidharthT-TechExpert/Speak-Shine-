@@ -404,8 +404,15 @@ export async function getStoryVoices(req, res) {
  */
 export async function generateScrapedStoryNow(req, res) {
   try {
+    const Status = (await import("../../models/statusSchema.js")).default;
+    const status = await Status.findOne().lean();
+    const adminWordCount = status?.storyWordCount ?? 200;
+    const adminTargetDuration = Math.round(adminWordCount / 130 * 60);
+
+    const targetDuration = Number(req.body?.targetDuration) || adminTargetDuration || 90;
+
     const { generateScrapedStoryChallenge } = await import("../services/ai/storyFeedIngestionService.js");
-    const challenge = await generateScrapedStoryChallenge(req.body || {});
+    const challenge = await generateScrapedStoryChallenge({ targetDuration });
     res.json({ success: true, ...challenge });
   } catch (error) {
     console.error("[Questions] Scraped story generation error:", error.message);
