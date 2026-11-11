@@ -1,7 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.mock("./groqKeyManager.js", () => ({
+  getTextKey: () => null,
+  getTextModel: () => "llama-3.3-70b-versatile",
+  markKeyExhausted: () => {},
+  parseRetryAfter: () => null,
+}));
+vi.mock("./grammarCheck.js", () => ({
+  checkGrammar: async () => [],
+  filterGrammarErrors: (e) => e || [],
+}));
 import {
   repairTruncatedJson,
   ensureScoreDefaults,
+  analyzeSpeech,
 } from "./analyzeSpeech.js";
 
 describe("analyzeSpeech JSON repair and fallback", () => {
@@ -97,5 +108,58 @@ describe("analyzeSpeech JSON repair and fallback", () => {
     expect(merged.strongPoints).toEqual(["Effort"]);
     expect(merged.overallComment).toBe("Baseline comment");
     expect(merged.cefrLevel).toBe("B1");
+  });
+
+  it("flags off-topic shadowing in analyzeSpeech fallback when student explains shadowing instead of repeating script", async () => {
+    const questionText = [
+      "Video Topic: Brain health with Dr Ayesha",
+      "Original Spoken Transcript: Well, my story is she came and sat next to me. And the first conversation was about the fact that our two amazing grandparents had passed away from Alzheimer and dementia.",
+      "Target Reference Duration: 85 seconds",
+    ].join("\n\n");
+
+    const metaSpeech =
+      "Hi everyone, today I would like to share with you a speech practice. Shadowing is one of the best techniques in English speaking skills because it helps us improve pronunciation and confidence. Today I want to explain its uses, advantages, and disadvantages.";
+
+    const result = await analyzeSpeech(
+      metaSpeech,
+      167,
+      [],
+      "Brain health with Dr Ayesha",
+      questionText,
+      [],
+      { speechRatio: 90, paceConsistency: 8 },
+      "shadowing_video"
+    );
+
+    expect(result.isOffTopic).toBe(true);
+    expect(result.topicRelevance).toBeLessThanOrEqual(2);
+    expect(result.topicFeedback).toContain("Your speech did not match today's assigned shadowing reference script");
+    expect(result.overallComment).not.toContain("good speaking effort");
+    expect(result.overallComment).toContain("Off-topic submission");
+  });
+
+  it("keeps shadowing valid in analyzeSpeech fallback when student genuinely repeats the reference script", async () => {
+    const questionText = [
+      "Video Topic: Brain health with Dr Ayesha",
+      "Original Spoken Transcript: Well, my story is she came and sat next to me. And the first conversation was about the fact that our two amazing grandparents had passed away from Alzheimer and dementia.",
+      "Target Reference Duration: 85 seconds",
+    ].join("\n\n");
+
+    const genuineSpeech =
+      "Well my story is she came and sat next to me and the first conversation was about the fact that our two amazing grandparents passed away from Alzheimer and dementia";
+
+    const result = await analyzeSpeech(
+      genuineSpeech,
+      80,
+      [],
+      "Brain health with Dr Ayesha",
+      questionText,
+      [],
+      { speechRatio: 90, paceConsistency: 8 },
+      "shadowing_video"
+    );
+
+    expect(result.isOffTopic).toBe(false);
+    expect(result.topicRelevance).toBe(7);
   });
 });

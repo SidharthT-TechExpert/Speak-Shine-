@@ -1,6 +1,7 @@
 import fetch from "node-fetch";
 import { checkGrammar, filterGrammarErrors } from "./grammarCheck.js";
 import { getTextKey, getTextModel, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
+import { evaluateShadowingMatch } from "../video/submitGate.js";
 
 // ---------------------------------------------------------------------------
 // Filler word detection
@@ -513,6 +514,14 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
   })();
 
   const hasTopic = !!(questionTopic || questionText);
+  const shadowingRefTranscript = (() => {
+    if (challengeType !== "shadowing_video" || typeof questionText !== "string") return null;
+    const m = questionText.match(/Original Spoken Transcript:\s*([\s\S]+?)(?:\r?\n\s*\r?\n\s*(?:Target Reference Duration:|DO NOT deduct|Judge the student)|\s*$)/i);
+    return m ? m[1].trim() : null;
+  })();
+  const shadowingMatch = challengeType === "shadowing_video"
+    ? evaluateShadowingMatch(transcript, shadowingRefTranscript)
+    : null;
 
   // Pronunciation summary for prompt
   const pronunciationSummary = pronunciationIssues.length > 0
@@ -555,11 +564,12 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
       1 = does not attempt to summarize the story at all or completely off-topic
 - topicFeedback: 1-2 sentences explaining specifically which story plot points/characters the student summarized well and which key story events or details they missed or could have explained more clearly.`
     : challengeType === "shadowing_video"
-    ? `- topicRelevance & isOffTopic: evaluate whether the speaker was engaged in shadowing/repeating the reference video dialogue or speech.
-    STRICT SECURITY CHECK: If the speaker is completely silent or reciting unrelated text:
+    ? `- topicRelevance & isOffTopic: evaluate whether the speaker was actually shadowing/repeating the exact assigned Original Spoken Transcript phrases aloud.
+    STRICT SECURITY CHECK: Compare the speaker's transcript directly against the Original Spoken Transcript.
+    If the speaker talks ABOUT shadowing (explaining what shadowing is, its benefits, uses, advantages/disadvantages, or giving a general English-learning speech), OR speaks unrelated free-form text instead of mirroring the Original Spoken Transcript:
       → You MUST set isOffTopic: true
-      → You MUST set topicRelevance: 1 or 2
-      → topicFeedback: explain that the student did not follow along with the reference video.
+      → You MUST set topicRelevance: 1 (NEVER higher than 2 for talking about the task or unrelated speech)
+      → topicFeedback: state clearly that the student spoke their own speech or explained the shadowing task instead of shadowing the reference speaker's words.
     If the speaker genuinely attempts to shadow the video:
       10 = speech closely mirrors the words, intonation, and phrasing of the reference speech
       8-9 = successfully shadowed the majority of phrases with natural rhythm
@@ -612,11 +622,12 @@ The student listened to an audio story and was asked to record a summary in thei
 When writing suggestions, provide concrete storytelling/summary tips (e.g. "Include the resolution/moral of the story", "Use time transitions like 'meanwhile' and 'eventually'").
 When writing overallComment, mention their story comprehension and summarization ability alongside speaking fluency.\n`
       : challengeType === "shadowing_video"
-      ? `\nCHALLENGE TYPE: Shadowing Activity (Speech Mimicry & Cadence Practice)
-The student watched a short video and practiced shadowing (speaking aloud concurrently with the speaker).
+      ? `\nCHALLENGE TYPE: Shadowing Activity (Exact Speech Mimicry & Cadence Practice)
+The student listened to a native reference recording (Original Spoken Transcript) and was required to repeat/mirror that speaker's EXACT words aloud in real time.
 CRITICAL RULES FOR SHADOWING EVALUATION:
+• FIRST verify they actually repeated the phrases of the Original Spoken Transcript. Talking ABOUT what shadowing is, its uses/benefits/advantages/disadvantages, or delivering a free-form personal essay is COMPLETELY OFF-TOPIC (set isOffTopic: true, topicRelevance: 1).
 • DO NOT evaluate or deduct points for advanced vocabulary — this is an imitation/shadowing drill, not an essay.
-• Focus on: Rhythm, pronunciation imitation, cadence, fluid pacing, and speaking confidence.
+• When truly shadowing the reference script, focus on: Rhythm, pronunciation imitation, cadence, fluid pacing, and speaking confidence.
 • When writing suggestions, give tips on breath control, mirroring sentence stress, and connecting speech smoothly.\n`
       : challengeType === "picture_description"
       ? `\nCHALLENGE TYPE: Picture Description
@@ -743,23 +754,32 @@ RULES:
       suggestions.push("Practice expanding your responses with specific examples and supporting details.");
     }
 
+    const offTopicShadow = Boolean(shadowingMatch && !shadowingMatch.isMatch);
+    if (offTopicShadow) {
+      suggestions.unshift("Play the reference shadowing audio again, follow the live phrase prompter, and repeat the native speaker's exact words aloud in real time.");
+    }
+
     return {
-      fluency: fluencyAnchor,
-      grammar: 7,
-      confidence: confidenceAnchor,
-      vocabulary: 7,
-      coherence: Math.round((fluencyAnchor + confidenceAnchor) / 2),
+      fluency: offTopicShadow ? Math.min(3, fluencyAnchor) : fluencyAnchor,
+      grammar: offTopicShadow ? 4 : 7,
+      confidence: offTopicShadow ? Math.min(3, confidenceAnchor) : confidenceAnchor,
+      vocabulary: offTopicShadow ? 4 : 7,
+      coherence: offTopicShadow ? 3 : Math.round((fluencyAnchor + confidenceAnchor) / 2),
       grammarErrors: [],
-      strongPoints: [
-        `Good effort delivering your response (${wordCount} words spoken).`,
-        wpm ? `Consistent speaking pace around ${wpm} WPM.` : "Clear spoken communication.",
-      ],
+      strongPoints: offTopicShadow
+        ? ["Audio and voice clarity were captured clearly during the recording."]
+        : [
+            `Good effort delivering your response (${wordCount} words spoken).`,
+            wpm ? `Consistent speaking pace around ${wpm} WPM.` : "Clear spoken communication.",
+          ],
       suggestions,
-      topicRelevance: hasTopic ? 7 : null,
-      topicFeedback: hasTopic
-        ? "You addressed the speaking prompt. Continue practicing to organize your points with clear examples."
-        : null,
-      isOffTopic: false,
+      topicRelevance: offTopicShadow ? 1 : (hasTopic ? 7 : null),
+      topicFeedback: offTopicShadow
+        ? shadowingMatch.reason
+        : (hasTopic
+          ? "You addressed the speaking prompt. Continue practicing to organize your points with clear examples."
+          : null),
+      isOffTopic: offTopicShadow,
       pronunciationNote: pronunciationIssues.length > 0
         ? `A few words could be articulated more clearly: ${pronunciationIssues.slice(0, 3).join(", ")}.`
         : "Clear pronunciation overall.",
@@ -771,7 +791,9 @@ RULES:
         strong: [],
         weak: [],
       },
-      overallComment: `You demonstrated a good speaking effort with ${wordCount} words spoken. Your pace was ${wpm ? `${wpm} WPM` : "natural"}. Keep practicing regular speaking exercises to build further confidence and vocabulary range.`,
+      overallComment: offTopicShadow
+        ? "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases."
+        : `You demonstrated a good speaking effort with ${wordCount} words spoken. Your pace was ${wpm ? `${wpm} WPM` : "natural"}. Keep practicing regular speaking exercises to build further confidence and vocabulary range.`,
     };
   };
 
@@ -880,6 +902,18 @@ RULES:
     scores.grammarErrors = filterGrammarErrors(
       mergeGrammarErrors(scores.grammarErrors || [], ltErrors || [])
     );
+  }
+
+  if (shadowingMatch && !shadowingMatch.isMatch) {
+    const missedOffTopic = scores.isOffTopic !== true;
+    scores.isOffTopic = true;
+    scores.topicRelevance = Math.min(typeof scores.topicRelevance === "number" ? scores.topicRelevance : 1, 2);
+    if (missedOffTopic || !scores.topicFeedback) {
+      scores.topicFeedback = shadowingMatch.reason;
+    }
+    if (missedOffTopic || !scores.overallComment || /^You demonstrated a good speaking effort/i.test(scores.overallComment)) {
+      scores.overallComment = "Off-topic submission: Today's shadowing task requires mirroring the native speaker's exact reference phrases aloud rather than speaking on your own or explaining what shadowing is. Replay the reference audio and repeat the speaker's words closely to earn full points.";
+    }
   }
 
   return {

@@ -7904,11 +7904,13 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Active Speech Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  label: bd.isOffTopic
+                    ? `🚫 Active Speech Match (0% script match${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s unrelated speech` : ""})`
+                    : `⏱️ Active Speech Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
-                  color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6",
-                  subtext: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "≥85% Full Score" : "Effort Proportional",
+                  color: bd.isOffTopic ? "#ef4444" : (((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6"),
+                  subtext: bd.isOffTopic ? "Script Mismatch" : (((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "≥85% Full Score" : "Effort Proportional"),
                 },
                 {
                   label: `🗣️ Delivery, Rhythm & Fluency`,

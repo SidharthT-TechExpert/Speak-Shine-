@@ -7,6 +7,7 @@ import VideoReport from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import { serializeStreakBadges } from "../../utils/streakBadges.js";
 import Status from "../../../models/statusSchema.js";
+import Question from "../../../models/questionSchema.js";
 import UploadAudit from "../../../models/uploadAuditSchema.js";
 import mongoose from "mongoose";
 import { uploadToR2, uploadBufferToR2, deleteFromR2, getR2Key, getPresignedUploadUrl, getPresignedDownloadUrl } from "../../config/storage.js";
@@ -15,7 +16,7 @@ import { getVideoDuration } from "../ai/videoProcessor.js";
 import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
 import { moderateVideo } from "../ai/contentModerator.js";
-import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits, evaluateSubmitGate } from "./submitGate.js";
+import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits, evaluateSubmitGate, resolveDayContentFlags } from "./submitGate.js";
 import { checkSecurityCache, saveSecurityCache } from "../ai/securityCache.js";
 import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 import fs from "fs";
@@ -1042,19 +1043,87 @@ export async function getVideoReport(reportId, authId) {
  * fields inside `analysis`, even though the report endpoint can reconstruct
  * them for the Video Analysis page.
  */
+function getISTDateKey(dateLike) {
+  if (!dateLike) return null;
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+}
+
+function isSamePublishedChallengeDay(report, status) {
+  const refDate = report?.submittedAt || report?.createdAt || null;
+  if (status?.questionPublishedDate) {
+    if (!refDate) return false;
+    return getISTDateKey(refDate) === status.questionPublishedDate;
+  }
+  if (!refDate) return true;
+  return getISTDateKey(refDate) === getISTDateKey(Date.now());
+}
+
+function inferStoredChallengeType(report, analysis) {
+  if (report?.challengeType) return report.challengeType;
+  if (analysis?.challengeType) return analysis.challengeType;
+  if (analysis?.scoreBreakdown?.isShadowing) return "shadowing_video";
+  if (analysis?.scoreBreakdown?.isPictureDescription) return "picture_description";
+  if (analysis?.scoreBreakdown?.isStorySummary) return "story_summary";
+  return null;
+}
+
+async function resolveShadowingReference(report, analysis, status, isSamePublishedDay) {
+  let targetDuration =
+    Number(analysis?.targetVideoDuration) ||
+    Number(analysis?.scoreBreakdown?.targetDuration) ||
+    (isSamePublishedDay ? Number(status?.todayVideoDuration) : 0) ||
+    null;
+  let targetTranscript =
+    analysis?.targetVideoTranscript ||
+    (isSamePublishedDay ? status?.todayVideoTranscript : null) ||
+    null;
+
+  if ((!targetTranscript || !targetDuration) && (report?.submittedAt || report?.createdAt)) {
+    try {
+      const subMs = new Date(report.submittedAt || report.createdAt).getTime();
+      if (!Number.isNaN(subMs)) {
+        const windowStart = new Date(subMs - 36 * 60 * 60 * 1000);
+        const windowEnd = new Date(subMs + 6 * 60 * 60 * 1000);
+        const q = await Question.findOne({
+          contentType: "shadowing_video",
+          videoTranscript: { $ne: null },
+          $or: [
+            { scheduledFor: { $gte: windowStart, $lte: windowEnd } },
+            { updatedAt: { $gte: windowStart, $lte: windowEnd } },
+          ],
+        })
+          .sort({ isUsed: -1, updatedAt: -1 })
+          .lean();
+        if (q) {
+          if (!targetTranscript && q.videoTranscript) targetTranscript = q.videoTranscript;
+          if (!targetDuration && q.videoDuration) targetDuration = q.videoDuration;
+        }
+      }
+    } catch (lookupErr) {
+      console.warn("[VideoService] Shadowing Question fallback lookup failed:", lookupErr.message);
+    }
+  }
+
+  return { targetDuration, targetTranscript };
+}
+
 async function prepareReportAnalysis(report) {
   let analysis = report.status === "completed" ? report.analysis : null;
-  let challengeType = report.challengeType || analysis?.challengeType || null;
+  let challengeType = inferStoredChallengeType(report, analysis);
 
   // Compatibility for reports created before challengeType/picture breakdown
   // fields were persisted. Do not change the stored score; only hydrate the
   // display payload exactly as the individual report endpoint does.
   const status = analysis ? await Status.findOne().lean() : null;
+  const samePublishedDay = analysis ? isSamePublishedChallengeDay(report, status) : false;
   const user = (analysis && report.phone) ? await User.findOne({ phone: report.phone }).lean() : null;
   const userHistory = user?.feedbackScores || [];
-  const isPicTask = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-  const isStoryTask = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-  const isShadowTask = challengeType === "shadowing_video" || status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
+  const dayFlags = resolveDayContentFlags(samePublishedDay ? status : null, challengeType);
+  const isPicTask = dayFlags.isPicture;
+  const isStoryTask = dayFlags.isStory;
+  const isShadowTask = dayFlags.isShadowing;
 
   if (!challengeType && analysis) {
     if (isPicTask) {
@@ -1068,13 +1137,15 @@ async function prepareReportAnalysis(report) {
 
   if (analysis && isShadowTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isShadowing)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+    const { targetDuration: refDuration, targetTranscript: refTranscript } = await resolveShadowingReference(report, source, status, samePublishedDay);
+    const effectiveTargetDur = refDuration || 85;
     const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
       maxDurationSeconds: status?.durationShadowingFull ?? 180,
       analysis: source,
       isShadowing: true,
-      targetVideoDuration: status?.todayVideoDuration || 60,
-      targetVideoTranscript: status?.todayVideoTranscript || null,
+      targetVideoDuration: effectiveTargetDur,
+      targetVideoTranscript: refTranscript,
       userHistory,
     });
     const shadowBreakdown = {
@@ -1090,9 +1161,9 @@ async function prepareReportAnalysis(report) {
       maxGrowth: 0,
       vocabulary: 0,
       maxVocabulary: 0,
-      durationMatchPercent: breakdown.durationRatio ?? Math.round(((report.videoDuration || 0) / (status?.todayVideoDuration || 60)) * 100),
+      durationMatchPercent: breakdown.durationMatchPercent ?? breakdown.durationRatio ?? (breakdown.isOffTopic ? 0 : Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / effectiveTargetDur) * 100)),
       durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
-      targetDuration: status?.todayVideoDuration || 60,
+      targetDuration: effectiveTargetDur,
       userDuration: report.videoDuration || 0,
       spokenDurationSeconds: breakdown.spokenDurationSeconds ?? null,
       speechRatio: breakdown.speechRatio ?? null,
@@ -1103,7 +1174,17 @@ async function prepareReportAnalysis(report) {
       offTopicReason: breakdown.offTopicReason ?? null,
       isShadowing: true,
     };
-    analysis = { ...source, compositeScore: score, scoreBreakdown: shadowBreakdown };
+    const offTopicComment = (breakdown.isOffTopic && (!source.overallComment || /^You demonstrated a good speaking effort/i.test(source.overallComment) || !source.isOffTopic))
+      ? "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases."
+      : source.overallComment;
+    analysis = {
+      ...source,
+      isOffTopic: Boolean(breakdown.isOffTopic || source.isOffTopic),
+      ...(breakdown.isOffTopic && breakdown.offTopicReason ? { topicFeedback: breakdown.offTopicReason } : {}),
+      ...(offTopicComment ? { overallComment: offTopicComment } : {}),
+      compositeScore: score,
+      scoreBreakdown: shadowBreakdown,
+    };
   }
 
   const picBdInconsistent = analysis && isPicTask && analysis.scoreBreakdown && analysis.scoreBreakdown.isPictureDescription && (
@@ -1856,12 +1937,10 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const todayVocab = status?.todayVocabulary || [];
   const transcript = report.analysis?.transcription || "";
 
-  // Check if shadowing challenge from report or status
-  const isShadowReport = report.challengeType === "shadowing_video" ||
-    report.analysis?.challengeType === "shadowing_video" ||
-    Boolean(report.analysis?.scoreBreakdown?.isShadowing) ||
-    status?.todayContentType === "shadowing_video" ||
-    Boolean(status?.isShadowingDay);
+  const isSameDayReEval = isSamePublishedChallengeDay(report, status);
+  const storedType = inferStoredChallengeType(report, report.analysis);
+  const statusScopedFlags = resolveDayContentFlags(isSameDayReEval ? status : null, storedType);
+  const isShadowReport = statusScopedFlags.isShadowing;
 
   // 1. Re-match vocabulary with intelligent matcher (waived for shadowing)
   // Preserve previously recognized target words so they are never lost if today's vocab is empty or changed
@@ -1871,15 +1950,12 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const matchedWords = isShadowReport ? [] : Array.from(new Set([...previousWords, ...newlyMatched]));
 
   // 2. Detect the authentic challenge type of this specific submission
-  const challengeType = report.challengeType || report.analysis?.challengeType || (
-    isShadowReport ? "shadowing_video"
-    : report.analysis?.scoreBreakdown?.isPictureDescription ? "picture_description"
-    : report.analysis?.scoreBreakdown?.isStorySummary ? "story_summary"
-    : status?.isMonthlyReflectionDay ? "monthly_reflection"
-    : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio")) ? "picture_description"
-    : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
-    : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
-    : status?.isMonthlyGoalsDay ? "monthly_goals"
+  const challengeType = storedType || (
+    statusScopedFlags.isShadowing ? "shadowing_video"
+    : statusScopedFlags.isPicture ? "picture_description"
+    : statusScopedFlags.isStory ? "story_summary"
+    : (isSameDayReEval && status?.isMonthlyReflectionDay) ? "monthly_reflection"
+    : (isSameDayReEval && status?.isMonthlyGoalsDay) ? "monthly_goals"
     : "topic"
   );
 
@@ -1927,8 +2003,11 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     return true;
   });
 
+  const { targetDuration: resolvedShadowDur, targetTranscript: resolvedShadowTranscript } = isShadow
+    ? await resolveShadowingReference(report, report.analysis, status, isSameDayReEval)
+    : { targetDuration: null, targetTranscript: null };
   const targetDur = isShadow
-    ? Math.max(20, Math.min(180, Number(report.analysis?.targetVideoDuration) || Number(report.analysis?.scoreBreakdown?.targetDuration) || Number(status?.todayVideoDuration) || 85))
+    ? Math.max(20, Math.min(180, Number(resolvedShadowDur) || Number(report.analysis?.scoreBreakdown?.targetDuration) || 85))
     : (status?.todayVideoDuration || 60);
 
   // 5. Calculate composite score with mathematical consistency
@@ -1944,7 +2023,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     isStorySummary: isStory || false,
     isShadowing: isShadow || false,
     targetVideoDuration: targetDur,
-    targetVideoTranscript: status?.todayVideoTranscript || null,
+    targetVideoTranscript: resolvedShadowTranscript || null,
     userHistory,
   });
 
@@ -1972,7 +2051,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     maxGrowth: 0,
     vocabulary: 0,
     maxVocabulary: 0,
-    durationMatchPercent: breakdown.durationRatio ?? Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100),
+    durationMatchPercent: breakdown.durationMatchPercent ?? breakdown.durationRatio ?? (breakdown.isOffTopic ? 0 : Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)),
     durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
     targetDuration: targetDur,
     userDuration: report.videoDuration || 0,
@@ -2002,10 +2081,23 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const isSunday = Boolean(report.analysis?.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
   const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
 
+  const updatedOffTopic = Boolean(updatedBreakdown?.isOffTopic);
   report.analysis.vocabularyUsed = matchedWords;
   report.analysis.vocabularyScore = vocabularyScore;
   report.analysis.compositeScore = score;
   report.analysis.scoreBreakdown = updatedBreakdown;
+  report.analysis.isOffTopic = updatedOffTopic;
+  if (isShadow) {
+    report.analysis.targetVideoDuration = targetDur;
+    if (resolvedShadowTranscript) report.analysis.targetVideoTranscript = resolvedShadowTranscript;
+    if (updatedOffTopic) {
+      report.analysis.topicRelevance = Math.min(typeof report.analysis.topicRelevance === "number" ? report.analysis.topicRelevance : 1, 2);
+      if (updatedBreakdown.offTopicReason) report.analysis.topicFeedback = updatedBreakdown.offTopicReason;
+      if (!report.analysis.overallComment || /^You demonstrated a good speaking effort/i.test(report.analysis.overallComment)) {
+        report.analysis.overallComment = "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases.";
+      }
+    }
+  }
   report.analysis.sundayBonus = isSunday;
   report.analysis.baseScore = score;
   report.analysis.bonusScore = effectiveScore;
@@ -2051,6 +2143,8 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const resultMessage = isShadow
     ? updatedBreakdown.isSilentAttempt
       ? "Score re-evaluated: No audible speech detected in recording (-85.5dB). Score updated to 0/100 pts."
+      : updatedBreakdown.isOffTopic
+      ? `Score re-evaluated: Off-topic / script mismatch detected (0/40 match). Composite score updated to ${Math.round(score)}/100 pts.${bonusMsg}`
       : `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.${bonusMsg}`
     : `Score re-evaluated: ${score} pts${bonusMsg}. Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`;
 

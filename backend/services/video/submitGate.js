@@ -324,6 +324,202 @@ export function calculateGrowthScore({ currentCommScore = 5, history = [] }) {
   };
 }
 
+const SHADOWING_STOP_WORDS = new Set([
+  "the", "and", "a", "an", "is", "in", "it", "its", "to", "of", "for", "on", "with", "as", "at", "by",
+  "this", "that", "these", "those", "i", "you", "your", "we", "our", "they", "their", "them",
+  "he", "his", "him", "she", "her", "hers", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "can", "may", "might", "must",
+  "not", "no", "nor", "but", "or", "so", "yet", "if", "when", "what", "which", "who", "whom", "whose", "why", "how", "where", "while",
+  "all", "any", "both", "each", "few", "more", "most", "other", "another", "some", "such", "than", "too", "very", "just",
+  "into", "from", "about", "out", "up", "down", "over", "under", "again", "then", "once", "here", "there",
+  "also", "because", "even", "well", "really", "only", "own", "same", "one", "two",
+  "make", "made", "get", "got", "take", "took", "give", "gave", "say", "said", "tell", "told",
+  "think", "thought", "know", "knew", "see", "saw", "want", "like", "look", "go", "going", "went", "come", "came",
+  "time", "day", "way", "thing", "things", "good", "better", "best", "right", "new", "first", "people", "me", "my", "us",
+  "much", "many", "feel", "try", "work", "life", "every",
+]);
+
+const META_SHADOWING_PATTERNS = [
+  { re: /\bwhat is shadowing\b/i, weight: 2 },
+  { re: /\badvantages?\b.*\bdisadvantages?\b/i, weight: 3 },
+  { re: /\bdisadvantages?\b/i, weight: 2 },
+  { re: /\badvantages? of (this|the|shadowing)\b/i, weight: 2 },
+  { re: /\buses? of (this|the) (task|activity|shadowing)\b/i, weight: 2 },
+  { re: /\bmeaning of (this|the) (task|activity|shadowing)\b/i, weight: 2 },
+  { re: /\bthis (task|activity) is about\b/i, weight: 2 },
+  { re: /\bshadowing is (a|an|one of|very|really|the)\b/i, weight: 2 },
+  { re: /\bshadowing (technique|method|activity|practice|exercise) (is|helps|can|makes)\b/i, weight: 2 },
+  { re: /\bshadowing makes me\b/i, weight: 2 },
+  { re: /\bi believe shadowing\b/i, weight: 2 },
+  { re: /\blearning english is\b/i, weight: 1 },
+  { re: /\bmy aim is to speak\b/i, weight: 1 },
+  { re: /\bachieve my communication goals\b/i, weight: 1 },
+  { re: /\b(hi|hello) everyone\b.*\b(share|talk|discuss|explain|speak)\b/i, weight: 1 },
+  { re: /\btoday i would like to (share|talk|speak|discuss|explain)\b/i, weight: 2 },
+];
+
+/**
+ * Evaluates whether a student's spoken transcript actually shadowed the assigned
+ * reference script, or whether they spoke unrelated content / talked about shadowing.
+ */
+/**
+ * Canonical daily challenge type resolution from Status + optional saved report challengeType.
+ * Ensures explicit todayContentType / challengeType always takes precedence over stale day flags.
+ */
+export function resolveDayContentFlags(status = null, challengeType = null) {
+  if (challengeType === "story_summary") return { isStory: true, isPicture: false, isShadowing: false };
+  if (challengeType === "picture_description") return { isStory: false, isPicture: true, isShadowing: false };
+  if (challengeType === "shadowing_video") return { isStory: false, isPicture: false, isShadowing: true };
+  if (challengeType === "normal") return { isStory: false, isPicture: false, isShadowing: false };
+
+  const ct = status?.todayContentType || null;
+  const hasExplicitSpecialType =
+    ct === "story_audio" || ct === "picture_description" || ct === "shadowing_video";
+  return {
+    isStory: ct === "story_audio" || (!hasExplicitSpecialType && Boolean(status?.isStorySummaryDay)),
+    isPicture: ct === "picture_description" || (!hasExplicitSpecialType && Boolean(status?.isPictureDescriptionDay)),
+    isShadowing: ct === "shadowing_video" || (!hasExplicitSpecialType && Boolean(status?.isShadowingDay)),
+  };
+}
+
+export function evaluateShadowingMatch(userTranscript, refTranscript = null) {
+  const userStr = typeof userTranscript === "string" ? userTranscript.trim() : "";
+  const refStr = typeof refTranscript === "string" ? refTranscript.trim() : "";
+
+  if (userStr.length < 20) {
+    return {
+      isMatch: true,
+      isStrongMatch: false,
+      hasRefTranscript: refStr.length > 30,
+      userContentPrecision: null,
+      refContentCoverage: null,
+      trigramHits: 0,
+      contentBigramHits: 0,
+      metaScore: 0,
+      reason: null,
+    };
+  }
+
+  const normalize = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const cleanUser = normalize(userStr);
+  const cleanRef = refStr ? normalize(refStr) : "";
+
+  // Detect meta-commentary about shadowing/speaking tasks (excluding patterns present in reference script)
+  let metaScore = 0;
+  for (const { re, weight } of META_SHADOWING_PATTERNS) {
+    if (re.test(cleanUser) && (!cleanRef || !re.test(cleanRef))) {
+      metaScore += weight;
+    }
+  }
+
+  if (refStr.length > 30) {
+    const allWords = (t) => normalize(t).split(" ").filter(w => w.length >= 2);
+    const contentTokens = (t) => normalize(t).split(" ").filter(w => w.length > 2 && !SHADOWING_STOP_WORDS.has(w));
+
+    const refAll = allWords(refStr);
+    const userAll = allWords(userStr);
+    const refContent = contentTokens(refStr);
+    const userContent = contentTokens(userStr);
+    const refContentSet = new Set(refContent);
+    const userContentSet = new Set(userContent);
+
+    if (refContentSet.size >= 6 && userContent.length >= 6) {
+      const matchedUserContent = userContent.filter(w => refContentSet.has(w)).length;
+      const userContentPrecision = matchedUserContent / userContent.length;
+      const uniqueMatchedRef = [...refContentSet].filter(w => userContentSet.has(w)).length;
+      const refContentCoverage = uniqueMatchedRef / refContentSet.size;
+
+      // Exact 3-word phrase shingles (must contain at least 1 meaningful content word)
+      const refTrigrams = new Set();
+      for (let i = 0; i <= refAll.length - 3; i++) {
+        const w1 = refAll[i], w2 = refAll[i + 1], w3 = refAll[i + 2];
+        if (!SHADOWING_STOP_WORDS.has(w1) || !SHADOWING_STOP_WORDS.has(w2) || !SHADOWING_STOP_WORDS.has(w3)) {
+          refTrigrams.add(`${w1} ${w2} ${w3}`);
+        }
+      }
+      const matchedTrigrams = new Set();
+      for (let i = 0; i <= userAll.length - 3; i++) {
+        const tri = `${userAll[i]} ${userAll[i + 1]} ${userAll[i + 2]}`;
+        if (refTrigrams.has(tri)) matchedTrigrams.add(tri);
+      }
+
+      // Consecutive content-word pairs (tolerant to dropped glue words in STT)
+      const refContentBigrams = new Set();
+      for (let i = 0; i <= refContent.length - 2; i++) {
+        refContentBigrams.add(`${refContent[i]} ${refContent[i + 1]}`);
+      }
+      const matchedContentBigrams = new Set();
+      for (let i = 0; i <= userContent.length - 2; i++) {
+        const bi = `${userContent[i]} ${userContent[i + 1]}`;
+        if (refContentBigrams.has(bi)) matchedContentBigrams.add(bi);
+      }
+
+      const trigramHits = matchedTrigrams.size;
+      const contentBigramHits = matchedContentBigrams.size;
+
+      let isMatch = true;
+      let reason = null;
+
+      if (metaScore >= 3 && trigramHits < 3 && userContentPrecision < 0.30) {
+        isMatch = false;
+        reason = "Your speech did not match today's assigned shadowing reference script — you explained or discussed the shadowing activity instead of mirroring the native speaker's words aloud.";
+      } else if (userContent.length >= 20) {
+        const hasEnoughWords = userContentPrecision >= 0.20;
+        const hasPhraseSequence = trigramHits >= 2 || contentBigramHits >= 3 || (userContentPrecision >= 0.30 && refContentCoverage >= 0.18);
+        if (!hasEnoughWords || !hasPhraseSequence) {
+          isMatch = false;
+          reason = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
+        }
+      } else {
+        if (userContentPrecision < 0.22 && trigramHits === 0 && contentBigramHits < 2) {
+          isMatch = false;
+          reason = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
+        }
+      }
+
+      const isStrongMatch = isMatch && userContentPrecision >= 0.32 && (trigramHits >= 2 || contentBigramHits >= 3) && metaScore < 3;
+      return {
+        isMatch,
+        isStrongMatch,
+        hasRefTranscript: true,
+        userContentPrecision: Math.round(userContentPrecision * 1000) / 1000,
+        refContentCoverage: Math.round(refContentCoverage * 1000) / 1000,
+        trigramHits,
+        contentBigramHits,
+        metaScore,
+        reason,
+      };
+    }
+  }
+
+  // Fallback when reference transcript is absent (e.g. historical re-evaluation after daily reset)
+  if (metaScore >= 2) {
+    return {
+      isMatch: false,
+      isStrongMatch: false,
+      hasRefTranscript: false,
+      userContentPrecision: null,
+      refContentCoverage: null,
+      trigramHits: 0,
+      contentBigramHits: 0,
+      metaScore,
+      reason: "Your speech did not match today's assigned shadowing reference script — you explained or discussed the shadowing activity instead of mirroring the native speaker's words aloud.",
+    };
+  }
+
+  return {
+    isMatch: true,
+    isStrongMatch: false,
+    hasRefTranscript: false,
+    userContentPrecision: null,
+    refContentCoverage: null,
+    trigramHits: 0,
+    contentBigramHits: 0,
+    metaScore,
+    reason: null,
+  };
+}
+
 export function calculateCompositeScore({
   durationSeconds,
   maxDurationSeconds,
@@ -423,23 +619,13 @@ export function calculateCompositeScore({
     // Check if student shadowed the assigned reference text or spoke unrelated text
     const refTranscript = targetVideoTranscript || analysis.targetVideoTranscript || analysis.referenceTranscript || null;
     const userTranscript = analysis.transcription || analysis.transcriptText || analysis.text || "";
-    let isOffTopic = false;
-    let offTopicWarning = null;
-
-    if (typeof refTranscript === "string" && refTranscript.trim().length > 30 && typeof userTranscript === "string" && userTranscript.trim().length > 30) {
-      const stopWords = new Set(["the", "and", "a", "an", "is", "in", "it", "to", "of", "for", "on", "with", "as", "at", "by", "this", "that", "i", "you", "we", "they", "he", "she"]);
-      const tokenize = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
-      const refTokens = new Set(tokenize(refTranscript));
-      const userTokens = tokenize(userTranscript);
-      if (refTokens.size >= 8 && userTokens.length >= 10) {
-        const overlapCount = userTokens.filter(w => refTokens.has(w)).length;
-        const overlapRatio = overlapCount / userTokens.length;
-        if (overlapRatio < 0.10) {
-          isOffTopic = true;
-          offTopicWarning = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
-        }
-      }
-    }
+    const effectiveTopicRel = typeof analysis.topicRelevance === "number" ? analysis.topicRelevance : topicRelevance;
+    const shadowingCheck = evaluateShadowingMatch(userTranscript, refTranscript);
+    const aiFlaggedOffTopic = analysis?.isOffTopic === true || (typeof effectiveTopicRel === "number" && effectiveTopicRel <= 3.5);
+    const isOffTopic = !shadowingCheck.isMatch || (!shadowingCheck.isStrongMatch && aiFlaggedOffTopic);
+    const offTopicWarning = isOffTopic
+      ? (shadowingCheck.reason || analysis?.topicFeedback || "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.")
+      : null;
 
     // Exact amount of time the student actually spoke on this video
     // Spoken Seconds = Video Duration * (Speech Ratio / 100)
@@ -515,9 +701,9 @@ export function calculateCompositeScore({
     }
     let communicationScore = Math.min(60, Math.round((rhythmComponent + deliveryComponent) * 100) / 100);
     if (isOffTopic) {
-      // Off topic shadowing penalty: zero duration score and heavily penalized delivery
+      // Off-topic shadowing penalty: zero duration score and heavily penalized delivery
       durationScore = 0;
-      communicationScore = Math.min(20, Math.round(communicationScore * 0.35));
+      communicationScore = Math.min(18, Math.round(communicationScore * 0.25 * 100) / 100);
     }
 
     // 3. Personal Growth: 0 points (Waived for shadowing activity)
@@ -527,6 +713,9 @@ export function calculateCompositeScore({
     total100 = Math.min(100, Math.max(0, total100));
 
     const matchPercent = Math.round(spokenRatio * 100);
+    const effectiveMatchPercent = isOffTopic ? 0 : matchPercent;
+    const effectiveSpokenRatio = isOffTopic ? 0 : spokenRatio;
+    const achievedTargetMatch = !isOffTopic && isEightyFivePercent;
 
     return {
       score: total100,
@@ -543,20 +732,24 @@ export function calculateCompositeScore({
         maxComm:          60,
         maxVocabulary:    0,
         maxGrowth:        0,
+        targetDuration:        targetDur,
         targetDurationSeconds: targetDur,
         targetActiveSpeechSeconds: targetActiveSpeechTime,
         actualDurationSeconds: Math.round(actualDur),
         spokenDurationSeconds: Math.round(spokenSeconds),
         speechRatio:           typeof rawSpeechRatio === "number" ? Math.round(rawSpeechRatio) : null,
-        durationRatio:         matchPercent,
-        durationMatchRatio:    spokenRatio,
-        isEightyFivePercentMatch: isEightyFivePercent,
-        isNinetyPercentMatch:  isEightyFivePercent,
+        durationRatio:         effectiveMatchPercent,
+        durationMatchPercent:  effectiveMatchPercent,
+        durationMatchRatio:    effectiveSpokenRatio,
+        isEightyFivePercentMatch: achievedTargetMatch,
+        isNinetyPercentMatch:  achievedTargetMatch,
         isOffTopic,
         offTopicReason: offTopicWarning,
-        durationMessage: isEightyFivePercent
-          ? `Full duration credit awarded (${matchPercent}% active spoken time vs ${targetActiveSpeechTime}s target speech — >=85% target achieved).`
-          : `Effort credit awarded (${Math.round(spokenSeconds)}s active spoken time vs ${targetActiveSpeechTime}s target speech — aim for >=85% for full duration points).`,
+        durationMessage: isOffTopic
+          ? offTopicWarning
+          : (achievedTargetMatch
+            ? `Full duration credit awarded (${matchPercent}% active spoken time vs ${targetActiveSpeechTime}s target speech — >=85% target achieved).`
+            : `Effort credit awarded (${Math.round(spokenSeconds)}s active spoken time vs ${targetActiveSpeechTime}s target speech — aim for >=85% for full duration points).`),
         speechMultiplier: Math.round(speechMult * 100),
         growthDelta:      null,
         baselineComm:     null,

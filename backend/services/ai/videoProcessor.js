@@ -11,7 +11,7 @@ import { transcribe } from "./transcribe.js";
 import { analyzeSpeech } from "./analyzeSpeech.js";
 import { analyzeVideo } from "./analyzeVideo.js";
 import { synthesizeOverallComment, parseFeedbackToStructure } from "./webFeedbackHelpers.js";
-import { buildAnalysisSummary } from "../video/submitGate.js";
+import { buildAnalysisSummary, resolveDayContentFlags } from "../video/submitGate.js";
 import {
   withTimeout,
   startStage,
@@ -47,12 +47,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     status = await Status.findOne().lean();
     questionTopic = status?.todayTopic || null;
     questionText  = status?.todayQuestion || null;
-    const isStory = status?.todayContentType === "story_audio"
-      || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-    const isPicture = status?.todayContentType === "picture_description"
-      || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-    const isShadowing = status?.todayContentType === "shadowing_video"
-      || Boolean(status?.isShadowingDay);
+    const { isStory, isPicture, isShadowing } = resolveDayContentFlags(status);
 
     if (isShadowing) {
       if (!questionTopic) questionTopic = status?.todayTopic || "Shadowing Practice";
@@ -173,12 +168,11 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
         await onProgress("Scoring your speech…");
 
         const speechStage = startStage("analyzeSpeech");
-        const isStoryActive = status?.todayContentType === "story_audio"
-          || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-        const isPictureActive = status?.todayContentType === "picture_description"
-          || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-        const isShadowingActive = status?.todayContentType === "shadowing_video"
-          || Boolean(status?.isShadowingDay);
+        const {
+          isStory: isStoryActive,
+          isPicture: isPictureActive,
+          isShadowing: isShadowingActive,
+        } = resolveDayContentFlags(status);
         const challengeType = isPictureActive ? "picture_description" : isStoryActive ? "story_summary" : isShadowingActive ? "shadowing_video" : null;
 
         try {
@@ -234,8 +228,14 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     }
 
     // Stage 4: Structured analysis + calibrated overall score / tier
+    const shadowMeta = resolveDayContentFlags(status).isShadowing
+      ? {
+          targetVideoDuration: status?.todayVideoDuration || null,
+          targetVideoTranscript: status?.todayVideoTranscript || null,
+        }
+      : {};
     const analysis = buildAnalysisSummary(
-      buildStructuredAnalysis(speechResult, visual, qualityWarning, transcription?.text || "")
+      buildStructuredAnalysis(speechResult, visual, qualityWarning, transcription?.text || "", shadowMeta)
     );
 
     return { analysis, duration };
@@ -251,7 +251,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
  * Build structured analysis object directly from pipeline results.
  * No regex parsing needed — we have the raw objects.
  */
-function buildStructuredAnalysis(speechResult, visual, qualityWarning, transcriptText = "") {
+function buildStructuredAnalysis(speechResult, visual, qualityWarning, transcriptText = "", shadowMeta = {}) {
   const s = speechResult._stats || {};
 
   return {
@@ -264,6 +264,9 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning, transcrip
     vocabulary:     speechResult.vocabulary,
     coherence:      speechResult.coherence ?? null,
     topicRelevance: speechResult.topicRelevance ?? null,
+    isOffTopic:     Boolean(speechResult.isOffTopic),
+    targetVideoDuration:   shadowMeta?.targetVideoDuration ?? null,
+    targetVideoTranscript: shadowMeta?.targetVideoTranscript ?? null,
 
     // Visual scores
     eyeContact:       visual?.eyeContact ?? null,
