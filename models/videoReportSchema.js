@@ -27,7 +27,12 @@ const videoReportSchema = new mongoose.Schema({
     isOffTopic: { type: Boolean, default: false },
     targetVideoDuration: { type: Number, default: null },
     targetVideoTranscript: { type: String, default: null },
-    challengeType: { type: String, default: null },
+    questionTopic: { type: String, default: null },
+    targetQuestion: { type: String, default: null },
+    targetStoryTranscript: { type: String, default: null },
+    targetSummaryGuide: { type: String, default: null },
+    targetImageScene: { type: String, default: null },
+    targetVocabulary: { type: [String], default: undefined },
     
     // Visual scores
     eyeContact: { type: Number, min: 0, max: 10 },

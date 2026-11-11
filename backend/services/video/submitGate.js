@@ -520,6 +520,184 @@ export function evaluateShadowingMatch(userTranscript, refTranscript = null) {
   };
 }
 
+const STORY_STOP_WORDS = new Set([
+  ...SHADOWING_STOP_WORDS,
+  "story", "stories", "tale", "fable", "summary", "summarize", "moral", "lesson",
+  "character", "characters", "once", "upon", "time", "said", "told", "asked", "replied",
+  "went", "came", "made", "took", "gave", "got", "saw", "looked", "felt", "wanted",
+  "decided", "started", "began", "finally", "eventually", "suddenly", "always", "never",
+  "people", "person", "someone", "everyone", "something", "anything", "everything",
+  "nothing", "good", "great", "little", "small", "big", "long", "many", "much", "well",
+  "even", "still", "also", "then", "first", "last", "next", "after", "before", "another",
+]);
+
+const PICTURE_VISUAL_CUES = new Set([
+  "background", "foreground", "left", "right", "middle", "center", "centre", "corner",
+  "top", "bottom", "front", "behind", "beside", "next", "near", "wearing", "dressed",
+  "standing", "sitting", "seated", "holding", "looking", "smiling", "laughing", "walking",
+  "running", "playing", "working", "talking", "pointing", "person", "people", "man", "men",
+  "woman", "women", "boy", "girl", "child", "children", "family", "group", "crowd",
+  "face", "eyes", "hair", "hand", "hands", "clothes", "shirt", "jacket", "dress",
+  "room", "indoor", "indoors", "outdoor", "outdoors", "outside", "inside", "street",
+  "road", "building", "house", "tree", "trees", "sky", "clouds", "sun", "sunny",
+  "sunset", "water", "river", "ocean", "sea", "mountain", "mountains", "grass", "table",
+  "chair", "window", "door", "light", "bright", "dark", "color", "colors", "colour",
+  "blue", "red", "green", "yellow", "white", "black", "brown", "orange", "visible",
+  "seems", "looks", "appear", "appears", "depicts", "shows", "scene", "setting", "mood",
+]);
+
+/**
+ * Deterministic off-topic & task-meta verification for non-shadowing categories
+ * (Story Summary, Picture Description, Daily Topic).
+ * Prevents fallback scoring or lenient AI passes from rewarding essays ABOUT the task
+ * or completely unrelated stories.
+ */
+export function evaluateCategoryOffTopic(userTranscript, opts = {}) {
+  const {
+    challengeType = null,
+    questionTopic = null,
+    questionText = null,
+    storyTranscript = null,
+    summaryGuide = null,
+    imageScene = null,
+    imageInstructions = null,
+    targetVideoTranscript = null,
+    vocabularyUsedCount = 0,
+  } = opts || {};
+
+  if (challengeType === "shadowing_video") {
+    const m = evaluateShadowingMatch(userTranscript, targetVideoTranscript || questionText);
+    return { isMatch: m.isMatch, reason: m.reason, metaScore: m.metaScore || 0 };
+  }
+
+  const userStr = typeof userTranscript === "string" ? userTranscript.trim() : "";
+  if (userStr.length < 25) {
+    return { isMatch: true, reason: null, metaScore: 0 };
+  }
+
+  if (challengeType === "monthly_reflection" || challengeType === "monthly_goals" || challengeType === "weekly_reflection") {
+    return { isMatch: true, reason: null, metaScore: 0 };
+  }
+
+  const normalize = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const cleanUser = normalize(userStr);
+
+  if (challengeType === "story_summary") {
+    const refRaw = [storyTranscript, summaryGuide, questionTopic].filter(Boolean).join(" ");
+    const cleanRef = normalize(refRaw);
+    const storyMetaPatterns = [
+      { re: /\b(story\s*summary|summarizing\s+(a\s+)?stor(y|ies)|story\s*retelling)\s+(task|activity|exercise|is|helps|improves|builds|teaches|makes)\b/i, weight: 2 },
+      { re: /\b(what|about|meaning of|purpose of|uses? of)\s+(is\s+)?(the\s+)?(story\s*summary|summarizing\s+(a\s+)?stor(y|ies))\b/i, weight: 2 },
+      { re: /\badvantages?\b.*\bdisadvantages?\b.*\b(story|summar|task|activity|exercise)\b/i, weight: 2 },
+      { re: /\b(hi|hello) everyone\b.*\b(share|talk|discuss|explain|speak)\b.*\b(story\s*summary|task|activity)\b/i, weight: 1 },
+      { re: /\btoday i (would like to|want to)\s+(explain|share|talk about|discuss)\s+(what|about|why|the uses of)?\s*(story\s*summary|this\s+(story|task|activity))\b/i, weight: 2 },
+    ];
+    let metaScore = 0;
+    for (const { re, weight } of storyMetaPatterns) {
+      if (re.test(cleanUser) && (!cleanRef || !re.test(cleanRef))) metaScore += weight;
+    }
+
+    const stem = (w) => (w.length >= 6 ? w.slice(0, 5) : w);
+    const tokenizeStems = (t) =>
+      normalize(t)
+        .split(" ")
+        .filter((w) => w.length >= 4 && !STORY_STOP_WORDS.has(w))
+        .map(stem);
+
+    const storyRefOnly = normalize([storyTranscript, summaryGuide].filter(Boolean).join(" "));
+    const refStemsList = storyRefOnly.length > 40 ? tokenizeStems(storyRefOnly) : [];
+    const refStemSet = new Set(refStemsList);
+    const userStemsList = tokenizeStems(cleanUser);
+    const uniqueMatchedStems = new Set(userStemsList.filter((st) => refStemSet.has(st))).size;
+    const matchedUserStems = userStemsList.filter((st) => refStemSet.has(st)).length;
+    const precision = userStemsList.length > 0 ? matchedUserStems / userStemsList.length : 0;
+
+    if (refStemSet.size >= 15 && userStemsList.length >= 18) {
+      if (metaScore >= 2 && uniqueMatchedStems < 4) {
+        return {
+          isMatch: false,
+          reason: "Submission is off-topic: you explained or discussed the story summary task instead of retelling today's assigned audio story.",
+          metaScore,
+        };
+      }
+      if (uniqueMatchedStems <= 1 || (uniqueMatchedStems <= 2 && precision < 0.04)) {
+        return {
+          isMatch: false,
+          reason: "Submission is off-topic and does not summarize today's audio story.",
+          metaScore,
+        };
+      }
+    } else if (metaScore >= 2 && uniqueMatchedStems < 2) {
+      return {
+        isMatch: false,
+        reason: "Submission is off-topic: you discussed the story summary task instead of summarizing today's audio story.",
+        metaScore,
+      };
+    }
+    return { isMatch: true, reason: null, metaScore };
+  }
+
+  if (challengeType === "picture_description") {
+    const cleanInstr = normalize([imageInstructions, questionText].filter(Boolean).join(" "));
+    const picMetaPatterns = [
+      { re: /\b(picture|image|photo)\s*description\s+(task|activity|exercise|is|helps|improves|builds|teaches|means|one of)\b/i, weight: 2 },
+      { re: /\b(what|about|meaning of|purpose of|uses? of)\s+(is\s+)?(the\s+)?(picture|image|photo)\s*description\b/i, weight: 2 },
+      { re: /\bdescribing\s+(a\s+)?(picture|image|photo)\s+(is|helps|improves|builds|teaches|one of)\b/i, weight: 2 },
+      { re: /\badvantages?\b.*\bdisadvantages?\b.*\b(picture|image|photo|describ|task|activity|exercise)\b/i, weight: 2 },
+      { re: /\b(hi|hello) everyone\b.*\b(share|talk|discuss|explain|speak)\b.*\b(picture\s*description|image\s*description|task|activity)\b/i, weight: 1 },
+      { re: /\btoday i (would like to|want to)\s+(explain|share|talk about|discuss)\s+(what|about|why|the uses of)?\s*(picture\s*description|image\s*description|this\s+(task|activity))\b/i, weight: 2 },
+    ];
+    let metaScore = 0;
+    for (const { re, weight } of picMetaPatterns) {
+      if (re.test(cleanUser) && (!cleanInstr || !re.test(cleanInstr))) metaScore += weight;
+    }
+    const strippedUser = cleanUser.replace(/\b(picture|image|photo)\s*description\b/g, " ");
+    const sceneWords = new Set(
+      normalize([imageScene, questionTopic].filter(Boolean).join(" "))
+        .split(" ")
+        .filter((w) => w.length >= 4 && !SHADOWING_STOP_WORDS.has(w))
+    );
+    const userTokens = strippedUser.split(" ").filter(Boolean);
+    let visualHits = 0;
+    for (const w of userTokens) {
+      if (PICTURE_VISUAL_CUES.has(w) || sceneWords.has(w)) visualHits++;
+    }
+    if ((metaScore >= 2 && visualHits < 3 && vocabularyUsedCount === 0) || (metaScore >= 3 && visualHits < 2)) {
+      return {
+        isMatch: false,
+        reason: "Submission is off-topic and does not describe today's assigned image.",
+        metaScore,
+      };
+    }
+    return { isMatch: true, reason: null, metaScore };
+  }
+
+  // Daily Topic / Normal question
+  const promptCombined = [questionTopic, questionText].filter(Boolean).join(" ");
+  const promptAsksAboutSpeaking = /english|speaking|speech|communication|fluency|vocabulary|confidence|practice|task|activity|skill/i.test(promptCombined);
+  if (!promptAsksAboutSpeaking) {
+    const topicMetaPatterns = [
+      { re: /\b(this|today'?s)\s+(speaking\s+)?(task|activity|question|challenge|topic)\s+(is|helps|allows|requires|improves|makes)\b/i, weight: 2 },
+      { re: /\badvantages?\b.*\bdisadvantages?\b.*\b(this\s+)?(speaking\s+)?(task|activity|question|challenge)\b/i, weight: 2 },
+      { re: /\b(what|about|meaning of|purpose of|uses? of)\s+(is\s+)?today'?s?\s+(speaking\s+)?(task|activity|question|challenge)\b/i, weight: 2 },
+      { re: /\b(speaking\s+practice|daily\s+speaking)\s+(is\s+one\s+of\s+the\s+best|helps\s+(me|us)|improves\s+our)\b/i, weight: 2 },
+    ];
+    let metaScore = 0;
+    for (const { re, weight } of topicMetaPatterns) {
+      if (re.test(cleanUser)) metaScore += weight;
+    }
+    if (metaScore >= 2) {
+      return {
+        isMatch: false,
+        reason: "Submission is off-topic and does not answer today's question.",
+        metaScore,
+      };
+    }
+  }
+
+  return { isMatch: true, reason: null, metaScore: 0 };
+}
+
 export function calculateCompositeScore({
   durationSeconds,
   maxDurationSeconds,
@@ -531,11 +709,16 @@ export function calculateCompositeScore({
   isPictureDescription = false,
   isStorySummary = false,
   isShadowing = false,
+  challengeType: explicitChallengeType = null,
   targetVideoDuration = null,
   targetVideoTranscript = null,
+  targetStoryTranscript = null,
+  targetSummaryGuide = null,
+  targetQuestion = null,
+  targetImageScene = null,
   userHistory = [],
 }) {
-  const challengeType = analysis?.challengeType || null;
+  const challengeType = explicitChallengeType || analysis?.challengeType || null;
   const isStoryTask = Boolean(isStorySummary || challengeType === "story_summary");
 
   // ── Shadowing Video: Effort-proportional duration matching + Speech delivery ──
@@ -836,17 +1019,28 @@ export function calculateCompositeScore({
     // 2) AI isOffTopic was not explicitly false, AND contentRel is critically low (<= 1.5) with no target words used.
     // When the speaker matched target vocabulary from today's prompt or AI confirmed isOffTopic: false,
     // a brief or developing description is NOT off-topic (it is scored proportionally in Content & Relevance).
+    const picCheck = evaluateCategoryOffTopic(analysis?.transcription || "", {
+      challengeType: "picture_description",
+      questionTopic: analysis?.questionTopic || null,
+      questionText: targetQuestion || analysis?.targetQuestion || null,
+      imageScene: targetImageScene || analysis?.targetImageScene || null,
+      vocabularyUsedCount: usedTargetWords,
+    });
     const hasTargetVocab = usedTargetWords > 0;
-    const isOffTopic = analysis?.isOffTopic === true || (
+    const isOffTopic = !picCheck.isMatch || analysis?.isOffTopic === true || (
       analysis?.isOffTopic !== false &&
       !hasTargetVocab &&
       typeof contentRel === "number" &&
       contentRel <= 1.5
     );
+    const effectiveContentRel = !picCheck.isMatch ? Math.min(contentRel, 1.5) : contentRel;
+    const picOffTopicReason = !isOffTopic
+      ? null
+      : (picCheck.reason || analysis?.topicFeedback || "Submission is off-topic and does not describe today's assigned image.");
 
     // Content & Relevance: max 25 pts (rebalanced from 35)
     const contentBase = isOffTopic
-      ? (Math.min(contentRel, 2.5) * 0.85 + coherence * 0.15)
+      ? (Math.min(effectiveContentRel, 2.5) * 0.85 + Math.min(coherence, 3) * 0.15)
       : (coherence * 0.60 + contentRel * 0.40);
     let contentScore = (contentBase / 10) * 25;
 
@@ -867,7 +1061,7 @@ export function calculateCompositeScore({
 
     // STRICT SECURITY GATE: Off-topic submissions cannot get high scores (>50)
     if (isOffTopic) {
-      const cap = contentRel <= 2 ? 35 : 48;
+      const cap = effectiveContentRel <= 2 ? 35 : 48;
       total100 = Math.min(cap, Math.round(total100 * 0.55 * 100) / 100);
     }
     total100 = Math.min(100, Math.max(0, total100));
@@ -910,7 +1104,7 @@ export function calculateCompositeScore({
         requiredVocabWords: requiredTargetWords,
         totalVocabWords:  configuredTotalWords,
         isOffTopic,
-        offTopicReason:   isOffTopic ? "Submission is off-topic and does not describe today's assigned image." : null,
+        offTopicReason:   picOffTopicReason,
         isPictureDescription: true,
         isStorySummary: false,
         isSpecialDay: false,
@@ -1020,9 +1214,20 @@ export function calculateCompositeScore({
     commScore  = (commAvg / 10) * 10;
   }
 
-  // Check if submission is off-topic or answering yesterday's / wrong question
+  // Check if submission is off-topic, explaining the task format, or unrelated to today's story/question
+  const categoryCheck = !isSpecialDay
+    ? evaluateCategoryOffTopic(analysis?.transcription || "", {
+        challengeType: isStoryTask ? "story_summary" : (challengeType || "topic"),
+        questionTopic: analysis?.questionTopic || targetQuestion || null,
+        questionText: targetQuestion || analysis?.targetQuestion || null,
+        storyTranscript: targetStoryTranscript || analysis?.targetStoryTranscript || null,
+        summaryGuide: targetSummaryGuide || analysis?.targetSummaryGuide || null,
+        vocabularyUsedCount: usedCount,
+      })
+    : { isMatch: true, reason: null };
   const hasTargetVocab = usedCount > 0;
   const isOffTopic = !isSpecialDay && (
+    !categoryCheck.isMatch ||
     analysis?.isOffTopic === true || (
       analysis?.isOffTopic !== false &&
       !hasTargetVocab &&
@@ -1030,6 +1235,10 @@ export function calculateCompositeScore({
       effectiveTopicRelevance <= 1.5
     )
   );
+  if (isOffTopic && !categoryCheck.isMatch) {
+    effectiveTopicRelevance = Math.min(typeof effectiveTopicRelevance === "number" ? effectiveTopicRelevance : 1, 1.5);
+    topicScore = (Math.max(0, Math.min(10, effectiveTopicRelevance)) / 10) * maxTopic;
+  }
 
   let total100 = Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100;
 
@@ -1077,9 +1286,9 @@ export function calculateCompositeScore({
       totalVocabWords: total,
       isOffTopic,
       offTopicReason: isOffTopic
-        ? (isStoryTask
+        ? (categoryCheck.reason || (isStoryTask
           ? "Submission is off-topic and does not summarize today's audio story."
-          : "Submission is off-topic and does not answer today's question.")
+          : "Submission is off-topic and does not answer today's question."))
         : null,
       isSpecialDay,
       isStorySummary:  isStoryTask,

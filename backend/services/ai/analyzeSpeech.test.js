@@ -162,4 +162,132 @@ describe("analyzeSpeech JSON repair and fallback", () => {
     expect(result.isOffTopic).toBe(false);
     expect(result.topicRelevance).toBe(7);
   });
+
+  const storyQuestionText = [
+    "Story Theme / Topic: Theater Pride",
+    "Story transcript: A nobleman announced a public entertainment in the theater offering splendid prizes for any novelty. A popular clown imitated a squealing pig empty-handed while a countryman concealed a real pig beneath his cloak and squeezed it on stage until the crowd caught the trick.",
+    "Expected key points / summary guide: A nobleman holds a talent show, a clever clown imitates a pig without props, and a rival countryman hides a real pig under his coat.",
+  ].join("\n\n");
+
+  it("flags story_summary meta-speech in analyzeSpeech fallback", async () => {
+    const metaStory =
+      "Hello everyone, today I want to explain what today's story summary activity is and the uses of summarizing stories. Story summary is a speaking task that has many advantages and disadvantages for building confidence and daily English fluency.";
+
+    const result = await analyzeSpeech(
+      metaStory,
+      140,
+      [],
+      "Theater Pride",
+      storyQuestionText,
+      [],
+      { speechRatio: 85, paceConsistency: 8 },
+      "story_summary"
+    );
+
+    expect(result.isOffTopic).toBe(true);
+    expect(result.topicRelevance).toBeLessThanOrEqual(2);
+    expect(result.overallComment).not.toContain("good speaking effort");
+    expect(result.overallComment).toContain("Off-topic submission");
+  });
+
+  it("flags completely unrelated stories in story_summary analyzeSpeech fallback", async () => {
+    const unrelatedStory =
+      "Astronauts aboard the international orbital telescope repaired solar panels, calibrated infrared mirrors, monitored battery voltage, and photographed distant spiral galaxies using automated robotics throughout their three-week scientific expedition across deep orbit.";
+
+    const result = await analyzeSpeech(
+      unrelatedStory,
+      140,
+      [],
+      "Theater Pride",
+      storyQuestionText,
+      [],
+      { speechRatio: 85, paceConsistency: 8 },
+      "story_summary"
+    );
+
+    expect(result.isOffTopic).toBe(true);
+    expect(result.topicRelevance).toBeLessThanOrEqual(2);
+    expect(result.overallComment).toContain("Off-topic submission");
+  });
+
+  it("keeps genuine paraphrased story_summary valid in analyzeSpeech fallback", async () => {
+    const validParaphrase =
+      "In the assigned story, a nobleman arranged a theater show with prizes. A clown impressed the theater crowd by squealing like a pig empty-handed, and a countryman later cheated by hiding a real pig beneath his cloak.";
+
+    const result = await analyzeSpeech(
+      validParaphrase,
+      140,
+      [],
+      "Theater Pride",
+      storyQuestionText,
+      [],
+      { speechRatio: 85, paceConsistency: 8 },
+      "story_summary"
+    );
+
+    expect(result.isOffTopic).toBe(false);
+    expect(result.topicRelevance).toBe(7);
+  });
+
+  it("flags picture_description meta-speech in analyzeSpeech fallback and preserves genuine descriptions", async () => {
+    const picContext = [
+      "Image scene: busy street market with colorful fruit stalls",
+      "Task instructions given to student: Describe what people and objects you see in the market photograph.",
+    ].join("\n\n");
+
+    const metaPic =
+      "Today I would like to share with you what picture description is. Picture description is an English speaking exercise with several advantages and disadvantages for fluency and confidence.";
+
+    const offTopic = await analyzeSpeech(
+      metaPic,
+      130,
+      [],
+      "Street Market Scene",
+      picContext,
+      [],
+      { speechRatio: 85, paceConsistency: 8 },
+      "picture_description"
+    );
+
+    expect(offTopic.isOffTopic).toBe(true);
+    expect(offTopic.topicRelevance).toBeLessThanOrEqual(2);
+    expect(offTopic.overallComment).toContain("Off-topic submission");
+
+    const validPic =
+      "In the foreground on the left, vendors are selling colorful mangoes and bananas under striped umbrellas while shoppers walk down the crowded street market in the background.";
+
+    const onTopic = await analyzeSpeech(
+      validPic,
+      130,
+      [],
+      "Street Market Scene",
+      picContext,
+      [],
+      { speechRatio: 85, paceConsistency: 8 },
+      "picture_description"
+    );
+
+    expect(onTopic.isOffTopic).toBe(false);
+    expect(onTopic.topicRelevance).toBe(7);
+  });
+
+  it("flags daily topic meta-speech when prompt is unrelated in analyzeSpeech fallback", async () => {
+    const metaTopic =
+      "This speaking activity helps learners improve communication and fluency. There are advantages and disadvantages of today's speaking task for vocabulary growth.";
+
+    const result = await analyzeSpeech(
+      metaTopic,
+      180,
+      [],
+      "Childhood Memories",
+      "Tell us about your favorite childhood summer vacation.",
+      [],
+      { speechRatio: 85, paceConsistency: 8 },
+      "topic"
+    );
+
+    expect(result.isOffTopic).toBe(true);
+    expect(result.topicRelevance).toBeLessThanOrEqual(2);
+    expect(result.overallComment).toContain("Off-topic submission");
+  });
 });

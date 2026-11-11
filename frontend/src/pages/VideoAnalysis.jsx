@@ -7933,7 +7933,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                 }] : []),
               ] : isPictureBd ? [
                 { label: `🗣️ Communication`, earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
-                { label: `🧠 Content & Relevance`,      earned: bd.content       || 0, max: bd.maxContent       || 25, color: "#a78bfa" },
+                { label: bd.isOffTopic ? `🚫 Content & Relevance` : `🧠 Content & Relevance`, earned: bd.content || 0, max: bd.maxContent || 25, color: bd.isOffTopic ? "#ef4444" : "#a78bfa", subtext: bd.isOffTopic ? "Off-Topic" : undefined },
                 { label: `🎯 Target Expressions`,       earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 20, color: "#34d399" },
                 { label: `⏱️ Duration`,                 earned: bd.duration      || 0, max: bd.maxDuration      || 20, color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
@@ -7952,7 +7952,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
               ] : [
                 { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || (isStoryBd ? 20 : 30), color: "#60a5fa" },
                 { label: "🎯 Expressions used", earned: bd.vocabUsed || 0, max: bd.maxVocab   || (isStoryBd ? 20 : 30), color: "#a78bfa" },
-                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "📖 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || (isStoryBd ? 25 : 15), color: "#34d399" }] : []),
+                ...(!bd.isSpecialDay ? [{ label: bd.isOffTopic ? (isStoryBd ? "🚫 Story relevance" : "🚫 Topic relevance") : (isStoryBd ? "📖 Story relevance" : "🎯 Topic relevance"), earned: bd.topic || 0, max: bd.maxTopic || (isStoryBd ? 25 : 15), color: bd.isOffTopic ? "#ef4444" : "#34d399", subtext: bd.isOffTopic ? "Off-Topic" : undefined }] : []),
                 { label: "🗣️ Communication", earned: bd.comm     || 0, max: bd.maxComm    || (bd.isSpecialDay ? 25 : (isStoryBd ? 20 : 10)), color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",
