@@ -863,12 +863,17 @@ export async function submitRegistration(verifyToken, name, password, referralCo
 
   // Validate referral code if provided
   let validReferralCode = null;
+  let referrerName = null;
   if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
-    const check = await validateReferralCode(referralCode.trim());
-    if (!check?.valid) {
+    const cleanCode = referralCode.trim();
+    const inviter = await User.findOne({
+      referralCode: { $regex: new RegExp(`^${cleanCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    }).select("name phone referralCode").lean();
+    if (!inviter) {
       throw new Error("Invalid referral code. Please check the code or leave it blank.");
     }
-    validReferralCode = check.code;
+    validReferralCode = inviter.referralCode;
+    referrerName = inviter.name || null;
   }
 
   // Block duplicates
@@ -886,29 +891,86 @@ export async function submitRegistration(verifyToken, name, password, referralCo
       name: name.trim(),
       password: hashed,
       referralCode: validReferralCode,
+      referrerName: referrerName,
       createdAt: new Date(),
     },
     { upsert: true, new: true }
   );
 
+  // Notify admin via WhatsApp on configured personal number (non-blocking)
+  try {
+    const rawDigits = String(phone).replace(/\D/g, "");
+    const cleanDisplayPhone = rawDigits.length === 10 ? `+91 ${rawDigits}` : `+${rawDigits}`;
+    const timeStr = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const alertLines = [
+      `🎉 *New Student Registration Received*`,
+      ``,
+      `👤 *Name:* ${name.trim()}`,
+      `📱 *Phone:* ${cleanDisplayPhone}`,
+    ];
+    if (referrerName) {
+      alertLines.push(`🤝 *Referred By:* ${referrerName}`);
+    } else if (validReferralCode) {
+      alertLines.push(`🎟️ *Referral Code:* ${validReferralCode}`);
+    }
+    alertLines.push(`⏰ *Time:* ${timeStr}`);
+    alertLines.push(``);
+    alertLines.push(`👉 Review & approve in Admin Dashboard (Registrations tab).`);
+
+    const alertMsg = alertLines.join("\n");
+
+    import("../whatsapp/whatsappService.js")
+      .then(({ sendAdminDirectMessage }) => sendAdminDirectMessage(alertMsg))
+      .then((res) => {
+        if (res?.success) {
+          console.log(`[Auth] 📲 Admin WhatsApp notification sent for new registration: ${name.trim()} (${cleanDisplayPhone})`);
+        } else {
+          console.log(`[Auth] ℹ️ WhatsApp notification skipped/failed: ${res?.message || "unknown"}`);
+        }
+      })
+      .catch((waErr) => {
+        console.warn("[Auth] Failed to send WhatsApp alert for new registration:", waErr?.message || waErr);
+      });
+  } catch (notifyErr) {
+    console.warn("[Auth] Error preparing registration WhatsApp alert:", notifyErr?.message || notifyErr);
+  }
+
   return {
     success: true,
-    message: "Registration submitted! An admin will review and approve your account within 24 hours.",
+    message: "Registration submitted! An admin will review and approve your account shortly.",
   };
 }
+
+
 
 /**
  * Admin — list all pending registrations
  */
 export async function listPendingRegistrations() {
   const pending = await PendingRegistration.find().sort({ createdAt: -1 }).lean();
+
+  // For any pending records missing stored referrerName, decode from User collection
+  const unresolvedCodes = [...new Set(pending.filter(p => p.referralCode && !p.referrerName).map(p => p.referralCode))];
+  let fallbackMap = new Map();
+  if (unresolvedCodes.length > 0) {
+    try {
+      const inviters = await User.find({ referralCode: { $in: unresolvedCodes } }).select("name referralCode").lean();
+      fallbackMap = new Map(inviters.map(u => [u.referralCode, u.name]));
+    } catch {}
+  }
   return pending.map(p => ({
     id: p._id,
     phone: p.phone,
     name: p.name,
     referralCode: p.referralCode || null,
+    referrerName: p.referrerName || (p.referralCode ? fallbackMap.get(p.referralCode) : null) || null,
     createdAt: p.createdAt,
-    expiresAt: new Date(new Date(p.createdAt).getTime() + 24 * 60 * 60 * 1000),
+
   }));
 }
 

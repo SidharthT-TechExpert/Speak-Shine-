@@ -156,22 +156,18 @@ export async function uploadFrames(req, res) {
 export async function preCheckSubmit(req, res) {
   try {
     const status = await checkSubmissionWindowActive();
-    const { evaluateSubmitGate } = await import("../services/video/submitGate.js");
-    const isStory = req.body?.isStorySummary !== undefined
-      ? !!req.body.isStorySummary
-      : (status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description"));
-    const isPicture = req.body?.isPictureDescription !== undefined
-      ? !!req.body.isPictureDescription
-      : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio"));
-    const isShadowing = req.body?.isShadowing !== undefined
-      ? !!req.body.isShadowing
-      : (status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay));
+    const { evaluateSubmitGate, resolveDayContentFlags } = await import("../services/video/submitGate.js");
+    const dayFlags = resolveDayContentFlags(status);
+    const isStory = req.body?.isStorySummary !== undefined ? !!req.body.isStorySummary : dayFlags.isStory;
+    const isPicture = req.body?.isPictureDescription !== undefined ? !!req.body.isPictureDescription : dayFlags.isPicture;
+    const isShadowing = req.body?.isShadowing !== undefined ? !!req.body.isShadowing : dayFlags.isShadowing;
     const flags = {
       isMonthlyReflection: req.body?.isMonthlyReflection !== undefined ? !!req.body.isMonthlyReflection : (status?.isMonthlyReflectionDay || false),
       isMonthlyGoals: req.body?.isMonthlyGoals !== undefined ? !!req.body.isMonthlyGoals : (status?.isMonthlyGoalsDay || false),
       isStorySummary: isStory,
       isPictureDescription: isPicture,
       isShadowing: isShadowing,
+      targetVideoDuration: isShadowing ? (status?.todayVideoDuration || null) : null,
     };
     const gate = evaluateSubmitGate({
       durationSeconds: req.body?.durationSeconds ?? null,

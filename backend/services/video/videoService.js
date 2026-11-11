@@ -7,6 +7,7 @@ import VideoReport from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import { serializeStreakBadges } from "../../utils/streakBadges.js";
 import Status from "../../../models/statusSchema.js";
+import Question from "../../../models/questionSchema.js";
 import UploadAudit from "../../../models/uploadAuditSchema.js";
 import mongoose from "mongoose";
 import { uploadToR2, uploadBufferToR2, deleteFromR2, getR2Key, getPresignedUploadUrl, getPresignedDownloadUrl } from "../../config/storage.js";
@@ -15,7 +16,7 @@ import { getVideoDuration } from "../ai/videoProcessor.js";
 import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
 import { moderateVideo } from "../ai/contentModerator.js";
-import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits, evaluateSubmitGate } from "./submitGate.js";
+import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits, evaluateSubmitGate, resolveDayContentFlags } from "./submitGate.js";
 import { checkSecurityCache, saveSecurityCache } from "../ai/securityCache.js";
 import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 import fs from "fs";
@@ -45,17 +46,15 @@ const MIME_BY_EXTENSION = Object.entries(VIDEO_EXTENSIONS_BY_MIME).reduce((acc, 
 const MAX_ANALYSIS_MB = 200; // Increased limit for larger videos (Railway has enough RAM)
 
 function isActiveStoryTask(status) {
-  return status?.todayContentType === "story_audio"
-    || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+  return resolveDayContentFlags(status).isStory;
 }
 
 function isActivePictureTask(status) {
-  return status?.todayContentType === "picture_description"
-    || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
+  return resolveDayContentFlags(status).isPicture;
 }
 
 function isActiveShadowingTask(status) {
-  return status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
+  return resolveDayContentFlags(status).isShadowing;
 }
 
 /**
@@ -543,11 +542,15 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
 
     // Derive duration limits from question type (server-side, not client-trusted)
     const status = await Status.findOne().lean();
+    const dayFlags = resolveDayContentFlags(status);
     const gateFlags = {
       isMonthlyReflection: status?.isMonthlyReflectionDay || false,
+      isWeeklyReflection: status?.isWeeklyReflectionDay || false,
       isMonthlyGoals: status?.isMonthlyGoalsDay || false,
-      isStorySummary: isActiveStoryTask(status),
-      isPictureDescription: isActivePictureTask(status),
+      isStorySummary: dayFlags.isStory,
+      isPictureDescription: dayFlags.isPicture,
+      isShadowing: dayFlags.isShadowing,
+      targetVideoDuration: status?.todayVideoDuration || null,
     };
 
     const gate = evaluateSubmitGate({
@@ -607,12 +610,15 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
 
   // Create report with recorded duration if provided
   const reportStatus = await Status.findOne().lean();
+  const reportDayFlags = resolveDayContentFlags(reportStatus);
   const reportGateFlags = {
     isMonthlyReflection: reportStatus?.isMonthlyReflectionDay || false,
+    isWeeklyReflection: reportStatus?.isWeeklyReflectionDay || false,
     isMonthlyGoals: reportStatus?.isMonthlyGoalsDay || false,
-    isStorySummary: isActiveStoryTask(reportStatus),
-    isPictureDescription: isActivePictureTask(reportStatus),
-    isShadowing: isActiveShadowingTask(reportStatus),
+    isStorySummary: reportDayFlags.isStory,
+    isPictureDescription: reportDayFlags.isPicture,
+    isShadowing: reportDayFlags.isShadowing,
+    targetVideoDuration: reportStatus?.todayVideoDuration || null,
   };
   const allowPrivateVideos = reportStatus?.allowPrivateVideos ?? true;
   const reportData = {
@@ -621,6 +627,7 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
       videoFileName: path.basename(key),
       challengeType: reportGateFlags.isShadowing ? "shadowing_video"
         : reportGateFlags.isMonthlyReflection ? "monthly_reflection"
+        : reportGateFlags.isWeeklyReflection ? "weekly_reflection"
         : reportGateFlags.isPictureDescription ? "picture_description"
         : reportGateFlags.isStorySummary ? "story_summary"
         : reportGateFlags.isMonthlyGoals ? "monthly_goals"
@@ -819,6 +826,7 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       isStorySummary,
       isPictureDescription,
       isShadowing,
+      targetVideoDuration: status?.todayVideoDuration || null,
     };
     
     const { minSeconds, maxSeconds, minLabel, maxLabel } = getDurationLimits(gateFlags, status || {});
@@ -1042,19 +1050,243 @@ export async function getVideoReport(reportId, authId) {
  * fields inside `analysis`, even though the report endpoint can reconstruct
  * them for the Video Analysis page.
  */
+function getISTDateKey(dateLike) {
+  if (!dateLike) return null;
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+}
+
+function isSamePublishedChallengeDay(report, status) {
+  const refDate = report?.submittedAt || report?.createdAt || null;
+  if (status?.questionPublishedDate) {
+    if (!refDate) return false;
+    return getISTDateKey(refDate) === status.questionPublishedDate;
+  }
+  if (!refDate) return true;
+  return getISTDateKey(refDate) === getISTDateKey(Date.now());
+}
+
+function inferStoredChallengeType(report, analysis) {
+  if (report?.challengeType) return report.challengeType;
+  if (analysis?.challengeType) return analysis.challengeType;
+  if (analysis?.scoreBreakdown?.isShadowing) return "shadowing_video";
+  if (analysis?.scoreBreakdown?.isPictureDescription) return "picture_description";
+  if (analysis?.scoreBreakdown?.isStorySummary) return "story_summary";
+  return null;
+}
+
+async function resolveShadowingReference(report, analysis, status, isSamePublishedDay) {
+  let targetDuration =
+    Number(analysis?.targetVideoDuration) ||
+    Number(analysis?.scoreBreakdown?.targetDuration) ||
+    (isSamePublishedDay ? Number(status?.todayVideoDuration) : 0) ||
+    null;
+  let targetTranscript =
+    analysis?.targetVideoTranscript ||
+    (isSamePublishedDay ? status?.todayVideoTranscript : null) ||
+    null;
+
+  if ((!targetTranscript || !targetDuration) && (report?.submittedAt || report?.createdAt)) {
+    try {
+      const subMs = new Date(report.submittedAt || report.createdAt).getTime();
+      if (!Number.isNaN(subMs)) {
+        const windowStart = new Date(subMs - 36 * 60 * 60 * 1000);
+        const windowEnd = new Date(subMs + 6 * 60 * 60 * 1000);
+        const q = await Question.findOne({
+          contentType: "shadowing_video",
+          videoTranscript: { $ne: null },
+          $or: [
+            { scheduledFor: { $gte: windowStart, $lte: windowEnd } },
+            { updatedAt: { $gte: windowStart, $lte: windowEnd } },
+          ],
+        })
+          .sort({ isUsed: -1, updatedAt: -1 })
+          .lean();
+        if (q) {
+          if (!targetTranscript && q.videoTranscript) targetTranscript = q.videoTranscript;
+          if (!targetDuration && q.videoDuration) targetDuration = q.videoDuration;
+        }
+      }
+    } catch (lookupErr) {
+      console.warn("[VideoService] Shadowing Question fallback lookup failed:", lookupErr.message);
+    }
+  }
+
+  return { targetDuration, targetTranscript };
+}
+
+function getOffTopicFallbackComment(challengeType) {
+  if (challengeType === "shadowing_video") {
+    return "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases.";
+  }
+  if (challengeType === "story_summary") {
+    return "Off-topic submission: This story summary task requires retelling the assigned story in your own words rather than explaining what the activity is or speaking about an unrelated subject.";
+  }
+  if (challengeType === "picture_description") {
+    return "Off-topic submission: This picture description task requires describing what you see in the assigned image rather than explaining what the task is or speaking about an unrelated subject.";
+  }
+  return "Off-topic submission: Your response did not directly answer today's speaking topic. Please address the assigned question rather than talking about the activity itself or an unrelated subject.";
+}
+
+async function resolveCategoryReference(report, analysis, status, isSamePublishedDay, challengeType) {
+  let questionTopic = analysis?.questionTopic || null;
+  let targetQuestion = analysis?.targetQuestion || null;
+  let targetStoryTranscript = analysis?.targetStoryTranscript || null;
+  let targetSummaryGuide = analysis?.targetSummaryGuide || null;
+  let targetImageScene = analysis?.targetImageScene || null;
+  const targetVocabulary =
+    Array.isArray(analysis?.targetVocabulary) && analysis.targetVocabulary.length > 0
+      ? analysis.targetVocabulary
+      : isSamePublishedDay && Array.isArray(status?.todayVocabulary) && status.todayVocabulary.length > 0
+      ? status.todayVocabulary
+      : [];
+
+  if (isSamePublishedDay && status) {
+    if (!questionTopic && status.todayTopic) questionTopic = status.todayTopic;
+    if (!targetQuestion) {
+      targetQuestion = challengeType === "picture_description"
+        ? (status.todayImageInstructions || status.todayQuestion || null)
+        : (status.todayQuestion || null);
+    }
+    if (challengeType === "story_summary") {
+      if (!targetStoryTranscript && status.todayStoryTranscript) targetStoryTranscript = status.todayStoryTranscript;
+      if (!targetSummaryGuide && status.todaySummaryGuide) targetSummaryGuide = status.todaySummaryGuide;
+    }
+    if (challengeType === "picture_description" && !targetImageScene && status.todayImageSearchQuery) {
+      targetImageScene = status.todayImageSearchQuery;
+    }
+  }
+
+  const needsStoryLookup = challengeType === "story_summary" && (!targetStoryTranscript || !targetSummaryGuide);
+  const needsPictureLookup = challengeType === "picture_description" && (!targetImageScene && !targetQuestion && !questionTopic);
+  const needsTopicLookup = (challengeType === "topic" || challengeType === "normal" || !challengeType) && (!targetQuestion && !questionTopic);
+
+  if ((needsStoryLookup || needsPictureLookup || needsTopicLookup) && (report?.submittedAt || report?.createdAt)) {
+    try {
+      const subMs = new Date(report.submittedAt || report.createdAt).getTime();
+      if (!Number.isNaN(subMs)) {
+        const windowStart = new Date(subMs - 36 * 60 * 60 * 1000);
+        const windowEnd = new Date(subMs + 6 * 60 * 60 * 1000);
+        const contentType = challengeType === "story_summary"
+          ? "story_audio"
+          : challengeType === "picture_description"
+          ? "picture_description"
+          : "question";
+        const q = await Question.findOne({
+          contentType,
+          $or: [
+            { scheduledFor: { $gte: windowStart, $lte: windowEnd } },
+            { updatedAt: { $gte: windowStart, $lte: windowEnd } },
+          ],
+        })
+          .sort({ isUsed: -1, updatedAt: -1 })
+          .lean();
+        if (q) {
+          if (!questionTopic && q.topic) questionTopic = q.topic;
+          if (!targetQuestion) {
+            targetQuestion = challengeType === "picture_description"
+              ? (q.imageInstructions || q.question || null)
+              : (q.question || null);
+          }
+          if (challengeType === "story_summary") {
+            if (!targetStoryTranscript && q.storyTranscript) targetStoryTranscript = q.storyTranscript;
+            if (!targetSummaryGuide && q.summaryGuide) targetSummaryGuide = q.summaryGuide;
+          }
+          if (challengeType === "picture_description" && !targetImageScene && q.imageSearchQuery) {
+            targetImageScene = q.imageSearchQuery;
+          }
+        }
+      }
+    } catch (lookupErr) {
+      console.warn(`[VideoService] ${challengeType || "topic"} Question fallback lookup failed:`, lookupErr.message);
+    }
+  }
+
+  return {
+    questionTopic,
+    targetQuestion,
+    targetStoryTranscript,
+    targetSummaryGuide,
+    targetImageScene,
+    targetVocabulary,
+  };
+}
+
+function syncAnalysisOffTopicAndRef(target, breakdown, challengeType, refMeta = null, wasAlreadyOffTopic = false) {
+  const updatedOffTopic = Boolean(breakdown?.isOffTopic);
+  target.isOffTopic = updatedOffTopic;
+  if (updatedOffTopic) {
+    target.topicRelevance = Math.min(typeof target.topicRelevance === "number" ? target.topicRelevance : 1.5, 2);
+    if (breakdown?.offTopicReason) {
+      target.topicFeedback = breakdown.offTopicReason;
+    }
+    if (!target.overallComment || /^You demonstrated a good speaking effort/i.test(target.overallComment) || !wasAlreadyOffTopic) {
+      target.overallComment = getOffTopicFallbackComment(challengeType);
+    }
+  }
+  if (refMeta) {
+    if (refMeta.questionTopic && !target.questionTopic) target.questionTopic = refMeta.questionTopic;
+    if (refMeta.targetQuestion && !target.targetQuestion) target.targetQuestion = refMeta.targetQuestion;
+    if (challengeType === "story_summary") {
+      if (refMeta.targetStoryTranscript && !target.targetStoryTranscript) {
+        target.targetStoryTranscript = refMeta.targetStoryTranscript;
+      }
+      if (refMeta.targetSummaryGuide && !target.targetSummaryGuide) {
+        target.targetSummaryGuide = refMeta.targetSummaryGuide;
+      }
+    }
+    if (challengeType === "picture_description" && refMeta.targetImageScene && !target.targetImageScene) {
+      target.targetImageScene = refMeta.targetImageScene;
+    }
+    if (
+      Array.isArray(refMeta.targetVocabulary) &&
+      refMeta.targetVocabulary.length > 0 &&
+      (!Array.isArray(target.targetVocabulary) || target.targetVocabulary.length === 0)
+    ) {
+      target.targetVocabulary = refMeta.targetVocabulary;
+    }
+  }
+}
+
+function buildPersistedRefUpdates(source, challengeType) {
+  return {
+    ...(source.isOffTopic != null ? { "analysis.isOffTopic": source.isOffTopic } : {}),
+    ...(source.topicRelevance != null ? { "analysis.topicRelevance": source.topicRelevance } : {}),
+    ...(source.topicFeedback ? { "analysis.topicFeedback": source.topicFeedback } : {}),
+    ...(source.overallComment ? { "analysis.overallComment": source.overallComment } : {}),
+    ...(source.questionTopic ? { "analysis.questionTopic": source.questionTopic } : {}),
+    ...(source.targetQuestion ? { "analysis.targetQuestion": source.targetQuestion } : {}),
+    ...(challengeType === "story_summary" && source.targetStoryTranscript
+      ? { "analysis.targetStoryTranscript": source.targetStoryTranscript }
+      : {}),
+    ...(challengeType === "story_summary" && source.targetSummaryGuide
+      ? { "analysis.targetSummaryGuide": source.targetSummaryGuide }
+      : {}),
+    ...(challengeType === "picture_description" && source.targetImageScene
+      ? { "analysis.targetImageScene": source.targetImageScene }
+      : {}),
+    ...(Array.isArray(source.targetVocabulary) && source.targetVocabulary.length > 0
+      ? { "analysis.targetVocabulary": source.targetVocabulary }
+      : {}),
+  };
+}
+
 async function prepareReportAnalysis(report) {
   let analysis = report.status === "completed" ? report.analysis : null;
-  let challengeType = report.challengeType || analysis?.challengeType || null;
+  let challengeType = inferStoredChallengeType(report, analysis);
 
   // Compatibility for reports created before challengeType/picture breakdown
   // fields were persisted. Do not change the stored score; only hydrate the
   // display payload exactly as the individual report endpoint does.
   const status = analysis ? await Status.findOne().lean() : null;
+  const samePublishedDay = analysis ? isSamePublishedChallengeDay(report, status) : false;
   const user = (analysis && report.phone) ? await User.findOne({ phone: report.phone }).lean() : null;
   const userHistory = user?.feedbackScores || [];
-  const isPicTask = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-  const isStoryTask = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-  const isShadowTask = challengeType === "shadowing_video" || status?.todayContentType === "shadowing_video" || Boolean(status?.isShadowingDay);
+  const dayFlags = resolveDayContentFlags(samePublishedDay ? status : null, challengeType);
+  const isPicTask = dayFlags.isPicture;
+  const isStoryTask = dayFlags.isStory;
+  const isShadowTask = dayFlags.isShadowing;
 
   if (!challengeType && analysis) {
     if (isPicTask) {
@@ -1063,18 +1295,25 @@ async function prepareReportAnalysis(report) {
       challengeType = "story_summary";
     } else if (isShadowTask) {
       challengeType = "shadowing_video";
+    } else if (samePublishedDay) {
+      if (status?.isMonthlyReflectionDay) challengeType = "monthly_reflection";
+      else if (status?.isWeeklyReflectionDay) challengeType = "weekly_reflection";
+      else if (status?.isMonthlyGoalsDay) challengeType = "monthly_goals";
+      else challengeType = "topic";
     }
   }
 
   if (analysis && isShadowTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isShadowing)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+    const { targetDuration: refDuration, targetTranscript: refTranscript } = await resolveShadowingReference(report, source, status, samePublishedDay);
+    const effectiveTargetDur = refDuration || 85;
     const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
       maxDurationSeconds: status?.durationShadowingFull ?? 180,
       analysis: source,
       isShadowing: true,
-      targetVideoDuration: status?.todayVideoDuration || 60,
-      targetVideoTranscript: status?.todayVideoTranscript || null,
+      targetVideoDuration: effectiveTargetDur,
+      targetVideoTranscript: refTranscript,
       userHistory,
     });
     const shadowBreakdown = {
@@ -1090,9 +1329,9 @@ async function prepareReportAnalysis(report) {
       maxGrowth: 0,
       vocabulary: 0,
       maxVocabulary: 0,
-      durationMatchPercent: breakdown.durationRatio ?? Math.round(((report.videoDuration || 0) / (status?.todayVideoDuration || 60)) * 100),
+      durationMatchPercent: breakdown.durationMatchPercent ?? breakdown.durationRatio ?? (breakdown.isOffTopic ? 0 : Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / effectiveTargetDur) * 100)),
       durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
-      targetDuration: status?.todayVideoDuration || 60,
+      targetDuration: effectiveTargetDur,
       userDuration: report.videoDuration || 0,
       spokenDurationSeconds: breakdown.spokenDurationSeconds ?? null,
       speechRatio: breakdown.speechRatio ?? null,
@@ -1103,7 +1342,17 @@ async function prepareReportAnalysis(report) {
       offTopicReason: breakdown.offTopicReason ?? null,
       isShadowing: true,
     };
-    analysis = { ...source, compositeScore: score, scoreBreakdown: shadowBreakdown };
+    const offTopicComment = (breakdown.isOffTopic && (!source.overallComment || /^You demonstrated a good speaking effort/i.test(source.overallComment) || !source.isOffTopic))
+      ? "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases."
+      : source.overallComment;
+    analysis = {
+      ...source,
+      isOffTopic: Boolean(breakdown.isOffTopic || source.isOffTopic),
+      ...(breakdown.isOffTopic && breakdown.offTopicReason ? { topicFeedback: breakdown.offTopicReason } : {}),
+      ...(offTopicComment ? { overallComment: offTopicComment } : {}),
+      compositeScore: score,
+      scoreBreakdown: shadowBreakdown,
+    };
   }
 
   const picBdInconsistent = analysis && isPicTask && analysis.scoreBreakdown && analysis.scoreBreakdown.isPictureDescription && (
@@ -1118,10 +1367,15 @@ async function prepareReportAnalysis(report) {
 
   if (analysis && isPicTask && (!analysis.scoreBreakdown || !analysis.scoreBreakdown.isPictureDescription || picBdInconsistent)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+    const wasAlreadyOffTopic = Boolean(source.isOffTopic);
+    const catRef = await resolveCategoryReference(report, source, status, samePublishedDay, "picture_description");
     const configuredPicWords = status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5;
     const configuredPicReq = status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 1;
-    const effectivePicTotal = status?.todayVocabulary?.length || configuredPicWords;
-    const effectivePicReq = Math.min(configuredPicReq, effectivePicTotal);
+    const effectivePicTotal = source.scoreBreakdown?.totalVocabWords || catRef.targetVocabulary.length || configuredPicWords;
+    const effectivePicReq = source.scoreBreakdown?.requiredVocabWords || Math.min(configuredPicReq, effectivePicTotal);
+    const analysisForScore = (catRef.questionTopic && !source.questionTopic)
+      ? { ...source, questionTopic: catRef.questionTopic }
+      : source;
 
     const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
@@ -1130,8 +1384,11 @@ async function prepareReportAnalysis(report) {
       totalVocabWords: effectivePicTotal,
       requiredVocabWords: effectivePicReq,
       topicRelevance: source.topicRelevance ?? null,
-      analysis: source,
+      analysis: analysisForScore,
+      challengeType: "picture_description",
       isPictureDescription: true,
+      targetQuestion: catRef.targetQuestion,
+      targetImageScene: catRef.targetImageScene,
       userHistory,
     });
 
@@ -1143,6 +1400,7 @@ async function prepareReportAnalysis(report) {
     source.sundayBonus = isSunday;
     source.baseScore = score;
     source.bonusScore = effectiveScore;
+    syncAnalysisOffTopicAndRef(source, breakdown, "picture_description", catRef, wasAlreadyOffTopic);
 
     // Persist self-healed picture score
     VideoReport.findByIdAndUpdate(report._id, {
@@ -1154,6 +1412,7 @@ async function prepareReportAnalysis(report) {
         "analysis.bonusScore": source.bonusScore,
         challengeType: "picture_description",
         "analysis.challengeType": "picture_description",
+        ...buildPersistedRefUpdates(source, "picture_description"),
       }
     }).catch(err => console.warn("[VideoService] Failed to persist healed picture score:", err.message));
 
@@ -1163,11 +1422,15 @@ async function prepareReportAnalysis(report) {
   // Self-heal story summary tasks if they were missing topic relevance or marked as special day
   if (analysis && isStoryTask && (analysis.scoreBreakdown?.isSpecialDay || analysis.topicRelevance == null || analysis.scoreBreakdown?.maxTopic === 0)) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
-    const todayVocab = status?.todayVocabulary || [];
+    const wasAlreadyOffTopic = Boolean(source.isOffTopic);
+    const catRef = await resolveCategoryReference(report, source, status, samePublishedDay, "story_summary");
     const configuredWordCount = status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5;
     const configuredRequiredCount = status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3;
-    const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
-    const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+    const effectiveTotalWords = source.scoreBreakdown?.totalVocabWords || catRef.targetVocabulary.length || configuredWordCount;
+    const effectiveRequiredWords = source.scoreBreakdown?.requiredVocabWords || Math.min(configuredRequiredCount, effectiveTotalWords);
+    const analysisForScore = (catRef.questionTopic && !source.questionTopic)
+      ? { ...source, questionTopic: catRef.questionTopic }
+      : source;
 
     const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
@@ -1176,23 +1439,23 @@ async function prepareReportAnalysis(report) {
       totalVocabWords: effectiveTotalWords,
       requiredVocabWords: effectiveRequiredWords,
       topicRelevance: source.topicRelevance ?? null,
-      analysis: source,
+      analysis: analysisForScore,
+      challengeType: "story_summary",
       isStorySummary: true,
+      targetStoryTranscript: catRef.targetStoryTranscript,
+      targetSummaryGuide: catRef.targetSummaryGuide,
+      targetQuestion: catRef.targetQuestion || catRef.questionTopic,
       userHistory,
     });
 
     source.compositeScore = score;
-    source.scoreBreakdown = {
-      ...breakdown,
-      maxLength: 30,
-      maxVocab: 30,
-      maxTopic: 15,
-      maxComm: 10,
-      maxGrowth: 15,
-    };
+    source.scoreBreakdown = breakdown;
     if (source.topicRelevance == null) {
-      source.topicRelevance = typeof breakdown.topic === "number" ? Math.round((breakdown.topic / 15) * 10 * 10) / 10 : 7.0;
+      source.topicRelevance = typeof breakdown.topic === "number"
+        ? Math.round((breakdown.topic / (breakdown.maxTopic || 25)) * 10 * 10) / 10
+        : 7.0;
     }
+    syncAnalysisOffTopicAndRef(source, breakdown, "story_summary", catRef, wasAlreadyOffTopic);
 
     // Persist self-healed story score
     VideoReport.findByIdAndUpdate(report._id, {
@@ -1202,6 +1465,7 @@ async function prepareReportAnalysis(report) {
         "analysis.topicRelevance": source.topicRelevance,
         challengeType: "story_summary",
         "analysis.challengeType": "story_summary",
+        ...buildPersistedRefUpdates(source, "story_summary"),
       }
     }).catch(err => console.warn("[VideoService] Failed to persist self-healed story score:", err.message));
 
@@ -1215,7 +1479,9 @@ async function prepareReportAnalysis(report) {
   );
   if (analysis && hasCorruptedGrowth) {
     const source = analysis.toObject ? analysis.toObject() : { ...analysis };
-    const todayVocab = status?.todayVocabulary || [];
+    const wasAlreadyOffTopic = Boolean(source.isOffTopic);
+    const effectiveType = challengeType || (isShadowTask ? "shadowing_video" : isPicTask ? "picture_description" : isStoryTask ? "story_summary" : "topic");
+    const catRef = !isShadowTask ? await resolveCategoryReference(report, source, status, samePublishedDay, effectiveType) : null;
     const configuredWordCount = isPicTask
       ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
       : isStoryTask
@@ -1226,70 +1492,81 @@ async function prepareReportAnalysis(report) {
       : isStoryTask
       ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
       : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
-    const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
-    const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+    const effectiveTotalWords = isShadowTask
+      ? 0
+      : (source.scoreBreakdown?.totalVocabWords || catRef?.targetVocabulary?.length || configuredWordCount);
+    const effectiveRequiredWords = isShadowTask
+      ? 0
+      : (source.scoreBreakdown?.requiredVocabWords || Math.min(configuredRequiredCount, effectiveTotalWords));
 
     const scoreGateFlags = {
       isPictureDescription: isPicTask || false,
       isStorySummary: isStoryTask || false,
-      isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-      isWeeklyReflection: status?.isWeeklyReflectionDay || false,
-      isMonthlyGoals: status?.isMonthlyGoalsDay || false,
+      isShadowing: isShadowTask || false,
+      challengeType: effectiveType,
+      isMonthlyReflection: effectiveType === "monthly_reflection" || (samePublishedDay && status?.isMonthlyReflectionDay) || false,
+      isWeeklyReflection: effectiveType === "weekly_reflection" || (samePublishedDay && status?.isWeeklyReflectionDay) || false,
+      isMonthlyGoals: effectiveType === "monthly_goals" || (samePublishedDay && status?.isMonthlyGoalsDay) || false,
     };
     const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
+    const analysisForScore = (catRef?.questionTopic && !source.questionTopic)
+      ? { ...source, questionTopic: catRef.questionTopic }
+      : source;
 
     const { score, breakdown } = calculateCompositeScore({
       durationSeconds: report.videoDuration || 0,
       maxDurationSeconds: fullScoreSeconds,
-      vocabularyUsed: source.vocabularyUsed || [],
+      vocabularyUsed: isShadowTask ? [] : (source.vocabularyUsed || []),
       totalVocabWords: effectiveTotalWords,
       requiredVocabWords: effectiveRequiredWords,
       topicRelevance: source.topicRelevance ?? null,
-      analysis: source,
+      analysis: analysisForScore,
+      challengeType: effectiveType,
       isPictureDescription: isPicTask || false,
       isStorySummary: isStoryTask || false,
+      isShadowing: isShadowTask || false,
+      targetStoryTranscript: isStoryTask ? (catRef?.targetStoryTranscript || null) : null,
+      targetSummaryGuide: isStoryTask ? (catRef?.targetSummaryGuide || null) : null,
+      targetQuestion: !isShadowTask ? (catRef?.targetQuestion || catRef?.questionTopic || null) : null,
+      targetImageScene: isPicTask ? (catRef?.targetImageScene || null) : null,
       userHistory,
     });
 
     source.compositeScore = score;
-    source.scoreBreakdown = isPicTask ? {
-      ...breakdown,
-      maxCommunication: 20,
-      maxContent: 35,
-      maxVocabulary: 10,
-      maxDuration: 20,
-      maxGrowth: 15,
-    } : {
-      ...breakdown,
-      maxLength: 30,
-      maxVocab: 30,
-      maxTopic: breakdown.isSpecialDay ? 0 : 15,
-      maxComm: breakdown.isSpecialDay ? 25 : 10,
-      maxGrowth: 15,
-    };
+    source.scoreBreakdown = breakdown;
+    syncAnalysisOffTopicAndRef(source, breakdown, effectiveType, catRef, wasAlreadyOffTopic);
 
     VideoReport.findByIdAndUpdate(report._id, {
       $set: {
         "analysis.compositeScore": score,
         "analysis.scoreBreakdown": source.scoreBreakdown,
+        ...buildPersistedRefUpdates(source, effectiveType),
       }
     }).catch(err => console.warn("[VideoService] Failed to persist self-healed growth score:", err.message));
 
     analysis = source;
   }
 
-  // Self-heal vocabulary matching if transcript exists and today's vocabulary has words
-  if (analysis && analysis.transcription && status?.todayVocabulary?.length > 0) {
-    const todayVocab = status.todayVocabulary || [];
-    const rechecked = matchVocabularyInTranscript(analysis.transcription, todayVocab, analysis);
+  // Self-heal vocabulary matching using the report's saved vocabulary (or same-day vocabulary), never shadowing or cross-day vocab
+  const vocabSourceList =
+    Array.isArray(analysis?.targetVocabulary) && analysis.targetVocabulary.length > 0
+      ? analysis.targetVocabulary
+      : samePublishedDay && Array.isArray(status?.todayVocabulary)
+      ? status.todayVocabulary
+      : [];
+  if (analysis && analysis.transcription && !isShadowTask && !analysis?.scoreBreakdown?.isShadowing && vocabSourceList.length > 0) {
+    const rechecked = matchVocabularyInTranscript(analysis.transcription, vocabSourceList, analysis);
     const existingCount = Array.isArray(analysis.vocabularyUsed) ? analysis.vocabularyUsed.length : 0;
-    
+
     if (rechecked.length > existingCount) {
       const source = analysis.toObject ? analysis.toObject() : { ...analysis };
+      const wasAlreadyOffTopic = Boolean(source.isOffTopic);
       source.vocabularyUsed = rechecked;
-      
-      const isPic = challengeType === "picture_description" || status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-      const isStory = challengeType === "story_summary" || status?.todayContentType === "story_audio" || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
+
+      const isPic = isPicTask;
+      const isStory = isStoryTask;
+      const effectiveType = challengeType || (isPic ? "picture_description" : isStory ? "story_summary" : "topic");
+      const catRef = await resolveCategoryReference(report, source, status, samePublishedDay, effectiveType);
       const configuredWordCount = isPic
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : isStory
@@ -1300,17 +1577,21 @@ async function prepareReportAnalysis(report) {
         : isStory
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
-      const effectiveTotalWords = todayVocab.length > 0 ? todayVocab.length : configuredWordCount;
-      const effectiveRequiredWords = Math.min(configuredRequiredCount, effectiveTotalWords);
+      const effectiveTotalWords = source.scoreBreakdown?.totalVocabWords || vocabSourceList.length || configuredWordCount;
+      const effectiveRequiredWords = source.scoreBreakdown?.requiredVocabWords || Math.min(configuredRequiredCount, effectiveTotalWords);
 
       const scoreGateFlags = {
         isPictureDescription: isPic || false,
         isStorySummary: isStory || false,
-        isMonthlyReflection: status?.isMonthlyReflectionDay || false,
-        isWeeklyReflection: status?.isWeeklyReflectionDay || false,
-        isMonthlyGoals: status?.isMonthlyGoalsDay || false,
+        challengeType: effectiveType,
+        isMonthlyReflection: effectiveType === "monthly_reflection" || (samePublishedDay && status?.isMonthlyReflectionDay) || false,
+        isWeeklyReflection: effectiveType === "weekly_reflection" || (samePublishedDay && status?.isWeeklyReflectionDay) || false,
+        isMonthlyGoals: effectiveType === "monthly_goals" || (samePublishedDay && status?.isMonthlyGoalsDay) || false,
       };
       const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
+      const analysisForScore = (catRef.questionTopic && !source.questionTopic)
+        ? { ...source, questionTopic: catRef.questionTopic }
+        : source;
 
       const { score, breakdown } = calculateCompositeScore({
         durationSeconds: report.videoDuration || 0,
@@ -1319,28 +1600,20 @@ async function prepareReportAnalysis(report) {
         totalVocabWords: effectiveTotalWords,
         requiredVocabWords: effectiveRequiredWords,
         topicRelevance: source.topicRelevance ?? null,
-        analysis: source,
+        analysis: analysisForScore,
+        challengeType: effectiveType,
         isPictureDescription: isPic || false,
         isStorySummary: isStory || false,
+        targetStoryTranscript: isStory ? catRef.targetStoryTranscript : null,
+        targetSummaryGuide: isStory ? catRef.targetSummaryGuide : null,
+        targetQuestion: catRef.targetQuestion || catRef.questionTopic,
+        targetImageScene: isPic ? catRef.targetImageScene : null,
         userHistory,
       });
 
       source.compositeScore = score;
-      source.scoreBreakdown = isPic ? {
-        ...breakdown,
-        maxCommunication: 20,
-        maxContent: 35,
-        maxVocabulary: 10,
-        maxDuration: 20,
-        maxGrowth: 15,
-      } : {
-        ...breakdown,
-        maxLength: 30,
-        maxVocab: 30,
-        maxTopic: breakdown.isSpecialDay ? 0 : 15,
-        maxComm: breakdown.isSpecialDay ? 25 : 10,
-        maxGrowth: 15,
-      };
+      source.scoreBreakdown = breakdown;
+      syncAnalysisOffTopicAndRef(source, breakdown, effectiveType, catRef, wasAlreadyOffTopic);
 
       // Persist the corrected analysis in database asynchronously
       VideoReport.findByIdAndUpdate(report._id, {
@@ -1348,6 +1621,7 @@ async function prepareReportAnalysis(report) {
           "analysis.vocabularyUsed": rechecked,
           "analysis.compositeScore": score,
           "analysis.scoreBreakdown": source.scoreBreakdown,
+          ...buildPersistedRefUpdates(source, effectiveType),
         }
       }).catch(err => console.warn("[VideoService] Failed to persist self-healed vocab score:", err.message));
 
@@ -1856,30 +2130,32 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const todayVocab = status?.todayVocabulary || [];
   const transcript = report.analysis?.transcription || "";
 
-  // Check if shadowing challenge from report or status
-  const isShadowReport = report.challengeType === "shadowing_video" ||
-    report.analysis?.challengeType === "shadowing_video" ||
-    Boolean(report.analysis?.scoreBreakdown?.isShadowing) ||
-    status?.todayContentType === "shadowing_video" ||
-    Boolean(status?.isShadowingDay);
+  const isSameDayReEval = isSamePublishedChallengeDay(report, status);
+  const storedType = inferStoredChallengeType(report, report.analysis);
+  const statusScopedFlags = resolveDayContentFlags(isSameDayReEval ? status : null, storedType);
+  const isShadowReport = statusScopedFlags.isShadowing;
 
-  // 1. Re-match vocabulary with intelligent matcher (waived for shadowing)
+  // 1. Re-match vocabulary with intelligent matcher (waived for shadowing & scoped to report's own day)
   // Preserve previously recognized target words so they are never lost if today's vocab is empty or changed
   const previousWords = Array.isArray(report.analysis?.vocabularyUsed) ? report.analysis.vocabularyUsed : [];
-  const vocabToMatch = (Array.isArray(todayVocab) && todayVocab.length > 0) ? todayVocab : previousWords;
+  const savedTargetVocab = Array.isArray(report.analysis?.targetVocabulary) && report.analysis.targetVocabulary.length > 0
+    ? report.analysis.targetVocabulary
+    : null;
+  const effectiveStatusVocab = isSameDayReEval && Array.isArray(todayVocab) && todayVocab.length > 0
+    ? todayVocab
+    : null;
+  const vocabToMatch = savedTargetVocab || effectiveStatusVocab || previousWords;
   const newlyMatched = isShadowReport ? [] : matchVocabularyInTranscript(transcript, vocabToMatch, report.analysis);
   const matchedWords = isShadowReport ? [] : Array.from(new Set([...previousWords, ...newlyMatched]));
 
   // 2. Detect the authentic challenge type of this specific submission
-  const challengeType = report.challengeType || report.analysis?.challengeType || (
-    isShadowReport ? "shadowing_video"
-    : report.analysis?.scoreBreakdown?.isPictureDescription ? "picture_description"
-    : report.analysis?.scoreBreakdown?.isStorySummary ? "story_summary"
-    : status?.isMonthlyReflectionDay ? "monthly_reflection"
-    : (status?.todayContentType === "picture_description" || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio")) ? "picture_description"
-    : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
-    : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
-    : status?.isMonthlyGoalsDay ? "monthly_goals"
+  const challengeType = storedType || (
+    statusScopedFlags.isShadowing ? "shadowing_video"
+    : statusScopedFlags.isPicture ? "picture_description"
+    : statusScopedFlags.isStory ? "story_summary"
+    : (isSameDayReEval && status?.isMonthlyReflectionDay) ? "monthly_reflection"
+    : (isSameDayReEval && status?.isWeeklyReflectionDay) ? "weekly_reflection"
+    : (isSameDayReEval && status?.isMonthlyGoalsDay) ? "monthly_goals"
     : "topic"
   );
 
@@ -1901,7 +2177,8 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
     : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
 
-  const effectiveTotalWords = isShadow ? 0 : (savedTotal || (todayVocab.length > 0 ? todayVocab.length : configuredWordCount));
+  const dayVocabCount = savedTargetVocab?.length || effectiveStatusVocab?.length || 0;
+  const effectiveTotalWords = isShadow ? 0 : (savedTotal || (dayVocabCount > 0 ? dayVocabCount : configuredWordCount));
   const effectiveRequiredWords = isShadow ? 0 : (savedRequired || Math.min(configuredRequiredCount, effectiveTotalWords));
 
   const scoreGateFlags = {
@@ -1909,9 +2186,9 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     isStorySummary: isStory || false,
     isShadowing: isShadow || false,
     challengeType: isShadow ? "shadowing_video" : challengeType,
-    isMonthlyReflection: challengeType === "monthly_reflection" || status?.isMonthlyReflectionDay || false,
-    isWeeklyReflection:  challengeType === "weekly_reflection" || status?.isWeeklyReflectionDay || false,
-    isMonthlyGoals:      challengeType === "monthly_goals" || status?.isMonthlyGoalsDay || false,
+    isMonthlyReflection: challengeType === "monthly_reflection" || (isSameDayReEval && status?.isMonthlyReflectionDay) || false,
+    isWeeklyReflection:  challengeType === "weekly_reflection" || (isSameDayReEval && status?.isWeeklyReflectionDay) || false,
+    isMonthlyGoals:      challengeType === "monthly_goals" || (isSameDayReEval && status?.isMonthlyGoalsDay) || false,
   };
   const { fullScoreSeconds } = getDurationLimits(scoreGateFlags, status || {});
 
@@ -1927,9 +2204,18 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     return true;
   });
 
+  const { targetDuration: resolvedShadowDur, targetTranscript: resolvedShadowTranscript } = isShadow
+    ? await resolveShadowingReference(report, report.analysis, status, isSameDayReEval)
+    : { targetDuration: null, targetTranscript: null };
+  const catRef = !isShadow
+    ? await resolveCategoryReference(report, report.analysis, status, isSameDayReEval, challengeType)
+    : null;
   const targetDur = isShadow
-    ? Math.max(20, Math.min(180, Number(report.analysis?.targetVideoDuration) || Number(report.analysis?.scoreBreakdown?.targetDuration) || Number(status?.todayVideoDuration) || 85))
+    ? Math.max(20, Math.min(180, Number(resolvedShadowDur) || Number(report.analysis?.scoreBreakdown?.targetDuration) || 85))
     : (status?.todayVideoDuration || 60);
+  const analysisForScore = (catRef?.questionTopic && !report.analysis.questionTopic)
+    ? { ...(report.analysis.toObject ? report.analysis.toObject() : report.analysis), questionTopic: catRef.questionTopic }
+    : report.analysis;
 
   // 5. Calculate composite score with mathematical consistency
   const { score, breakdown } = calculateCompositeScore({
@@ -1939,27 +2225,27 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     totalVocabWords: effectiveTotalWords,
     requiredVocabWords: effectiveRequiredWords,
     topicRelevance: report.analysis.topicRelevance ?? null,
-    analysis: report.analysis,
+    analysis: analysisForScore,
+    challengeType: isShadow ? "shadowing_video" : challengeType,
     isPictureDescription: isPic || false,
     isStorySummary: isStory || false,
     isShadowing: isShadow || false,
     targetVideoDuration: targetDur,
-    targetVideoTranscript: status?.todayVideoTranscript || null,
+    targetVideoTranscript: resolvedShadowTranscript || null,
+    targetStoryTranscript: isStory ? (catRef?.targetStoryTranscript || null) : null,
+    targetSummaryGuide: isStory ? (catRef?.targetSummaryGuide || null) : null,
+    targetQuestion: !isShadow ? (catRef?.targetQuestion || catRef?.questionTopic || null) : null,
+    targetImageScene: isPic ? (catRef?.targetImageScene || null) : null,
     userHistory,
   });
 
   if (isStory && report.analysis.topicRelevance == null) {
-    report.analysis.topicRelevance = typeof breakdown.topic === "number" ? Math.round((breakdown.topic / 15) * 10 * 10) / 10 : 7.0;
+    report.analysis.topicRelevance = typeof breakdown.topic === "number"
+      ? Math.round((breakdown.topic / (breakdown.maxTopic || 25)) * 10 * 10) / 10
+      : 7.0;
   }
 
-  const updatedBreakdown = isPic ? {
-    ...breakdown,
-    maxCommunication: 20,
-    maxContent: 35,
-    maxVocabulary: 10,
-    maxDuration: 20,
-    maxGrowth: 15,
-  } : isShadow ? {
+  const updatedBreakdown = isShadow ? {
     ...breakdown,
     duration: breakdown.duration ?? 0,
     length: breakdown.duration ?? 0,
@@ -1972,7 +2258,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     maxGrowth: 0,
     vocabulary: 0,
     maxVocabulary: 0,
-    durationMatchPercent: breakdown.durationRatio ?? Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100),
+    durationMatchPercent: breakdown.durationMatchPercent ?? breakdown.durationRatio ?? (breakdown.isOffTopic ? 0 : Math.round(((breakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)),
     durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
     targetDuration: targetDur,
     userDuration: report.videoDuration || 0,
@@ -1984,16 +2270,9 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     isOffTopic: breakdown.isOffTopic ?? false,
     offTopicReason: breakdown.offTopicReason ?? null,
     isShadowing: true,
-  } : {
-    ...breakdown,
-    maxLength: 30,
-    maxVocab: 30,
-    maxTopic: breakdown.isSpecialDay ? 0 : 15,
-    maxComm: breakdown.isSpecialDay ? 25 : 10,
-    maxGrowth: 15,
-  };
+  } : { ...breakdown };
 
-  const requiredCount = Math.min(configuredRequiredCount, effectiveTotalWords || 1);
+  const requiredCount = Math.min(savedRequired || configuredRequiredCount, effectiveTotalWords || 1);
   const vocabularyScore = (effectiveTotalWords > 0)
     ? Math.round((Math.min(matchedWords.length, requiredCount) / requiredCount) * 10 * 10) / 10
     : report.analysis.vocabularyScore ?? null;
@@ -2002,10 +2281,16 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const isSunday = Boolean(report.analysis?.sundayBonus || (report.submittedAt && new Date(new Date(report.submittedAt).toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).getDay() === 0));
   const effectiveScore = isSunday ? Math.round(score * 2 * 100) / 100 : score;
 
+  const wasAlreadyOffTopic = Boolean(report.analysis?.isOffTopic);
   report.analysis.vocabularyUsed = matchedWords;
   report.analysis.vocabularyScore = vocabularyScore;
   report.analysis.compositeScore = score;
   report.analysis.scoreBreakdown = updatedBreakdown;
+  if (isShadow) {
+    report.analysis.targetVideoDuration = targetDur;
+    if (resolvedShadowTranscript) report.analysis.targetVideoTranscript = resolvedShadowTranscript;
+  }
+  syncAnalysisOffTopicAndRef(report.analysis, updatedBreakdown, challengeType, catRef, wasAlreadyOffTopic);
   report.analysis.sundayBonus = isSunday;
   report.analysis.baseScore = score;
   report.analysis.bonusScore = effectiveScore;
@@ -2051,7 +2336,11 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   const resultMessage = isShadow
     ? updatedBreakdown.isSilentAttempt
       ? "Score re-evaluated: No audible speech detected in recording (-85.5dB). Score updated to 0/100 pts."
+      : updatedBreakdown.isOffTopic
+      ? `Score re-evaluated: Off-topic / script mismatch detected (0/40 match). Composite score updated to ${Math.round(score)}/100 pts.${bonusMsg}`
       : `Score re-evaluated! Active speech: ~${updatedBreakdown.spokenDurationSeconds ?? Math.round((report.videoDuration || 0) * 0.7)}s (${updatedBreakdown.durationMatchPercent ?? Math.round(((updatedBreakdown.spokenDurationSeconds || report.videoDuration || 0) / targetDur) * 100)}% match). Composite score: ${Math.round(score)}/100 pts.${bonusMsg}`
+    : updatedBreakdown.isOffTopic
+    ? `Score re-evaluated: Off-topic response detected. Composite score updated to ${Math.round(score)}/100 pts.${bonusMsg}`
     : `Score re-evaluated: ${score} pts${bonusMsg}. Recognized ${matchedWords.length} vocabulary word${matchedWords.length === 1 ? '' : 's'}.`;
 
   return {

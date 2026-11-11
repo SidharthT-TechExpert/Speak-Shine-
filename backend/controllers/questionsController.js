@@ -331,13 +331,19 @@ export async function generateStoryNow(req, res) {
     const { generateListeningStory } = await import("../services/ai/storyGenerator.js");
     const Status = (await import("../../models/statusSchema.js")).default;
     const status = await Status.findOne().lean();
-    const wordCount = status?.storyWordCount ?? 200;
+
+    const targetDuration = Number(req.body?.targetDuration);
+    const wordCount = Number(req.body?.wordCount) ||
+      (targetDuration ? Math.round((targetDuration / 60) * 130) : null) ||
+      status?.storyWordCount || 200;
     const usedThemes = status?.usedStoryThemes || [];
-    const level = status?.storyLevel || "B1";
+    const level = req.body?.level || status?.storyLevel || "B2";
+
+    console.log(`[Questions] AI generating story with wordCount: ${wordCount} (~${Math.round(wordCount / 130 * 60)}s), level: ${level}`);
     const story = await generateListeningStory({ wordCount, usedThemes, level });
     // Track used theme to avoid repeats
     await Status.updateOne({}, { $addToSet: { usedStoryThemes: story.theme } }, { upsert: true });
-    res.json({ success: true, ...story });
+    res.json({ success: true, ...story, targetDuration: Math.round(wordCount / 130 * 60) });
   } catch (error) {
     console.error("[Questions] Story generation error:", error.message);
     res.status(500).json({ error: error.message });
@@ -394,6 +400,44 @@ export async function getStoryVoices(req, res) {
     const { getAvailableVoices } = await import("../services/ai/storyVoiceAnalyzer.js");
     res.json({ success: true, voices: getAvailableVoices() });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/questions/generate-scraped-story
+ * Scrapes 1-2 minute authentic English short story audio from RSS, slices, transcribes, and extracts key summary points.
+ */
+export async function generateScrapedStoryNow(req, res) {
+  try {
+    const Status = (await import("../../models/statusSchema.js")).default;
+    const status = await Status.findOne().lean();
+    const adminWordCount = status?.storyWordCount ?? 200;
+    const adminTargetDuration = Math.round(adminWordCount / 130 * 60);
+
+    const targetDuration = Number(req.body?.targetDuration) || adminTargetDuration || 90;
+
+    const { generateScrapedStoryChallenge } = await import("../services/ai/storyFeedIngestionService.js");
+    const challenge = await generateScrapedStoryChallenge({ targetDuration });
+    res.json({ success: true, ...challenge });
+  } catch (error) {
+    console.error("[Questions] Scraped story generation error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/questions/clean-story-transcript
+ * Trims narrator preambles, LibriVox ads, and outro credits from a story transcript.
+ */
+export async function cleanStoryTranscriptController(req, res) {
+  try {
+    const { text, title } = req.body || {};
+    const { cleanNarrativeTranscript } = await import("../services/ai/storyFeedIngestionService.js");
+    const cleanedTranscript = cleanNarrativeTranscript(text, title);
+    res.json({ success: true, cleanedTranscript });
+  } catch (error) {
+    console.error("[Questions] Clean transcript error:", error.message);
     res.status(500).json({ error: error.message });
   }
 }

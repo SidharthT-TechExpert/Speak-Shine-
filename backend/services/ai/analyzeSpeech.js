@@ -1,6 +1,7 @@
 import fetch from "node-fetch";
 import { checkGrammar, filterGrammarErrors } from "./grammarCheck.js";
 import { getTextKey, getTextModel, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
+import { evaluateShadowingMatch, evaluateCategoryOffTopic } from "../video/submitGate.js";
 
 // ---------------------------------------------------------------------------
 // Filler word detection
@@ -513,6 +514,47 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
   })();
 
   const hasTopic = !!(questionTopic || questionText);
+  const shadowingRefTranscript = (() => {
+    if (challengeType !== "shadowing_video" || typeof questionText !== "string") return null;
+    const m = questionText.match(/Original Spoken Transcript:\s*([\s\S]+?)(?:\r?\n\s*\r?\n\s*(?:Target Reference Duration:|DO NOT deduct|Judge the student)|\s*$)/i);
+    return m ? m[1].trim() : null;
+  })();
+  const shadowingMatch = challengeType === "shadowing_video"
+    ? evaluateShadowingMatch(transcript, shadowingRefTranscript)
+    : null;
+  const extractedContext = (() => {
+    if (typeof questionText !== "string") return {};
+    const storyMatch = questionText.match(/Story transcript:\s*([\s\S]+?)(?:\r?\n\s*\r?\n\s*(?:Expected key points|Judge topic relevance)|\s*$)/i);
+    const guideMatch = questionText.match(/Expected key points \/ summary guide:\s*([\s\S]+?)(?:\r?\n\s*\r?\n\s*Judge topic relevance|\s*$)/i);
+    const sceneMatch = questionText.match(/Image scene:\s*([^\r\n]+)/i);
+    const instrMatch = questionText.match(/Task instructions given to student:\s*([^\r\n]+)/i);
+    return {
+      storyTranscript: storyMatch ? storyMatch[1].trim() : null,
+      summaryGuide: guideMatch ? guideMatch[1].trim() : null,
+      imageScene: sceneMatch ? sceneMatch[1].trim() : null,
+      imageInstructions: instrMatch ? instrMatch[1].trim() : null,
+    };
+  })();
+  const categoryMatch = challengeType !== "shadowing_video" && hasTopic
+    ? evaluateCategoryOffTopic(transcript, {
+        challengeType: challengeType || "topic",
+        questionTopic,
+        questionText,
+        ...extractedContext,
+      })
+    : null;
+  const deterministicMismatch = (shadowingMatch && !shadowingMatch.isMatch)
+    ? shadowingMatch
+    : (categoryMatch && !categoryMatch.isMatch)
+    ? categoryMatch
+    : null;
+  const offTopicCategoryComment = challengeType === "shadowing_video"
+    ? "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases."
+    : challengeType === "story_summary"
+    ? "Off-topic submission: This story summary activity requires retelling today's assigned audio story in your own words rather than explaining the task format or speaking about an unrelated topic."
+    : challengeType === "picture_description"
+    ? "Off-topic submission: This picture description activity requires describing the people, objects, actions, and setting visible in today's assigned image rather than speaking about unrelated topics or explaining the task."
+    : "Off-topic submission: Your speech did not address today's assigned topic or question directly. Please focus directly on today's prompt.";
 
   // Pronunciation summary for prompt
   const pronunciationSummary = pronunciationIssues.length > 0
@@ -542,7 +584,7 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
 - isOffTopic: false`
     : challengeType === "story_summary"
     ? `- topicRelevance & isOffTopic: how accurately, coherently, and thoroughly the speaker summarized the audio story (characters, sequence of events, conflict, resolution, and main lesson/takeaway).
-    STRICT SECURITY CHECK: If the speaker is NOT summarizing this specific audio story (e.g. talking about yesterday's topic, random life stories, or an unrelated subject):
+    STRICT SECURITY CHECK: If the speaker is NOT summarizing this specific audio story (e.g. talking ABOUT what a story summary task is, explaining its uses/benefits/advantages/disadvantages, telling an unrelated story, or talking about yesterday's topic):
       → You MUST set isOffTopic: true
       → You MUST set topicRelevance: 1 or 2 (NEVER higher than 2 for an unrelated or wrong-story speech)
       → topicFeedback: explain specifically that the submission does not retell today's assigned story.
@@ -555,11 +597,12 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
       1 = does not attempt to summarize the story at all or completely off-topic
 - topicFeedback: 1-2 sentences explaining specifically which story plot points/characters the student summarized well and which key story events or details they missed or could have explained more clearly.`
     : challengeType === "shadowing_video"
-    ? `- topicRelevance & isOffTopic: evaluate whether the speaker was engaged in shadowing/repeating the reference video dialogue or speech.
-    STRICT SECURITY CHECK: If the speaker is completely silent or reciting unrelated text:
+    ? `- topicRelevance & isOffTopic: evaluate whether the speaker was actually shadowing/repeating the exact assigned Original Spoken Transcript phrases aloud.
+    STRICT SECURITY CHECK: Compare the speaker's transcript directly against the Original Spoken Transcript.
+    If the speaker talks ABOUT shadowing (explaining what shadowing is, its benefits, uses, advantages/disadvantages, or giving a general English-learning speech), OR speaks unrelated free-form text instead of mirroring the Original Spoken Transcript:
       → You MUST set isOffTopic: true
-      → You MUST set topicRelevance: 1 or 2
-      → topicFeedback: explain that the student did not follow along with the reference video.
+      → You MUST set topicRelevance: 1 (NEVER higher than 2 for talking about the task or unrelated speech)
+      → topicFeedback: state clearly that the student spoke their own speech or explained the shadowing task instead of shadowing the reference speaker's words.
     If the speaker genuinely attempts to shadow the video:
       10 = speech closely mirrors the words, intonation, and phrasing of the reference speech
       8-9 = successfully shadowed the majority of phrases with natural rhythm
@@ -570,7 +613,7 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
 - topicFeedback: 1-2 sentences on how closely the student shadowed the video phrases and paced their speech.`
     : challengeType === "picture_description"
     ? `- topicRelevance & isOffTopic: how thoroughly the speaker described the image and followed the task instructions.
-    STRICT SECURITY CHECK: If the speaker does not describe the assigned picture (e.g. speaks about yesterday's question or an unrelated topic):
+    STRICT SECURITY CHECK: If the speaker does not describe the assigned picture (e.g. talks ABOUT what picture description is or its uses/benefits/advantages, speaks about yesterday's question, or discusses an unrelated topic):
       → You MUST set isOffTopic: true
       → You MUST set topicRelevance: 1 or 2 (NEVER higher than 2 for an unrelated speech)
       → topicFeedback: explain specifically that the submission does not describe today's assigned picture.
@@ -583,7 +626,7 @@ export async function analyzeSpeech(transcript, durationSeconds, words = [], que
       1 = does not attempt to describe the image at all
 - topicFeedback: 1-2 sentences explaining specifically which visual elements the student described well (people, objects, setting, mood, actions) and which important details they missed or could expand on. Be concrete — mention what was actually in their description.`
     : `- topicRelevance & isOffTopic: how directly and thoroughly the speaker addressed the specific topic/question.
-    STRICT SECURITY CHECK: If the speaker talks about a DIFFERENT question (e.g. yesterday's topic, an old prompt, or a completely unrelated subject):
+    STRICT SECURITY CHECK: If the speaker talks about a DIFFERENT question (e.g. yesterday's topic, an old prompt, explains what this speaking activity/app task is instead of answering it, or talks about a completely unrelated subject):
       → You MUST set isOffTopic: true
       → You MUST set topicRelevance: 1 or 2 (NEVER higher than 2 for an off-topic or wrong-question speech)
       → topicFeedback: explain specifically that the video discusses a different question/topic instead of today's assigned prompt.
@@ -612,11 +655,12 @@ The student listened to an audio story and was asked to record a summary in thei
 When writing suggestions, provide concrete storytelling/summary tips (e.g. "Include the resolution/moral of the story", "Use time transitions like 'meanwhile' and 'eventually'").
 When writing overallComment, mention their story comprehension and summarization ability alongside speaking fluency.\n`
       : challengeType === "shadowing_video"
-      ? `\nCHALLENGE TYPE: Shadowing Activity (Speech Mimicry & Cadence Practice)
-The student watched a short video and practiced shadowing (speaking aloud concurrently with the speaker).
+      ? `\nCHALLENGE TYPE: Shadowing Activity (Exact Speech Mimicry & Cadence Practice)
+The student listened to a native reference recording (Original Spoken Transcript) and was required to repeat/mirror that speaker's EXACT words aloud in real time.
 CRITICAL RULES FOR SHADOWING EVALUATION:
+• FIRST verify they actually repeated the phrases of the Original Spoken Transcript. Talking ABOUT what shadowing is, its uses/benefits/advantages/disadvantages, or delivering a free-form personal essay is COMPLETELY OFF-TOPIC (set isOffTopic: true, topicRelevance: 1).
 • DO NOT evaluate or deduct points for advanced vocabulary — this is an imitation/shadowing drill, not an essay.
-• Focus on: Rhythm, pronunciation imitation, cadence, fluid pacing, and speaking confidence.
+• When truly shadowing the reference script, focus on: Rhythm, pronunciation imitation, cadence, fluid pacing, and speaking confidence.
 • When writing suggestions, give tips on breath control, mirroring sentence stress, and connecting speech smoothly.\n`
       : challengeType === "picture_description"
       ? `\nCHALLENGE TYPE: Picture Description
@@ -743,23 +787,40 @@ RULES:
       suggestions.push("Practice expanding your responses with specific examples and supporting details.");
     }
 
+    const offTopicDetected = Boolean(deterministicMismatch);
+    if (offTopicDetected) {
+      suggestions.unshift(
+        challengeType === "shadowing_video"
+          ? "Play the reference shadowing audio again, follow the live phrase prompter, and repeat the native speaker's exact words aloud in real time."
+          : challengeType === "story_summary"
+          ? "Listen to today's assigned audio story again and retell its key characters, events, and ending in your own words."
+          : challengeType === "picture_description"
+          ? "Focus directly on describing the people, objects, actions, colors, and setting shown in today's image."
+          : "Answer today's assigned speaking question directly using specific examples and the target expressions."
+      );
+    }
+
     return {
-      fluency: fluencyAnchor,
-      grammar: 7,
-      confidence: confidenceAnchor,
-      vocabulary: 7,
-      coherence: Math.round((fluencyAnchor + confidenceAnchor) / 2),
+      fluency: offTopicDetected ? Math.min(3, fluencyAnchor) : fluencyAnchor,
+      grammar: offTopicDetected ? 4 : 7,
+      confidence: offTopicDetected ? Math.min(3, confidenceAnchor) : confidenceAnchor,
+      vocabulary: offTopicDetected ? 4 : 7,
+      coherence: offTopicDetected ? 3 : Math.round((fluencyAnchor + confidenceAnchor) / 2),
       grammarErrors: [],
-      strongPoints: [
-        `Good effort delivering your response (${wordCount} words spoken).`,
-        wpm ? `Consistent speaking pace around ${wpm} WPM.` : "Clear spoken communication.",
-      ],
+      strongPoints: offTopicDetected
+        ? ["Audio and voice clarity were captured clearly during the recording."]
+        : [
+            `Good effort delivering your response (${wordCount} words spoken).`,
+            wpm ? `Consistent speaking pace around ${wpm} WPM.` : "Clear spoken communication.",
+          ],
       suggestions,
-      topicRelevance: hasTopic ? 7 : null,
-      topicFeedback: hasTopic
-        ? "You addressed the speaking prompt. Continue practicing to organize your points with clear examples."
-        : null,
-      isOffTopic: false,
+      topicRelevance: offTopicDetected ? 1 : (hasTopic ? 7 : null),
+      topicFeedback: offTopicDetected
+        ? deterministicMismatch.reason
+        : (hasTopic
+          ? "You addressed the speaking prompt. Continue practicing to organize your points with clear examples."
+          : null),
+      isOffTopic: offTopicDetected,
       pronunciationNote: pronunciationIssues.length > 0
         ? `A few words could be articulated more clearly: ${pronunciationIssues.slice(0, 3).join(", ")}.`
         : "Clear pronunciation overall.",
@@ -771,7 +832,9 @@ RULES:
         strong: [],
         weak: [],
       },
-      overallComment: `You demonstrated a good speaking effort with ${wordCount} words spoken. Your pace was ${wpm ? `${wpm} WPM` : "natural"}. Keep practicing regular speaking exercises to build further confidence and vocabulary range.`,
+      overallComment: offTopicDetected
+        ? offTopicCategoryComment
+        : `You demonstrated a good speaking effort with ${wordCount} words spoken. Your pace was ${wpm ? `${wpm} WPM` : "natural"}. Keep practicing regular speaking exercises to build further confidence and vocabulary range.`,
     };
   };
 
@@ -880,6 +943,18 @@ RULES:
     scores.grammarErrors = filterGrammarErrors(
       mergeGrammarErrors(scores.grammarErrors || [], ltErrors || [])
     );
+  }
+
+  if (deterministicMismatch) {
+    const missedOffTopic = scores.isOffTopic !== true;
+    scores.isOffTopic = true;
+    scores.topicRelevance = Math.min(typeof scores.topicRelevance === "number" ? scores.topicRelevance : 1, 2);
+    if (missedOffTopic || !scores.topicFeedback) {
+      scores.topicFeedback = deterministicMismatch.reason;
+    }
+    if (missedOffTopic || !scores.overallComment || /^You demonstrated a good speaking effort/i.test(scores.overallComment)) {
+      scores.overallComment = offTopicCategoryComment;
+    }
   }
 
   return {

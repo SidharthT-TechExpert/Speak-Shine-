@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateCompositeScore } from "./submitGate.js";
+import { calculateCompositeScore, evaluateShadowingMatch, resolveDayContentFlags } from "./submitGate.js";
 
 describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth / 0 Vocab)", () => {
   it("awards full 40 duration points when actual spoken time is >= 85% of target active speech duration", () => {
@@ -183,5 +183,132 @@ describe("Shadowing Activity Scoring Model (40 Duration / 60 Delivery / 0 Growth
     expect(breakdown.communication).toBeLessThanOrEqual(20);
     expect(score).toBeLessThanOrEqual(20);
     expect(breakdown.offTopicReason).toContain("Your speech did not match today's assigned shadowing reference script");
+  });
+
+  it("flags isOffTopic and denies duration points when student explains what shadowing is instead of mirroring Dr. Ayesha script (even under fallback scores)", () => {
+    const drAyeshaScript =
+      "Well, my story is she came and sat next to me. And the first conversation was about the fact that our two amazing grandparents had passed away from Alzheimer and dementia. And from a year later we were married after many really unusual dates in a situation like that. And then we came back and from the very first day we started studying lifestyle medicine together.";
+    const studentMetaSpeech =
+      "Hi everyone, today I would like to share with you a speech practice. What I find interesting in native speakers is communication naturally and confidently. When I listen to native speakers, I try to observe their pronunciation, tone, and pronunciation. The power of speech and sentences sharing is one of the best techniques in my English speaking skills because it helps me understand the natural language. However, I believe regular listening and speaking practice can help me overcome these difficulties. This reason why I see this is that shadowing makes me in the several skills at the same time. I listen carefully to the speaker repeating sentence and voice trying to make pronunciation right. On top of that I try to proper my own voice and compare it to the original speaker. This helps me identify my mistakes and understand what I need to improve. I believe shadowing is a powerful technique that can help me achieve my communication goals. My aim is to speak English naturally and confidently and without hesitations.";
+
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: 167,
+      targetVideoDuration: 85,
+      targetVideoTranscript: drAyeshaScript,
+      isShadowing: true,
+      topicRelevance: 7,
+      analysis: {
+        transcription: studentMetaSpeech,
+        fluency: 7,
+        grammar: 7,
+        confidence: 6,
+        topicRelevance: 7,
+        isOffTopic: false,
+        stats: {
+          wordCount: 332,
+          wpm: 120,
+          pauses: 5,
+          rhythm: { speechRatio: 90, paceConsistency: 8 },
+        },
+      },
+    });
+
+    expect(breakdown.isOffTopic).toBe(true);
+    expect(breakdown.duration).toBe(0);
+    expect(breakdown.durationMatchPercent).toBe(0);
+    expect(breakdown.durationRatio).toBe(0);
+    expect(breakdown.isEightyFivePercentMatch).toBe(false);
+    expect(breakdown.communication).toBeLessThanOrEqual(20);
+    expect(score).toBeLessThanOrEqual(20);
+    expect(breakdown.durationMessage).toBe(breakdown.offTopicReason);
+    expect(breakdown.offTopicReason).toContain("Your speech did not match today's assigned shadowing reference script");
+  });
+
+  it("flags meta-commentary about shadowing even when reference script mentions speaking/shadowing OR when targetVideoTranscript is absent", () => {
+    const speakingPracticeScript =
+      "Welcome to morning fluency warm-up. Breathe calmly, drop your shoulders, and focus on crisp consonant endings as we pace through each short announcement from the studio.";
+    const metaExplanation =
+      "Today I would like to explain what shadowing is and its advantages and disadvantages. Shadowing is a great language learning technique that helps us improve pronunciation, listening, and confidence by comparing our voice with a native speaker.";
+
+    const withScript = calculateCompositeScore({
+      durationSeconds: 90,
+      targetVideoDuration: 85,
+      targetVideoTranscript: speakingPracticeScript,
+      isShadowing: true,
+      analysis: {
+        transcription: metaExplanation,
+        fluency: 8,
+        confidence: 8,
+        grammar: 8,
+        stats: { wpm: 125, pauses: 1, rhythm: { speechRatio: 85, paceConsistency: 8 } },
+      },
+    });
+    expect(withScript.breakdown.isOffTopic).toBe(true);
+    expect(withScript.breakdown.duration).toBe(0);
+    expect(withScript.score).toBeLessThanOrEqual(20);
+
+    const withoutScript = calculateCompositeScore({
+      durationSeconds: 90,
+      targetVideoDuration: 85,
+      targetVideoTranscript: null,
+      isShadowing: true,
+      analysis: {
+        transcription: metaExplanation,
+        fluency: 8,
+        confidence: 8,
+        grammar: 8,
+        stats: { wpm: 125, pauses: 1, rhythm: { speechRatio: 85, paceConsistency: 8 } },
+      },
+    });
+    expect(withoutScript.breakdown.isOffTopic).toBe(true);
+    expect(withoutScript.breakdown.duration).toBe(0);
+    expect(withoutScript.score).toBeLessThanOrEqual(20);
+    expect(withoutScript.breakdown.offTopicReason).toContain("Your speech did not match today's assigned shadowing reference script");
+  });
+
+  it("accepts genuine shadowing with minor STT variations and awards full score", () => {
+    const drAyeshaScript =
+      "Well, my story is she came and sat next to me. And the first conversation was about the fact that our two amazing grandparents had passed away from Alzheimer and dementia. A year later we were married after many unusual dates.";
+    const studentActualShadowing =
+      "Well my story is she came and sat next to me and the first conversation was about the fact our two amazing grandparents passed away from Alzheimer's and dementia and year later we were married after many unusual dates";
+
+    const match = evaluateShadowingMatch(studentActualShadowing, drAyeshaScript);
+    expect(match.isMatch).toBe(true);
+    expect(match.isStrongMatch).toBe(true);
+
+    const { score, breakdown } = calculateCompositeScore({
+      durationSeconds: 85,
+      targetVideoDuration: 85,
+      targetVideoTranscript: drAyeshaScript,
+      isShadowing: true,
+      analysis: {
+        transcription: studentActualShadowing,
+        fluency: 9,
+        confidence: 9,
+        grammar: 9,
+        stats: { wordCount: 40, wpm: 120, pauses: 1, rhythm: { speechRatio: 90, paceConsistency: 9 } },
+      },
+    });
+
+    expect(breakdown.isOffTopic).toBe(false);
+    expect(breakdown.duration).toBe(40);
+    expect(breakdown.isEightyFivePercentMatch).toBe(true);
+    expect(score).toBeGreaterThanOrEqual(80);
+  });
+
+  it("resolveDayContentFlags prioritizes explicit todayContentType and stored challengeType over stale flags", () => {
+    const shadowWithStale = resolveDayContentFlags({
+      todayContentType: "shadowing_video",
+      isStorySummaryDay: true,
+      isPictureDescriptionDay: true,
+      isShadowingDay: false,
+    });
+    expect(shadowWithStale).toEqual({ isStory: false, isPicture: false, isShadowing: true });
+
+    const historicalNormal = resolveDayContentFlags({
+      todayContentType: "shadowing_video",
+      isShadowingDay: true,
+    }, "normal");
+    expect(historicalNormal).toEqual({ isStory: false, isPicture: false, isShadowing: false });
   });
 });

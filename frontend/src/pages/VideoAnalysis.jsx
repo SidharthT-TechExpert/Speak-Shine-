@@ -253,6 +253,10 @@ export default function VideoAnalysis() {
     videoDuration: initToday.videoDuration,
     videoTranscript: initToday.videoTranscript,
     videoTitle: initToday.videoTitle,
+    storyTranscript: initToday.storyTranscript || initToday.todayStoryTranscript || null,
+    todayStoryTranscript: initToday.todayStoryTranscript || initToday.storyTranscript || null,
+    summaryGuide: initToday.summaryGuide || initToday.todaySummaryGuide || null,
+    storyDuration: initToday.storyDuration || null,
     durationSettings: initToday.durationSettings,
     isWeeklyReflection: initToday.isWeeklyReflection,
     isShadowing: initShadowing,
@@ -267,7 +271,14 @@ export default function VideoAnalysis() {
   const [isStorySummary, setIsStorySummary] = useState(() => Boolean(initToday?.contentType === "story_audio" || initToday?.isStorySummaryDay));
   const [isPictureDescription, setIsPictureDescription] = useState(() => Boolean(initToday?.contentType === "picture_description" || initToday?.isPictureDescriptionDay));
   const [isShadowing, setIsShadowing] = useState(() => initShadowing);
-  const [showPreviewScript, setShowPreviewScript] = useState(false); // Script turned OFF by default; toggle ON if needed
+  const [showPreviewScript, setShowPreviewScript] = useState(() => {
+    try {
+      const stored = localStorage.getItem("speakshine_show_script");
+      return stored !== null ? stored === "true" : true;
+    } catch {
+      return true;
+    }
+  });
   const [shadowVideoSrcOverride, setShadowVideoSrcOverride] = useState("");
   const [shadowingVideoFailed, setShadowingVideoFailed] = useState(false);
   const [picturePreviewOpen, setPicturePreviewOpen] = useState(false);
@@ -635,6 +646,10 @@ export default function VideoAnalysis() {
         videoDuration: t.videoDuration,
         videoTranscript: t.videoTranscript,
         videoTitle: t.videoTitle,
+        storyTranscript: t.storyTranscript || t.todayStoryTranscript || null,
+        todayStoryTranscript: t.todayStoryTranscript || t.storyTranscript || null,
+        summaryGuide: t.summaryGuide || t.todaySummaryGuide || null,
+        storyDuration: t.storyDuration || null,
         durationSettings: t.durationSettings,
         isWeeklyReflection: t.isWeeklyReflection,
         isShadowing: isShadowingDetected
@@ -988,6 +1003,10 @@ export default function VideoAnalysis() {
             videoDuration: qType === "shadowing_video" ? todayQuestion?.videoDuration : null,
             videoTranscript: qType === "shadowing_video" ? todayQuestion?.videoTranscript : null,
             videoTitle: qType === "shadowing_video" ? todayQuestion?.videoTitle : null,
+            storyTranscript: todayQuestion?.storyTranscript || todayQuestion?.todayStoryTranscript || null,
+            todayStoryTranscript: todayQuestion?.todayStoryTranscript || todayQuestion?.storyTranscript || null,
+            summaryGuide: todayQuestion?.summaryGuide || todayQuestion?.todaySummaryGuide || null,
+            storyDuration: todayQuestion?.storyDuration || null,
             vocabWordCount,
             vocabRequiredCount,
             vocabLevel,
@@ -1638,170 +1657,491 @@ export default function VideoAnalysis() {
                   </div>
                 )}
 
-                {/* ── 2. Specialized Mode: Story Audio Waveform Player ── */}
+                {/* ── 2. Specialized Mode: Interactive Story Audio & Teleprompter Suite ── */}
                 {qType === "story_audio" && qConfig.hasAudio && audioSrc && (
                   <div style={{ marginBottom: "1.35rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.08em", color: qConfig.theme.primary, textTransform: "uppercase" }}>
-                        🎧 LISTEN TO THE STORY
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.55rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em", color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        <span>🎙️</span> ORIGINAL STORY AUDIO ({duration || todayQuestion.storyDuration || 90}s)
                       </span>
-                      <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
-                        Listen once before recording summary
+                      <span style={{ fontSize: "0.74rem", color: isDark ? "#34d399" : "#059669", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                        <span>📖</span> Listen to story &amp; retell key points in your summary
                       </span>
                     </div>
-                    <div className="speakshine-audio-bar" style={{
-                      borderRadius: 12,
-                      padding: "0.75rem 1.1rem",
+
+                    {/* Glowing Waveform Audio Bar */}
+                    <div style={{
+                      borderRadius: 14,
+                      padding: "0.9rem 1.25rem",
                       display: "flex",
                       alignItems: "center",
-                      gap: "1rem",
-                      background: isDark ? "rgba(255, 255, 255, 0.04)" : "#f8fafc",
-                      border: `1px solid ${qConfig.theme.border}`,
-                      boxShadow: isDark ? "none" : "0 2px 8px rgba(0, 0, 0, 0.04)",
+                      gap: "1.1rem",
+                      background: isDark
+                        ? "linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(124, 111, 255, 0.04))"
+                        : "linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(124, 111, 255, 0.03))",
+                      border: isDark ? "1px solid rgba(167, 139, 250, 0.35)" : "1.5px solid rgba(167, 139, 250, 0.35)",
+                      boxShadow: isDark ? "0 8px 30px rgba(0,0,0,0.3)" : "0 4px 16px rgba(167, 139, 250, 0.08)",
                     }}>
+                      {/* Play/Pause Button */}
                       <button
                         type="button"
                         onClick={togglePlay}
-                        title={isPlaying ? "Pause audio" : "Play audio"}
-                        className="audio-play-btn"
+                        title={isPlaying ? "Pause story" : "Play story"}
                         style={{
-                          width: 38,
-                          height: 38,
+                          width: 44,
+                          height: 44,
                           borderRadius: "50%",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           cursor: "pointer",
                           flexShrink: 0,
-                          background: qConfig.theme.primary,
-                          color: "#0d0a18",
+                          background: "linear-gradient(135deg, #a78bfa, #7c3aed)",
+                          color: "#fff",
                           border: "none",
-                          transition: "transform 0.15s ease",
+                          boxShadow: isPlaying ? "0 0 20px rgba(167, 139, 250, 0.6)" : "0 4px 12px rgba(167, 139, 250, 0.3)",
+                          transition: "all 0.2s ease",
                         }}
-                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.06)"}
                         onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
                       >
                         {isPlaying ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <rect x="6" y="4" width="4" height="16" />
                             <rect x="14" y="4" width="4" height="16" />
                           </svg>
                         ) : (
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
                             <polygon points="5 3 19 12 5 21 5 3" />
                           </svg>
                         )}
                       </button>
 
-                      {/* Waveform Bars */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "32px", cursor: "pointer" }}>
+                      {/* Interactive Waveform Bars */}
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, height: "36px", cursor: "pointer" }}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clickRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                          const targetTime = clickRatio * (duration || 90);
+                          if (audioRef.current && !isNaN(audioRef.current.duration)) {
+                            audioRef.current.currentTime = targetTime;
+                            setCurrentTime(targetTime);
+                          }
+                        }}
+                      >
                         {WAVE_PATTERN.map((height, i) => {
                           const isPassed = i <= activeWaveIndex;
                           return (
                             <div
                               key={i}
-                              className={`audio-wave-bar ${isPassed ? "active" : ""}`}
-                              onClick={() => seekWaveform(i)}
-                              title={`Seek to ${fmtTime((i / WAVE_PATTERN.length) * duration)}`}
                               style={{
                                 flex: 1,
+                                minWidth: "3px",
                                 height: `${height}px`,
-                                borderRadius: 2,
-                                background: isPassed ? qConfig.theme.primary : "rgba(255, 255, 255, 0.18)",
-                                transition: "background 0.15s ease",
+                                borderRadius: "3px",
+                                background: isPassed ? "linear-gradient(180deg, #a78bfa, #7c3aed)" : (isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"),
+                                boxShadow: (isPassed && isPlaying) ? "0 0 8px rgba(167,139,250,0.5)" : "none",
+                                transition: "all 0.15s ease",
                               }}
                             />
                           );
                         })}
                       </div>
 
-                      <span className="audio-time-val" style={{ fontSize: "0.78rem", fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: isDark ? "#e2e8f0" : "#1e293b" }}>
-                        {fmtTime(currentTime)} / {fmtTime(duration)}
-                      </span>
+                      {/* Time, Speed & Script Toggle */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexShrink: 0 }}>
+                        <span style={{ fontSize: "0.78rem", color: isDark ? "#e2e8f0" : "#1e293b", fontFamily: "monospace", fontWeight: 600 }}>
+                          {fmtTime(currentTime)} / {fmtTime(duration)}
+                        </span>
+                        <div style={{
+                          display: "flex",
+                          gap: "2px",
+                          background: isDark ? "rgba(0,0,0,0.35)" : "#f1f5f9",
+                          padding: "2px",
+                          borderRadius: "8px",
+                          border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1"
+                        }}>
+                          {[0.8, 1.0, 1.2].map((spd) => (
+                            <button
+                              key={spd}
+                              type="button"
+                              onClick={() => handleSelectSpeed(spd)}
+                              style={{
+                                background: playbackSpeed === spd ? "linear-gradient(135deg, #a78bfa, #7c3aed)" : "transparent",
+                                color: playbackSpeed === spd ? "#fff" : (isDark ? "#94a3b8" : "#475569"),
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "2px 6px",
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {spd}x
+                            </button>
+                          ))}
+                        </div>
 
-                      {/* Speed Selector Pill & Menu */}
-                      <div ref={speedMenuRef} style={{ position: "relative", flexShrink: 0 }}>
+                        {/* Script / Subtitles Toggle */}
                         <button
                           type="button"
-                          onClick={() => setShowSpeedMenu(prev => !prev)}
-                          title={`Playback speed: ${playbackSpeed}x (Click to change)`}
+                          onClick={() => {
+                            setShowPreviewScript(prev => {
+                              const next = !prev;
+                              try { localStorage.setItem("speakshine_show_script", String(next)); } catch {}
+                              return next;
+                            });
+                          }}
                           style={{
+                            background: showPreviewScript
+                              ? (isDark ? "rgba(167, 139, 250, 0.28)" : "#f3e8ff")
+                              : (isDark ? "rgba(255,255,255,0.1)" : "#f1f5f9"),
+                            color: showPreviewScript ? (isDark ? "#c084fc" : "#7c3aed") : (isDark ? "#cbd5e1" : "#475569"),
+                            border: showPreviewScript
+                              ? (isDark ? "1px solid rgba(167, 139, 250, 0.55)" : "1.5px solid #a78bfa")
+                              : (isDark ? "1px solid rgba(255,255,255,0.15)" : "1px solid #cbd5e1"),
+                            borderRadius: "8px",
+                            padding: "3px 8px",
+                            fontSize: "0.68rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "3px",
-                            padding: "3px 8px",
-                            borderRadius: 8,
-                            fontSize: "0.74rem",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            background: playbackSpeed !== 1 ? qConfig.theme.primary : (isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9"),
-                            color: playbackSpeed !== 1 ? "#0d0a18" : (isDark ? "#e2e8f0" : "#1e293b"),
-                            border: playbackSpeed !== 1 ? "none" : (isDark ? "1px solid rgba(255, 255, 255, 0.15)" : "1px solid #cbd5e1"),
-                            transition: "all 0.15s ease",
-                            boxShadow: playbackSpeed !== 1 ? `0 2px 8px ${qConfig.theme.primary}55` : "none",
                           }}
+                          title={showPreviewScript ? "Hide Story Script" : "Show Story Script"}
                         >
-                          <span style={{ fontSize: "0.68rem", opacity: 0.85 }}>⚡</span>
-                          <span>{playbackSpeed}x</span>
-                          <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor" style={{ opacity: 0.7, transform: showSpeedMenu ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>
-                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
+                          {showPreviewScript ? "📜 Script: ON" : "📜 Script: OFF"}
                         </button>
-
-                        {showSpeedMenu && (
-                          <div style={{
-                            position: "absolute",
-                            bottom: "calc(100% + 8px)",
-                            right: 0,
-                            background: isDark ? "#18142a" : "#ffffff",
-                            border: isDark ? "1px solid rgba(255, 255, 255, 0.18)" : "1px solid #e2e8f0",
-                            borderRadius: 10,
-                            padding: "4px",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "2px",
-                            minWidth: 92,
-                            boxShadow: isDark ? "0 10px 25px rgba(0, 0, 0, 0.55)" : "0 10px 25px rgba(0, 0, 0, 0.1)",
-                            zIndex: 50,
-                            backdropFilter: "blur(12px)",
-                          }}>
-                            <div style={{ fontSize: "0.62rem", fontWeight: 800, color: isDark ? "#94a3b8" : "#64748b", padding: "4px 8px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0", marginBottom: "2px" }}>
-                              Speed
-                            </div>
-                            {PLAYBACK_SPEEDS.map(speed => {
-                              const isSelected = playbackSpeed === speed;
-                              return (
-                                <button
-                                  key={speed}
-                                  type="button"
-                                  onClick={() => handleSelectSpeed(speed)}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "5px 8px",
-                                    borderRadius: 6,
-                                    fontSize: "0.75rem",
-                                    fontWeight: isSelected ? 800 : 500,
-                                    background: isSelected ? qConfig.theme.primary : "transparent",
-                                    color: isSelected ? "#0d0a18" : (isDark ? "#f1f5f9" : "#1e293b"),
-                                    border: "none",
-                                    cursor: "pointer",
-                                    textAlign: "left",
-                                    transition: "background 0.12s ease",
-                                  }}
-                                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isDark ? "rgba(255, 255, 255, 0.08)" : "#f1f5f9"; }}
-                                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
-                                >
-                                  <span>{speed}x</span>
-                                  {isSelected && <span style={{ fontSize: "0.7rem", fontWeight: 900 }}>✓</span>}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
                     </div>
+
+                    {/* Synchronized Story Teleprompter */}
+                    {(() => {
+                      const textToSplit = todayQuestion.storyTranscript || todayQuestion.todayStoryTranscript || todayQuestion.videoTranscript || todayQuestion.question || "";
+                      if (!textToSplit) return null;
+                      const cues = buildTeleprompterCues(textToSplit, duration || todayQuestion.storyDuration || 90);
+                      if (!cues.length) return null;
+
+                      if (!showPreviewScript) {
+                        return (
+                          <div style={{
+                            marginTop: "0.75rem",
+                            background: isDark
+                              ? "linear-gradient(135deg, rgba(17, 12, 34, 0.6) 0%, rgba(26, 16, 48, 0.5) 100%)"
+                              : "#ffffff",
+                            border: isDark ? "1px dashed rgba(167, 139, 250, 0.3)" : "1.5px dashed rgba(167, 139, 250, 0.45)",
+                            borderRadius: 14,
+                            padding: "0.85rem 1.15rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.75rem",
+                            flexWrap: "wrap",
+                            boxShadow: isDark ? "none" : "0 2px 10px rgba(0,0,0,0.03)",
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                              <span style={{ fontSize: "1.2rem" }}>🎧</span>
+                              <div>
+                                <div style={{ fontSize: "0.82rem", fontWeight: 700, color: isDark ? "#c084fc" : "#7c3aed" }}>Pure Listening Comprehension Mode (Script Hidden)</div>
+                                <div style={{ fontSize: "0.72rem", color: isDark ? "#94a3b8" : "#64748b" }}>Focus on in-ear story audio to train memory, comprehension, and key narrative recall.</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowPreviewScript(true);
+                                try { localStorage.setItem("speakshine_show_script", "true"); } catch {}
+                              }}
+                              style={{
+                                background: isDark ? "rgba(167, 139, 250, 0.16)" : "#f5f3ff",
+                                color: isDark ? "#c084fc" : "#7c3aed",
+                                border: isDark ? "1px solid rgba(167, 139, 250, 0.45)" : "1.5px solid #a78bfa",
+                                padding: "4px 12px",
+                                borderRadius: 8,
+                                fontSize: "0.74rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                boxShadow: isDark ? "none" : "0 1px 3px rgba(167,139,250,0.15)",
+                              }}
+                              title="Turn on story teleprompter script"
+                            >
+                              👁️ Show Story Script
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      const activeIdx = cues.findIndex(c => currentTime >= c.start && currentTime < c.end);
+                      const safeIdx = activeIdx !== -1 ? activeIdx : (currentTime >= (duration || 90) ? cues.length - 1 : 0);
+                      const activeCue = cues[safeIdx] || cues[0];
+                      const prevCue = safeIdx > 0 ? cues[safeIdx - 1] : null;
+                      const nextCue = safeIdx < cues.length - 1 ? cues[safeIdx + 1] : null;
+                      const cueProgress = activeCue && activeCue.duration > 0
+                        ? Math.min(1, Math.max(0, (currentTime - activeCue.start) / activeCue.duration))
+                        : 0;
+
+                      const seekToCue = (startSec) => {
+                        if (audioRef.current && !isNaN(audioRef.current.duration)) {
+                          audioRef.current.currentTime = startSec;
+                          setCurrentTime(startSec);
+                        }
+                      };
+
+                      // 1. Standby State (When audio has not started playing yet)
+                      if (!isPlaying && currentTime === 0) {
+                        return (
+                          <div style={{
+                            marginTop: "0.85rem",
+                            background: isDark
+                              ? "linear-gradient(135deg, rgba(17, 12, 34, 0.85) 0%, rgba(26, 16, 48, 0.75) 100%)"
+                              : "#ffffff",
+                            border: isDark ? "1px solid rgba(167, 139, 250, 0.3)" : "1.5px solid rgba(167, 139, 250, 0.35)",
+                            borderRadius: 16,
+                            padding: "1.35rem 1.4rem",
+                            boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.35)" : "0 4px 20px rgba(0,0,0,0.06)",
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem" }}>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                <span>🎙️</span> Dynamic Story Teleprompter
+                              </span>
+                              <span style={{
+                                fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                                background: isDark ? "rgba(148, 163, 184, 0.15)" : "#f1f5f9",
+                                color: isDark ? "#94a3b8" : "#475569",
+                                border: isDark ? "1px solid rgba(148, 163, 184, 0.25)" : "1px solid #cbd5e1"
+                              }}>
+                                ⏸️ Standby
+                              </span>
+                            </div>
+
+                            <div style={{ textAlign: "center", padding: "0.85rem 0.5rem" }}>
+                              <div style={{ fontSize: "1.75rem", marginBottom: "0.4rem" }}>🎧</div>
+                              <h4 style={{ margin: "0 0 0.35rem 0", color: isDark ? "#ffffff" : "#0f172a", fontSize: "1.05rem", fontWeight: 700 }}>
+                                Teleprompter Synchronized to Story Audio
+                              </h4>
+                              <p style={{ margin: "0 auto 1.15rem auto", maxWidth: "460px", color: isDark ? "#94a3b8" : "#475569", fontSize: "0.84rem", lineHeight: 1.55 }}>
+                                The spoken story will automatically appear <strong style={{ color: isDark ? "#c084fc" : "#7c3aed" }}>line-by-line in natural 4–5 second phrase windows</strong> as the audio plays. Put on your earphones and press Play!
+                              </p>
+
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  onClick={togglePlay}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: "0.5rem",
+                                    padding: "0.55rem 1.15rem", borderRadius: 10,
+                                    background: "linear-gradient(135deg, #a78bfa, #7c3aed)",
+                                    color: "#ffffff", border: "none", fontWeight: 700, fontSize: "0.84rem",
+                                    cursor: "pointer", boxShadow: "0 4px 16px rgba(167,139,250,0.35)",
+                                  }}
+                                >
+                                  <span>▶</span> Play &amp; Start Teleprompter
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // 2. Active Synchronized Phrase Window (Playing or Paused mid-audio)
+                      return (
+                        <div style={{
+                          marginTop: "0.85rem",
+                          background: isDark
+                            ? "linear-gradient(135deg, rgba(17, 12, 34, 0.9) 0%, rgba(26, 16, 48, 0.8) 100%)"
+                            : "#ffffff",
+                          border: isDark ? "1px solid rgba(167, 139, 250, 0.45)" : "1.5px solid rgba(167, 139, 250, 0.35)",
+                          borderRadius: 16,
+                          padding: "1.15rem 1.35rem",
+                          boxShadow: isDark ? "0 10px 35px rgba(167, 139, 250, 0.15)" : "0 4px 20px rgba(0,0,0,0.06)",
+                        }}>
+                          {/* Prompter Header */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <span style={{ fontSize: "0.72rem", fontWeight: 800, color: isDark ? "#c084fc" : "#7c3aed", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                                <span>🎙️</span> Dynamic Story Prompter
+                              </span>
+                              <span style={{
+                                display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                                fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                                background: isPlaying ? "rgba(52, 211, 153, 0.15)" : "rgba(251, 191, 36, 0.15)",
+                                color: isPlaying ? (isDark ? "#34d399" : "#15803d") : (isDark ? "#fbbf24" : "#b45309"),
+                                border: `1px solid ${isPlaying ? "rgba(52, 211, 153, 0.35)" : "rgba(251, 191, 36, 0.35)"}`
+                              }}>
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: isPlaying ? "#34d399" : "#fbbf24" }} />
+                                {isPlaying ? "LIVE SYNC" : "PAUSED"}
+                              </span>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                              <span style={{ fontWeight: 700, color: isDark ? "#e2e8f0" : "#1e293b" }}>
+                                Phrase {safeIdx + 1} / {cues.length}
+                              </span>
+                              <span>•</span>
+                              <span style={{ fontFamily: "monospace", color: isDark ? "#c084fc" : "#7c3aed" }}>
+                                {activeCue.startFormatted} – {activeCue.endFormatted}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Context: Previous Phrase (Dimmed) */}
+                          {prevCue && (
+                            <div
+                              onClick={() => seekToCue(prevCue.start)}
+                              style={{
+                                fontSize: "0.82rem",
+                                color: isDark ? "#64748b" : "#94a3b8",
+                                fontStyle: "italic",
+                                marginBottom: "0.45rem",
+                                padding: "0.2rem 0.6rem",
+                                cursor: "pointer",
+                                opacity: 0.8,
+                                transition: "all 0.2s ease",
+                              }}
+                              title="Click to jump back to this phrase"
+                            >
+                              &larr; {prevCue.text}
+                            </div>
+                          )}
+
+                          {/* HERO ACTIVE PHRASE CARD */}
+                          <div style={{
+                            background: isDark
+                              ? "linear-gradient(135deg, rgba(167, 139, 250, 0.22) 0%, rgba(124, 111, 255, 0.15) 100%)"
+                              : "linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%)",
+                            border: isDark ? "1px solid rgba(192, 132, 252, 0.6)" : "1.5px solid #a78bfa",
+                            borderRadius: 14,
+                            padding: "1.1rem 1.35rem",
+                            position: "relative",
+                            boxShadow: isDark ? "0 6px 25px rgba(167, 139, 250, 0.2)" : "0 4px 14px rgba(167, 139, 250, 0.12)",
+                            overflow: "hidden",
+                          }}>
+                            {/* Left Accent Neon Bar */}
+                            <div style={{
+                              position: "absolute", top: 0, left: 0, bottom: 0, width: 4,
+                              background: "linear-gradient(180deg, #a78bfa 0%, #7c3aed 100%)",
+                            }} />
+
+                            <div style={{
+                              fontSize: "1.24rem",
+                              fontWeight: 700,
+                              color: isDark ? "#ffffff" : "#0f172a",
+                              lineHeight: 1.55,
+                              letterSpacing: "-0.01em",
+                              textShadow: isDark ? "0 2px 10px rgba(0,0,0,0.5)" : "none",
+                            }}>
+                              {activeCue.text}
+                            </div>
+
+                            {/* Phrase Pacing Micro-Bar */}
+                            <div style={{
+                              height: 3,
+                              borderRadius: 99,
+                              background: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
+                              marginTop: "0.85rem",
+                              overflow: "hidden",
+                            }}>
+                              <div style={{
+                                height: "100%",
+                                width: `${Math.min(100, cueProgress * 100)}%`,
+                                background: "linear-gradient(90deg, #a78bfa, #7c3aed)",
+                                transition: "width 0.15s linear",
+                              }} />
+                            </div>
+                          </div>
+
+                          {/* Context: Next Phrase (Upcoming Preview) */}
+                          {nextCue && (
+                            <div
+                              onClick={() => seekToCue(nextCue.start)}
+                              style={{
+                                fontSize: "0.84rem",
+                                color: isDark ? "#94a3b8" : "#475569",
+                                marginTop: "0.55rem",
+                                padding: "0.2rem 0.6rem",
+                                opacity: 0.85,
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                              }}
+                              title="Click to skip forward to this phrase"
+                            >
+                              <span style={{ color: isDark ? "#c084fc" : "#7c3aed", fontWeight: 700, marginRight: "0.35rem" }}>Next &rarr;</span>
+                              {nextCue.text}
+                            </div>
+                          )}
+
+                          {/* Bottom Navigation & Controls */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.95rem", paddingTop: "0.65rem", borderTop: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid #e2e8f0", flexWrap: "wrap", gap: "0.5rem" }}>
+                            <div style={{ display: "flex", gap: "0.4rem" }}>
+                              <button
+                                type="button"
+                                disabled={!prevCue}
+                                onClick={() => prevCue && seekToCue(prevCue.start)}
+                                style={{
+                                  background: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                                  color: prevCue ? (isDark ? "#e2e8f0" : "#1e293b") : (isDark ? "#475569" : "#94a3b8"),
+                                  border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #cbd5e1",
+                                  borderRadius: 8, padding: "3px 8px",
+                                  fontSize: "0.72rem", fontWeight: 600, cursor: prevCue ? "pointer" : "not-allowed",
+                                }}
+                              >
+                                ◀ Prev Line
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!nextCue}
+                                onClick={() => nextCue && seekToCue(nextCue.start)}
+                                style={{
+                                  background: isDark ? "rgba(255,255,255,0.06)" : "#f1f5f9",
+                                  color: nextCue ? (isDark ? "#e2e8f0" : "#1e293b") : (isDark ? "#475569" : "#94a3b8"),
+                                  border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #cbd5e1",
+                                  borderRadius: 8, padding: "3px 8px",
+                                  fontSize: "0.72rem", fontWeight: 600, cursor: nextCue ? "pointer" : "not-allowed",
+                                }}
+                              >
+                                Next Line ▶
+                              </button>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <button
+                                type="button"
+                                onClick={() => seekToCue(0)}
+                                style={{
+                                  background: "transparent",
+                                  color: isDark ? "#94a3b8" : "#64748b",
+                                  border: "none", fontSize: "0.72rem", cursor: "pointer",
+                                  textDecoration: "underline",
+                                }}
+                              >
+                                ↺ Restart Audio
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowPreviewScript(false);
+                                  try { localStorage.setItem("speakshine_show_script", "false"); } catch {}
+                                }}
+                                style={{
+                                  background: "transparent",
+                                  color: isDark ? "#94a3b8" : "#64748b",
+                                  border: "none", fontSize: "0.72rem", cursor: "pointer",
+                                  textDecoration: "underline",
+                                }}
+                              >
+                                Hide Script ✕
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1917,6 +2257,26 @@ export default function VideoAnalysis() {
                       letterSpacing: "-0.012em",
                     }}>
                       {todayQuestion?.question || (isMonthlyGoals ? "Record a video detailing your personal learning milestones, dreams, and specific goals for this month." : isMonthlyReflection ? "Answer all monthly reflection questions below to assess your growth and learning progress." : "What's on your mind today? Share your thoughts clearly.")}
+                    </div>
+                  )}
+
+                  {qType === "story_audio" && (todayQuestion?.summaryGuide || todayQuestion?.todaySummaryGuide) && (
+                    <div style={{
+                      marginTop: "0.85rem",
+                      fontSize: "0.84rem",
+                      color: isDark ? "#c084fc" : "#7c3aed",
+                      background: isDark ? "rgba(167, 139, 250, 0.08)" : "#f5f3ff",
+                      border: isDark ? "1px solid rgba(167, 139, 250, 0.25)" : "1px solid #ddd6fe",
+                      borderRadius: 10,
+                      padding: "0.75rem 1rem",
+                      lineHeight: 1.55,
+                    }}>
+                      <div style={{ fontWeight: 800, marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        <span>🎯</span> Key Story Elements to Include in Summary:
+                      </div>
+                      <div style={{ color: isDark ? "#e2e8f0" : "#334155", fontSize: "0.82rem", whiteSpace: "pre-line" }}>
+                        {todayQuestion?.summaryGuide || todayQuestion?.todaySummaryGuide}
+                      </div>
                     </div>
                   )}
 
@@ -7544,11 +7904,13 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
             <div style={{ padding: "0 1.25rem 1rem", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Active Speech Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  label: bd.isOffTopic
+                    ? `🚫 Active Speech Match (0% script match${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s unrelated speech` : ""})`
+                    : `⏱️ Active Speech Match (${bd.durationMatchPercent ?? Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100)}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
-                  color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6",
-                  subtext: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "≥85% Full Score" : "Effort Proportional",
+                  color: bd.isOffTopic ? "#ef4444" : (((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "#10b981" : "#f472b6"),
+                  subtext: bd.isOffTopic ? "Script Mismatch" : (((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch) ? "≥85% Full Score" : "Effort Proportional"),
                 },
                 {
                   label: `🗣️ Delivery, Rhythm & Fluency`,
@@ -7571,7 +7933,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
                 }] : []),
               ] : isPictureBd ? [
                 { label: `🗣️ Communication`, earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
-                { label: `🧠 Content & Relevance`,      earned: bd.content       || 0, max: bd.maxContent       || 25, color: "#a78bfa" },
+                { label: bd.isOffTopic ? `🚫 Content & Relevance` : `🧠 Content & Relevance`, earned: bd.content || 0, max: bd.maxContent || 25, color: bd.isOffTopic ? "#ef4444" : "#a78bfa", subtext: bd.isOffTopic ? "Off-Topic" : undefined },
                 { label: `🎯 Target Expressions`,       earned: bd.vocabulary    || 0, max: bd.maxVocabulary    || 20, color: "#34d399" },
                 { label: `⏱️ Duration`,                 earned: bd.duration      || 0, max: bd.maxDuration      || 20, color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
@@ -7590,7 +7952,7 @@ function ReportView({ analysis: a, expiresAt, formatTimeRemaining, videoUrl, rep
               ] : [
                 { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || (isStoryBd ? 20 : 30), color: "#60a5fa" },
                 { label: "🎯 Expressions used", earned: bd.vocabUsed || 0, max: bd.maxVocab   || (isStoryBd ? 20 : 30), color: "#a78bfa" },
-                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "📖 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || (isStoryBd ? 25 : 15), color: "#34d399" }] : []),
+                ...(!bd.isSpecialDay ? [{ label: bd.isOffTopic ? (isStoryBd ? "🚫 Story relevance" : "🚫 Topic relevance") : (isStoryBd ? "📖 Story relevance" : "🎯 Topic relevance"), earned: bd.topic || 0, max: bd.maxTopic || (isStoryBd ? 25 : 15), color: bd.isOffTopic ? "#ef4444" : "#34d399", subtext: bd.isOffTopic ? "Off-Topic" : undefined }] : []),
                 { label: "🗣️ Communication", earned: bd.comm     || 0, max: bd.maxComm    || (bd.isSpecialDay ? 25 : (isStoryBd ? 20 : 10)), color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",

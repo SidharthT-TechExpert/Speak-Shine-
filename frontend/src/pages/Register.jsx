@@ -466,7 +466,7 @@ export default function Register() {
             }}>
               Your account is <strong style={{ color: "#a78bfa" }}>awaiting admin approval</strong>.<br />
               You'll be able to log in once an admin reviews your request.<br />
-              <span style={{ fontSize: "0.75rem", color: "#55557a" }}>Requests expire after 24 hours if not reviewed.</span>
+              <span style={{ fontSize: "0.75rem", color: "#818cf8" }}>The admin has been notified directly via WhatsApp and will review your request.</span>
             </div>
             <button className="btn-primary" style={{ width: "100%" }} onClick={() => navigate("/login")}>
               Go to Login →

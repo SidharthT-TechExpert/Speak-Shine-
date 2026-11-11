@@ -383,11 +383,13 @@ function DetailedReport({ a, challengeType, isDark: propIsDark }) {
             <div style={{ padding: "0 1.1rem 0.85rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {(isShadowBd ? [
                 {
-                  label: `⏱️ Active Speech Match (${bd.durationMatchPercent ?? (bd.speechRatio != null ? `${bd.speechRatio}% speaking` : Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100))}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
+                  label: bd.isOffTopic
+                    ? `🚫 Active Speech Match (0% script match${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s unrelated speech` : ""})`
+                    : `⏱️ Active Speech Match (${bd.durationMatchPercent ?? (bd.speechRatio != null ? `${bd.speechRatio}% speaking` : Math.round(((bd.spokenDurationSeconds || bd.userDuration || 0) / (bd.targetDuration || 60)) * 100))}%${bd.spokenDurationSeconds ? ` · ~${bd.spokenDurationSeconds}s spoken` : ""})`,
                   earned: bd.length || 0,
                   max: bd.maxLength || 40,
-                  color: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch || (bd.length || 0) >= 40) ? "#10b981" : "#f472b6",
-                  subtext: ((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch || (bd.length || 0) >= 40) ? "≥85% Full Score" : "Effort Proportional",
+                  color: bd.isOffTopic ? "#ef4444" : (((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch || (bd.length || 0) >= 40) ? "#10b981" : "#f472b6"),
+                  subtext: bd.isOffTopic ? "Script Mismatch" : (((bd.durationMatchRatio ?? 0) >= 0.85 || bd.isEightyFivePercentMatch || (bd.length || 0) >= 40) ? "≥85% Full Score" : "Effort Proportional"),
                 },
                 {
                   label: "🗣️ Delivery, Rhythm & Fluency",
@@ -410,8 +412,8 @@ function DetailedReport({ a, challengeType, isDark: propIsDark }) {
                 }] : []),
               ] : isPictureBd ? [
                 { label: "🗣️ Communication", earned: bd.communication || 0, max: bd.maxCommunication || 20, color: "#60a5fa" },
-                { label: "🧠 Content & Relevance", earned: bd.content || 0, max: bd.maxContent || 35, color: "#a78bfa" },
-                { label: "📚 Vocabulary", earned: bd.vocabulary || 0, max: bd.maxVocabulary || 10, color: "#34d399" },
+                { label: bd.isOffTopic ? "🚫 Content & Relevance" : "🧠 Content & Relevance", earned: bd.content || 0, max: bd.maxContent || 25, color: bd.isOffTopic ? "#ef4444" : "#a78bfa", subtext: bd.isOffTopic ? "Off-Topic" : undefined },
+                { label: "📚 Vocabulary", earned: bd.vocabulary || 0, max: bd.maxVocabulary || 20, color: "#34d399" },
                 { label: "⏱️ Duration", earned: bd.duration || 0, max: bd.maxDuration || 20, color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",
@@ -427,10 +429,10 @@ function DetailedReport({ a, challengeType, isDark: propIsDark }) {
                     : `${bd.growthDelta.toFixed(1)} vs baseline`,
                 }] : []),
               ] : [
-                { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || 30, color: "#60a5fa" },
-                { label: "📚 Vocab used", earned: bd.vocabUsed || 0, max: bd.maxVocab || 30, color: "#a78bfa" },
-                ...(!bd.isSpecialDay ? [{ label: isStoryBd ? "🎯 Story relevance" : "🎯 Topic relevance", earned: bd.topic || 0, max: bd.maxTopic || 15, color: "#34d399" }] : []),
-                { label: "🗣️ Communication", earned: bd.comm || 0, max: bd.maxComm || (bd.isSpecialDay ? 25 : 10), color: "#fbbf24" },
+                { label: bd.speechRatio != null ? `⏱️ Duration (${bd.speechRatio}% speaking)` : "⏱️ Duration", earned: bd.length || 0, max: bd.maxLength || (isStoryBd ? 20 : 30), color: "#60a5fa" },
+                { label: "📚 Vocab used", earned: bd.vocabUsed || 0, max: bd.maxVocab || (isStoryBd ? 20 : 30), color: "#a78bfa" },
+                ...(!bd.isSpecialDay ? [{ label: bd.isOffTopic ? (isStoryBd ? "🚫 Story relevance" : "🚫 Topic relevance") : (isStoryBd ? "🎯 Story relevance" : "🎯 Topic relevance"), earned: bd.topic || 0, max: bd.maxTopic || (isStoryBd ? 25 : 15), color: bd.isOffTopic ? "#ef4444" : "#34d399", subtext: bd.isOffTopic ? "Off-Topic" : undefined }] : []),
+                { label: "🗣️ Communication", earned: bd.comm || 0, max: bd.maxComm || (bd.isSpecialDay ? 25 : (isStoryBd ? 20 : 10)), color: "#fbbf24" },
                 ...(bd.growth != null || bd.maxGrowth != null ? [{
                   label: "🌱 Personal Growth",
                   earned: bd.growth || 0,

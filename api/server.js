@@ -393,6 +393,13 @@ app.use("/api/mcp", mcpRoutes);
 console.log("[Routes] MCP routes mounted at /api/mcp");
 app.use("/api", openapiRoutes);
 
+// Serve local static story & shadowing audio
+const publicAudioDir = path.join(__dirname, "../frontend/public");
+if (fs.existsSync(publicAudioDir)) {
+  app.use("/story-audio", express.static(path.join(publicAudioDir, "story-audio")));
+  app.use("/shadowing", express.static(path.join(publicAudioDir, "shadowing")));
+}
+
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 
 // ── Global Error Handler ─────────────────────────────────────────────────────

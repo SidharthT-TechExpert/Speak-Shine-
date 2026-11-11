@@ -324,6 +324,380 @@ export function calculateGrowthScore({ currentCommScore = 5, history = [] }) {
   };
 }
 
+const SHADOWING_STOP_WORDS = new Set([
+  "the", "and", "a", "an", "is", "in", "it", "its", "to", "of", "for", "on", "with", "as", "at", "by",
+  "this", "that", "these", "those", "i", "you", "your", "we", "our", "they", "their", "them",
+  "he", "his", "him", "she", "her", "hers", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "can", "may", "might", "must",
+  "not", "no", "nor", "but", "or", "so", "yet", "if", "when", "what", "which", "who", "whom", "whose", "why", "how", "where", "while",
+  "all", "any", "both", "each", "few", "more", "most", "other", "another", "some", "such", "than", "too", "very", "just",
+  "into", "from", "about", "out", "up", "down", "over", "under", "again", "then", "once", "here", "there",
+  "also", "because", "even", "well", "really", "only", "own", "same", "one", "two",
+  "make", "made", "get", "got", "take", "took", "give", "gave", "say", "said", "tell", "told",
+  "think", "thought", "know", "knew", "see", "saw", "want", "like", "look", "go", "going", "went", "come", "came",
+  "time", "day", "way", "thing", "things", "good", "better", "best", "right", "new", "first", "people", "me", "my", "us",
+  "much", "many", "feel", "try", "work", "life", "every",
+]);
+
+const META_SHADOWING_PATTERNS = [
+  { re: /\bwhat is shadowing\b/i, weight: 2 },
+  { re: /\badvantages?\b.*\bdisadvantages?\b/i, weight: 3 },
+  { re: /\bdisadvantages?\b/i, weight: 2 },
+  { re: /\badvantages? of (this|the|shadowing)\b/i, weight: 2 },
+  { re: /\buses? of (this|the) (task|activity|shadowing)\b/i, weight: 2 },
+  { re: /\bmeaning of (this|the) (task|activity|shadowing)\b/i, weight: 2 },
+  { re: /\bthis (task|activity) is about\b/i, weight: 2 },
+  { re: /\bshadowing is (a|an|one of|very|really|the)\b/i, weight: 2 },
+  { re: /\bshadowing (technique|method|activity|practice|exercise) (is|helps|can|makes)\b/i, weight: 2 },
+  { re: /\bshadowing makes me\b/i, weight: 2 },
+  { re: /\bi believe shadowing\b/i, weight: 2 },
+  { re: /\blearning english is\b/i, weight: 1 },
+  { re: /\bmy aim is to speak\b/i, weight: 1 },
+  { re: /\bachieve my communication goals\b/i, weight: 1 },
+  { re: /\b(hi|hello) everyone\b.*\b(share|talk|discuss|explain|speak)\b/i, weight: 1 },
+  { re: /\btoday i would like to (share|talk|speak|discuss|explain)\b/i, weight: 2 },
+];
+
+/**
+ * Evaluates whether a student's spoken transcript actually shadowed the assigned
+ * reference script, or whether they spoke unrelated content / talked about shadowing.
+ */
+/**
+ * Canonical daily challenge type resolution from Status + optional saved report challengeType.
+ * Ensures explicit todayContentType / challengeType always takes precedence over stale day flags.
+ */
+export function resolveDayContentFlags(status = null, challengeType = null) {
+  if (challengeType === "story_summary") return { isStory: true, isPicture: false, isShadowing: false };
+  if (challengeType === "picture_description") return { isStory: false, isPicture: true, isShadowing: false };
+  if (challengeType === "shadowing_video") return { isStory: false, isPicture: false, isShadowing: true };
+  if (challengeType === "normal") return { isStory: false, isPicture: false, isShadowing: false };
+
+  const ct = status?.todayContentType || null;
+  const hasExplicitSpecialType =
+    ct === "story_audio" || ct === "picture_description" || ct === "shadowing_video";
+  return {
+    isStory: ct === "story_audio" || (!hasExplicitSpecialType && Boolean(status?.isStorySummaryDay)),
+    isPicture: ct === "picture_description" || (!hasExplicitSpecialType && Boolean(status?.isPictureDescriptionDay)),
+    isShadowing: ct === "shadowing_video" || (!hasExplicitSpecialType && Boolean(status?.isShadowingDay)),
+  };
+}
+
+export function evaluateShadowingMatch(userTranscript, refTranscript = null) {
+  const userStr = typeof userTranscript === "string" ? userTranscript.trim() : "";
+  const refStr = typeof refTranscript === "string" ? refTranscript.trim() : "";
+
+  if (userStr.length < 20) {
+    return {
+      isMatch: true,
+      isStrongMatch: false,
+      hasRefTranscript: refStr.length > 30,
+      userContentPrecision: null,
+      refContentCoverage: null,
+      trigramHits: 0,
+      contentBigramHits: 0,
+      metaScore: 0,
+      reason: null,
+    };
+  }
+
+  const normalize = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const cleanUser = normalize(userStr);
+  const cleanRef = refStr ? normalize(refStr) : "";
+
+  // Detect meta-commentary about shadowing/speaking tasks (excluding patterns present in reference script)
+  let metaScore = 0;
+  for (const { re, weight } of META_SHADOWING_PATTERNS) {
+    if (re.test(cleanUser) && (!cleanRef || !re.test(cleanRef))) {
+      metaScore += weight;
+    }
+  }
+
+  if (refStr.length > 30) {
+    const allWords = (t) => normalize(t).split(" ").filter(w => w.length >= 2);
+    const contentTokens = (t) => normalize(t).split(" ").filter(w => w.length > 2 && !SHADOWING_STOP_WORDS.has(w));
+
+    const refAll = allWords(refStr);
+    const userAll = allWords(userStr);
+    const refContent = contentTokens(refStr);
+    const userContent = contentTokens(userStr);
+    const refContentSet = new Set(refContent);
+    const userContentSet = new Set(userContent);
+
+    if (refContentSet.size >= 6 && userContent.length >= 6) {
+      const matchedUserContent = userContent.filter(w => refContentSet.has(w)).length;
+      const userContentPrecision = matchedUserContent / userContent.length;
+      const uniqueMatchedRef = [...refContentSet].filter(w => userContentSet.has(w)).length;
+      const refContentCoverage = uniqueMatchedRef / refContentSet.size;
+
+      // Exact 3-word phrase shingles (must contain at least 1 meaningful content word)
+      const refTrigrams = new Set();
+      for (let i = 0; i <= refAll.length - 3; i++) {
+        const w1 = refAll[i], w2 = refAll[i + 1], w3 = refAll[i + 2];
+        if (!SHADOWING_STOP_WORDS.has(w1) || !SHADOWING_STOP_WORDS.has(w2) || !SHADOWING_STOP_WORDS.has(w3)) {
+          refTrigrams.add(`${w1} ${w2} ${w3}`);
+        }
+      }
+      const matchedTrigrams = new Set();
+      for (let i = 0; i <= userAll.length - 3; i++) {
+        const tri = `${userAll[i]} ${userAll[i + 1]} ${userAll[i + 2]}`;
+        if (refTrigrams.has(tri)) matchedTrigrams.add(tri);
+      }
+
+      // Consecutive content-word pairs (tolerant to dropped glue words in STT)
+      const refContentBigrams = new Set();
+      for (let i = 0; i <= refContent.length - 2; i++) {
+        refContentBigrams.add(`${refContent[i]} ${refContent[i + 1]}`);
+      }
+      const matchedContentBigrams = new Set();
+      for (let i = 0; i <= userContent.length - 2; i++) {
+        const bi = `${userContent[i]} ${userContent[i + 1]}`;
+        if (refContentBigrams.has(bi)) matchedContentBigrams.add(bi);
+      }
+
+      const trigramHits = matchedTrigrams.size;
+      const contentBigramHits = matchedContentBigrams.size;
+
+      let isMatch = true;
+      let reason = null;
+
+      if (metaScore >= 3 && trigramHits < 3 && userContentPrecision < 0.30) {
+        isMatch = false;
+        reason = "Your speech did not match today's assigned shadowing reference script — you explained or discussed the shadowing activity instead of mirroring the native speaker's words aloud.";
+      } else if (userContent.length >= 20) {
+        const hasEnoughWords = userContentPrecision >= 0.20;
+        const hasPhraseSequence = trigramHits >= 2 || contentBigramHits >= 3 || (userContentPrecision >= 0.30 && refContentCoverage >= 0.18);
+        if (!hasEnoughWords || !hasPhraseSequence) {
+          isMatch = false;
+          reason = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
+        }
+      } else {
+        if (userContentPrecision < 0.22 && trigramHits === 0 && contentBigramHits < 2) {
+          isMatch = false;
+          reason = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
+        }
+      }
+
+      const isStrongMatch = isMatch && userContentPrecision >= 0.32 && (trigramHits >= 2 || contentBigramHits >= 3) && metaScore < 3;
+      return {
+        isMatch,
+        isStrongMatch,
+        hasRefTranscript: true,
+        userContentPrecision: Math.round(userContentPrecision * 1000) / 1000,
+        refContentCoverage: Math.round(refContentCoverage * 1000) / 1000,
+        trigramHits,
+        contentBigramHits,
+        metaScore,
+        reason,
+      };
+    }
+  }
+
+  // Fallback when reference transcript is absent (e.g. historical re-evaluation after daily reset)
+  if (metaScore >= 2) {
+    return {
+      isMatch: false,
+      isStrongMatch: false,
+      hasRefTranscript: false,
+      userContentPrecision: null,
+      refContentCoverage: null,
+      trigramHits: 0,
+      contentBigramHits: 0,
+      metaScore,
+      reason: "Your speech did not match today's assigned shadowing reference script — you explained or discussed the shadowing activity instead of mirroring the native speaker's words aloud.",
+    };
+  }
+
+  return {
+    isMatch: true,
+    isStrongMatch: false,
+    hasRefTranscript: false,
+    userContentPrecision: null,
+    refContentCoverage: null,
+    trigramHits: 0,
+    contentBigramHits: 0,
+    metaScore,
+    reason: null,
+  };
+}
+
+const STORY_STOP_WORDS = new Set([
+  ...SHADOWING_STOP_WORDS,
+  "story", "stories", "tale", "fable", "summary", "summarize", "moral", "lesson",
+  "character", "characters", "once", "upon", "time", "said", "told", "asked", "replied",
+  "went", "came", "made", "took", "gave", "got", "saw", "looked", "felt", "wanted",
+  "decided", "started", "began", "finally", "eventually", "suddenly", "always", "never",
+  "people", "person", "someone", "everyone", "something", "anything", "everything",
+  "nothing", "good", "great", "little", "small", "big", "long", "many", "much", "well",
+  "even", "still", "also", "then", "first", "last", "next", "after", "before", "another",
+]);
+
+const PICTURE_VISUAL_CUES = new Set([
+  "background", "foreground", "left", "right", "middle", "center", "centre", "corner",
+  "top", "bottom", "front", "behind", "beside", "next", "near", "wearing", "dressed",
+  "standing", "sitting", "seated", "holding", "looking", "smiling", "laughing", "walking",
+  "running", "playing", "working", "talking", "pointing", "person", "people", "man", "men",
+  "woman", "women", "boy", "girl", "child", "children", "family", "group", "crowd",
+  "face", "eyes", "hair", "hand", "hands", "clothes", "shirt", "jacket", "dress",
+  "room", "indoor", "indoors", "outdoor", "outdoors", "outside", "inside", "street",
+  "road", "building", "house", "tree", "trees", "sky", "clouds", "sun", "sunny",
+  "sunset", "water", "river", "ocean", "sea", "mountain", "mountains", "grass", "table",
+  "chair", "window", "door", "light", "bright", "dark", "color", "colors", "colour",
+  "blue", "red", "green", "yellow", "white", "black", "brown", "orange", "visible",
+  "seems", "looks", "appear", "appears", "depicts", "shows", "scene", "setting", "mood",
+]);
+
+/**
+ * Deterministic off-topic & task-meta verification for non-shadowing categories
+ * (Story Summary, Picture Description, Daily Topic).
+ * Prevents fallback scoring or lenient AI passes from rewarding essays ABOUT the task
+ * or completely unrelated stories.
+ */
+export function evaluateCategoryOffTopic(userTranscript, opts = {}) {
+  const {
+    challengeType = null,
+    questionTopic = null,
+    questionText = null,
+    storyTranscript = null,
+    summaryGuide = null,
+    imageScene = null,
+    imageInstructions = null,
+    targetVideoTranscript = null,
+    vocabularyUsedCount = 0,
+  } = opts || {};
+
+  if (challengeType === "shadowing_video") {
+    const m = evaluateShadowingMatch(userTranscript, targetVideoTranscript || questionText);
+    return { isMatch: m.isMatch, reason: m.reason, metaScore: m.metaScore || 0 };
+  }
+
+  const userStr = typeof userTranscript === "string" ? userTranscript.trim() : "";
+  if (userStr.length < 25) {
+    return { isMatch: true, reason: null, metaScore: 0 };
+  }
+
+  if (challengeType === "monthly_reflection" || challengeType === "monthly_goals" || challengeType === "weekly_reflection") {
+    return { isMatch: true, reason: null, metaScore: 0 };
+  }
+
+  const normalize = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const cleanUser = normalize(userStr);
+
+  if (challengeType === "story_summary") {
+    const refRaw = [storyTranscript, summaryGuide, questionTopic].filter(Boolean).join(" ");
+    const cleanRef = normalize(refRaw);
+    const storyMetaPatterns = [
+      { re: /\b(story\s*summary|summarizing\s+(a\s+)?stor(y|ies)|story\s*retelling)\s+(task|activity|exercise|is|helps|improves|builds|teaches|makes)\b/i, weight: 2 },
+      { re: /\b(what|about|meaning of|purpose of|uses? of)\s+(is\s+)?(the\s+)?(story\s*summary|summarizing\s+(a\s+)?stor(y|ies))\b/i, weight: 2 },
+      { re: /\badvantages?\b.*\bdisadvantages?\b.*\b(story|summar|task|activity|exercise)\b/i, weight: 2 },
+      { re: /\b(hi|hello) everyone\b.*\b(share|talk|discuss|explain|speak)\b.*\b(story\s*summary|task|activity)\b/i, weight: 1 },
+      { re: /\btoday i (would like to|want to)\s+(explain|share|talk about|discuss)\s+(what|about|why|the uses of)?\s*(story\s*summary|this\s+(story|task|activity))\b/i, weight: 2 },
+    ];
+    let metaScore = 0;
+    for (const { re, weight } of storyMetaPatterns) {
+      if (re.test(cleanUser) && (!cleanRef || !re.test(cleanRef))) metaScore += weight;
+    }
+
+    const stem = (w) => (w.length >= 6 ? w.slice(0, 5) : w);
+    const tokenizeStems = (t) =>
+      normalize(t)
+        .split(" ")
+        .filter((w) => w.length >= 4 && !STORY_STOP_WORDS.has(w))
+        .map(stem);
+
+    const storyRefOnly = normalize([storyTranscript, summaryGuide].filter(Boolean).join(" "));
+    const refStemsList = storyRefOnly.length > 40 ? tokenizeStems(storyRefOnly) : [];
+    const refStemSet = new Set(refStemsList);
+    const userStemsList = tokenizeStems(cleanUser);
+    const uniqueMatchedStems = new Set(userStemsList.filter((st) => refStemSet.has(st))).size;
+    const matchedUserStems = userStemsList.filter((st) => refStemSet.has(st)).length;
+    const precision = userStemsList.length > 0 ? matchedUserStems / userStemsList.length : 0;
+
+    if (refStemSet.size >= 15 && userStemsList.length >= 18) {
+      if (metaScore >= 2 && uniqueMatchedStems < 4) {
+        return {
+          isMatch: false,
+          reason: "Submission is off-topic: you explained or discussed the story summary task instead of retelling today's assigned audio story.",
+          metaScore,
+        };
+      }
+      if (uniqueMatchedStems <= 1 || (uniqueMatchedStems <= 2 && precision < 0.04)) {
+        return {
+          isMatch: false,
+          reason: "Submission is off-topic and does not summarize today's audio story.",
+          metaScore,
+        };
+      }
+    } else if (metaScore >= 2 && uniqueMatchedStems < 2) {
+      return {
+        isMatch: false,
+        reason: "Submission is off-topic: you discussed the story summary task instead of summarizing today's audio story.",
+        metaScore,
+      };
+    }
+    return { isMatch: true, reason: null, metaScore };
+  }
+
+  if (challengeType === "picture_description") {
+    const cleanInstr = normalize([imageInstructions, questionText].filter(Boolean).join(" "));
+    const picMetaPatterns = [
+      { re: /\b(picture|image|photo)\s*description\s+(task|activity|exercise|is|helps|improves|builds|teaches|means|one of)\b/i, weight: 2 },
+      { re: /\b(what|about|meaning of|purpose of|uses? of)\s+(is\s+)?(the\s+)?(picture|image|photo)\s*description\b/i, weight: 2 },
+      { re: /\bdescribing\s+(a\s+)?(picture|image|photo)\s+(is|helps|improves|builds|teaches|one of)\b/i, weight: 2 },
+      { re: /\badvantages?\b.*\bdisadvantages?\b.*\b(picture|image|photo|describ|task|activity|exercise)\b/i, weight: 2 },
+      { re: /\b(hi|hello) everyone\b.*\b(share|talk|discuss|explain|speak)\b.*\b(picture\s*description|image\s*description|task|activity)\b/i, weight: 1 },
+      { re: /\btoday i (would like to|want to)\s+(explain|share|talk about|discuss)\s+(what|about|why|the uses of)?\s*(picture\s*description|image\s*description|this\s+(task|activity))\b/i, weight: 2 },
+    ];
+    let metaScore = 0;
+    for (const { re, weight } of picMetaPatterns) {
+      if (re.test(cleanUser) && (!cleanInstr || !re.test(cleanInstr))) metaScore += weight;
+    }
+    const strippedUser = cleanUser.replace(/\b(picture|image|photo)\s*description\b/g, " ");
+    const sceneWords = new Set(
+      normalize([imageScene, questionTopic].filter(Boolean).join(" "))
+        .split(" ")
+        .filter((w) => w.length >= 4 && !SHADOWING_STOP_WORDS.has(w))
+    );
+    const userTokens = strippedUser.split(" ").filter(Boolean);
+    let visualHits = 0;
+    for (const w of userTokens) {
+      if (PICTURE_VISUAL_CUES.has(w) || sceneWords.has(w)) visualHits++;
+    }
+    if ((metaScore >= 2 && visualHits < 3 && vocabularyUsedCount === 0) || (metaScore >= 3 && visualHits < 2)) {
+      return {
+        isMatch: false,
+        reason: "Submission is off-topic and does not describe today's assigned image.",
+        metaScore,
+      };
+    }
+    return { isMatch: true, reason: null, metaScore };
+  }
+
+  // Daily Topic / Normal question
+  const promptCombined = [questionTopic, questionText].filter(Boolean).join(" ");
+  const promptAsksAboutSpeaking = /english|speaking|speech|communication|fluency|vocabulary|confidence|practice|task|activity|skill/i.test(promptCombined);
+  if (!promptAsksAboutSpeaking) {
+    const topicMetaPatterns = [
+      { re: /\b(this|today'?s)\s+(speaking\s+)?(task|activity|question|challenge|topic)\s+(is|helps|allows|requires|improves|makes)\b/i, weight: 2 },
+      { re: /\badvantages?\b.*\bdisadvantages?\b.*\b(this\s+)?(speaking\s+)?(task|activity|question|challenge)\b/i, weight: 2 },
+      { re: /\b(what|about|meaning of|purpose of|uses? of)\s+(is\s+)?today'?s?\s+(speaking\s+)?(task|activity|question|challenge)\b/i, weight: 2 },
+      { re: /\b(speaking\s+practice|daily\s+speaking)\s+(is\s+one\s+of\s+the\s+best|helps\s+(me|us)|improves\s+our)\b/i, weight: 2 },
+    ];
+    let metaScore = 0;
+    for (const { re, weight } of topicMetaPatterns) {
+      if (re.test(cleanUser)) metaScore += weight;
+    }
+    if (metaScore >= 2) {
+      return {
+        isMatch: false,
+        reason: "Submission is off-topic and does not answer today's question.",
+        metaScore,
+      };
+    }
+  }
+
+  return { isMatch: true, reason: null, metaScore: 0 };
+}
+
 export function calculateCompositeScore({
   durationSeconds,
   maxDurationSeconds,
@@ -335,11 +709,16 @@ export function calculateCompositeScore({
   isPictureDescription = false,
   isStorySummary = false,
   isShadowing = false,
+  challengeType: explicitChallengeType = null,
   targetVideoDuration = null,
   targetVideoTranscript = null,
+  targetStoryTranscript = null,
+  targetSummaryGuide = null,
+  targetQuestion = null,
+  targetImageScene = null,
   userHistory = [],
 }) {
-  const challengeType = analysis?.challengeType || null;
+  const challengeType = explicitChallengeType || analysis?.challengeType || null;
   const isStoryTask = Boolean(isStorySummary || challengeType === "story_summary");
 
   // ── Shadowing Video: Effort-proportional duration matching + Speech delivery ──
@@ -423,23 +802,13 @@ export function calculateCompositeScore({
     // Check if student shadowed the assigned reference text or spoke unrelated text
     const refTranscript = targetVideoTranscript || analysis.targetVideoTranscript || analysis.referenceTranscript || null;
     const userTranscript = analysis.transcription || analysis.transcriptText || analysis.text || "";
-    let isOffTopic = false;
-    let offTopicWarning = null;
-
-    if (typeof refTranscript === "string" && refTranscript.trim().length > 30 && typeof userTranscript === "string" && userTranscript.trim().length > 30) {
-      const stopWords = new Set(["the", "and", "a", "an", "is", "in", "it", "to", "of", "for", "on", "with", "as", "at", "by", "this", "that", "i", "you", "we", "they", "he", "she"]);
-      const tokenize = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
-      const refTokens = new Set(tokenize(refTranscript));
-      const userTokens = tokenize(userTranscript);
-      if (refTokens.size >= 8 && userTokens.length >= 10) {
-        const overlapCount = userTokens.filter(w => refTokens.has(w)).length;
-        const overlapRatio = overlapCount / userTokens.length;
-        if (overlapRatio < 0.10) {
-          isOffTopic = true;
-          offTopicWarning = "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.";
-        }
-      }
-    }
+    const effectiveTopicRel = typeof analysis.topicRelevance === "number" ? analysis.topicRelevance : topicRelevance;
+    const shadowingCheck = evaluateShadowingMatch(userTranscript, refTranscript);
+    const aiFlaggedOffTopic = analysis?.isOffTopic === true || (typeof effectiveTopicRel === "number" && effectiveTopicRel <= 3.5);
+    const isOffTopic = !shadowingCheck.isMatch || (!shadowingCheck.isStrongMatch && aiFlaggedOffTopic);
+    const offTopicWarning = isOffTopic
+      ? (shadowingCheck.reason || analysis?.topicFeedback || "Your speech did not match today's assigned shadowing reference script. Mirror the native speaker's words to earn full points.")
+      : null;
 
     // Exact amount of time the student actually spoke on this video
     // Spoken Seconds = Video Duration * (Speech Ratio / 100)
@@ -515,9 +884,9 @@ export function calculateCompositeScore({
     }
     let communicationScore = Math.min(60, Math.round((rhythmComponent + deliveryComponent) * 100) / 100);
     if (isOffTopic) {
-      // Off topic shadowing penalty: zero duration score and heavily penalized delivery
+      // Off-topic shadowing penalty: zero duration score and heavily penalized delivery
       durationScore = 0;
-      communicationScore = Math.min(20, Math.round(communicationScore * 0.35));
+      communicationScore = Math.min(18, Math.round(communicationScore * 0.25 * 100) / 100);
     }
 
     // 3. Personal Growth: 0 points (Waived for shadowing activity)
@@ -527,6 +896,9 @@ export function calculateCompositeScore({
     total100 = Math.min(100, Math.max(0, total100));
 
     const matchPercent = Math.round(spokenRatio * 100);
+    const effectiveMatchPercent = isOffTopic ? 0 : matchPercent;
+    const effectiveSpokenRatio = isOffTopic ? 0 : spokenRatio;
+    const achievedTargetMatch = !isOffTopic && isEightyFivePercent;
 
     return {
       score: total100,
@@ -543,20 +915,24 @@ export function calculateCompositeScore({
         maxComm:          60,
         maxVocabulary:    0,
         maxGrowth:        0,
+        targetDuration:        targetDur,
         targetDurationSeconds: targetDur,
         targetActiveSpeechSeconds: targetActiveSpeechTime,
         actualDurationSeconds: Math.round(actualDur),
         spokenDurationSeconds: Math.round(spokenSeconds),
         speechRatio:           typeof rawSpeechRatio === "number" ? Math.round(rawSpeechRatio) : null,
-        durationRatio:         matchPercent,
-        durationMatchRatio:    spokenRatio,
-        isEightyFivePercentMatch: isEightyFivePercent,
-        isNinetyPercentMatch:  isEightyFivePercent,
+        durationRatio:         effectiveMatchPercent,
+        durationMatchPercent:  effectiveMatchPercent,
+        durationMatchRatio:    effectiveSpokenRatio,
+        isEightyFivePercentMatch: achievedTargetMatch,
+        isNinetyPercentMatch:  achievedTargetMatch,
         isOffTopic,
         offTopicReason: offTopicWarning,
-        durationMessage: isEightyFivePercent
-          ? `Full duration credit awarded (${matchPercent}% active spoken time vs ${targetActiveSpeechTime}s target speech — >=85% target achieved).`
-          : `Effort credit awarded (${Math.round(spokenSeconds)}s active spoken time vs ${targetActiveSpeechTime}s target speech — aim for >=85% for full duration points).`,
+        durationMessage: isOffTopic
+          ? offTopicWarning
+          : (achievedTargetMatch
+            ? `Full duration credit awarded (${matchPercent}% active spoken time vs ${targetActiveSpeechTime}s target speech — >=85% target achieved).`
+            : `Effort credit awarded (${Math.round(spokenSeconds)}s active spoken time vs ${targetActiveSpeechTime}s target speech — aim for >=85% for full duration points).`),
         speechMultiplier: Math.round(speechMult * 100),
         growthDelta:      null,
         baselineComm:     null,
@@ -643,17 +1019,28 @@ export function calculateCompositeScore({
     // 2) AI isOffTopic was not explicitly false, AND contentRel is critically low (<= 1.5) with no target words used.
     // When the speaker matched target vocabulary from today's prompt or AI confirmed isOffTopic: false,
     // a brief or developing description is NOT off-topic (it is scored proportionally in Content & Relevance).
+    const picCheck = evaluateCategoryOffTopic(analysis?.transcription || "", {
+      challengeType: "picture_description",
+      questionTopic: analysis?.questionTopic || null,
+      questionText: targetQuestion || analysis?.targetQuestion || null,
+      imageScene: targetImageScene || analysis?.targetImageScene || null,
+      vocabularyUsedCount: usedTargetWords,
+    });
     const hasTargetVocab = usedTargetWords > 0;
-    const isOffTopic = analysis?.isOffTopic === true || (
+    const isOffTopic = !picCheck.isMatch || analysis?.isOffTopic === true || (
       analysis?.isOffTopic !== false &&
       !hasTargetVocab &&
       typeof contentRel === "number" &&
       contentRel <= 1.5
     );
+    const effectiveContentRel = !picCheck.isMatch ? Math.min(contentRel, 1.5) : contentRel;
+    const picOffTopicReason = !isOffTopic
+      ? null
+      : (picCheck.reason || analysis?.topicFeedback || "Submission is off-topic and does not describe today's assigned image.");
 
     // Content & Relevance: max 25 pts (rebalanced from 35)
     const contentBase = isOffTopic
-      ? (Math.min(contentRel, 2.5) * 0.85 + coherence * 0.15)
+      ? (Math.min(effectiveContentRel, 2.5) * 0.85 + Math.min(coherence, 3) * 0.15)
       : (coherence * 0.60 + contentRel * 0.40);
     let contentScore = (contentBase / 10) * 25;
 
@@ -674,7 +1061,7 @@ export function calculateCompositeScore({
 
     // STRICT SECURITY GATE: Off-topic submissions cannot get high scores (>50)
     if (isOffTopic) {
-      const cap = contentRel <= 2 ? 35 : 48;
+      const cap = effectiveContentRel <= 2 ? 35 : 48;
       total100 = Math.min(cap, Math.round(total100 * 0.55 * 100) / 100);
     }
     total100 = Math.min(100, Math.max(0, total100));
@@ -717,7 +1104,7 @@ export function calculateCompositeScore({
         requiredVocabWords: requiredTargetWords,
         totalVocabWords:  configuredTotalWords,
         isOffTopic,
-        offTopicReason:   isOffTopic ? "Submission is off-topic and does not describe today's assigned image." : null,
+        offTopicReason:   picOffTopicReason,
         isPictureDescription: true,
         isStorySummary: false,
         isSpecialDay: false,
@@ -827,9 +1214,20 @@ export function calculateCompositeScore({
     commScore  = (commAvg / 10) * 10;
   }
 
-  // Check if submission is off-topic or answering yesterday's / wrong question
+  // Check if submission is off-topic, explaining the task format, or unrelated to today's story/question
+  const categoryCheck = !isSpecialDay
+    ? evaluateCategoryOffTopic(analysis?.transcription || "", {
+        challengeType: isStoryTask ? "story_summary" : (challengeType || "topic"),
+        questionTopic: analysis?.questionTopic || targetQuestion || null,
+        questionText: targetQuestion || analysis?.targetQuestion || null,
+        storyTranscript: targetStoryTranscript || analysis?.targetStoryTranscript || null,
+        summaryGuide: targetSummaryGuide || analysis?.targetSummaryGuide || null,
+        vocabularyUsedCount: usedCount,
+      })
+    : { isMatch: true, reason: null };
   const hasTargetVocab = usedCount > 0;
   const isOffTopic = !isSpecialDay && (
+    !categoryCheck.isMatch ||
     analysis?.isOffTopic === true || (
       analysis?.isOffTopic !== false &&
       !hasTargetVocab &&
@@ -837,6 +1235,10 @@ export function calculateCompositeScore({
       effectiveTopicRelevance <= 1.5
     )
   );
+  if (isOffTopic && !categoryCheck.isMatch) {
+    effectiveTopicRelevance = Math.min(typeof effectiveTopicRelevance === "number" ? effectiveTopicRelevance : 1, 1.5);
+    topicScore = (Math.max(0, Math.min(10, effectiveTopicRelevance)) / 10) * maxTopic;
+  }
 
   let total100 = Math.round((lengthScore + vocabUsedScore + topicScore + commScore + growthScore) * 100) / 100;
 
@@ -884,9 +1286,9 @@ export function calculateCompositeScore({
       totalVocabWords: total,
       isOffTopic,
       offTopicReason: isOffTopic
-        ? (isStoryTask
+        ? (categoryCheck.reason || (isStoryTask
           ? "Submission is off-topic and does not summarize today's audio story."
-          : "Submission is off-topic and does not answer today's question.")
+          : "Submission is off-topic and does not answer today's question."))
         : null,
       isSpecialDay,
       isStorySummary:  isStoryTask,

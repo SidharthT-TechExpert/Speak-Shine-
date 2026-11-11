@@ -11,7 +11,7 @@ import { transcribe } from "./transcribe.js";
 import { analyzeSpeech } from "./analyzeSpeech.js";
 import { analyzeVideo } from "./analyzeVideo.js";
 import { synthesizeOverallComment, parseFeedbackToStructure } from "./webFeedbackHelpers.js";
-import { buildAnalysisSummary } from "../video/submitGate.js";
+import { buildAnalysisSummary, resolveDayContentFlags, getDurationLimits } from "../video/submitGate.js";
 import {
   withTimeout,
   startStage,
@@ -47,12 +47,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     status = await Status.findOne().lean();
     questionTopic = status?.todayTopic || null;
     questionText  = status?.todayQuestion || null;
-    const isStory = status?.todayContentType === "story_audio"
-      || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-    const isPicture = status?.todayContentType === "picture_description"
-      || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-    const isShadowing = status?.todayContentType === "shadowing_video"
-      || Boolean(status?.isShadowingDay);
+    const { isStory, isPicture, isShadowing } = resolveDayContentFlags(status);
 
     if (isShadowing) {
       if (!questionTopic) questionTopic = status?.todayTopic || "Shadowing Practice";
@@ -109,7 +104,11 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
       console.log(`[VideoProcessor] Detected duration from file: ${duration}s (took ${Date.now() - detectStart}ms)`);
     }
 
-    if (duration < 60) throw new Error(`Video is too short (${duration}s). Minimum is 1 minute.`);
+    const minCheckFlags = resolveDayContentFlags(status);
+    const minDurLimit = minCheckFlags.isShadowing
+      ? getDurationLimits({ isShadowing: true, targetVideoDuration: status?.todayVideoDuration || null }, status || {}).minSeconds
+      : 60;
+    if (duration < minDurLimit) throw new Error(`Video is too short (${duration}s). Minimum is ${minDurLimit} seconds.`);
     // Add 5-second tolerance to account for recording timer drift (max configurable is 1200s / 20 min)
     if (duration > 1205) throw new Error(`Video is too long (${duration}s). Maximum is 20 minutes.`);
 
@@ -173,12 +172,11 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
         await onProgress("Scoring your speech…");
 
         const speechStage = startStage("analyzeSpeech");
-        const isStoryActive = status?.todayContentType === "story_audio"
-          || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
-        const isPictureActive = status?.todayContentType === "picture_description"
-          || (status?.isPictureDescriptionDay && status?.todayContentType !== "story_audio");
-        const isShadowingActive = status?.todayContentType === "shadowing_video"
-          || Boolean(status?.isShadowingDay);
+        const {
+          isStory: isStoryActive,
+          isPicture: isPictureActive,
+          isShadowing: isShadowingActive,
+        } = resolveDayContentFlags(status);
         const challengeType = isPictureActive ? "picture_description" : isStoryActive ? "story_summary" : isShadowingActive ? "shadowing_video" : null;
 
         try {
@@ -234,8 +232,20 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
     }
 
     // Stage 4: Structured analysis + calibrated overall score / tier
+    const stage4Flags = resolveDayContentFlags(status);
+    const taskMeta = {
+      questionTopic: status?.todayTopic || null,
+      targetQuestion: stage4Flags.isPicture
+        ? (status?.todayImageInstructions || status?.todayQuestion || null)
+        : (status?.todayQuestion || null),
+      targetStoryTranscript: stage4Flags.isStory ? (status?.todayStoryTranscript || null) : null,
+      targetSummaryGuide: stage4Flags.isStory ? (status?.todaySummaryGuide || null) : null,
+      targetImageScene: stage4Flags.isPicture ? (status?.todayImageSearchQuery || null) : null,
+      targetVideoDuration: stage4Flags.isShadowing ? (status?.todayVideoDuration || null) : null,
+      targetVideoTranscript: stage4Flags.isShadowing ? (status?.todayVideoTranscript || null) : null,
+    };
     const analysis = buildAnalysisSummary(
-      buildStructuredAnalysis(speechResult, visual, qualityWarning, transcription?.text || "")
+      buildStructuredAnalysis(speechResult, visual, qualityWarning, transcription?.text || "", taskMeta)
     );
 
     return { analysis, duration };
@@ -251,7 +261,7 @@ export async function processWebVideo(videoPath, displayName = "User", onProgres
  * Build structured analysis object directly from pipeline results.
  * No regex parsing needed — we have the raw objects.
  */
-function buildStructuredAnalysis(speechResult, visual, qualityWarning, transcriptText = "") {
+function buildStructuredAnalysis(speechResult, visual, qualityWarning, transcriptText = "", taskMeta = {}) {
   const s = speechResult._stats || {};
 
   return {
@@ -264,6 +274,14 @@ function buildStructuredAnalysis(speechResult, visual, qualityWarning, transcrip
     vocabulary:     speechResult.vocabulary,
     coherence:      speechResult.coherence ?? null,
     topicRelevance: speechResult.topicRelevance ?? null,
+    isOffTopic:     Boolean(speechResult.isOffTopic),
+    questionTopic:         taskMeta?.questionTopic ?? null,
+    targetQuestion:        taskMeta?.targetQuestion ?? null,
+    targetStoryTranscript: taskMeta?.targetStoryTranscript ?? null,
+    targetSummaryGuide:    taskMeta?.targetSummaryGuide ?? null,
+    targetImageScene:      taskMeta?.targetImageScene ?? null,
+    targetVideoDuration:   taskMeta?.targetVideoDuration ?? null,
+    targetVideoTranscript: taskMeta?.targetVideoTranscript ?? null,
 
     // Visual scores
     eyeContact:       visual?.eyeContact ?? null,

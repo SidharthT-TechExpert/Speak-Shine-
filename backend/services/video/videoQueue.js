@@ -11,7 +11,7 @@ import Status from "../../../models/statusSchema.js";
 import StreakRecord from "../../../models/streakRecordSchema.js";
 import { processWebVideo } from "../ai/videoProcessor.js";
 import { phoneVariants } from "../../utils/phoneVariants.js";
-import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits } from "./submitGate.js";
+import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits, resolveDayContentFlags } from "./submitGate.js";
 import { getNewStreakBadgeIds } from "../../utils/streakBadges.js";
 import fs from "fs";
 
@@ -297,11 +297,12 @@ async function processJob(job) {
     try {
       const status = await Status.findOne().lean();
       const todayVocab = status?.todayVocabulary || [];
+      const vocabDayFlags = resolveDayContentFlags(status);
       const taskType = reportMeta?.challengeType || (
         status?.isMonthlyReflectionDay ? "monthly_reflection"
-        : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
-        : (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
-        : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
+        : vocabDayFlags.isShadowing ? "shadowing_video"
+        : vocabDayFlags.isPicture ? "picture_description"
+        : vocabDayFlags.isStory ? "story_summary"
         : status?.isMonthlyGoalsDay ? "monthly_goals"
         : "topic"
       );
@@ -311,7 +312,7 @@ async function processJob(job) {
         ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
       const transcript = result.analysis?.transcription || "";
-      if (todayVocab.length > 0 && transcript) {
+      if (taskType !== "shadowing_video" && todayVocab.length > 0 && transcript) {
         vocabularyUsed = matchVocabularyInTranscript(transcript, todayVocab, result.analysis);
         const requiredCount = Math.min(
           configuredRequiredCount,
@@ -329,19 +330,38 @@ async function processJob(job) {
     let compositeScore = null;
     let challengeType = reportMeta?.challengeType || null;
     let gateFlags = null;
+    let resolvedTargetDuration = null;
+    let resolvedTargetTranscript = null;
+    let resolvedQuestionTopic = null;
+    let resolvedTargetQuestion = null;
+    let resolvedStoryTranscript = null;
+    let resolvedSummaryGuide = null;
+    let resolvedImageScene = null;
+    let resolvedTargetVocabulary = null;
     try {
       const [status, userDoc] = await Promise.all([
         Status.findOne().lean(),
         User.findOne({ phone }).lean(),
       ]);
+      const dayFlags = resolveDayContentFlags(status);
       challengeType = challengeType || (
         status?.isMonthlyReflectionDay ? "monthly_reflection"
-        : (status?.todayContentType === "shadowing_video" || status?.isShadowingDay) ? "shadowing_video"
-        : (status?.todayContentType === "picture_description" || status?.isPictureDescriptionDay) ? "picture_description"
-        : (status?.todayContentType === "story_audio" || status?.isStorySummaryDay) ? "story_summary"
+        : dayFlags.isShadowing ? "shadowing_video"
+        : dayFlags.isPicture ? "picture_description"
+        : dayFlags.isStory ? "story_summary"
         : status?.isMonthlyGoalsDay ? "monthly_goals"
         : "topic"
       );
+      resolvedTargetDuration = result.analysis?.targetVideoDuration || status?.todayVideoDuration || null;
+      resolvedTargetTranscript = result.analysis?.targetVideoTranscript || status?.todayVideoTranscript || null;
+      resolvedQuestionTopic = result.analysis?.questionTopic || status?.todayTopic || null;
+      resolvedTargetQuestion = result.analysis?.targetQuestion || (challengeType === "picture_description" ? (status?.todayImageInstructions || status?.todayQuestion) : status?.todayQuestion) || null;
+      resolvedStoryTranscript = result.analysis?.targetStoryTranscript || status?.todayStoryTranscript || null;
+      resolvedSummaryGuide = result.analysis?.targetSummaryGuide || status?.todaySummaryGuide || null;
+      resolvedImageScene = result.analysis?.targetImageScene || status?.todayImageSearchQuery || null;
+      resolvedTargetVocabulary = challengeType !== "shadowing_video" && Array.isArray(status?.todayVocabulary) && status.todayVocabulary.length > 0
+        ? status.todayVocabulary
+        : null;
       gateFlags = {
         isMonthlyReflection: challengeType === "monthly_reflection",
         isWeeklyReflection:  challengeType === "weekly_reflection" || Boolean(status?.isWeeklyReflectionDay),
@@ -349,6 +369,7 @@ async function processJob(job) {
         isStorySummary:      challengeType === "story_summary",
         isPictureDescription: challengeType === "picture_description",
         isShadowing:          challengeType === "shadowing_video",
+        targetVideoDuration: resolvedTargetDuration,
       };
       const { fullScoreSeconds } = getDurationLimits(gateFlags, status || {});
       const todayVocab = status?.todayVocabulary || [];
@@ -376,8 +397,13 @@ async function processJob(job) {
         isPictureDescription: gateFlags.isPictureDescription || false,
         isStorySummary:     gateFlags.isStorySummary || false,
         isShadowing:        gateFlags.isShadowing || false,
-        targetVideoDuration: status?.todayVideoDuration || 60,
-        targetVideoTranscript: status?.todayVideoTranscript || null,
+        challengeType,
+        targetVideoDuration: resolvedTargetDuration || 60,
+        targetVideoTranscript: resolvedTargetTranscript || null,
+        targetStoryTranscript: resolvedStoryTranscript,
+        targetSummaryGuide: resolvedSummaryGuide,
+        targetQuestion: resolvedTargetQuestion || resolvedQuestionTopic,
+        targetImageScene: resolvedImageScene,
         userHistory:        userDoc?.feedbackScores || [],
       });
       compositeScore = score;
@@ -397,7 +423,7 @@ async function processJob(job) {
         maxVocabulary: 0,
         durationMatchPercent: breakdown.durationRatio ?? Math.round(((durationToSave || 0) / (status?.todayVideoDuration || 60)) * 100),
         durationMatchRatio: (breakdown.durationRatio ?? 0) / 100,
-        targetDuration: status?.todayVideoDuration || 60,
+        targetDuration: breakdown.targetDuration || resolvedTargetDuration || 60,
         userDuration: durationToSave || 0,
         spokenDurationSeconds: breakdown.spokenDurationSeconds ?? null,
         speechRatio: breakdown.speechRatio ?? null,
@@ -407,21 +433,8 @@ async function processJob(job) {
         isOffTopic: breakdown.isOffTopic ?? false,
         offTopicReason: breakdown.offTopicReason ?? null,
         isShadowing: true,
-      } : breakdown.isPictureDescription ? {
-        ...breakdown,
-        // Picture Description category weights for UI (Option B)
-        maxCommunication: 20,
-        maxContent:       35,
-        maxVocabulary:    10,
-        maxDuration:      20,
-        maxGrowth:        15,
       } : {
         ...breakdown,
-        maxLength:    30,
-        maxVocab:     30,
-        maxTopic:     breakdown.isSpecialDay ? 0  : 15,
-        maxComm:      breakdown.isSpecialDay ? 25 : 10,
-        maxGrowth:    15,
       };
     } catch (scoreErr) {
       console.warn("[Queue] Composite score calculation failed (non-fatal):", scoreErr.message);
@@ -447,10 +460,55 @@ async function processJob(job) {
       console.log(`[Queue] 🎉 Sunday bonus! Score doubled: ${compositeScore.toFixed(1)} → ${effectiveScore.toFixed(1)} for ${phone}`);
     }
 
+    const finalOffTopic = Boolean(
+      result.analysis?.isOffTopic || result.analysis?._scoreBreakdown?.isOffTopic
+    );
+    const savedTargetDur = gateFlags?.isShadowing
+      ? (resolvedTargetDuration || result.analysis?._scoreBreakdown?.targetDuration || null)
+      : null;
+    const savedTargetTranscript = gateFlags?.isShadowing
+      ? (resolvedTargetTranscript || null)
+      : null;
+    const resolvedChallengeType = gateFlags?.isShadowing ? "shadowing_video"
+      : gateFlags?.isMonthlyReflection ? "monthly_reflection"
+      : gateFlags?.isPictureDescription ? "picture_description"
+      : gateFlags?.isStorySummary ? "story_summary"
+      : gateFlags?.isMonthlyGoals ? "monthly_goals"
+      : "topic";
+    const savedTopicFeedback = (finalOffTopic && result.analysis?._scoreBreakdown?.offTopicReason && (!result.analysis?.topicFeedback || !result.analysis?.isOffTopic))
+      ? result.analysis._scoreBreakdown.offTopicReason
+      : result.analysis?.topicFeedback;
+    const defaultOffTopicComment = resolvedChallengeType === "shadowing_video"
+      ? "Off-topic submission: This shadowing activity requires repeating the assigned native speaker's words aloud rather than delivering a free-form speech or explaining what shadowing is. Listen to the reference audio and mirror the speaker's exact phrases."
+      : resolvedChallengeType === "story_summary"
+      ? "Off-topic submission: This story summary activity requires retelling today's assigned audio story in your own words rather than explaining the task format or speaking about an unrelated topic."
+      : resolvedChallengeType === "picture_description"
+      ? "Off-topic submission: This picture description activity requires describing the people, objects, actions, and setting visible in today's assigned image rather than speaking about unrelated topics or explaining the task."
+      : "Off-topic submission: Your speech did not address today's assigned topic or question directly. Please focus directly on today's prompt.";
+    const savedOverallComment = (finalOffTopic && (!result.analysis?.overallComment || /^You demonstrated a good speaking effort/i.test(result.analysis.overallComment) || !result.analysis?.isOffTopic))
+      ? defaultOffTopicComment
+      : result.analysis?.overallComment;
+    const savedTopicRel = finalOffTopic
+      ? Math.min(typeof result.analysis?.topicRelevance === "number" ? result.analysis.topicRelevance : 1, 2)
+      : result.analysis?.topicRelevance;
+
     await VideoReport.findByIdAndUpdate(reportId, {
       status: "completed",
+      challengeType: resolvedChallengeType,
       analysis: {
         ...result.analysis,
+        isOffTopic: finalOffTopic,
+        ...(savedTopicRel !== undefined ? { topicRelevance: savedTopicRel } : {}),
+        ...(savedTopicFeedback !== undefined ? { topicFeedback: savedTopicFeedback } : {}),
+        ...(savedOverallComment !== undefined ? { overallComment: savedOverallComment } : {}),
+        ...(resolvedQuestionTopic ? { questionTopic: resolvedQuestionTopic } : {}),
+        ...(resolvedTargetQuestion ? { targetQuestion: resolvedTargetQuestion } : {}),
+        ...(gateFlags?.isStorySummary && resolvedStoryTranscript ? { targetStoryTranscript: resolvedStoryTranscript } : {}),
+        ...(gateFlags?.isStorySummary && resolvedSummaryGuide ? { targetSummaryGuide: resolvedSummaryGuide } : {}),
+        ...(gateFlags?.isPictureDescription && resolvedImageScene ? { targetImageScene: resolvedImageScene } : {}),
+        ...(resolvedTargetVocabulary ? { targetVocabulary: resolvedTargetVocabulary } : {}),
+        ...(savedTargetDur != null ? { targetVideoDuration: savedTargetDur } : {}),
+        ...(savedTargetTranscript ? { targetVideoTranscript: savedTargetTranscript } : {}),
         vocabularyUsed,
         vocabularyScore,
         compositeScore: result.analysis._compositeScore ?? null,
@@ -458,11 +516,11 @@ async function processJob(job) {
         sundayBonus: isSundayScore,
         baseScore: compositeScore,
         bonusScore: effectiveScore,
-        challengeType: gateFlags.isShadowing ? "shadowing_video"
-          : gateFlags.isMonthlyReflection ? "monthly_reflection"
-          : gateFlags.isPictureDescription ? "picture_description"
-          : gateFlags.isStorySummary ? "story_summary"
-          : gateFlags.isMonthlyGoals ? "monthly_goals"
+        challengeType: gateFlags?.isShadowing ? "shadowing_video"
+          : gateFlags?.isMonthlyReflection ? "monthly_reflection"
+          : gateFlags?.isPictureDescription ? "picture_description"
+          : gateFlags?.isStorySummary ? "story_summary"
+          : gateFlags?.isMonthlyGoals ? "monthly_goals"
           : "topic",
       },
       ...(durationToSave ? { videoDuration: durationToSave } : {}),

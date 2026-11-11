@@ -4643,7 +4643,7 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div style={{ fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.2rem" }}>
-                Review and approve new student sign-up requests before account credentials expire.
+                Review and approve new student sign-up requests.
               </div>
             </div>
             <button
@@ -4674,8 +4674,8 @@ export default function AdminDashboard() {
           {!pendingRegsLoading && pendingRegs.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {pendingRegs.map(p => {
-                const hoursLeft = Math.max(0, Math.round((new Date(p.expiresAt) - Date.now()) / 3600000));
-                const urgent = hoursLeft < 4;
+
+
                 return (
                   <div
                     key={p.id}
@@ -4684,19 +4684,33 @@ export default function AdminDashboard() {
                       alignItems: "center",
                       gap: "1rem",
                       flexWrap: "wrap",
-                      background: urgent ? "rgba(239, 68, 68, 0.04)" : "rgba(255, 255, 255, 0.02)",
-                      border: `1px solid ${urgent ? "rgba(239, 68, 68, 0.25)" : "rgba(255, 255, 255, 0.07)"}`,
+                      background: "rgba(255, 255, 255, 0.02)",
+                      border: "1px solid rgba(255, 255, 255, 0.07)",
                       borderRadius: 14,
                       padding: "0.9rem 1.1rem",
                       boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
                     }}
                   >
-                    <div className="admin-user-avatar" style={{ background: urgent ? "linear-gradient(135deg, #f87171, #fb923c)" : "linear-gradient(135deg, #6366f1, #06b6d4)" }}>
+                    <div className="admin-user-avatar" style={{ background: "linear-gradient(135deg, #6366f1, #06b6d4)" }}>
                       {p.name[0]?.toUpperCase() || "?"}
                     </div>
 
                     <div style={{ flex: 1, minWidth: 200 }}>
-                      <div style={{ fontWeight: 700, fontSize: "0.92rem", color: "#f8fafc" }}>{p.name}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 700, fontSize: "0.92rem", color: "#f8fafc" }}>{p.name}</span>
+                        <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "rgba(99, 102, 241, 0.15)", color: "#a5b4fc", border: "1px solid rgba(99, 102, 241, 0.3)" }}>
+                          ⏳ Awaiting Approval
+                        </span>
+                        {p.referrerName ? (
+                          <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                            🤝 Referred By: {p.referrerName}
+                          </span>
+                        ) : p.referralCode ? (
+                          <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "rgba(16, 185, 129, 0.15)", color: "#6ee7b7", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                            🎟️ Ref: {p.referralCode}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="admin-user-phone-wrap" style={{ marginTop: "0.15rem" }}>
                         <span className="admin-user-phone">📱 {p.phone}</span>
                         <button
@@ -4707,10 +4721,10 @@ export default function AdminDashboard() {
                           ⎘
                         </button>
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: urgent ? "#f87171" : "var(--muted)", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                        <span>{urgent ? "⚠️" : "⏳"} Expires in {hoursLeft}h</span>
-                        <span>·</span>
-                        <span>Requested {new Date(p.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</span>
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+
+
+                        <span>Requested {new Date(p.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
                       </div>
                     </div>
 
@@ -6918,10 +6932,10 @@ export default function AdminDashboard() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.75rem" }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: "0.98rem", color: "#fff", display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                        🚀 Personal WhatsApp Deployment &amp; Crash Alerts
+                        🚀 Personal WhatsApp Deployment, Crash &amp; Registration Alerts
                       </div>
                       <p style={{ color: "var(--muted)", fontSize: "0.8rem", margin: "0.2rem 0 0" }}>
-                        Automatically receive a private WhatsApp notification on your personal phone whenever a deployment succeeds or if a server boot error occurs.
+                        Automatically receive a private WhatsApp notification on your personal phone whenever a new student registers, when a deployment succeeds, or if a server boot error occurs.
                       </p>
                     </div>
 

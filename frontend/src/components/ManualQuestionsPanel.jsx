@@ -27,10 +27,13 @@ export default function ManualQuestionsPanel() {
     videoUrl: "",
     videoDuration: 60,
     videoTranscript: "",
-    videoTitle: ""
+    videoTitle: "",
+    storyDuration: 90
   });
   const [saving, setSaving] = useState(false);
   const [generatingStory, setGeneratingStory] = useState(false);
+  const [scrapingStory, setScrapingStory] = useState(false);
+  const [storySourceMode, setStorySourceMode] = useState("scraped");
   const [generatingAudio, setGeneratingAudio] = useState(false);
   const [generatingPicture, setGeneratingPicture] = useState(false);
   const [generatingShadowing, setGeneratingShadowing] = useState(false);
@@ -171,10 +174,46 @@ export default function ManualQuestionsPanel() {
     }
   };
 
+  const handleScrapeStory = async () => {
+    setScrapingStory(true);
+    try {
+      const targetDuration = form.storyDuration || 90;
+      const res = await api.post("/questions/generate-scraped-story", { targetDuration }, {
+        timeout: 120000 // 2 minutes timeout for audio download, whisper transcribing, slicing, and LLM summary extraction
+      });
+      const { topic, title, storyTranscript, audioUrl, summaryGuide, question, duration, voiceRecommendation: vRec } = res.data;
+      setForm(f => ({
+        ...f,
+        topic: topic || title || f.topic,
+        question: question || f.question,
+        storyTranscript: storyTranscript || f.storyTranscript,
+        audioUrl: audioUrl || f.audioUrl,
+        storyDuration: duration || targetDuration,
+        summaryGuide: Array.isArray(summaryGuide) ? summaryGuide.join("\n") : summaryGuide || f.summaryGuide,
+      }));
+      const durationLabel = duration ? ` (${duration}s - Target ${targetDuration}s)` : "";
+      notify(`📻 English story sliced cleanly${durationLabel}! Intro trimmed.`);
+      if (storyTranscript) {
+        if (vRec) {
+        setVoiceRecommendation(vRec);
+        if (vRec.voiceId) setSelectedVoiceId(vRec.voiceId);
+      }
+      handleAnalyzeVoice(storyTranscript);
+      }
+    } catch (err) {
+      console.error("[ManualQuestionsPanel] Scrape story error:", err);
+      const errMsg = err.response?.data?.error || (err.code === "ECONNABORTED" ? "Request timed out while downloading and processing story audio. Please try again." : err.message) || "Story scraping failed";
+      notify(errMsg, "error");
+    } finally {
+      setScrapingStory(false);
+    }
+  };
+
   const handleGenerateStory = async () => {
     setGeneratingStory(true);
     try {
-      const res = await api.post("/questions/generate-story");
+      const targetDuration = form.storyDuration || 90;
+      const res = await api.post("/questions/generate-story", { targetDuration, level: "B2" });
       const { topic, story, summaryGuide, question, voiceRecommendation: vRec } = res.data;
       setForm(f => ({
         ...f,
@@ -203,7 +242,7 @@ export default function ManualQuestionsPanel() {
     setAnalyzingVoice(true);
     try {
       const res = await api.post("/questions/analyze-story-voice", {
-        storyText: form.storyTranscript,
+        storyText: textToAnalyze,
       });
       if (res.data.voiceRecommendation) {
         setVoiceRecommendation(res.data.voiceRecommendation);
@@ -216,6 +255,22 @@ export default function ManualQuestionsPanel() {
       notify(err.response?.data?.error || "Voice analysis failed", "error");
     } finally {
       setAnalyzingVoice(false);
+    }
+  };
+
+    const handleCleanTranscript = async () => {
+    if (!form.storyTranscript) return;
+    try {
+      const res = await api.post("/questions/clean-story-transcript", {
+        text: form.storyTranscript,
+        title: form.topic
+      });
+      if (res.data?.cleanedTranscript) {
+        setForm(f => ({ ...f, storyTranscript: res.data.cleanedTranscript }));
+        notify("✂️ Narrator preambles, disclaimers, and outros trimmed!");
+      }
+    } catch (err) {
+      notify("Failed to clean transcript", "error");
     }
   };
 
@@ -232,7 +287,7 @@ export default function ManualQuestionsPanel() {
         voiceId: selectedVoiceId || voiceRecommendation?.voiceId || undefined,
         voiceSettings: (selectedVoiceId === voiceRecommendation?.voiceId) ? voiceRecommendation?.voiceSettings : undefined,
       });
-      setForm(f => ({ ...f, audioUrl: res.data.audioUrl }));
+      setForm(f => ({ ...f, audioUrl: res.data.audioUrl, storyDuration: res.data.duration || f.storyDuration }));
       const voiceLabel = res.data.voiceUsed?.name ? ` with voice ${res.data.voiceUsed.name}` : "";
       notify(`Audio generated and uploaded${voiceLabel}! URL filled in.`);
     } catch (err) {
@@ -671,23 +726,186 @@ export default function ManualQuestionsPanel() {
             </div>
             {form.setupType === "story_summary" && (
               <>
-                <div style={{ marginBottom: "0.75rem" }}>
+                {/* Story Mode Selector Tabs */}
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.85rem", background: "rgba(15,23,42,0.6)", padding: "4px", borderRadius: 10, border: "1px solid var(--border)" }}>
                   <button
                     type="button"
-                    className="btn-primary"
-                    disabled={generatingStory}
-                    onClick={handleGenerateStory}
-                    style={{ width: "100%", marginBottom: "0.5rem", background: "linear-gradient(135deg,#0f766e,#0d9488)" }}
+                    onClick={() => setStorySourceMode("scraped")}
+                    style={{
+                      flex: 1,
+                      padding: "0.6rem 0.75rem",
+                      borderRadius: 8,
+                      fontSize: "0.82rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      border: "none",
+                      background: storySourceMode === "scraped" ? "linear-gradient(135deg, #0284c7, #4f46e5)" : "transparent",
+                      color: storySourceMode === "scraped" ? "#fff" : "var(--muted)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.4rem",
+                      boxShadow: storySourceMode === "scraped" ? "0 2px 8px rgba(2, 132, 199, 0.4)" : "none"
+                    }}
                   >
-                    {generatingStory ? "✨ Generating story…" : "✨ AI Generate Story"}
+                    📻 Scraped Authentic Story (Native Audio)
                   </button>
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
-                    Generates a natural listening story with human pacing, key summary points, and matches the best character voice.
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStorySourceMode("ai_custom")}
+                    style={{
+                      flex: 1,
+                      padding: "0.6rem 0.75rem",
+                      borderRadius: 8,
+                      fontSize: "0.82rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      border: "none",
+                      background: storySourceMode === "ai_custom" ? "linear-gradient(135deg, #0f766e, #0d9488)" : "transparent",
+                      color: storySourceMode === "ai_custom" ? "#fff" : "var(--muted)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.4rem",
+                      boxShadow: storySourceMode === "ai_custom" ? "0 2px 8px rgba(15, 118, 110, 0.4)" : "none"
+                    }}
+                  >
+                    ✨ AI Story Generator + ElevenLabs Voice
+                  </button>
                 </div>
 
+                {storySourceMode === "scraped" ? (
+                  <>
+                    {/* Target Story Duration Control */}
+                    <div style={{ marginBottom: "0.85rem", padding: "0.85rem 1rem", borderRadius: 10, background: "rgba(2,132,199,0.06)", border: "1px solid rgba(2,132,199,0.25)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                        <label className="form-label" style={{ marginBottom: 0, fontWeight: 700, fontSize: "0.82rem", color: "#38bdf8" }}>
+                          🎯 Target Story Duration (Seconds)
+                        </label>
+                        <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
+                          Admin setting: ≈92s (60s – 120s recommended)
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <input
+                          type="number"
+                          className="form-input"
+                          min={50}
+                          max={180}
+                          step={5}
+                          value={form.storyDuration || 90}
+                          onChange={e => setForm(f => ({ ...f, storyDuration: Math.max(45, Math.min(180, parseInt(e.target.value, 10) || 90)) }))}
+                          style={{ width: 100, textAlign: "center", fontWeight: 700 }}
+                        />
+                        <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                          {[60, 75, 90, 105, 120].map(s => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setForm(f => ({ ...f, storyDuration: s }))}
+                              style={{
+                                padding: "4px 10px",
+                                fontSize: "0.72rem",
+                                borderRadius: 6,
+                                border: (form.storyDuration || 90) === s ? "1px solid #38bdf8" : "1px solid var(--border)",
+                                background: (form.storyDuration || 90) === s ? "rgba(56,189,248,0.2)" : "rgba(255,255,255,0.05)",
+                                color: (form.storyDuration || 90) === s ? "#38bdf8" : "var(--muted)",
+                                cursor: "pointer",
+                                fontWeight: (form.storyDuration || 90) === s ? 700 : 500
+                              }}
+                            >
+                              {s}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 1-Click Automated RSS Story Scraping & Slicing */}
+                    <div style={{
+                      marginBottom: "0.85rem",
+                      padding: "0.85rem 1rem",
+                      borderRadius: 12,
+                      background: "linear-gradient(135deg, rgba(2, 132, 199, 0.12), rgba(99, 102, 241, 0.08))",
+                      border: "1px solid rgba(2, 132, 199, 0.35)"
+                    }}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={scrapingStory}
+                        onClick={handleScrapeStory}
+                        style={{
+                          width: "100%",
+                          marginBottom: "0.45rem",
+                          background: "linear-gradient(135deg, #0284c7, #4f46e5)",
+                          border: "none",
+                          padding: "0.85rem 1rem",
+                          fontWeight: 800,
+                          fontSize: "0.94rem",
+                          borderRadius: 10,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "0.5rem",
+                          boxShadow: "0 4px 15px rgba(2, 132, 199, 0.35)",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {scrapingStory
+                          ? "📻 Auto-Scraping Story & Slicing..."
+                          : `📻 1-Click Auto-Scrape English Story (Target: ${form.storyDuration || 90}s)`}
+                      </button>
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
+                        ✂️ Slices strictly from story opening word to final moral. Intro preamble, LibriVox ads &amp; outro stripped.
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ marginBottom: "0.75rem" }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={generatingStory}
+                      onClick={handleGenerateStory}
+                      style={{ width: "100%", marginBottom: "0.5rem", background: "linear-gradient(135deg,#0f766e,#0d9488)" }}
+                    >
+                      {generatingStory ? "✨ Generating story…" : "✨ AI Generate Story (Custom Text)"}
+                    </button>
+                    <div style={{ fontSize: "0.72rem", color: "var(--muted)", textAlign: "center" }}>
+                      Generates a natural listening story with human pacing, key summary points, and matches the best character voice.
+                    </div>
+                  </div>
+                )}
+
+                {/* Story Transcript with 1-Click Auto-Trim */}
                 <div style={{ marginBottom: "0.75rem" }}>
-                  <label className="form-label">Story Transcript *</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>
+                      Story Transcript * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(clean narrative · preamble trimmed)</span>
+                    </label>
+                    {form.storyTranscript && (
+                      <button
+                        type="button"
+                        onClick={handleCleanTranscript}
+                        style={{
+                          background: "rgba(56, 189, 248, 0.12)",
+                          border: "1px solid rgba(56, 189, 248, 0.35)",
+                          color: "#38bdf8",
+                          borderRadius: 6,
+                          padding: "2px 8px",
+                          fontSize: "0.72rem",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontWeight: 600
+                        }}
+                        title="Clean introductory credits, disclaimers, and outro"
+                      >
+                        ✂️ Auto-Trim Intro &amp; Outro
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     className="form-input"
                     rows={5}
@@ -697,28 +915,31 @@ export default function ManualQuestionsPanel() {
                   />
                 </div>
 
-                {/* Character & Adaptive Voice Matcher Card */}
+                {/* Character & Adaptive Voice Matcher Card (Available in Both Modes!) */}
                 <div style={{
                   marginBottom: "0.85rem",
-                  padding: "0.85rem",
+                  padding: "0.85rem 1rem",
                   background: "rgba(167, 139, 250, 0.08)",
-                  borderRadius: 8,
-                  border: "1px solid rgba(167, 139, 250, 0.25)"
+                  borderRadius: 10,
+                  border: "1px solid rgba(167, 139, 250, 0.28)"
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.82rem", color: "#c4b5fd" }}>
-                      🎭 Character Voice Matcher
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span style={{ fontSize: "1rem" }}>🎭</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.82rem", color: "#c4b5fd" }}>
+                        Character Voice Matcher (ElevenLabs Human Cast)
+                      </span>
+                    </div>
                     {form.storyTranscript && (
                       <button
                         type="button"
                         disabled={analyzingVoice}
-                        onClick={handleAnalyzeVoice}
+                        onClick={() => handleAnalyzeVoice()}
                         style={{
                           background: "rgba(167, 139, 250, 0.15)",
                           border: "1px solid rgba(196, 181, 253, 0.35)",
                           color: "#ddd6fe",
-                          borderRadius: 4,
+                          borderRadius: 6,
                           padding: "3px 8px",
                           fontSize: "0.72rem",
                           cursor: "pointer"
@@ -732,7 +953,7 @@ export default function ManualQuestionsPanel() {
                   {voiceRecommendation && (
                     <div style={{ fontSize: "0.78rem", color: "#e2e8f0", marginBottom: "0.65rem", lineHeight: 1.45, background: "rgba(15, 23, 42, 0.4)", padding: "8px", borderRadius: 6 }}>
                       <div><strong style={{ color: "#a78bfa" }}>Character:</strong> {voiceRecommendation.characterName} <span style={{ color: "#94a3b8" }}>({voiceRecommendation.persona})</span></div>
-                      <div><strong style={{ color: "#38bdf8" }}>Mood & Delivery:</strong> {voiceRecommendation.mood}</div>
+                      <div><strong style={{ color: "#38bdf8" }}>Mood &amp; Delivery:</strong> {voiceRecommendation.mood}</div>
                       <div style={{ color: "#cbd5e1", marginTop: "3px", fontSize: "0.73rem" }}>
                         💡 <em>"{voiceRecommendation.reason}"</em>
                       </div>
@@ -748,12 +969,12 @@ export default function ManualQuestionsPanel() {
                     onChange={e => setSelectedVoiceId(e.target.value)}
                     style={{ fontSize: "0.82rem", background: "#0f172a", borderColor: "rgba(167, 139, 250, 0.4)", color: "#f8fafc" }}
                   >
-                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Warm & Conversational (Female, Most Natural)</option>
-                    <option value="AZnzlk1XvdvUeBnXmlld">Domi — Energetic & Expressive (Female, Lively)</option>
-                    <option value="EXAVITQu4vr4xnSDxMaL">Bella — Gentle Storyteller (Female, Soft & Calming)</option>
-                    <option value="MF3mGyEYCl7XYWbV9V6O">Elli — Bright & Youthful (Female, Student)</option>
-                    <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Casual & Relatable (Male, Most Natural)</option>
-                    <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Dynamic & Expressive (Male, Confident)</option>
+                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel — Warm &amp; Conversational (Female, Most Natural)</option>
+                    <option value="AZnzlk1XvdvUeBnXmlld">Domi — Energetic &amp; Expressive (Female, Lively)</option>
+                    <option value="EXAVITQu4vr4xnSDxMaL">Bella — Gentle Storyteller (Female, Soft &amp; Calming)</option>
+                    <option value="MF3mGyEYCl7XYWbV9V6O">Elli — Bright &amp; Youthful (Female, Student)</option>
+                    <option value="TxGEqnHWrfWFTfGW9XjX">Josh — Casual &amp; Relatable (Male, Most Natural)</option>
+                    <option value="yoZ06aMxZJJ28mfd3POQ">Sam — Dynamic &amp; Expressive (Male, Confident)</option>
                     <option value="ErXwobaYiN019PkySvjV">Antoni — Warm Storyteller (Male, Balanced)</option>
                     <option value="pNInz6obpgDQGcFmaJgB">Adam — Deep Classic Narrator (Male)</option>
                   </select>
@@ -768,14 +989,22 @@ export default function ManualQuestionsPanel() {
                       width: "100%",
                       color: "#22d3ee",
                       borderColor: "rgba(6,182,212,0.45)",
-                      fontWeight: 600,
-                      background: "rgba(6, 182, 212, 0.08)"
+                      fontWeight: 700,
+                      background: "rgba(6, 182, 212, 0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem"
                     }}
                   >
-                    {generatingAudio ? "🎙️ Generating Audio with Selected Voice…" : "🎙️ Generate Audio with Character Voice"}
+                    {generatingAudio ? "🎙️ Generating Audio with Selected Voice…" : "🎙️ Generate Audio with Character Voice (Studio Human Voice)"}
                   </button>
+                  <div style={{ fontSize: "0.71rem", color: "var(--muted)", textAlign: "center", marginTop: "0.35rem" }}>
+                    💡 Generates studio-quality human narration from the story transcript — zero robotic tone, zero vintage static.
+                  </div>
                 </div>
 
+                {/* Story Audio URL and Player Preview */}
                 <div style={{ marginBottom: "0.75rem" }}>
                   <label className="form-label">Story Audio URL *</label>
                   <input
@@ -787,8 +1016,26 @@ export default function ManualQuestionsPanel() {
                     onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
                   />
                   {form.audioUrl && (
-                    <div style={{ marginTop: "0.5rem" }}>
-                      <audio controls src={form.audioUrl} style={{ width: "100%", height: 36 }} />
+                    <div style={{
+                      marginTop: "0.55rem",
+                      padding: "0.75rem 1rem",
+                      borderRadius: 10,
+                      background: "rgba(15,23,42,0.6)",
+                      border: "1px solid rgba(56,189,248,0.25)"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          <span>🎧</span>
+                          <strong style={{ fontSize: "0.82rem", color: "#38bdf8" }}>Story Audio Player</strong>
+                        </div>
+                        <span style={{ fontSize: "0.72rem", padding: "2px 8px", borderRadius: 4, background: "rgba(16,185,129,0.15)", color: "#10b981", fontWeight: 700 }}>
+                          ⏱️ {form.storyDuration ? `${form.storyDuration}s` : "Ready"}
+                        </span>
+                      </div>
+                      <audio controls src={form.audioUrl} style={{ width: "100%", height: 38 }} />
+                      <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginTop: "0.35rem" }}>
+                        ✅ Narrator preamble &amp; outro trimmed. Audio starts directly with the story narrative.
+                      </div>
                     </div>
                   )}
                 </div>
