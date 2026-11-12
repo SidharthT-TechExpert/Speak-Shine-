@@ -1172,7 +1172,7 @@ export default function VideoAnalysis() {
                       alt={todayQuestion.topic || "Picture description"}
                       style={{
                         width: "100%",
-                        maxHeight: 380,
+                        maxHeight: 270,
                         objectFit: "cover",
                         display: "block",
                         borderRadius: 14,
@@ -2707,12 +2707,11 @@ export default function VideoAnalysis() {
               </div>
 
               {/* Right Column: Action & Countdown Card */}
-              <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible", alignItems: "stretch", justifyContent: "flex-start", width: "100%" }}>
               {/* Right Action & Countdown Card (Matching Dashboard Page) */}
               <div className="speakshine-hero-right-card" style={{
                 width: "100%",
-                maxWidth: 440,
-                margin: "0 auto",
+                margin: 0,
                 overflow: "visible",
                 scrollbarWidth: "none",
                 background: isDark
@@ -2864,18 +2863,30 @@ export default function VideoAnalysis() {
                   })()}
                 </div>
 
-                {/* Privacy & Instant Grading Security Seal */}
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.45rem",
-                  fontSize: "0.68rem",
-                  color: isDark ? "#94a3b8" : "#64748b",
-                  paddingTop: "0.2rem",
-                }}>
-                  <span style={{ color: "#22c55e" }}>🛡️</span>
-                  <span>100% Private &amp; Secure · AI Feedback within 60s</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "auto", paddingTop: "0.25rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById("video-studio-container")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="speakshine-submit-btn"
+                    style={{ marginTop: 0 }}
+                  >
+                    <span>🎬</span>
+                    <span>{isTodaySubmitted ? "Practice Extra Take Below ↓" : "Start Recording / Upload ↓"}</span>
+                  </button>
+
+                  {/* Privacy & Instant Grading Security Seal */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.68rem",
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    paddingTop: "0.1rem",
+                  }}>
+                    <span style={{ color: "#22c55e" }}>🛡️</span>
+                    <span>100% Private &amp; Secure · AI Feedback within 60s</span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -5974,11 +5974,21 @@ audio { border-radius: 12px; }
 
 .speakshine-hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr);
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
   width: 100%;
-  align-items: center;
+  align-items: stretch;
+}
+
+@media (min-width: 1025px) and (max-width: 1220px) {
+  .speakshine-hero-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+    gap: 1rem;
+  }
+  .speakshine-hero-left-card {
+    padding: 1.35rem 1.4rem !important;
+  }
 }
 
 @media (min-width: 1025px) {
@@ -5986,7 +5996,7 @@ audio { border-radius: 12px; }
     height: auto;
     max-height: none;
     min-height: 0;
-    align-items: center;
+    align-items: stretch;
     margin-bottom: 2rem;
   }
 
@@ -6000,8 +6010,11 @@ audio { border-radius: 12px; }
   .speakshine-hero-right-col {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: stretch;
+    align-self: start;
+    position: sticky;
+    top: 1rem;
     width: 100%;
     height: auto !important;
     max-height: none !important;
@@ -6012,8 +6025,8 @@ audio { border-radius: 12px; }
   .speakshine-hero-right-card,
   .speakshine-hero-grid > .speakshine-hero-right-card {
     width: 100%;
-    max-width: 440px;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
@@ -6065,9 +6078,9 @@ audio { border-radius: 12px; }
 @media (max-width: 1024px) {
   .speakshine-hero-grid {
     grid-template-columns: 1fr !important;
-    gap: 1.25rem;
+    gap: 1rem;
     height: auto !important;
-    align-items: center;
+    align-items: stretch;
   }
   .speakshine-hero-left-card,
   .speakshine-hero-right-col {
@@ -6076,24 +6089,29 @@ audio { border-radius: 12px; }
     overflow-y: visible !important;
   }
   .speakshine-hero-right-col {
+    position: static;
+    align-self: stretch;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: flex-start;
     width: 100%;
   }
-  .speakshine-hero-right-card {
+  .speakshine-hero-right-card,
+  .speakshine-hero-grid > .speakshine-hero-right-card {
     width: 100%;
-    max-width: 440px;
-    margin: 0 auto;
+    max-width: 100% !important;
+    margin: 0;
+    flex: none;
+    min-height: 0;
   }
 }
 
 .speakshine-hero-right-col {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start;
+  align-items: stretch;
   gap: 1.25rem;
   min-width: 0;
   width: 100%;
@@ -6230,6 +6248,15 @@ audio { border-radius: 12px; }
   }
   .speakshine-canvas {
     padding: 0.75rem 0.5rem 2rem;
+  }
+  .speakshine-hero-left-card,
+  .speakshine-hero-right-card {
+    padding: 1.1rem 1rem !important;
+    border-radius: 14px !important;
+  }
+  .speakshine-hero-left-card h1,
+  .speakshine-hero-left-card .story-title-heading {
+    font-size: clamp(1.45rem, 6vw, 1.85rem) !important;
   }
   .admin-command-bar {
     padding: 0.5rem 0.65rem;

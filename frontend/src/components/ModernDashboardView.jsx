@@ -1994,8 +1994,7 @@ export default function ModernDashboardView({
               {/* Right: Streak Security & Daily Mission Status Card */}
               <div className="speakshine-hero-right-card" onWheel={handleHeroWheel} style={{
                 width: "100%",
-                maxWidth: 440,
-                margin: "0 auto",
+                margin: 0,
                 background: isDark
                   ? "linear-gradient(145deg, #120e24 0%, #0d0918 100%)"
                   : "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
@@ -2301,7 +2300,7 @@ export default function ModernDashboardView({
                       alt={today.topic || "Picture description"}
                       style={{
                         width: "100%",
-                        maxHeight: "360px",
+                        maxHeight: "270px",
                         objectFit: "cover",
                         display: "block",
                         cursor: "pointer",
@@ -3309,13 +3308,12 @@ export default function ModernDashboardView({
               )}
             </div>
 
-            {/* Right Column: Action Card + Target Vocabulary Card in Empty Space */}
-            <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible", alignItems: "center", justifyContent: "center", width: "100%" }}>
+            {/* Right Column: Action Card + Target Vocabulary Card */}
+            <div className="speakshine-hero-right-col flex flex-col gap-4" style={{ overflow: "visible", alignItems: "stretch", justifyContent: "flex-start", width: "100%" }}>
               {/* Right Action & Countdown Card */}
               <div className="speakshine-hero-right-card" style={{
                 width: "100%",
-                maxWidth: 440,
-                margin: "0 auto",
+                margin: 0,
                 overflow: "visible",
                 scrollbarWidth: "none",
                 background: isDark
@@ -3399,10 +3397,10 @@ export default function ModernDashboardView({
                     background: isDark ? "rgba(255, 255, 255, 0.025)" : "#f8fafc",
                     border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
                     borderRadius: 14,
-                    padding: "0.95rem 1rem",
+                    padding: "0.9rem 1rem",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "0.75rem",
+                    gap: "0.7rem",
                   }}>
                     <div style={{
                       fontSize: "0.95rem",
@@ -3486,18 +3484,30 @@ export default function ModernDashboardView({
 
 
 
-                {/* Privacy & Instant Grading Security Seal */}
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.45rem",
-                  fontSize: "0.68rem",
-                  color: isDark ? "#94a3b8" : "#64748b",
-                  paddingTop: "0.2rem",
-                }}>
-                  <span style={{ color: "#22c55e" }}>🛡️</span>
-                  <span>100% Private &amp; Secure · AI Feedback within 60s</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "auto", paddingTop: "0.25rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/record#video-studio-container")}
+                    className="speakshine-submit-btn"
+                    style={{ marginTop: 0 }}
+                  >
+                    <span>🎙️</span>
+                    <span>{isTodaySubmitted ? "Practice Extra Take in Studio →" : "Record Today's Video →"}</span>
+                  </button>
+
+                  {/* Privacy & Instant Grading Security Seal */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.68rem",
+                    color: isDark ? "#94a3b8" : "#64748b",
+                    paddingTop: "0.1rem",
+                  }}>
+                    <span style={{ color: "#22c55e" }}>🛡️</span>
+                    <span>100% Private &amp; Secure · AI Feedback within 60s</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3656,8 +3666,7 @@ export default function ModernDashboardView({
               {/* Right: Coach's Practice & Daily Rhythm Card */}
               <div className="speakshine-hero-right-card" style={{
                 width: "100%",
-                maxWidth: 440,
-                margin: "0 auto",
+                margin: 0,
                 background: isDark ? "#0d0a18" : "#ffffff",
                 border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
                 borderRadius: 18,
