@@ -1,6 +1,52 @@
 import mongoose from "mongoose";
 
 /**
+ * Normalize a vocabulary/expression list (plain strings or expression objects
+ * like `{ expression, word, meaning, usage, example }`) into clean deduplicated
+ * strings so Mongoose `[String]` fields never fail casting.
+ */
+export function normalizeVocabularyList(val) {
+  if (val === undefined) return undefined;
+  if (val === null) return [];
+
+  let list = val;
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch {
+        list = [trimmed];
+      }
+    } else {
+      list = [trimmed];
+    }
+  }
+
+  if (!Array.isArray(list)) return [];
+
+  const result = [];
+  const seen = new Set();
+  for (const item of list) {
+    let text = "";
+    if (typeof item === "string") {
+      text = item.trim();
+    } else if (item && typeof item === "object") {
+      text = String(item.expression || item.word || item.term || item.name || item.title || "").trim();
+    } else if (item != null && typeof item !== "boolean") {
+      text = String(item).trim();
+    }
+    if (text && !seen.has(text)) {
+      seen.add(text);
+      result.push(text);
+    }
+  }
+  return result;
+}
+
+/**
  * Temporary video analysis reports — auto-deleted after 18 hours.
  * Users can submit videos via the website and view their analysis report.
  * Reports are NOT permanently stored — only cached for quick review.
@@ -32,7 +78,7 @@ const videoReportSchema = new mongoose.Schema({
     targetStoryTranscript: { type: String, default: null },
     targetSummaryGuide: { type: String, default: null },
     targetImageScene: { type: String, default: null },
-    targetVocabulary: { type: [String], default: undefined },
+    targetVocabulary: { type: [String], default: undefined, set: normalizeVocabularyList },
     
     // Visual scores
     eyeContact: { type: Number, min: 0, max: 10 },
@@ -89,7 +135,7 @@ const videoReportSchema = new mongoose.Schema({
     
     // Vocabulary challenge
     vocabularyScore: { type: Number, min: 0, max: 10, default: null }, // out of 10
-    vocabularyUsed:  { type: [String], default: [] }, // which of today's 5 words were used correctly
+    vocabularyUsed:  { type: [String], default: [], set: normalizeVocabularyList }, // which of today's expressions/words were used correctly
     challengeType: { type: String, default: null },
 
     // Composite 100-point score (added to monthlyScore)

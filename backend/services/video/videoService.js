@@ -3,7 +3,7 @@
  * Business logic for video upload, validation, and management
  */
 
-import VideoReport from "../../../models/videoReportSchema.js";
+import VideoReport, { normalizeVocabularyList } from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import { serializeStreakBadges } from "../../utils/streakBadges.js";
 import Status from "../../../models/statusSchema.js";
@@ -1135,12 +1135,13 @@ async function resolveCategoryReference(report, analysis, status, isSamePublishe
   let targetStoryTranscript = analysis?.targetStoryTranscript || null;
   let targetSummaryGuide = analysis?.targetSummaryGuide || null;
   let targetImageScene = analysis?.targetImageScene || null;
-  const targetVocabulary =
+  const rawTargetVocabulary =
     Array.isArray(analysis?.targetVocabulary) && analysis.targetVocabulary.length > 0
       ? analysis.targetVocabulary
       : isSamePublishedDay && Array.isArray(status?.todayVocabulary) && status.todayVocabulary.length > 0
       ? status.todayVocabulary
       : [];
+  const targetVocabulary = normalizeVocabularyList(rawTargetVocabulary) || [];
 
   if (isSamePublishedDay && status) {
     if (!questionTopic && status.todayTopic) questionTopic = status.todayTopic;
@@ -1239,12 +1240,12 @@ function syncAnalysisOffTopicAndRef(target, breakdown, challengeType, refMeta = 
     if (challengeType === "picture_description" && refMeta.targetImageScene && !target.targetImageScene) {
       target.targetImageScene = refMeta.targetImageScene;
     }
+    const normalizedRefVocab = normalizeVocabularyList(refMeta.targetVocabulary) || [];
     if (
-      Array.isArray(refMeta.targetVocabulary) &&
-      refMeta.targetVocabulary.length > 0 &&
+      normalizedRefVocab.length > 0 &&
       (!Array.isArray(target.targetVocabulary) || target.targetVocabulary.length === 0)
     ) {
-      target.targetVocabulary = refMeta.targetVocabulary;
+      target.targetVocabulary = normalizedRefVocab;
     }
   }
 }
@@ -1266,9 +1267,10 @@ function buildPersistedRefUpdates(source, challengeType) {
     ...(challengeType === "picture_description" && source.targetImageScene
       ? { "analysis.targetImageScene": source.targetImageScene }
       : {}),
-    ...(Array.isArray(source.targetVocabulary) && source.targetVocabulary.length > 0
-      ? { "analysis.targetVocabulary": source.targetVocabulary }
-      : {}),
+    ...((() => {
+      const normalized = normalizeVocabularyList(source.targetVocabulary) || [];
+      return normalized.length > 0 ? { "analysis.targetVocabulary": normalized } : {};
+    })()),
   };
 }
 
@@ -1548,12 +1550,13 @@ async function prepareReportAnalysis(report) {
   }
 
   // Self-heal vocabulary matching using the report's saved vocabulary (or same-day vocabulary), never shadowing or cross-day vocab
-  const vocabSourceList =
+  const vocabSourceList = normalizeVocabularyList(
     Array.isArray(analysis?.targetVocabulary) && analysis.targetVocabulary.length > 0
       ? analysis.targetVocabulary
       : samePublishedDay && Array.isArray(status?.todayVocabulary)
       ? status.todayVocabulary
-      : [];
+      : []
+  ) || [];
   if (analysis && analysis.transcription && !isShadowTask && !analysis?.scoreBreakdown?.isShadowing && vocabSourceList.length > 0) {
     const rechecked = matchVocabularyInTranscript(analysis.transcription, vocabSourceList, analysis);
     const existingCount = Array.isArray(analysis.vocabularyUsed) ? analysis.vocabularyUsed.length : 0;
@@ -2138,9 +2141,8 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   // 1. Re-match vocabulary with intelligent matcher (waived for shadowing & scoped to report's own day)
   // Preserve previously recognized target words so they are never lost if today's vocab is empty or changed
   const previousWords = Array.isArray(report.analysis?.vocabularyUsed) ? report.analysis.vocabularyUsed : [];
-  const savedTargetVocab = Array.isArray(report.analysis?.targetVocabulary) && report.analysis.targetVocabulary.length > 0
-    ? report.analysis.targetVocabulary
-    : null;
+  const savedTargetVocabList = normalizeVocabularyList(report.analysis?.targetVocabulary) || [];
+  const savedTargetVocab = savedTargetVocabList.length > 0 ? savedTargetVocabList : null;
   const effectiveStatusVocab = isSameDayReEval && Array.isArray(todayVocab) && todayVocab.length > 0
     ? todayVocab
     : null;

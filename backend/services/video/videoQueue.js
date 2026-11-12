@@ -5,7 +5,7 @@
  * while staying within the 512 MB RAM budget (≈16 MB per video with optimisations).
  */
 
-import VideoReport from "../../../models/videoReportSchema.js";
+import VideoReport, { normalizeVocabularyList } from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import StreakRecord from "../../../models/streakRecordSchema.js";
@@ -359,9 +359,10 @@ async function processJob(job) {
       resolvedStoryTranscript = result.analysis?.targetStoryTranscript || status?.todayStoryTranscript || null;
       resolvedSummaryGuide = result.analysis?.targetSummaryGuide || status?.todaySummaryGuide || null;
       resolvedImageScene = result.analysis?.targetImageScene || status?.todayImageSearchQuery || null;
-      resolvedTargetVocabulary = challengeType !== "shadowing_video" && Array.isArray(status?.todayVocabulary) && status.todayVocabulary.length > 0
-        ? status.todayVocabulary
-        : null;
+      const normalizedStatusVocab = challengeType !== "shadowing_video"
+        ? (normalizeVocabularyList(status?.todayVocabulary) || [])
+        : [];
+      resolvedTargetVocabulary = normalizedStatusVocab.length > 0 ? normalizedStatusVocab : null;
       gateFlags = {
         isMonthlyReflection: challengeType === "monthly_reflection",
         isWeeklyReflection:  challengeType === "weekly_reflection" || Boolean(status?.isWeeklyReflectionDay),
@@ -506,7 +507,7 @@ async function processJob(job) {
         ...(gateFlags?.isStorySummary && resolvedStoryTranscript ? { targetStoryTranscript: resolvedStoryTranscript } : {}),
         ...(gateFlags?.isStorySummary && resolvedSummaryGuide ? { targetSummaryGuide: resolvedSummaryGuide } : {}),
         ...(gateFlags?.isPictureDescription && resolvedImageScene ? { targetImageScene: resolvedImageScene } : {}),
-        ...(resolvedTargetVocabulary ? { targetVocabulary: resolvedTargetVocabulary } : {}),
+        ...(resolvedTargetVocabulary?.length ? { targetVocabulary: resolvedTargetVocabulary } : {}),
         ...(savedTargetDur != null ? { targetVideoDuration: savedTargetDur } : {}),
         ...(savedTargetTranscript ? { targetVideoTranscript: savedTargetTranscript } : {}),
         vocabularyUsed,
