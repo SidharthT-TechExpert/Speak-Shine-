@@ -82,11 +82,13 @@ export async function setupManualQuestion(req, res) {
       { audioUrl, storyTranscript, summaryGuide, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery, imageInstructions, imageDifficulty, speakingDuration, videoUrl, videoDuration, videoTranscript, videoTitle },
       publishNow === true
     );
-    try {
-      const { publishDueManualQuestion } = await import("../services/scheduler/questionSchedulerService.js");
-      await publishDueManualQuestion();
-    } catch (publishErr) {
-      console.warn("[Questions] Publish check skipped:", publishErr.message);
+    if (publishNow !== true) {
+      try {
+        const { publishDueManualQuestion } = await import("../services/scheduler/questionSchedulerService.js");
+        await publishDueManualQuestion();
+      } catch (publishErr) {
+        console.warn("[Questions] Publish check skipped:", publishErr.message);
+      }
     }
     res.status(201).json(result);
   } catch (error) {
@@ -137,12 +139,13 @@ export async function listManualQuestions(req, res) {
 export async function updateManualQuestion(req, res) {
   try {
     const result = await questionsService.updateManualQuestion(req.params.id, req.body, req.user?.phone || req.user?.name);
-    
-    try {
-      const { publishDueManualQuestion } = await import("../services/scheduler/questionSchedulerService.js");
-      await publishDueManualQuestion();
-    } catch (publishErr) {
-      console.warn("[Questions] Publish check skipped:", publishErr.message);
+    if (req.body?.publishNow !== true) {
+      try {
+        const { publishDueManualQuestion } = await import("../services/scheduler/questionSchedulerService.js");
+        await publishDueManualQuestion();
+      } catch (publishErr) {
+        console.warn("[Questions] Publish check skipped:", publishErr.message);
+      }
     }
     res.json(result);
   } catch (error) {

@@ -8,6 +8,34 @@ import Question from "../../../models/questionSchema.js";
 import { generateAndInsertQuestions } from "../ai/questionGenerator.js";
 import { getDueManualQuestion, getManualQuestionForDate } from "../questions/questionsService.js";
 import { ensureTodayVocabulary } from "../ai/vocabularyGenerator.js";
+import { getISTDateKey, getISTParts } from "../../utils/dateUtils.js";
+import { normalizeVocabularyList } from "../../../models/videoReportSchema.js";
+
+const BASE_CLEARED_TASK_FIELDS = {
+  isMonthlyReflectionDay: false,
+  isMonthlyGoalsDay: false,
+  isStorySummaryDay: false,
+  isPictureDescriptionDay: false,
+  isShadowingDay: false,
+  todayContentType: "question",
+  todayAudioUrl: null,
+  todayStoryTranscript: null,
+  todaySummaryGuide: null,
+  todayImageUrl: null,
+  todayImageSource: null,
+  todayImagePageUrl: null,
+  todayImagePhotographer: null,
+  todayImagePhotographerUrl: null,
+  todayImageSearchQuery: null,
+  todayImageInstructions: null,
+  todayVideoUrl: null,
+  todayVideoDuration: null,
+  todayVideoTranscript: null,
+  todayVideoTitle: null,
+  todayPosterImage: null,
+  posterExpiresAt: null,
+  todayVocabulary: [],
+};
 
 /**
  * Sends today's poster to TARGET_GROUP on WhatsApp if connected.
@@ -30,11 +58,7 @@ async function dispatchPosterToWhatsApp(details = {}) {
  * Returns today's date in IST format "YYYY-MM-DD"
  */
 function getTodayISTDate() {
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const y = nowIST.getFullYear();
-  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-  const d = String(nowIST.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${d}`;
+  return getISTDateKey();
 }
 
 // Monthly reflection questions — shown on the last day of every month
@@ -92,19 +116,16 @@ export const CURATED_FALLBACK_QUESTIONS = [
  * Check if today is the last day of the month (IST)
  */
 function isLastDayOfMonth() {
-  const now = new Date();
-  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const lastDate = new Date(istDate.getFullYear(), istDate.getMonth() + 1, 0).getDate();
-  return istDate.getDate() === lastDate;
+  const { year, month, day } = getISTParts();
+  const lastDate = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day === lastDate;
 }
 
 /**
  * Check if today is the 1st of the month (IST)
  */
 function isFirstDayOfMonth() {
-  const now = new Date();
-  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  return istDate.getDate() === 1;
+  return getISTParts().day === 1;
 }
 
 /**
@@ -113,10 +134,9 @@ function isFirstDayOfMonth() {
  */
 async function isStoryDay() {
   try {
-    const status = await Status.findOne().select("storyDays storyDay isStorySummaryDay todayContentType").lean();
-    if (status?.isStorySummaryDay || status?.todayContentType === "story_audio") return true;
+    const status = await Status.findOne().select("storyDays storyDay").lean();
     let days = [];
-    if (Array.isArray(status?.storyDays) && status.storyDays.length > 0) {
+    if (Array.isArray(status?.storyDays)) {
       days = status.storyDays;
     } else if (status?.storyDay !== undefined && status.storyDay !== null && status.storyDay !== -1) {
       days = [status.storyDay];
@@ -126,14 +146,9 @@ async function isStoryDay() {
       days = [6]; // default Saturday
     }
     if (days.length === 0) return false;
-    const now = new Date();
-    const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return days.includes(istDate.getDay());
+    return days.includes(getISTParts().dayOfWeek);
   } catch {
-    // Fallback to Saturday if DB is unavailable
-    const now = new Date();
-    const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return istDate.getDay() === 6;
+    return getISTParts().dayOfWeek === 6;
   }
 }
 
@@ -141,9 +156,7 @@ async function isStoryDay() {
  * Check if today is Saturday (IST) — kept for backwards compat
  */
 function isSaturday() {
-  const now = new Date();
-  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  return istDate.getDay() === 6; // 6 = Saturday
+  return getISTParts().dayOfWeek === 6; // 6 = Saturday
 }
 
 /**
@@ -165,8 +178,7 @@ async function isPictureDescriptionDay() {
       days = [4]; // default Thursday
     }
     if (days.length === 0) return false;
-    const istDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return days.includes(istDate.getDay());
+    return days.includes(getISTParts().dayOfWeek);
   } catch {
     return false;
   }
@@ -180,10 +192,9 @@ export const SHADOWING_CATEGORY = "Shadowing Practice";
  */
 export async function isShadowingDay() {
   try {
-    const status = await Status.findOne().select("shadowingDays shadowingDay isShadowingDay todayContentType").lean();
-    if (status?.isShadowingDay || status?.todayContentType === "shadowing_video") return true;
+    const status = await Status.findOne().select("shadowingDays shadowingDay").lean();
     let days = [];
-    if (Array.isArray(status?.shadowingDays) && status.shadowingDays.length > 0) {
+    if (Array.isArray(status?.shadowingDays)) {
       days = status.shadowingDays;
     } else if (status?.shadowingDay !== undefined && status?.shadowingDay !== null && status?.shadowingDay !== -1) {
       days = [status.shadowingDay];
@@ -193,8 +204,7 @@ export async function isShadowingDay() {
       days = [2]; // default Tuesday
     }
     if (days.length === 0) return false;
-    const istDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return days.includes(istDate.getDay());
+    return days.includes(getISTParts().dayOfWeek);
   } catch {
     return false;
   }
@@ -211,13 +221,10 @@ export async function publishAutoShadowingVideo() {
 
     await Status.updateOne({}, {
       $set: {
+        ...BASE_CLEARED_TASK_FIELDS,
         questionSentToday: true,
         questionPublishedDate: getTodayISTDate(),
         isShadowingDay: true,
-        isPictureDescriptionDay: false,
-        isStorySummaryDay: false,
-        isMonthlyReflectionDay: false,
-        isMonthlyGoalsDay: false,
         todayContentType: "shadowing_video",
         todayTopic: challenge.title,
         todayQuestion: challenge.instructions,
@@ -227,11 +234,6 @@ export async function publishAutoShadowingVideo() {
         todayVideoTranscript: challenge.videoTranscript,
         todayVideoTitle: challenge.title,
         todayAudioUrl: challenge.audioUrl || challenge.videoUrl || null,
-        todayStoryTranscript: null,
-        todaySummaryGuide: null,
-        todayImageUrl: null,
-        todayPosterImage: null,
-        todayVocabulary: [],
       }
     }, { upsert: true });
 
@@ -262,12 +264,10 @@ async function publishAutoPictureDescription() {
 
     await Status.updateOne({}, {
       $set: {
+        ...BASE_CLEARED_TASK_FIELDS,
         questionSentToday: true,
         questionPublishedDate: getTodayISTDate(),
         isPictureDescriptionDay: true,
-        isStorySummaryDay: false,
-        isMonthlyReflectionDay: false,
-        isMonthlyGoalsDay: false,
         todayContentType: "picture_description",
         todayTopic: challenge.title,
         todayQuestion: challenge.instructions,
@@ -279,11 +279,6 @@ async function publishAutoPictureDescription() {
         todayImagePhotographerUrl: challenge.imagePhotographerUrl,
         todayImageSearchQuery: challenge.imageQuery,
         todayImageInstructions: challenge.instructions,
-        todayAudioUrl: null,
-        todayStoryTranscript: null,
-        todaySummaryGuide: null,
-        todayPosterImage: null,
-        todayVocabulary: [],
       }
     }, { upsert: true });
 
@@ -321,11 +316,10 @@ export async function publishAutoSaturdayStory() {
       if (challenge && challenge.audioUrl && challenge.storyTranscript) {
         await Status.updateOne({}, {
           $set: {
+            ...BASE_CLEARED_TASK_FIELDS,
             questionSentToday: true,
             questionPublishedDate: getTodayISTDate(),
             isStorySummaryDay: true,
-            isMonthlyReflectionDay: false,
-            isMonthlyGoalsDay: false,
             todayContentType: "story_audio",
             todayTopic: challenge.topic,
             todayQuestion: challenge.question || "Listen to this short story and record a 1-minute video summary in your own words. Explain what happened and the moral lesson.",
@@ -333,8 +327,7 @@ export async function publishAutoSaturdayStory() {
             todayAudioUrl: challenge.audioUrl,
             todayStoryTranscript: challenge.storyTranscript,
             todaySummaryGuide: Array.isArray(challenge.summaryGuide) ? challenge.summaryGuide.join("\n") : (challenge.summaryGuide || ""),
-            todayPosterImage: null,
-            todayVocabulary: challenge.vocabulary || [],
+            todayVocabulary: normalizeVocabularyList(challenge.vocabulary || []),
           }
         }, { upsert: true });
 
@@ -378,11 +371,10 @@ export async function publishAutoSaturdayStory() {
     // Publish as story summary day
     await Status.updateOne({}, {
       $set: {
+        ...BASE_CLEARED_TASK_FIELDS,
         questionSentToday: true,
         questionPublishedDate: getTodayISTDate(),
         isStorySummaryDay: true,
-        isMonthlyReflectionDay: false,
-        isMonthlyGoalsDay: false,
         todayContentType: "story_audio",
         todayTopic: story.topic,
         todayQuestion: story.question,
@@ -390,8 +382,6 @@ export async function publishAutoSaturdayStory() {
         todayAudioUrl: audioUrl,
         todayStoryTranscript: story.story,
         todaySummaryGuide: story.summaryGuide.join("\n"),
-        todayPosterImage: null,
-        todayVocabulary: [],
       }
     }, { upsert: true });
 
@@ -415,14 +405,29 @@ export const publishAutoStorySummary = publishAutoSaturdayStory;
 export async function publishManualQuestion(q) {
   if (!q) return { published: false };
 
-  const isStory = q.setupType === "story_summary" || q.contentType === "story_audio" || q.category?.toLowerCase().includes("story");
-  const isPicture = q.setupType === "picture_description" || q.contentType === "picture_description" || q.category?.toLowerCase().includes("picture");
-  const isShadowing = q.setupType === "shadowing_video" || q.contentType === "shadowing_video" || q.category?.toLowerCase().includes("shadowing") || q.topic?.toLowerCase().includes("shadowing");
-  const isReflection = q.setupType === "monthly_reflection";
-  const isGoals = q.setupType === "monthly_goals";
+  const catLower = (q.category || "").trim().toLowerCase();
+  const isShadowing = q.setupType === "shadowing_video"
+    || q.contentType === "shadowing_video"
+    || catLower === "shadowing"
+    || catLower === "shadowing practice";
+  const isStory = !isShadowing && (
+    q.setupType === "story_summary"
+    || q.contentType === "story_audio"
+    || catLower === "story"
+    || catLower === "story summary"
+  );
+  const isPicture = !isShadowing && !isStory && (
+    q.setupType === "picture_description"
+    || q.contentType === "picture_description"
+    || catLower === "picture"
+    || catLower === "picture description"
+  );
+  const isReflection = !isShadowing && !isStory && !isPicture && q.setupType === "monthly_reflection";
+  const isGoals = !isShadowing && !isStory && !isPicture && !isReflection && q.setupType === "monthly_goals";
 
   await Status.updateOne({}, {
     $set: {
+      ...BASE_CLEARED_TASK_FIELDS,
       questionSentToday: true,
       questionPublishedDate: getTodayISTDate(),
       todayContentType: isStory ? "story_audio" : isPicture ? "picture_description" : isShadowing ? "shadowing_video" : "question",
@@ -434,22 +439,21 @@ export async function publishManualQuestion(q) {
       todayTopic: q.topic || (isStory ? STORY_SUMMARY_TOPIC : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isShadowing ? SHADOWING_CATEGORY : isReflection ? MONTHLY_REFLECTION_TOPIC : isGoals ? MONTHLY_GOALS_TOPIC : "Daily Practice"),
       todayQuestion: q.question,
       todayCategory: q.category || (isStory ? STORY_SUMMARY_CATEGORY : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isShadowing ? SHADOWING_CATEGORY : isReflection ? MONTHLY_REFLECTION_CATEGORY : isGoals ? MONTHLY_GOALS_CATEGORY : "General"),
-      todayAudioUrl: isShadowing ? (q.audioUrl || q.videoUrl || null) : (q.audioUrl || null),
-      todayStoryTranscript: q.storyTranscript || null,
-      todaySummaryGuide: q.summaryGuide || null,
-      todayImageUrl: q.imageUrl || null,
-      todayImageSource: q.imageSource || null,
-      todayImagePageUrl: q.imagePageUrl || null,
-      todayImagePhotographer: q.imagePhotographer || null,
-      todayImagePhotographerUrl: q.imagePhotographerUrl || null,
-      todayImageSearchQuery: q.imageSearchQuery || null,
-      todayImageInstructions: q.imageInstructions || null,
-      todayVideoUrl: q.videoUrl || null,
-      todayVideoDuration: q.videoDuration || null,
-      todayVideoTranscript: q.videoTranscript || null,
-      todayVideoTitle: q.videoTitle || q.topic || null,
-      todayPosterImage: null,
-      todayVocabulary: [],
+      todayAudioUrl: isShadowing ? (q.audioUrl || q.videoUrl || null) : isStory ? (q.audioUrl || null) : null,
+      todayStoryTranscript: isStory ? (q.storyTranscript || null) : null,
+      todaySummaryGuide: isStory ? (q.summaryGuide || null) : null,
+      todayImageUrl: isPicture ? (q.imageUrl || null) : null,
+      todayImageSource: isPicture ? (q.imageSource || null) : null,
+      todayImagePageUrl: isPicture ? (q.imagePageUrl || null) : null,
+      todayImagePhotographer: isPicture ? (q.imagePhotographer || null) : null,
+      todayImagePhotographerUrl: isPicture ? (q.imagePhotographerUrl || null) : null,
+      todayImageSearchQuery: isPicture ? (q.imageSearchQuery || null) : null,
+      todayImageInstructions: isPicture ? (q.imageInstructions || null) : null,
+      todayVideoUrl: isShadowing ? (q.videoUrl || q.audioUrl || null) : null,
+      todayVideoDuration: isShadowing ? (q.videoDuration || q.speakingDuration || null) : null,
+      todayVideoTranscript: isShadowing ? (q.videoTranscript || q.storyTranscript || null) : null,
+      todayVideoTitle: isShadowing ? (q.videoTitle || q.topic || null) : null,
+      todayVocabulary: isShadowing ? [] : normalizeVocabularyList(q.vocabulary || []),
     }
   }, { upsert: true });
 
@@ -512,14 +516,15 @@ export async function publishDueManualShadowingQuestion(now = new Date()) {
  */
 export async function publishDailyQuestion() {
   try {
+    const todayIST = getTodayISTDate();
     const statusCheck = await Status.findOne();
-    if (statusCheck?.questionSentToday) {
+    if (statusCheck?.questionSentToday && statusCheck?.questionPublishedDate === todayIST && statusCheck?.todayQuestion) {
       return { alreadyPublished: true };
     }
 
     const today = new Date();
 
-    // ── 0. Check for any due or scheduled manual question for today first ──────
+    // ── 0. Check for any due manual question for today first ──────
     const dueManual = await publishDueManualQuestion(today);
     if (dueManual.published) return dueManual;
 
@@ -530,45 +535,21 @@ export async function publishDailyQuestion() {
 
     // ── 1. Last day of month → Monthly Reflection (Highest milestone priority) ──
     if (isLastDayOfMonth()) {
-      // Check for manual monthly reflection question first
       const manualQuestion = await getManualQuestionForDate(today, "monthly_reflection");
-      
       if (manualQuestion) {
-        await Status.updateOne({}, {
-          $set: {
-            questionSentToday: true,
-            questionPublishedDate: getTodayISTDate(),
-            isMonthlyReflectionDay: true,
-            isMonthlyGoalsDay: false,
-            isStorySummaryDay: false,
-            isPictureDescriptionDay: false,
-            todayTopic: manualQuestion.topic,
-            todayQuestion: manualQuestion.question,
-            todayCategory: manualQuestion.category,
-          }
-        }, { upsert: true });
-        
-        return { 
-          published: true, 
-          type: "monthly_reflection",
-          topic: manualQuestion.topic,
-          source: "manual"
-        };
+        return await publishManualQuestion(manualQuestion);
       }
 
-      // Use default questions if no manual question
       const reflectionText = MONTHLY_REFLECTION_QUESTIONS
         .map((q, i) => `${i + 1}. ${q}`)
         .join("\n");
-      
+
       await Status.updateOne({}, {
         $set: {
+          ...BASE_CLEARED_TASK_FIELDS,
           questionSentToday: true,
-          questionPublishedDate: getTodayISTDate(),
+          questionPublishedDate: todayIST,
           isMonthlyReflectionDay: true,
-          isMonthlyGoalsDay: false,
-          isStorySummaryDay: false,
-          isPictureDescriptionDay: false,
           todayTopic: MONTHLY_REFLECTION_TOPIC,
           todayQuestion: reflectionText,
           todayCategory: MONTHLY_REFLECTION_CATEGORY,
@@ -630,45 +611,21 @@ export async function publishDailyQuestion() {
 
     // ── 6. 1st of month → Monthly Goal Setting (lower priority than story/picture) ──
     if (isFirstDayOfMonth()) {
-      // Check for manual monthly goals question first
       const manualQuestion = await getManualQuestionForDate(today, "monthly_goals");
-      
       if (manualQuestion) {
-        await Status.updateOne({}, {
-          $set: {
-            questionSentToday: true,
-            questionPublishedDate: getTodayISTDate(),
-            isMonthlyGoalsDay: true,
-            isMonthlyReflectionDay: false,
-            isStorySummaryDay: false,
-            isPictureDescriptionDay: false,
-            todayTopic: manualQuestion.topic,
-            todayQuestion: manualQuestion.question,
-            todayCategory: manualQuestion.category,
-          }
-        }, { upsert: true });
-        
-        return { 
-          published: true, 
-          type: "monthly_goals",
-          topic: manualQuestion.topic,
-          source: "manual"
-        };
+        return await publishManualQuestion(manualQuestion);
       }
 
-      // Use default questions if no manual question
       const goalsText = MONTHLY_GOALS_QUESTIONS
         .map((q, i) => `${i + 1}. ${q}`)
         .join("\n");
-      
+
       await Status.updateOne({}, {
         $set: {
+          ...BASE_CLEARED_TASK_FIELDS,
           questionSentToday: true,
-          questionPublishedDate: getTodayISTDate(),
+          questionPublishedDate: todayIST,
           isMonthlyGoalsDay: true,
-          isMonthlyReflectionDay: false,
-          isStorySummaryDay: false,
-          isPictureDescriptionDay: false,
           todayTopic: MONTHLY_GOALS_TOPIC,
           todayQuestion: goalsText,
           todayCategory: MONTHLY_GOALS_CATEGORY,
@@ -781,12 +738,9 @@ export async function publishDailyQuestion() {
 
     await Status.updateOne({}, {
       $set: {
+        ...BASE_CLEARED_TASK_FIELDS,
         questionSentToday: true,
-        questionPublishedDate: getTodayISTDate(),
-        todayContentType: "question",
-        todayAudioUrl: null,
-        todayStoryTranscript: null,
-        todaySummaryGuide: null,
+        questionPublishedDate: todayIST,
         todayTopic: question.topic || null,
         todayQuestion: question.question || null,
         todayCategory: question.category || null,
@@ -830,8 +784,8 @@ export async function shouldPublishQuestion() {
     const status = await Status.findOne().lean();
     if (!status) return false;
 
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
+    const { hour, minute } = getISTParts();
+    const nowMins = hour * 60 + minute;
 
     const sendTime = status.posterSendTime || "08:00";
     const [sh, sm] = sendTime.split(":").map(Number);
@@ -839,7 +793,7 @@ export async function shouldPublishQuestion() {
 
     const todayIST = getTodayISTDate();
     const alreadyPublished = Boolean(status.questionSentToday && status.questionPublishedDate === todayIST && status.todayQuestion);
-    
+
     return nowMins >= sendMins && !alreadyPublished;
   } catch (err) {
     console.error("[QuestionScheduler] Check time error:", err.message);
@@ -858,8 +812,8 @@ export async function catchUpPublishQuestion() {
     if (!status || alreadyPublished) return { catchUpNeeded: false };
 
     const sendTime = status.posterSendTime || "08:00";
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
+    const { hour, minute } = getISTParts();
+    const nowMins = hour * 60 + minute;
     const [sh, sm] = sendTime.split(":").map(Number);
     const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
 

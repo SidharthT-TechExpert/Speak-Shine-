@@ -13,26 +13,76 @@ export function normalizeToUTCMidnight(dateInput) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+export const IST_OFFSET_MS = 330 * 60 * 1000;
+
 /**
- * Get start of day in IST timezone
- * @param {Date} date - Date object
- * @returns {Date} - Start of day in IST
+ * Get IST wall-clock components safely regardless of OS/container timezone.
+ * @param {Date|string|number} [date=new Date()]
  */
-export function getISTStartOfDay(date = new Date()) {
-  const istDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  istDate.setHours(0, 0, 0, 0);
-  return istDate;
+export function getISTParts(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const shifted = new Date(d.getTime() + IST_OFFSET_MS);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth(); // 0-indexed
+  const day = shifted.getUTCDate();
+  const weekday = shifted.getUTCDay();
+  const hours = shifted.getUTCHours();
+  const minutes = shifted.getUTCMinutes();
+  const seconds = shifted.getUTCSeconds();
+  const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const timeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return { year, month, day, weekday, hours, minutes, seconds, dateStr, timeStr };
 }
 
 /**
- * Get end of day in IST timezone
- * @param {Date} date - Date object
+ * Get IST "YYYY-MM-DD" date key safely regardless of OS timezone.
+ * @param {Date|string|number} [date=new Date()]
+ * @returns {string}
+ */
+export function getISTDateKey(date = new Date()) {
+  return getISTParts(date).dateStr;
+}
+
+/**
+ * Get start of day in IST timezone as a UTC Date.
+ * @param {Date|string|number} [date=new Date()] - Date object
+ * @returns {Date} - Start of day in IST
+ */
+export function getISTStartOfDay(date = new Date()) {
+  const { dateStr } = getISTParts(date);
+  return new Date(`${dateStr}T00:00:00.000+05:30`);
+}
+
+/**
+ * Get end of day in IST timezone as a UTC Date.
+ * @param {Date|string|number} [date=new Date()] - Date object
  * @returns {Date} - End of day in IST
  */
 export function getISTEndOfDay(date = new Date()) {
-  const istDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  istDate.setHours(23, 59, 59, 999);
-  return istDate;
+  const { dateStr } = getISTParts(date);
+  return new Date(`${dateStr}T23:59:59.999+05:30`);
+}
+
+/**
+ * Get [start, endExclusive) bounds for an IST calendar day.
+ * @param {Date|string|number} [date=new Date()]
+ */
+export function getISTDayBounds(date = new Date()) {
+  const start = getISTStartOfDay(date);
+  const endExclusive = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, endExclusive };
+}
+
+/**
+ * Construct a Date at a specific IST wall-clock time on an IST date ("YYYY-MM-DD" and "HH:MM").
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {string} [timeStr="00:00"] - HH:MM
+ * @returns {Date}
+ */
+export function parseISTDateTime(dateStr, timeStr = "00:00") {
+  const cleanDate = String(dateStr || "").split("T")[0].trim();
+  const cleanTime = String(timeStr || "00:00").trim();
+  return new Date(`${cleanDate}T${cleanTime}:00+05:30`);
 }
 
 /**

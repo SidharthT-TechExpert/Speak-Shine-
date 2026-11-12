@@ -111,6 +111,8 @@ const videoReportSchema = new mongoose.Schema({
     // Stats
     stats: {
       duration: String,
+      durationSeconds: Number,
+      activeSpeakingSeconds: Number,
       wpm: Number,
       fillerWords: mongoose.Schema.Types.Mixed,
       fillerTotal: Number,
@@ -125,6 +127,8 @@ const videoReportSchema = new mongoose.Schema({
         rushesAtStart: Boolean,
         rushesAtEnd: Boolean,
         paceConsistency: Number,
+        longestPause: Number,
+        longestPauseAfter: String,
       },
     },
     
@@ -195,6 +199,10 @@ const videoReportSchema = new mongoose.Schema({
       isSilentAttempt:           { type: Boolean, default: false },
       silenceWarning:            { type: String, default: null },
       durationMessage:           { type: String, default: null },
+      requiredVocabWords:        { type: Number, default: null },
+      totalVocabWords:           { type: Number, default: null },
+      userDuration:              { type: Number, default: null },
+      isCalibration:             { type: Boolean, default: false },
     },
     // Sunday 2x multiplier tracking
     sundayBonus: { type: Boolean, default: false },

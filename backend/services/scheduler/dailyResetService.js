@@ -7,8 +7,7 @@ import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import StreakRecord from "../../../models/streakRecordSchema.js";
 import { getNewStreakBadgeIds } from "../../utils/streakBadges.js";
-
-const TIMEZONE = "Asia/Kolkata";
+import { getISTDateKey, getISTParts, getISTStartOfDay } from "../../utils/dateUtils.js";
 
 export function computeMissedDayFineUpdate(currentFine = 0, dailyFine = 2) {
   if (currentFine < 0) {
@@ -36,11 +35,8 @@ export async function applyStreakUpdates() {
     // with atomic lastStreakDate guard.
     // At midnight, we only run a safety catch-up for any user marked completed: true
     // whose streak was not yet incremented today (e.g. manual admin override).
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const y  = nowIST.getFullYear();
-    const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-    const d  = String(nowIST.getDate()).padStart(2, "0");
-    const todayIST = `${y}-${mo}-${d}`;
+    const todayIST = getISTDateKey();
+    const yesterdayIST = getISTDateKey(new Date(getISTStartOfDay().getTime() - 60_000));
 
     // Clear fineChargedToday for all submitters
     await User.updateMany(
@@ -48,17 +44,17 @@ export async function applyStreakUpdates() {
       { $set: { fineChargedToday: false } }
     );
 
-    // Safety fallback: only increment submitters who were not already incremented today
+    // Safety fallback: only increment completed submitters who weren't already incremented yesterday or today
     const pendingSubmitters = await User.find({
       completed: true,
-      lastStreakDate: { $ne: todayIST },
+      lastStreakDate: { $nin: [yesterdayIST, todayIST] },
     }).lean();
 
     let freezesAwarded = 0;
     for (const u of pendingSubmitters) {
       const updateRes = await User.updateOne(
-        { _id: u._id, lastStreakDate: { $ne: todayIST } },
-        { $inc: { streak: 1 }, $set: { lastStreakDate: todayIST } }
+        { _id: u._id, lastStreakDate: { $nin: [yesterdayIST, todayIST] } },
+        { $inc: { streak: 1 }, $set: { lastStreakDate: yesterdayIST } }
       );
       if (updateRes.modifiedCount === 1) {
         const newStreak = (u.streak || 0) + 1;
@@ -189,8 +185,7 @@ export async function resetDailyFlags() {
  */
 export async function resetWeeklyCounters() {
   try {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-    const dayOfWeek = nowIST.getDay(); // 0 = Sunday
+    const { dayOfWeek } = getISTParts(); // 0 = Sunday
 
     if (dayOfWeek !== 0) {
       return { isSunday: false, reset: false };
@@ -218,8 +213,7 @@ export async function resetWeeklyCounters() {
  */
 export async function resetMonthlyCounters() {
   try {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-    const dayOfMonth = nowIST.getDate();
+    const { day: dayOfMonth } = getISTParts();
 
     if (dayOfMonth !== 1) {
       return { isFirstDay: false, reset: false };
@@ -255,12 +249,13 @@ export async function resetMonthlyCounters() {
 /**
  * Reset status flags
  */
-export async function resetStatusFlags() {
+export async function resetStatusFlags(extraSet = {}) {
   try {
     await Status.updateOne({}, {
       $set: {
         questionSentToday: false,
         dailyReportGenerated: false,
+        reportExpiresAt: null,
         isMonthlyReflectionDay: false,
         isMonthlyGoalsDay: false,
         isStorySummaryDay: false,
@@ -285,8 +280,10 @@ export async function resetStatusFlags() {
         todayTopic: null,
         todayCategory: null,
         todayPosterImage: null,
+        posterExpiresAt: null,
         todayVocabulary: [],
         questionPublishedDate: null,
+        ...extraSet,
       }
     }, { upsert: true });
 
@@ -339,47 +336,12 @@ export async function performDailyReset() {
     }
 
     // 6. Reset status flags + vocabulary + stamp lastResetDate
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const y = nowIST.getFullYear();
-    const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-    const d = String(nowIST.getDate()).padStart(2, "0");
-    const todayIST = `${y}-${mo}-${d}`;
-
-    await Status.updateOne({}, {
-      $set: {
-        questionSentToday: false,
-        dailyReportGenerated: false,
-        isMonthlyReflectionDay: false,
-        isMonthlyGoalsDay: false,
-        isStorySummaryDay: false,
-        isPictureDescriptionDay: false,
-        isShadowingDay: false,
-        todayContentType: "question",
-        todayAudioUrl: null,
-        todayStoryTranscript: null,
-        todaySummaryGuide: null,
-        todayImageUrl: null,
-        todayImageSource: null,
-        todayImagePageUrl: null,
-        todayImagePhotographer: null,
-        todayImagePhotographerUrl: null,
-        todayImageSearchQuery: null,
-        todayImageInstructions: null,
-        todayVideoUrl: null,
-        todayVideoDuration: null,
-        todayVideoTranscript: null,
-        todayVideoTitle: null,
-        todayQuestion: null,
-        todayTopic: null,
-        todayCategory: null,
-        todayPosterImage: null,
-        todayVocabulary: [],
-        questionPublishedDate: null,
-        lastResetDate: todayIST,
-        lastSubmissionReportDate: null,
-        lastSubmissionReportTime: null,
-      }
-    }, { upsert: true });
+    const todayIST = getISTDateKey();
+    await resetStatusFlags({
+      lastResetDate: todayIST,
+      lastSubmissionReportDate: null,
+      lastSubmissionReportTime: null,
+    });
 
     // Reset auto-send slot statuses for the new day
     const statusDoc = await Status.findOne();

@@ -3,6 +3,7 @@
  * Handles HTTP requests for authentication endpoints
  */
 
+import mongoose from "mongoose";
 import * as authService from "../services/auth/authService.js";
 import { validateReferralCode } from "../services/referral/referralService.js";
 
@@ -188,11 +189,12 @@ export async function sendRegistrationOTP(req, res) {
  */
 export async function verifyRegistrationOTP(req, res) {
   try {
-    const { phone, otp } = req.body;
+    const { phone, otp } = req.body || {};
     if (!phone || !otp) return res.status(400).json({ error: "Phone and OTP are required" });
     const result = await authService.verifyRegistrationOTP(phone, otp);
     res.json(result);
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     res.status(400).json({ error: error.message });
   }
 }
@@ -202,13 +204,14 @@ export async function verifyRegistrationOTP(req, res) {
  */
 export async function register(req, res) {
   try {
-    const { verifyToken, name, password, referralCode } = req.body;
+    const { verifyToken, name, password, referralCode } = req.body || {};
     if (!verifyToken || !name || !password) {
       return res.status(400).json({ error: "verifyToken, name, and password are required" });
     }
     const result = await authService.submitRegistration(verifyToken, name, password, referralCode);
     res.json(result);
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     res.status(400).json({ error: error.message });
   }
 }
@@ -248,9 +251,13 @@ export async function listPending(req, res) {
  */
 export async function approvePending(req, res) {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: "Invalid registration ID" });
+    }
     const result = await authService.approvePendingRegistration(req.params.id);
     res.json(result);
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     res.status(400).json({ error: error.message });
   }
 }
@@ -260,9 +267,13 @@ export async function approvePending(req, res) {
  */
 export async function rejectPending(req, res) {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: "Invalid registration ID" });
+    }
     const result = await authService.rejectPendingRegistration(req.params.id);
     res.json(result);
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
     res.status(400).json({ error: error.message });
   }
 }

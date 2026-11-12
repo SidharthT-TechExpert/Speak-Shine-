@@ -3,9 +3,12 @@
  * Handles HTTP requests for video endpoints
  */
 
+import mongoose from "mongoose";
 import * as videoService from "../services/video/videoService.js";
 import * as videoQueue from "../services/video/videoQueue.js";
 import { COMMUNITY_ROOM } from "../services/chat/chatService.js";
+import { getISTDateKey } from "../utils/dateUtils.js";
+import { phoneInQuery } from "../utils/phoneVariants.js";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -19,11 +22,7 @@ function broadcastCommunity(req, event, payload) {
 async function checkSubmissionWindowActive() {
   const Status = (await import("../../models/statusSchema.js")).default;
   const status = await Status.findOne().lean();
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const y = nowIST.getFullYear();
-  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-  const d = String(nowIST.getDate()).padStart(2, "0");
-  const todayIST = `${y}-${mo}-${d}`;
+  const todayIST = getISTDateKey();
 
   const isQuestionSentToday = Boolean(
     status?.questionSentToday &&
@@ -58,8 +57,9 @@ export async function proxyUpload(req, res) {
     }
 
     const expectedPrefix = `videos/${req.user.id}/`;
-    if (!key.startsWith(expectedPrefix)) {
-      console.error(`[ProxyUpload] Key mismatch — user ${req.user.id} tried to upload to ${key}`);
+    const safeKeyRegex = /^[a-zA-Z0-9/_.-]+$/;
+    if (!key.startsWith(expectedPrefix) || key.includes("..") || !safeKeyRegex.test(key)) {
+      console.error(`[ProxyUpload] Invalid key — user ${req.user.id} tried to upload to ${key}`);
       return res.status(403).json({ error: "Invalid upload key" });
     }
 
@@ -76,6 +76,12 @@ export async function proxyUpload(req, res) {
     console.log(`[ProxyUpload] ✅ Uploaded successfully: ${publicUrl}`);
     res.json({ success: true, publicUrl });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        ...(error.locked ? { locked: true, posterSendTime: error.posterSendTime } : {}),
+      });
+    }
     const http = error.$metadata?.httpStatusCode;
     console.error("[ProxyUpload] Error:", error.message, "| Code:", error.Code || error.name, "| HTTP:", http);
     const hint =
@@ -222,6 +228,7 @@ export async function confirmUpload(req, res) {
  */
 export async function uploadVideo(req, res) {
   try {
+    await checkSubmissionWindowActive();
     const isPublic = req.body.isPublic;
     const ipAddress = req.ip;
     const userAgent = req.headers['user-agent'] || 'unknown';
@@ -245,6 +252,11 @@ export async function uploadVideo(req, res) {
 }
 
 async function assertReportOwner(req, reportId) {
+  if (!mongoose.Types.ObjectId.isValid(reportId)) {
+    const err = new Error("Invalid report ID");
+    err.statusCode = 400;
+    throw err;
+  }
   const VideoReport = (await import("../../models/videoReportSchema.js")).default;
   const Auth = (await import("../../models/authSchema.js")).default;
   const User = (await import("../../models/userSchema.js")).default;
@@ -267,8 +279,8 @@ async function assertReportOwner(req, reportId) {
     return report;
   }
 
-  const stripped = auth.phone.replace(/^(\+91|91)/, "");
-  const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+  const phoneFilter = auth.phone ? { phone: phoneInQuery(auth.phone) } : (auth.userId ? { userId: auth.userId } : null);
+  const user = phoneFilter ? await User.findOne(phoneFilter) : null;
   if (!user) {
     const err = new Error("Access denied");
     err.statusCode = 403;
@@ -348,9 +360,12 @@ export async function getProgress(req, res) {
 
     req.on("close", () => {
       clearInterval(heartbeat);
-      videoQueue.unregisterSseClient(reportId);
+      videoQueue.unregisterSseClient(reportId, res);
     });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error("[Progress] Error:", error.message);
     res.status(500).json({ error: "Failed to stream progress" });
   }

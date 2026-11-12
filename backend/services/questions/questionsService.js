@@ -5,6 +5,7 @@
 
 import Question from "../../../models/questionSchema.js";
 import Status from "../../../models/statusSchema.js";
+import { getISTDateKey, getISTDayBounds, getISTParts, parseISTDateTime } from "../../utils/dateUtils.js";
 
 /**
  * Get a random question for practice
@@ -99,9 +100,9 @@ export async function editQuestion(questionId, category, topic, question) {
  */
 export async function setupManualQuestion(setupType, scheduledFor, scheduledTime, category, topic, question, createdBy, story = {}, publishNow = false) {
   if (publishNow) {
-    scheduledFor = scheduledFor || new Date().toISOString().split('T')[0];
-    const now = new Date();
-    scheduledTime = scheduledTime || `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    scheduledFor = scheduledFor || getISTDateKey();
+    const { hour, minute } = getISTParts();
+    scheduledTime = scheduledTime || `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   }
 
   if (!setupType || !scheduledFor || !category || !topic || !question) {
@@ -134,20 +135,21 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
   const scheduleDate = publishNow
     ? new Date()
     : (normalizedTime
-      ? new Date(`${scheduledFor}T${normalizedTime}:00+05:30`)
-      : new Date(scheduledFor));
-  if (isNaN(scheduleDate.getTime())) {
+      ? parseISTDateTime(scheduledFor, normalizedTime)
+      : (parseISTDateTime(scheduledFor, "00:00") || new Date(scheduledFor)));
+  if (!scheduleDate || isNaN(scheduleDate.getTime())) {
     throw new Error("Invalid scheduledFor date");
   }
 
-  // Check if there's already a manual question for this date and type
+  // Check if there's already a manual question for this IST date and type
   if (!publishNow) {
+    const { start, end } = getISTDayBounds(scheduleDate);
     const existing = await Question.findOne({
       isManualSetup: true,
       setupType,
       scheduledFor: {
-        $gte: new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate()),
-        $lt: new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate() + 1)
+        $gte: start,
+        $lt: end
       },
       isUsed: false
     });
@@ -189,10 +191,8 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
     });
   } catch (err) {
     if (err.code === 11000) {
-      // Duplicate key: find the colliding document and update it with the new setup
-      const existing = await Question.findOne({
-        $or: [{ question }, { topic }]
-      });
+      // Duplicate key: only update the exact colliding document by unique question text
+      const existing = await Question.findOne({ question });
       if (existing) {
         existing.category = category;
         existing.topic = topic;
@@ -200,26 +200,26 @@ export async function setupManualQuestion(setupType, scheduledFor, scheduledTime
         existing.isManualSetup = true;
         existing.setupType = setupType;
         existing.contentType = setupType === "story_summary" ? "story_audio" : setupType === "picture_description" ? "picture_description" : setupType === "shadowing_video" ? "shadowing_video" : "question";
-        existing.audioUrl = story.audioUrl || existing.audioUrl || null;
-        existing.storyTranscript = story.storyTranscript || existing.storyTranscript || null;
-        existing.summaryGuide = story.summaryGuide || existing.summaryGuide || null;
-        existing.imageUrl = story.imageUrl || existing.imageUrl || null;
-        existing.imageSource = story.imageSource || existing.imageSource || null;
-        existing.imagePageUrl = story.imagePageUrl || existing.imagePageUrl || null;
-        existing.imagePhotographer = story.imagePhotographer || existing.imagePhotographer || null;
-        existing.imagePhotographerUrl = story.imagePhotographerUrl || existing.imagePhotographerUrl || null;
-        existing.imageSearchQuery = story.imageSearchQuery || existing.imageSearchQuery || null;
-        existing.imageInstructions = story.imageInstructions || existing.imageInstructions || null;
-        existing.imageDifficulty = story.imageDifficulty || existing.imageDifficulty || null;
-        existing.speakingDuration = story.speakingDuration || existing.speakingDuration || null;
-        existing.videoUrl = story.videoUrl || existing.videoUrl || null;
-        existing.videoDuration = story.videoDuration || existing.videoDuration || null;
-        existing.videoTranscript = story.videoTranscript || existing.videoTranscript || null;
-        existing.videoTitle = story.videoTitle || topic || existing.videoTitle || null;
+        existing.audioUrl = story.audioUrl || null;
+        existing.storyTranscript = story.storyTranscript || null;
+        existing.summaryGuide = story.summaryGuide || null;
+        existing.imageUrl = story.imageUrl || null;
+        existing.imageSource = story.imageSource || null;
+        existing.imagePageUrl = story.imagePageUrl || null;
+        existing.imagePhotographer = story.imagePhotographer || null;
+        existing.imagePhotographerUrl = story.imagePhotographerUrl || null;
+        existing.imageSearchQuery = story.imageSearchQuery || null;
+        existing.imageInstructions = story.imageInstructions || null;
+        existing.imageDifficulty = story.imageDifficulty || null;
+        existing.speakingDuration = story.speakingDuration || null;
+        existing.videoUrl = story.videoUrl || null;
+        existing.videoDuration = story.videoDuration || null;
+        existing.videoTranscript = story.videoTranscript || null;
+        existing.videoTitle = story.videoTitle || topic || null;
         existing.scheduledFor = scheduleDate;
         existing.scheduledTime = normalizedTime;
         existing.createdBy = createdBy || existing.createdBy;
-        existing.isUsed = publishNow ? true : existing.isUsed;
+        existing.isUsed = Boolean(publishNow);
         await existing.save();
         manualQuestion = existing;
       } else {
@@ -249,9 +249,8 @@ export async function listManualQuestions(setupType, upcomingOnly = false) {
   }
   
   if (upcomingOnly) {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    filter.scheduledFor = { $gte: startOfToday };
+    const { start: startOfTodayIST } = getISTDayBounds();
+    filter.scheduledFor = { $gte: startOfTodayIST };
   }
 
   const questions = await Question.find(filter)
@@ -307,8 +306,10 @@ export async function updateManualQuestion(questionId, data, userPhone) {
     videoDuration,
     videoTranscript,
     videoTitle,
+    publishNow,
   } = data;
 
+  const prevSetupType = question.setupType;
   const validTypes = ["normal", "regular", "monthly_reflection", "monthly_goals", "story_summary", "picture_description", "shadowing_video"];
   const finalSetupType = setupType || question.setupType;
   if (!validTypes.includes(finalSetupType)) {
@@ -348,25 +349,30 @@ export async function updateManualQuestion(questionId, data, userPhone) {
     }
   }
 
-  if (scheduledFor) {
-    const datePart = typeof scheduledFor === "string" ? scheduledFor.split("T")[0] : new Date(scheduledFor).toISOString().split("T")[0];
+  if (publishNow === true) {
+    scheduleDate = new Date();
+    if (!normalizedTime) {
+      const { hour, minute } = getISTParts(scheduleDate);
+      normalizedTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    }
+  } else if (scheduledFor) {
+    const datePart = typeof scheduledFor === "string" ? scheduledFor.split("T")[0] : getISTDateKey(new Date(scheduledFor));
     scheduleDate = normalizedTime
-      ? new Date(`${datePart}T${normalizedTime}:00+05:30`)
-      : new Date(scheduledFor);
-    if (isNaN(scheduleDate.getTime())) {
+      ? parseISTDateTime(datePart, normalizedTime)
+      : (parseISTDateTime(datePart, "00:00") || new Date(scheduledFor));
+    if (!scheduleDate || isNaN(scheduleDate.getTime())) {
       const error = new Error("Invalid scheduledFor date");
       error.statusCode = 400;
       throw error;
     }
   } else if (normalizedTime && question.scheduledFor) {
-    const datePart = question.scheduledFor.toISOString().split("T")[0];
-    scheduleDate = new Date(`${datePart}T${normalizedTime}:00+05:30`);
+    const datePart = getISTDateKey(question.scheduledFor);
+    scheduleDate = parseISTDateTime(datePart, normalizedTime) || scheduleDate;
   }
 
-  // Check if another manual question conflicts on this date
-  if (scheduledFor || setupType) {
-    const startOfDay = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
-    const endOfDay = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate() + 1);
+  // Check if another manual question conflicts on this IST date
+  if ((scheduledFor || setupType) && publishNow !== true) {
+    const { start: startOfDay, end: endOfDay } = getISTDayBounds(scheduleDate);
     const existing = await Question.findOne({
       _id: { $ne: questionId },
       isManualSetup: true,
@@ -405,37 +411,61 @@ export async function updateManualQuestion(questionId, data, userPhone) {
   if (videoDuration !== undefined) question.videoDuration = videoDuration || null;
   if (videoTranscript !== undefined) question.videoTranscript = videoTranscript || null;
   if (videoTitle !== undefined) question.videoTitle = videoTitle || null;
+  if (publishNow === true) {
+    question.isUsed = true;
+  }
 
   await question.save();
 
-  // If question is currently active on today's status, update Status in real time
+  if (publishNow === true) {
+    const { publishManualQuestion } = await import("../scheduler/questionSchedulerService.js");
+    await publishManualQuestion(question);
+    return question;
+  }
+
+  // If question is currently active on today's status, sync Status cleanly
   if (question.isUsed) {
     const status = await Status.findOne();
     if (status) {
-      const isActiveType = (finalSetupType === "story_summary" && status.todayContentType === "story_audio")
-        || (finalSetupType === "picture_description" && status.todayContentType === "picture_description")
-        || (finalSetupType === "shadowing_video" && status.todayContentType === "shadowing_video")
-        || (finalSetupType === "monthly_reflection" && status.isMonthlyReflectionDay)
-        || (finalSetupType === "monthly_goals" && status.isMonthlyGoalsDay);
+      const checkType = prevSetupType || finalSetupType;
+      const isNormalActive = status.todayContentType === "question"
+        && !status.isStorySummaryDay
+        && !status.isPictureDescriptionDay
+        && !status.isShadowingDay
+        && !status.isMonthlyReflectionDay
+        && !status.isMonthlyGoalsDay;
+      const isActiveType = (checkType === "story_summary" && status.todayContentType === "story_audio")
+        || (checkType === "picture_description" && status.todayContentType === "picture_description")
+        || (checkType === "shadowing_video" && status.todayContentType === "shadowing_video")
+        || (checkType === "monthly_reflection" && status.isMonthlyReflectionDay)
+        || (checkType === "monthly_goals" && status.isMonthlyGoalsDay)
+        || ((checkType === "normal" || checkType === "regular") && isNormalActive);
 
       if (isActiveType) {
-        if (topic) status.todayTopic = topic;
-        if (questionText) status.todayQuestion = questionText;
-        if (category) status.todayCategory = category;
-        if (audioUrl !== undefined) status.todayAudioUrl = audioUrl || null;
-        if (storyTranscript !== undefined) status.todayStoryTranscript = storyTranscript || null;
-        if (summaryGuide !== undefined) status.todaySummaryGuide = summaryGuide || null;
-        if (imageUrl !== undefined) status.todayImageUrl = imageUrl || null;
-        if (imageSource !== undefined) status.todayImageSource = imageSource || null;
-        if (imagePageUrl !== undefined) status.todayImagePageUrl = imagePageUrl || null;
-        if (imagePhotographer !== undefined) status.todayImagePhotographer = imagePhotographer || null;
-        if (imagePhotographerUrl !== undefined) status.todayImagePhotographerUrl = imagePhotographerUrl || null;
-        if (imageInstructions !== undefined) status.todayImageInstructions = imageInstructions || null;
-        if (videoUrl !== undefined) status.todayVideoUrl = videoUrl || null;
-        if (videoDuration !== undefined) status.todayVideoDuration = videoDuration || null;
-        if (videoTranscript !== undefined) status.todayVideoTranscript = videoTranscript || null;
-        if (videoTitle !== undefined) status.todayVideoTitle = videoTitle || null;
-        await status.save();
+        if (prevSetupType && prevSetupType !== finalSetupType) {
+          // Mode changed — republish through scheduler helper so all stale mode flags clear
+          const { publishManualQuestion } = await import("../scheduler/questionSchedulerService.js");
+          await publishManualQuestion(question);
+        } else {
+          if (topic) status.todayTopic = topic;
+          if (questionText) status.todayQuestion = questionText;
+          if (category) status.todayCategory = category;
+          if (audioUrl !== undefined) status.todayAudioUrl = audioUrl || null;
+          if (storyTranscript !== undefined) status.todayStoryTranscript = storyTranscript || null;
+          if (summaryGuide !== undefined) status.todaySummaryGuide = summaryGuide || null;
+          if (imageUrl !== undefined) status.todayImageUrl = imageUrl || null;
+          if (imageSource !== undefined) status.todayImageSource = imageSource || null;
+          if (imagePageUrl !== undefined) status.todayImagePageUrl = imagePageUrl || null;
+          if (imagePhotographer !== undefined) status.todayImagePhotographer = imagePhotographer || null;
+          if (imagePhotographerUrl !== undefined) status.todayImagePhotographerUrl = imagePhotographerUrl || null;
+          if (imageSearchQuery !== undefined) status.todayImageSearchQuery = imageSearchQuery || null;
+          if (imageInstructions !== undefined) status.todayImageInstructions = imageInstructions || null;
+          if (videoUrl !== undefined) status.todayVideoUrl = videoUrl || null;
+          if (videoDuration !== undefined) status.todayVideoDuration = videoDuration || null;
+          if (videoTranscript !== undefined) status.todayVideoTranscript = videoTranscript || null;
+          if (videoTitle !== undefined) status.todayVideoTitle = videoTitle || null;
+          await status.save();
+        }
       }
     }
   }
@@ -463,14 +493,24 @@ export async function deleteManualQuestion(questionId, userPhone) {
 
   if (question.isUsed) {
     const status = await Status.findOne().lean();
+    const isNormalActive = status?.todayContentType === "question"
+      && !status?.isStorySummaryDay
+      && !status?.isPictureDescriptionDay
+      && !status?.isShadowingDay
+      && !status?.isMonthlyReflectionDay
+      && !status?.isMonthlyGoalsDay;
     const isActiveType = question.setupType === "story_summary"
       ? status?.todayContentType === "story_audio"
       : question.setupType === "picture_description"
       ? status?.todayContentType === "picture_description"
+      : question.setupType === "shadowing_video"
+      ? (status?.todayContentType === "shadowing_video" || status?.isShadowingDay === true)
       : question.setupType === "monthly_reflection"
       ? status?.isMonthlyReflectionDay === true
       : question.setupType === "monthly_goals"
       ? status?.isMonthlyGoalsDay === true
+      : (question.setupType === "normal" || question.setupType === "regular")
+      ? isNormalActive
       : false;
     const isActive = isActiveType
       && status?.todayTopic === question.topic
@@ -480,6 +520,7 @@ export async function deleteManualQuestion(questionId, userPhone) {
       await Status.updateOne({}, {
         $set: {
           questionSentToday: false,
+          questionPublishedDate: null,
           todayContentType: "question",
           todayTopic: null,
           todayQuestion: null,
@@ -494,8 +535,16 @@ export async function deleteManualQuestion(questionId, userPhone) {
           todayImagePhotographerUrl: null,
           todayImageSearchQuery: null,
           todayImageInstructions: null,
+          todayVideoUrl: null,
+          todayVideoDuration: null,
+          todayVideoTranscript: null,
+          todayVideoTitle: null,
+          todayPosterImage: null,
           isStorySummaryDay: false,
           isPictureDescriptionDay: false,
+          isShadowingDay: false,
+          isMonthlyReflectionDay: false,
+          isMonthlyGoalsDay: false,
           todayVocabulary: [],
         }
       }, { upsert: true });
@@ -565,8 +614,8 @@ export async function getQuestionTemplates() {
  * Get manual question for specific date and type (used by scheduler)
  */
 export async function getManualQuestionForDate(date, setupType = null) {
-  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  const now = date instanceof Date ? date : new Date(date);
+  const { start: startOfDay, end: endOfDay } = getISTDayBounds(now);
 
   const filter = {
     isManualSetup: true,
@@ -580,8 +629,13 @@ export async function getManualQuestionForDate(date, setupType = null) {
     filter.setupType = setupType;
   }
 
-  const manualQuestion = await Question.findOne(filter).sort({ scheduledFor: 1 });
-  return manualQuestion;
+  const candidates = await Question.find(filter).sort({ scheduledFor: 1 });
+  for (const candidate of candidates) {
+    if (!candidate.scheduledTime || candidate.scheduledFor <= now) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 /**

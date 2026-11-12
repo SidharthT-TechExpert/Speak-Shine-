@@ -124,6 +124,18 @@ function parseQuestionItems(rawText) {
 /**
  * Generate an SVG poster that matches the Speak & Shine HD challenge design.
  */
+export function resolveVocabRequiredCount(status = {}, override = {}) {
+  const isShadowing = override.isShadowing ?? (status?.isShadowingDay || status?.todayContentType === "shadowing_video");
+  if (isShadowing) return 0;
+  const isPicture = override.isPicture ?? (status?.isPictureDescriptionDay || status?.todayContentType === "picture_description");
+  const isStory = override.isStory ?? (status?.isStorySummaryDay || status?.todayContentType === "story_audio");
+  return isPicture
+    ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
+    : isStory
+    ? (status?.vocabStoryRequiredCount ?? status?.vocabRequiredCount ?? 3)
+    : (status?.vocabNormalRequiredCount ?? status?.vocabRequiredCount ?? 3);
+}
+
 export function generateSVGPoster({
   topic = "Speaking Practice",
   question = "",
@@ -264,14 +276,17 @@ export function generateSVGPoster({
   const hasVocab = Array.isArray(vocabulary) && vocabulary.length > 0;
   const wordsToRender = hasVocab ? vocabulary.slice(0, 5) : [];
   
-  // Calculate expression card height
+  // Calculate expression card height safely for string or object vocab items
   let vocabItemsH = 0;
-  const vocabRenderData = wordsToRender.map(w => {
-    const text = w.expression || w.word || "";
-    const exLines = wrapLines(w.example ? `"${w.example}"` : "", 52);
-    const itemH = 34 + exLines.length * 22 + 10;
+  const vocabRenderData = wordsToRender.map(raw => {
+    const w = typeof raw === "string" ? { expression: raw, meaning: "", example: "" } : (raw || {});
+    const text = String(w.expression || w.word || "").trim();
+    const meaningStr = String(w.meaning || w.definition || "").trim();
+    const titleLines = wrapLines(meaningStr ? `${text} — ${meaningStr}` : text, 54);
+    const exLines = wrapLines(w.example ? `"${w.example}"` : "", 54);
+    const itemH = 14 + titleLines.length * 21 + (exLines.length > 0 ? 6 + exLines.length * 20 : 0) + 12;
     vocabItemsH += itemH + 10;
-    return { ...w, text, exLines, itemH };
+    return { ...w, text, meaningStr, titleLines, exLines, itemH };
   });
 
   const VOCAB_CARD_H = hasVocab ? (50 + vocabItemsH + 34) : 0;
@@ -307,15 +322,15 @@ export function generateSVGPoster({
         <rect width="${INNER - 32}" height="${w.itemH}" rx="10"
           fill="rgba(255,255,255,0.03)" stroke="rgba(124,111,255,0.18)" stroke-width="1"/>
         
-        <!-- Expression and definition -->
-        <text x="16" y="24" font-size="16" font-weight="700" fill="#a78bfa"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(w.text)}</text>
-        <text x="${16 + Math.min(280, w.text.length * 9) + 12}" y="24" font-size="13" font-style="italic" fill="#94a3b8"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">— ${esc(w.meaning)}</text>
-        
+        <!-- Expression and definition (wrapped cleanly without horizontal overlap) -->
+        ${w.titleLines.map((tLine, ti) =>
+          `<text x="16" y="${24 + ti * 21}" font-size="${ti === 0 ? 15.5 : 13.5}" font-weight="${ti === 0 ? 700 : 500}" fill="${ti === 0 ? "#a78bfa" : "#cbd5e1"}"
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(tLine)}</text>`
+        ).join("\n        ")}
+
         <!-- Example sentence -->
         ${w.exLines.map((exLine, li) =>
-          `<text x="16" y="${46 + li * 20}" font-size="14" fill="#cbd5e1" font-style="italic"
+          `<text x="16" y="${24 + w.titleLines.length * 21 + 4 + li * 20}" font-size="13.5" fill="#94a3b8" font-style="italic"
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif">${esc(exLine)}</text>`
         ).join("\n        ")}
       </g>`;
@@ -464,13 +479,7 @@ export async function ensurePoster(status) {
 
   // ── No poster stored — generate one (fallback only) ────────────────────
   try {
-    const isPicture = status.isPictureDescriptionDay || status.todayContentType === "picture_description";
-    const isStory = status.isStorySummaryDay || status.todayContentType === "story_audio";
-    const vocabRequiredCount = isPicture
-      ? (status.vocabPictureRequiredCount ?? 1)
-      : isStory
-      ? (status.vocabStoryRequiredCount ?? 3)
-      : (status.vocabNormalRequiredCount ?? 3);
+    const vocabRequiredCount = resolveVocabRequiredCount(status);
 
     console.log("[Poster] No poster in DB — generating fallback SVG...");
     const posterDataUri = generateSVGPoster({

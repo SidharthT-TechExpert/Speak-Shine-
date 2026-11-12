@@ -50,64 +50,78 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
     
     video.onloadedmetadata = () => {
       clearTimeout(metadataTimeout);
-      const duration = video.duration;
+      const rawDur = video.duration;
+      const seekableEnd = video.seekable?.length > 0 ? video.seekable.end(video.seekable.length - 1) : 0;
+      const duration = Number.isFinite(rawDur) && rawDur > 0 ? rawDur : (Number.isFinite(seekableEnd) && seekableEnd > 0 ? seekableEnd : null);
+
+      if (!duration) {
+        URL.revokeObjectURL(video.src);
+        resolve({ hash: null, duration: null, frames: [], width: 0, height: 0 });
+        return;
+      }
+
       const interval = duration / (totalFrames + 1); // Skip first and last frame
-      
-      // Set canvas size based on quality
-      if (quality === 'high') {
-        // Use video dimensions but cap at 720p for reasonable size
+
+      // Set high-quality canvas size when frames are requested for AI
+      if (quality === 'high' || quality === 'both') {
         const maxDimension = 720;
-        const scale = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
-        canvas.width = Math.round(video.videoWidth * scale);
-        canvas.height = Math.round(video.videoHeight * scale);
+        const scale = Math.min(1, maxDimension / Math.max(video.videoWidth || 1, video.videoHeight || 1));
+        canvas.width = Math.max(1, Math.round((video.videoWidth || 640) * scale));
+        canvas.height = Math.max(1, Math.round((video.videoHeight || 480) * scale));
       } else {
-        // Low quality for hashing only
         canvas.width = 32;
         canvas.height = 32;
       }
-      
+
+      // Dedicated 32x32 canvas ensures full-frame perceptual hash even when main canvas is 720p
+      const hashCanvas = document.createElement('canvas');
+      hashCanvas.width = 32;
+      hashCanvas.height = 32;
+      const hashCtx = hashCanvas.getContext('2d', { willReadFrequently: true });
+
+      let seekTimeout = null;
+      let activeSeekId = 0;
+
       const captureFrame = () => {
         if (currentFrame >= totalFrames) {
           URL.revokeObjectURL(video.src);
-          
-          // Generate hash from low-res data
           hashFrameData(frames)
-            .then(hash => resolve({ 
-              hash, 
+            .then(hash => resolve({
+              hash,
               duration,
-              frames: frameBlobs, // Full-quality frames
+              frames: frameBlobs,
               width: canvas.width,
               height: canvas.height
             }))
             .catch(reject);
           return;
         }
-        
+
+        const seekId = ++activeSeekId;
         const time = interval * (currentFrame + 1);
         video.currentTime = time;
-        
-        // If seek doesn't fire within 3s, skip this frame and move on
+
         seekTimeout = setTimeout(() => {
+          if (seekId !== activeSeekId) return;
+          activeSeekId++;
           console.warn(`[VideoHash] Seek timeout for frame ${currentFrame}, skipping`);
           currentFrame++;
           captureFrame();
         }, 2000);
       };
-      
-      // Timeout per seek — some browsers hang on seek for recorded blobs
-      let seekTimeout = null;
-      
+
       video.onseeked = () => {
+        const seekId = activeSeekId;
         clearTimeout(seekTimeout);
+        activeSeekId++;
         try {
-          // Draw frame to canvas
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // For hashing: Get low-res perceptual hash
+
           if (quality === 'low' || quality === 'both') {
-            const imageData = ctx.getImageData(0, 0, 32, 32);
+            hashCtx.drawImage(video, 0, 0, 32, 32);
+            const imageData = hashCtx.getImageData(0, 0, 32, 32);
             const data = imageData.data;
-            
+
             let blockHash = '';
             for (let y = 0; y < 32; y += 4) {
               for (let x = 0; x < 32; x += 4) {
@@ -124,8 +138,7 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
             }
             frames.push(blockHash);
           }
-          
-          // For AI: Get high-quality frame as blob
+
           if (quality === 'high' || quality === 'both') {
             canvas.toBlob((blob) => {
               if (blob) {
@@ -133,18 +146,20 @@ async function extractFramesAndHash(videoFile, quality = 'high') {
               }
               currentFrame++;
               captureFrame();
-            }, 'image/jpeg', 0.85); // 85% quality JPEG
-            return; // Wait for blob callback
+            }, 'image/jpeg', 0.85);
+            return;
           }
-          
-          currentFrame++;
-          captureFrame();
+
+          if (seekId >= 0) {
+            currentFrame++;
+            captureFrame();
+          }
         } catch (err) {
           URL.revokeObjectURL(video.src);
           reject(err);
         }
       };
-      
+
       captureFrame();
     };
     

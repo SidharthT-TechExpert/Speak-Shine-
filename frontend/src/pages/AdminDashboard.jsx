@@ -476,6 +476,7 @@ export default function AdminDashboard() {
   const [adminActionToken, setAdminActionToken] = useState("");
   const [pendingRegs, setPendingRegs] = useState([]);
   const [pendingRegsLoading, setPendingRegsLoading] = useState(false);
+  const [pendingActionId, setPendingActionId] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [userFilter, setUserFilter] = useState("all"); // filter chip for users tab
@@ -4731,26 +4732,32 @@ export default function AdminDashboard() {
                     <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
                       <button
                         className="paid-toggle-btn paid"
-                        style={{ padding: "0.45rem 0.95rem" }}
+                        style={{ padding: "0.45rem 0.95rem", opacity: pendingActionId === p.id ? 0.5 : 1 }}
+                        disabled={pendingActionId === p.id}
                         onClick={async () => {
+                          setPendingActionId(p.id);
                           try {
                             await api.post(`/auth/pending/${p.id}/approve`);
                             msg(`✅ ${p.name} approved — they can now log in`);
                             loadPendingRegs();
                           } catch (e) { msg(e.response?.data?.error || "Approve failed", "danger"); }
+                          finally { setPendingActionId(null); }
                         }}
                       >
-                        ✓ Approve
+                        {pendingActionId === p.id ? "Processing…" : "✓ Approve"}
                       </button>
                       <button
                         className="paid-toggle-btn unpaid"
-                        style={{ padding: "0.45rem 0.95rem" }}
+                        style={{ padding: "0.45rem 0.95rem", opacity: pendingActionId === p.id ? 0.5 : 1 }}
+                        disabled={pendingActionId === p.id}
                         onClick={async () => {
+                          setPendingActionId(p.id);
                           try {
                             await api.delete(`/auth/pending/${p.id}`);
                             msg(`Rejected ${p.name}`, "danger");
                             loadPendingRegs();
                           } catch (e) { msg(e.response?.data?.error || "Reject failed", "danger"); }
+                          finally { setPendingActionId(null); }
                         }}
                       >
                         ✕ Reject

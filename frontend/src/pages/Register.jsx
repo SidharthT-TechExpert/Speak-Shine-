@@ -47,6 +47,7 @@ export default function Register() {
   const [stepError, setStepError] = useState("");
   const [otpChannel, setOtpChannel] = useState("sms"); // "whatsapp" | "sms"
   const otpRefs = useRef([]);
+  const verifyInFlightRef = useRef(false);
 
   // Auto-validate referral code if present
   useEffect(() => {
@@ -129,13 +130,16 @@ export default function Register() {
   // Step 2 → verify OTP
   const verifyOTP = async (e) => {
     e?.preventDefault();
+    if (verifyInFlightRef.current || loading) return;
     const code = otp.join("");
     if (code.length !== 6) return;
+    verifyInFlightRef.current = true;
     setLoading(true);
     setStepError(""); // clear any previous error
     try {
       const { data } = await api.post("/auth/verify-otp", { phone, otp: code });
       setVerifyToken(data.verifyToken);
+      setStepError("");
       setStep(3);
     } catch (err) {
       const msg = err.response?.data?.error || "Invalid OTP";
@@ -143,14 +147,17 @@ export default function Register() {
       setOtp(["","","","","",""]);
       otpRefs.current[0]?.focus();
     } finally {
+      verifyInFlightRef.current = false;
       setLoading(false);
     }
   };
 
   // Auto-submit when all 6 digits entered
   useEffect(() => {
-    if (step === 2 && otp.join("").length === 6) verifyOTP();
-  }, [otp]);
+    if (step === 2 && !loading && !verifyInFlightRef.current && otp.join("").length === 6) {
+      verifyOTP();
+    }
+  }, [otp, step, loading]);
 
   // Step 3 → complete registration (submit for approval)
   const register = async (e) => {
@@ -160,6 +167,7 @@ export default function Register() {
     // Validate password according to backend rules
     const passwordErrors = [];
     if (form.password.length < 8) passwordErrors.push("at least 8 characters");
+    if (form.password.length > 128) passwordErrors.push("at most 128 characters");
     if (!/[A-Z]/.test(form.password)) passwordErrors.push("one uppercase letter");
     if (!/[a-z]/.test(form.password)) passwordErrors.push("one lowercase letter");
     if (!/[0-9]/.test(form.password)) passwordErrors.push("one number");
@@ -200,6 +208,7 @@ export default function Register() {
       if (field === "password") {
         const passwordErrors = [];
         if (val.length < 8) passwordErrors.push("at least 8 characters");
+        if (val.length > 128) passwordErrors.push("at most 128 characters");
         if (!/[A-Z]/.test(val)) passwordErrors.push("one uppercase letter");
         if (!/[a-z]/.test(val)) passwordErrors.push("one lowercase letter");
         if (!/[0-9]/.test(val)) passwordErrors.push("one number");
@@ -274,7 +283,7 @@ export default function Register() {
         {step === 2 && (
           <form onSubmit={verifyOTP}>
             <p className="auth-sub" style={{ marginBottom: 20, textAlign: "center", lineHeight: 1.5 }}>
-              OTP sent — check your WhatsApp or SMS
+              {otpChannel === "whatsapp" ? "OTP sent to your WhatsApp" : "OTP sent — check your WhatsApp or SMS"}
             </p>
             <div className="otp-boxes">
               {otp.map((digit, i) => (

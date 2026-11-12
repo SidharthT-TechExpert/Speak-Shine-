@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema({
 
   feedbackScores: {
     type: [{
+      reportId: { type: mongoose.Schema.Types.ObjectId, ref: "VideoReport", default: null },
       fluency: Number,
       grammar: Number,
       confidence: Number,

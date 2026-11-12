@@ -352,19 +352,27 @@ async function downloadAudioSample(url, destinationPath, maxBytes = 25 * 1024 * 
   let totalBytes = 0;
 
   await new Promise((resolve, reject) => {
+    let settled = false;
+    const finishDone = () => {
+      if (!settled) { settled = true; resolve(); }
+    };
     res.body.on("data", (chunk) => {
       totalBytes += chunk.length;
       if (totalBytes > maxBytes) {
+        res.body.unpipe(fileStream);
         res.body.destroy();
-        resolve();
+        fileStream.end();
       }
     });
 
     res.body.pipe(fileStream);
-    res.body.on("end", resolve);
-    res.body.on("error", reject);
-    fileStream.on("error", reject);
-    fileStream.on("finish", resolve);
+    res.body.on("error", (err) => {
+      if (!settled) { settled = true; reject(err); }
+    });
+    fileStream.on("error", (err) => {
+      if (!settled) { settled = true; reject(err); }
+    });
+    fileStream.on("finish", finishDone);
   });
 
   return destinationPath;
@@ -424,8 +432,9 @@ async function transcribeAudioWithWhisper(audioFilePath) {
   });
 
   if (response.status === 429) {
-    const retryAfter = parseRetryAfter(response);
-    markKeyExhausted(groqKey, retryAfter);
+    const errText = await response.text().catch(() => "");
+    const retryAfter = parseRetryAfter(errText);
+    markKeyExhausted(groqKey, retryAfter || undefined);
     throw new Error("Groq Whisper rate limit reached");
   }
 
@@ -790,10 +799,25 @@ async function sliceAudioFile(inputPath, startTime, endTime, outputPath) {
 /**
  * Extract story metadata, key summary points, and focus vocabulary with LLM
  */
+function normalizeStoryVocabItem(w) {
+  if (!w) return null;
+  if (typeof w === "string") {
+    const expr = w.trim();
+    return expr ? { expression: expr, word: expr, meaning: "", usage: "", example: "" } : null;
+  }
+  const expr = String(w.expression || w.word || "").trim();
+  if (!expr) return null;
+  return {
+    expression: expr,
+    word: expr,
+    meaning: String(w.meaning || w.definition || "").trim(),
+    usage: String(w.usage || "When retelling key events in the story").trim(),
+    example: String(w.example || "").trim(),
+  };
+}
+
 export async function extractStoryMetadataWithLLM(transcript, rawTitle = "") {
-  const apiKey = getTextKey();
-  if (apiKey) {
-    const prompt = `Analyze this English short story narrative for an English speaking practice task where students listen and record a summary video.
+  const prompt = `Analyze this English short story narrative for an English speaking practice task where students listen and record a summary video.
 
 Story Transcript:
 """
@@ -812,13 +836,14 @@ Respond ONLY with a valid JSON object with these exact keys:
     "3. The outcome and moral / life lesson learned."
   ],
   "vocabulary": [
-    { "word": "word1", "definition": "simple clear definition" },
-    { "word": "word2", "definition": "simple clear definition" },
-    { "word": "word3", "definition": "simple clear definition" }
+    { "expression": "word or phrase", "meaning": "simple clear definition", "usage": "when to use it", "example": "short example sentence" }
   ],
   "question": "Listen to this short story and record a 1-minute video summary in your own words. Explain what happened, how the characters reacted, and the lesson learned."
 }`;
 
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const apiKey = getTextKey();
+    if (!apiKey) break;
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -836,22 +861,40 @@ Respond ONLY with a valid JSON object with these exact keys:
         timeout: 25000
       });
 
+      if (res.status === 429) {
+        const errText = await res.text().catch(() => "");
+        markKeyExhausted(apiKey, parseRetryAfter(errText) || undefined);
+        continue;
+      }
+
       if (res.ok) {
         const data = await res.json();
         const rawContent = data.choices?.[0]?.message?.content?.trim();
         if (rawContent) {
-          const parsed = JSON.parse(rawContent);
+          let jsonStr = rawContent;
+          const fence = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (fence) {
+            jsonStr = fence[1].trim();
+          } else {
+            const s = rawContent.indexOf("{");
+            const e = rawContent.lastIndexOf("}");
+            if (s !== -1 && e !== -1) jsonStr = rawContent.slice(s, e + 1);
+          }
+          const parsed = JSON.parse(jsonStr);
           if (parsed.topic && Array.isArray(parsed.summaryGuide)) {
             return {
               topic: cleanStoryTitle(parsed.topic.trim()),
               theme: parsed.theme || "Life Lessons",
               summaryGuide: parsed.summaryGuide.map(p => String(p).trim()),
-              vocabulary: Array.isArray(parsed.vocabulary) ? parsed.vocabulary : [],
+              vocabulary: Array.isArray(parsed.vocabulary)
+                ? parsed.vocabulary.map(normalizeStoryVocabItem).filter(Boolean)
+                : [],
               question: parsed.question || "Listen to this short story and record a 1-minute video summary in your own words. Explain what happened and the lesson learned."
             };
           }
         }
       }
+      break;
     } catch (llmErr) {
       console.warn("[StoryIngestion] LLM extraction warning:", llmErr.message);
     }
@@ -873,10 +916,10 @@ Respond ONLY with a valid JSON object with these exact keys:
       `3. Resolution & Lesson: ${conclusion}`
     ],
     vocabulary: [
-      { word: "narrative", definition: "A spoken or written account of connected events; a story." },
-      { word: "dilemma", definition: "A situation requiring a difficult choice between alternatives." },
-      { word: "resolution", definition: "The conclusion or solution to the main conflict of a story." }
-    ],
+      normalizeStoryVocabItem({ word: "narrative", definition: "A spoken or written account of connected events; a story." }),
+      normalizeStoryVocabItem({ word: "dilemma", definition: "A situation requiring a difficult choice between alternatives." }),
+      normalizeStoryVocabItem({ word: "resolution", definition: "The conclusion or solution to the main conflict of a story." })
+    ].filter(Boolean),
     question: "Listen to this 1-minute story and record a short video summary in your own words. Explain what happened, how the situation unfolded, and the takeaway."
   };
 }
@@ -987,7 +1030,9 @@ export async function processStoryAudioIntoChallenge(storyItem, options = {}) {
       const r2Key = `story-audio/scraped-${Date.now()}.mp3`;
       console.log(`[StorySlicer] ☁️ Uploading sliced story to Cloudflare R2 (${r2Key})...`);
       const uploadRes = await uploadBufferToR2(audioBuffer, r2Key, "audio/mpeg");
-      if (uploadRes && uploadRes.url) {
+      if (typeof uploadRes === "string" && uploadRes) {
+        finalAudioUrl = uploadRes;
+      } else if (uploadRes && uploadRes.url) {
         finalAudioUrl = uploadRes.url;
       } else if (process.env.R2_PUBLIC_URL) {
         finalAudioUrl = `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}`;
@@ -1067,9 +1112,27 @@ export async function generateScrapedStoryChallenge(options = {}) {
   // Fallback to verified public domain English stories closest to targetDuration
   const sorted = [...FALLBACK_STORIES].sort((a, b) => Math.abs(a.duration - targetDuration) - Math.abs(b.duration - targetDuration));
   const fallback = sorted[0] || FALLBACK_STORIES[0];
+  let fallbackAudioUrl = fallback.audioUrl;
+  const localAudioRel = String(fallback.audioUrl || "").replace(/^\//, "");
+  const localAudioAbs = localAudioRel ? path.resolve(process.cwd(), "frontend/public", localAudioRel) : "";
+  if (!localAudioAbs || !fs.existsSync(localAudioAbs)) {
+    try {
+      const { generateAndUploadStoryAudio } = await import("./storyAudioService.js");
+      const synth = await generateAndUploadStoryAudio(fallback.storyTranscript, fallback.topic);
+      if (synth?.audioUrl) {
+        fallbackAudioUrl = synth.audioUrl;
+      }
+    } catch (synthErr) {
+      console.warn("[StoryFeed] Fallback story TTS synthesis skipped:", synthErr.message);
+    }
+  }
   return {
     success: true,
     ...fallback,
+    audioUrl: fallbackAudioUrl,
+    vocabulary: Array.isArray(fallback.vocabulary)
+      ? fallback.vocabulary.map(normalizeStoryVocabItem).filter(Boolean)
+      : [],
     sourceFeed: "Curated Classic English Fables Library"
   };
 }

@@ -415,7 +415,7 @@ export function getVideoDuration(videoPath, isUrl = false) {
           '-print_format', 'json',
           videoPath
         ];
-        execFile(ffprobeCmd, lastPktArgs2, { timeout: 60000 }, (err2, stdout2) => {
+        execFile(ffprobeCmd, lastPktArgs2, { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (err2, stdout2) => {
           if (err2 || !stdout2?.trim()) {
             return reject(new Error("Could not determine video duration."));
           }

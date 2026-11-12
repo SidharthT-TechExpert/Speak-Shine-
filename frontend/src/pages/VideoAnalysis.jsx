@@ -767,8 +767,10 @@ export default function VideoAnalysis() {
     if (!reportId || !report || report.status !== "processing") return;
 
     let done = false;
-    // token may be null for cookie-based sessions — SSE/XHR use withCredentials instead
-    const token = localStorage.getItem("token") || null;
+    let pollTimer = null;
+    let evtSource = null;
+    let socket = null;
+    let onSocketProgress = null;
 
     const finish = (data) => {
       if (done) return;
@@ -811,32 +813,36 @@ export default function VideoAnalysis() {
     };
 
     poll();
-    const pollTimer = setInterval(poll, 700);
+    pollTimer = setInterval(poll, 700);
 
-    const evtSource = new EventSource(
-      token
-        ? `/api/video/progress/${reportId}?token=${encodeURIComponent(token)}`
-        : `/api/video/progress/${reportId}`
-    );
-    evtSource.onmessage = (e) => {
-      try {
-        applyProgress(JSON.parse(e.data));
-      } catch { /* ignore */ }
-    };
-    evtSource.onerror = () => evtSource.close();
+    getAuthToken().then((token) => {
+      if (done) return;
+      evtSource = new EventSource(
+        token
+          ? `/api/video/progress/${reportId}?token=${encodeURIComponent(token)}`
+          : `/api/video/progress/${reportId}`,
+        { withCredentials: true }
+      );
+      evtSource.onmessage = (e) => {
+        try {
+          applyProgress(JSON.parse(e.data));
+        } catch { /* ignore */ }
+      };
+      evtSource.onerror = () => evtSource?.close();
 
-    const socket = token ? getSharedSocket(token) : null;
-    const onSocketProgress = (payload) => {
-      if (String(payload?.reportId) !== String(reportId)) return;
-      applyProgress(payload);
-    };
-    socket?.on("video:progress", onSocketProgress);
+      socket = getSharedSocket(token);
+      onSocketProgress = (payload) => {
+        if (String(payload?.reportId) !== String(reportId)) return;
+        applyProgress(payload);
+      };
+      socket?.on("video:progress", onSocketProgress);
+    });
 
     return () => {
       done = true;
-      clearInterval(pollTimer);
-      evtSource.close();
-      socket?.off("video:progress", onSocketProgress);
+      if (pollTimer) clearInterval(pollTimer);
+      evtSource?.close();
+      if (socket && onSocketProgress) socket.off("video:progress", onSocketProgress);
     };
   }, [reportId, report?.status]);
 
@@ -2186,7 +2192,7 @@ export default function VideoAnalysis() {
                       <button
                         type="button"
                         className="speakshine-tts-btn"
-                        onClick={() => handleSpeak(parsedQItems.map(q => q.text).join(". "), "", "", 999)}
+                        onClick={() => handleSpeakVocab(parsedQItems.map(q => q.text).join(". "), "", "", 999)}
                         style={{
                           background: isDark ? "rgba(255, 255, 255, 0.07)" : "#f1f5f9",
                           border: isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid #cbd5e1",
@@ -3613,8 +3619,8 @@ function ProcessingProgress({ stage, stageKey, completedSteps = [], percent = 0,
 // Only compress when the file exceeds the server's hard 110 MB limit.
 // Compression plays the video in real-time (canvas → MediaRecorder), so
 // a 7-min video takes ~7 min. We only trigger it as a last resort.
-const COMPRESS_THRESHOLD = 500 * 1024 * 1024; // 500 MB - effectively disable compression
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB hard limit
+const COMPRESS_THRESHOLD = 110 * 1024 * 1024; // Compress files over 110 MB server limit when supported
+const MAX_FILE_SIZE = 110 * 1024 * 1024; // 110 MB server upload limit
 
 // True when the browser can re-encode large files before upload (canvas + MediaRecorder).
 const CAN_COMPRESS =
@@ -4442,19 +4448,19 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
           fileToUpload = file;
           
           // If original file is too large and compression failed, show clear error
-          if (file.size > 200 * 1024 * 1024) {
+          if (file.size > MAX_FILE_SIZE) {
             setUploading(false);
-            setError(`Video compression failed (browser memory limit). Your file is ${(file.size/1024/1024).toFixed(1)}MB (max 200MB without compression). Please:\n• Record a shorter video (max ${isMonthlyReflection ? "7" : isMonthlyGoals ? "10" : isStorySummary || isPictureDescription ? "3" : "5"} min)\n• Or use a lower resolution when recording`);
+            setError(`Video compression failed (browser memory limit). Your file is ${(file.size/1024/1024).toFixed(1)}MB (max 110MB without compression). Please:\n• Record a shorter video (max ${isMonthlyReflection ? "7" : isMonthlyGoals ? "10" : isStorySummary || isPictureDescription ? "3" : "5"} min)\n• Or use a lower resolution when recording`);
             return;
           }
         }
       }
 
-      // Server accepts files up to 200 MB
-      if (fileToUpload.size > 200 * 1024 * 1024) {
+      // Server accepts files up to 110 MB
+      if (fileToUpload.size > MAX_FILE_SIZE) {
         setUploading(false);
         setStage("");
-        setError(`File is ${(fileToUpload.size / 1024 / 1024).toFixed(1)}MB (max 200MB). Please record a shorter or lower-resolution video.`);
+        setError(`File is ${(fileToUpload.size / 1024 / 1024).toFixed(1)}MB (max 110MB). Please record a shorter or lower-resolution video.`);
         return;
       }
 
@@ -4614,7 +4620,8 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
       onAnalysisStarted(data.reportId, isPublic);
       setIsPublic(true);
       setFile(null);
-      document.getElementById("video-input").value = "";
+      const videoInputEl = document.getElementById("video-input");
+      if (videoInputEl) videoInputEl.value = "";
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Upload failed");
     } finally {
@@ -4626,7 +4633,7 @@ function UploadCard({ onAnalysisStarted, isMonthlyReflection, isWeeklyReflection
     <div className="card">
       <div className="section-title">📹 Upload Video for Analysis</div>
       <p style={{ color: "var(--muted)", marginBottom: "1rem" }}>
-        Minimum {durationLimits.minLabel} · Full score at {durationLimits.fullScoreLabel} · Max {durationLimits.maxLabel} · Up to 500MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
+        Minimum {durationLimits.minLabel} · Full score at {durationLimits.fullScoreLabel} · Max {durationLimits.maxLabel} · Up to 110MB · MP4, MOV, AVI, WEBM, 3GP · Reports stored 18 hours
       </p>
       <div className="upload-area">
         <input id="video-input" type="file"

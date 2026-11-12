@@ -7,8 +7,7 @@ import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import DailyReport from "../../../models/dailyReportSchema.js";
 import VideoReport from "../../../models/videoReportSchema.js";
-
-const TIMEZONE = "Asia/Kolkata";
+import { getISTDayBounds } from "../../utils/dateUtils.js";
 
 /**
  * Generate daily reports for all users
@@ -19,21 +18,17 @@ export async function generateDailyReports() {
   try {
     console.log("[DailyReport] 📊 Generating daily reports...");
 
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-    const reportDate = new Date(nowIST);
-    reportDate.setHours(0, 0, 0, 0);
-    
-    // Report expires at 8 AM today
-    const expiresAt = new Date(reportDate);
-    expiresAt.setHours(8, 0, 0, 0);
+    const { start: reportDate } = getISTDayBounds();
+
+    // Report expires at 8 AM IST today
+    const expiresAt = new Date(reportDate.getTime() + 8 * 60 * 60 * 1000);
 
     // Get all users
     const users = await User.find({}).lean();
-    
-    // Get yesterday's date range (for finding video reports)
-    const yesterdayStart = new Date(reportDate);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    const yesterdayEnd = new Date(reportDate);
+
+    // Get yesterday's IST date range (for finding video reports)
+    const yesterdayStart = new Date(reportDate.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayEnd = reportDate;
 
     let reportsCreated = 0;
     const reports = [];
@@ -129,9 +124,8 @@ export async function getUserDailyReport(userId) {
       return { report: null, showQuestion: true };
     }
     
-    // Get today's report
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    // Get today's report (IST day start)
+    const { start: todayStart } = getISTDayBounds();
     
     const report = await DailyReport.findOne({
       userId,
