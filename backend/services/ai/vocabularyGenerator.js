@@ -396,6 +396,10 @@ export async function ensureTodayVocabulary() {
   try {
     const status = await Status.findOne().lean();
 
+    if (status?.isShadowingDay || status?.todayContentType === "shadowing_video") {
+      return [];
+    }
+
     // Read dynamic settings (admin-configurable)
     const isStory = status?.todayContentType === "story_audio"
       || (status?.isStorySummaryDay && status?.todayContentType !== "picture_description");
@@ -410,10 +414,10 @@ export async function ensureTodayVocabulary() {
 
     // Already have enough expressions for today
     if (status?.todayVocabulary && status.todayVocabulary.length >= wordCount) {
-      // Check if they already have expression and usage fields
-      const first = status.todayVocabulary[0];
+      const sliced = status.todayVocabulary.slice(0, wordCount);
+      const first = sliced[0];
       if (first && (first.expression || first.usage)) {
-        return status.todayVocabulary.slice(0, wordCount);
+        return sliced;
       }
     }
 
@@ -430,15 +434,16 @@ export async function ensureTodayVocabulary() {
 
     if (!expressions || expressions.length === 0) {
       console.warn("[ExpressionGen] Generation failed — using curated fallback");
-      const fallback = getFallbackExpressions(topic, wordCount);
+      const fallback = getFallbackExpressions(topic, wordCount).slice(0, wordCount);
       await Status.updateOne({}, { $set: { todayVocabulary: fallback } }, { upsert: true });
       return fallback;
     }
 
-    await Status.updateOne({}, { $set: { todayVocabulary: expressions } }, { upsert: true });
-    console.log(`[ExpressionGen] ✅ Stored ${expressions.length} expressions (${level}): ${expressions.map(e => e.expression || e.word).join(" | ")}`);
+    const finalExpressions = expressions.slice(0, wordCount);
+    await Status.updateOne({}, { $set: { todayVocabulary: finalExpressions } }, { upsert: true });
+    console.log(`[ExpressionGen] ✅ Stored ${finalExpressions.length} expressions (${level}): ${finalExpressions.map(e => e.expression || e.word).join(" | ")}`);
 
-    return expressions;
+    return finalExpressions;
   } catch (err) {
     console.error("[ExpressionGen] ensureTodayVocabulary error:", err.message);
     return [];

@@ -28,6 +28,9 @@ export default function ManualQuestionsPanel() {
     videoDuration: 60,
     videoTranscript: "",
     videoTitle: "",
+    imageSearchQuery: "",
+    imageDifficulty: "",
+    speakingDuration: "",
     storyDuration: 90
   });
   const [saving, setSaving] = useState(false);
@@ -138,23 +141,37 @@ export default function ManualQuestionsPanel() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const getTodayDate = () => new Date().toISOString().split('T')[0];
+  const formatISTDateKey = (date = new Date()) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
 
-  const getCurrentTime = () => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  };
+  const getTodayDate = () => formatISTDateKey(new Date());
+
+  const getCurrentTime = () =>
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date());
 
   const getNextMonthFirst = () => {
-    const today = new Date();
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    return nextMonth.toISOString().split('T')[0];
+    const [y, m] = getTodayDate().split("-").map(Number);
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    return `${nextY}-${String(nextM).padStart(2, "0")}-01`;
   };
 
   const getNextMonthLast = () => {
-    const today = new Date();
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-    return nextMonth.toISOString().split('T')[0];
+    const [y, m] = getTodayDate().split("-").map(Number);
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    const lastDay = new Date(Date.UTC(nextY, nextM, 0)).getUTCDate();
+    return `${nextY}-${String(nextM).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
   };
 
   const getDefaultDate = (setupType, mode = publishMode) => {
@@ -234,8 +251,9 @@ export default function ManualQuestionsPanel() {
     }
   };
 
-  const handleAnalyzeVoice = async () => {
-    if (!form.storyTranscript) {
+  const handleAnalyzeVoice = async (overrideText) => {
+    const textToAnalyze = typeof overrideText === "string" ? overrideText : form.storyTranscript;
+    if (!textToAnalyze) {
       notify("Please enter or generate a story transcript first.", "error");
       return;
     }
@@ -301,7 +319,7 @@ export default function ManualQuestionsPanel() {
     setGeneratingPicture(true);
     try {
       const res = await api.post("/questions/generate-picture");
-      const { title, instructions, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery } = res.data;
+      const { title, instructions, imageUrl, imageSource, imagePageUrl, imagePhotographer, imagePhotographerUrl, imageSearchQuery, difficulty, speakingDuration } = res.data;
       setForm(f => ({
         ...f,
         topic: title || f.topic,
@@ -311,6 +329,9 @@ export default function ManualQuestionsPanel() {
         imagePageUrl: imagePageUrl || "",
         imagePhotographer: imagePhotographer || "",
         imagePhotographerUrl: imagePhotographerUrl || "",
+        imageSearchQuery: imageSearchQuery || "",
+        imageDifficulty: difficulty || "",
+        speakingDuration: speakingDuration || "",
         imageInstructions: instructions || "",
         category: "Picture Description",
       }));
@@ -361,8 +382,14 @@ export default function ManualQuestionsPanel() {
       videoUrl: "",
       videoDuration: 60,
       videoTranscript: "",
-      videoTitle: ""
+      videoTitle: "",
+      imageSearchQuery: "",
+      imageDifficulty: "",
+      speakingDuration: "",
+      storyDuration: 90
     });
+    setVoiceRecommendation(null);
+    setSelectedVoiceId("21m00Tcm4TlvDq8ikWAM");
     setSelectedTemplate("");
     setShowForm(false);
   };
@@ -371,11 +398,19 @@ export default function ManualQuestionsPanel() {
     setEditingId(q._id);
     const isPastOrToday = q.scheduledFor && new Date(q.scheduledFor) <= new Date();
     setPublishMode(isPastOrToday ? "now" : "schedule");
-    const dateStr = q.scheduledFor ? new Date(q.scheduledFor).toISOString().split("T")[0] : "";
+    const dateStr = q.scheduledFor ? formatISTDateKey(new Date(q.scheduledFor)) : "";
+    const istTime = q.scheduledFor
+      ? new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(new Date(q.scheduledFor))
+      : "";
     setForm({
       setupType: q.setupType || "normal",
       scheduledFor: dateStr,
-      scheduledTime: q.scheduledTime || (q.scheduledFor ? new Date(q.scheduledFor).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : ""),
+      scheduledTime: q.scheduledTime || istTime,
       category: q.category || "General",
       topic: q.topic || "",
       question: q.question || "",
@@ -387,21 +422,35 @@ export default function ManualQuestionsPanel() {
       imagePageUrl: q.imagePageUrl || "",
       imagePhotographer: q.imagePhotographer || "",
       imagePhotographerUrl: q.imagePhotographerUrl || "",
+      imageSearchQuery: q.imageSearchQuery || "",
+      imageDifficulty: q.imageDifficulty || "",
+      speakingDuration: q.speakingDuration || "",
       imageInstructions: q.imageInstructions || "",
       videoUrl: q.videoUrl || "",
       videoDuration: q.videoDuration || 60,
       videoTranscript: q.videoTranscript || "",
-      videoTitle: q.videoTitle || ""
+      videoTitle: q.videoTitle || "",
+      storyDuration: q.speakingDuration || 90
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const isValidMediaUrl = (val) => {
+    if (!val || typeof val !== "string") return false;
+    const trimmed = val.trim();
+    return trimmed.startsWith("/") || /^https?:\/\//i.test(trimmed);
+  };
+
   const setupQuestion = async (e) => {
     e.preventDefault();
+    if (form.setupType === "story_summary" && !isValidMediaUrl(form.audioUrl)) {
+      notify("Please enter a valid Story Audio URL (https://... or /story-audio/...)", "error");
+      return;
+    }
     if (form.setupType === "shadowing_video") {
-      if (!form.videoUrl) {
-        notify("Please enter a Video URL or use AI Generate Shadowing Video", "error");
+      if (!isValidMediaUrl(form.videoUrl)) {
+        notify("Please enter a valid Audio/Video URL (https://... or /shadowing/...) or generate one", "error");
         return;
       }
       if (Number(form.videoDuration) > 180) {
@@ -1009,8 +1058,8 @@ export default function ManualQuestionsPanel() {
                   <label className="form-label">Story Audio URL *</label>
                   <input
                     className="form-input"
-                    type="url"
-                    placeholder="https://.../story.mp3"
+                    type="text"
+                    placeholder="https://.../story.mp3 or /story-audio/..."
                     required
                     value={form.audioUrl}
                     onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
@@ -1204,6 +1253,7 @@ export default function ManualQuestionsPanel() {
                           videoTitle: item.title,
                           topic: item.topic,
                           question: item.instructions,
+                          audioUrl: item.audioUrl || item.videoUrl,
                           videoUrl: item.videoUrl,
                           videoDuration: item.videoDuration,
                           videoTranscript: item.videoTranscript,
@@ -1212,7 +1262,12 @@ export default function ManualQuestionsPanel() {
                         notify(`Loaded curated lesson: "${item.title}"`);
                       }
                     }}
-                    defaultValue=""
+                    value={(() => {
+                      const matchedIdx = CURATED_SHADOWING_LESSONS.findIndex(
+                        item => item.videoUrl === form.videoUrl && item.title === form.videoTitle
+                      );
+                      return matchedIdx >= 0 ? String(matchedIdx) : "";
+                    })()}
                   >
                     <option value="" disabled>Select a curated TED-style public speaking lesson...</option>
                     {CURATED_SHADOWING_LESSONS.map((item, idx) => (
@@ -1241,11 +1296,11 @@ export default function ManualQuestionsPanel() {
                   <label className="form-label">Native Speaker Audio URL (MP3) * <span style={{ color: "var(--muted)", fontWeight: 400 }}>(direct human audio stream link, max 3 min)</span></label>
                   <input
                     className="form-input"
-                    type="url"
-                    placeholder="https://.../video.mp4"
+                    type="text"
+                    placeholder="https://.../audio.mp3 or /shadowing/..."
                     required
                     value={form.videoUrl}
-                    onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value }))}
+                    onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value, audioUrl: e.target.value }))}
                   />
                   {form.videoUrl && (
                     <div style={{ marginTop: "0.5rem", padding: "0.65rem 0.85rem", borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(236,72,153,0.3)", display: "flex", alignItems: "center", gap: "0.75rem" }}>

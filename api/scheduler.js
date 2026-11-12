@@ -12,6 +12,7 @@ import DailyReport from "../models/dailyReportSchema.js";
 import VideoReport from "../models/videoReportSchema.js";
 import { generateAndInsertQuestions } from "../backend/services/ai/questionGenerator.js";
 import { deleteFromR2 } from "../backend/config/storage.js";
+import { getISTDateKey, getISTDayBounds, getISTParts } from "../backend/utils/dateUtils.js";
 
 const TIMEZONE = "Asia/Kolkata";
 
@@ -41,24 +42,19 @@ export const MONTHLY_GOALS_CATEGORY = "Monthly Goals";
 
 /** Returns true if today is the last day of the month (IST) */
 function isLastDayOfMonth() {
-  const now = new Date();
-  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const lastDate = new Date(istDate.getFullYear(), istDate.getMonth() + 1, 0).getDate();
-  return istDate.getDate() === lastDate;
+  const { year, month, day } = getISTParts();
+  const lastDate = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return day === lastDate;
 }
 
 /** Returns true if today is the 1st of the month (IST) */
 function isFirstDayOfMonth() {
-  const now = new Date();
-  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  return istDate.getDate() === 1;
+  return getISTParts().day === 1;
 }
 
 /** Returns true if today is Saturday (IST) */
 function isSaturday() {
-  const now = new Date();
-  const istDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  return istDate.getDay() === 6; // 6 = Saturday
+  return getISTParts().dayOfWeek === 6; // 6 = Saturday
 }
 
 async function publishDailyQuestion() {
@@ -79,29 +75,28 @@ export function startScheduler() {
       const s = await Status.findOne().lean();
       if (!s) return;
 
-      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-      const nowTime = `${String(nowIST.getHours()).padStart(2,"0")}:${String(nowIST.getMinutes()).padStart(2,"0")}`;
+      const { hour: nowHour, minute: nowMin } = getISTParts();
+      const nowTime = `${String(nowHour).padStart(2,"0")}:${String(nowMin).padStart(2,"0")}`;
 
       // ── 0. Publish due manual tasks (normal, story, picture, reflection, goals) ─────
       const { publishDueManualQuestion } = await import("../backend/services/scheduler/questionSchedulerService.js");
       const manualResult = await publishDueManualQuestion();
       if (manualResult?.published) {
         console.log(`[Scheduler] 📝 Due manual task published (${manualResult.type}): ${manualResult.topic}`);
-        return;
       }
 
       // ── 1. Robust Daily Question & Poster Dispatch ───────────────────────
       const sendTime = s.posterSendTime || "08:00";
       const [sh, sm] = sendTime.split(":").map(Number);
       const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
-      const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
+      const nowMins = nowHour * 60 + nowMin;
       const todayDate = getTodayIST();
 
       const isPastSendTime = nowMins >= sendMins;
-      const isAlreadyPublishedToday = Boolean(s.questionSentToday && s.questionPublishedDate === todayDate && s.todayQuestion);
+      const isAlreadyPublishedToday = Boolean(manualResult?.published || (s.questionSentToday && s.questionPublishedDate === todayDate && s.todayQuestion));
 
       // A. If send time has arrived or passed and question is not yet published today
-      if (isPastSendTime && !isAlreadyPublishedToday) {
+      if (isPastSendTime && !isAlreadyPublishedToday && !manualResult?.published) {
         console.log(`[Scheduler] ⏰ Send time reached or passed (${nowTime} >= ${sendTime}) — publishing question & dispatching poster...`);
         const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
         await publishFromService();
@@ -216,30 +211,22 @@ export function startScheduler() {
       if (!s) return;
 
       const todayDate = getTodayIST();
-      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-      const nowMins = nowIST.getHours() * 60 + nowIST.getMinutes();
+      const { hour: nowHour, minute: nowMin } = getISTParts();
+      const nowMins = nowHour * 60 + nowMin;
 
-      const { publishDueManualStoryQuestion, publishDueManualPictureDescriptionQuestion, publishDueManualShadowingQuestion } = await import("../backend/services/scheduler/questionSchedulerService.js");
-      const storyResult = await publishDueManualStoryQuestion();
-      if (storyResult?.published) {
-        console.log(`[Scheduler] Catch-up: story summary published: ${storyResult.topic}`);
-      }
-      const pictureResult = await publishDueManualPictureDescriptionQuestion();
-      if (pictureResult?.published) {
-        console.log(`[Scheduler] Catch-up: picture description published: ${pictureResult.topic}`);
-      }
-      const shadowResult = await publishDueManualShadowingQuestion();
-      if (shadowResult?.published) {
-        console.log(`[Scheduler] Catch-up: shadowing video published: ${shadowResult.topic}`);
+      const { publishDueManualQuestion } = await import("../backend/services/scheduler/questionSchedulerService.js");
+      const manualResult = await publishDueManualQuestion();
+      if (manualResult?.published) {
+        console.log(`[Scheduler] Catch-up: due manual task published (${manualResult.type}): ${manualResult.topic}`);
       }
 
       // ── Catch-up: publish question if posterSendTime passed ──────────────
       const sendTime = s.posterSendTime || "08:00";
       const [sh, sm] = sendTime.split(":").map(Number);
       const sendMins = (Number.isFinite(sh) ? sh : 8) * 60 + (Number.isFinite(sm) ? sm : 0);
-      const isAlreadyPublishedToday = Boolean(s.questionSentToday && s.questionPublishedDate === todayDate && s.todayQuestion);
+      const isAlreadyPublishedToday = Boolean(manualResult?.published || (s.questionSentToday && s.questionPublishedDate === todayDate && s.todayQuestion));
 
-      if (nowMins >= sendMins && !isAlreadyPublishedToday) {
+      if (nowMins >= sendMins && !isAlreadyPublishedToday && !manualResult?.published) {
         console.log(`[Scheduler] Catch-up: ${sendTime} already passed today, publishing challenge now...`);
         const { publishDailyQuestion: publishFromService } = await import("../backend/services/scheduler/questionSchedulerService.js");
         await publishFromService();
@@ -283,11 +270,7 @@ export function startScheduler() {
  * Returns today's date string in IST as "YYYY-MM-DD"
  */
 function getTodayIST() {
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-  const y = nowIST.getFullYear();
-  const m = String(nowIST.getMonth() + 1).padStart(2, "0");
-  const d = String(nowIST.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return getISTDateKey();
 }
 
 /**
@@ -306,21 +289,17 @@ export async function generateDailyReports() {
   try {
     console.log("[Scheduler] 📊 Generating daily reports...");
 
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-    const reportDate = new Date(nowIST);
-    reportDate.setHours(0, 0, 0, 0);
-    
-    // Report expires at 8 AM today
-    const expiresAt = new Date(reportDate);
-    expiresAt.setHours(8, 0, 0, 0);
+    const { start: reportDate } = getISTDayBounds();
+
+    // Report expires at 8 AM IST today
+    const expiresAt = new Date(reportDate.getTime() + 8 * 60 * 60 * 1000);
 
     // Get all users
     const users = await User.find({}).lean();
-    
-    // Get yesterday's date range (for finding video reports)
-    const yesterdayStart = new Date(reportDate);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    const yesterdayEnd = new Date(reportDate);
+
+    // Get yesterday's IST date range (for finding video reports)
+    const yesterdayStart = new Date(reportDate.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayEnd = reportDate;
 
     let reportsCreated = 0;
 
@@ -485,17 +464,16 @@ export function startDailyReset() {
   // Runs 1 minute before 12:00 AM midnight reset so final monthly scores and totals are intact!
   cron.schedule("59 23 * * *", async () => {
     try {
-      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE }));
-      const tomorrowIST = new Date(nowIST);
-      tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+      const { year, month, day } = getISTParts();
+      const lastDateOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-      // Check if tomorrow is the 1st of the new month (i.e. today is the last day of the month)
-      if (tomorrowIST.getDate() === 1) {
+      // Check if today is the last day of the month in IST
+      if (day === lastDateOfMonth) {
         const Status = (await import("../models/statusSchema.js")).default;
         const status = await Status.findOne().lean().catch(() => null);
 
         if (status?.monthEndReportAutoSend !== false) {
-          console.log(`[Scheduler] 🏆 Month-end detected (${nowIST.toLocaleDateString("en-IN")}) — dispatching automated Month-End Prize Distribution Report at 11:59 PM IST...`);
+          console.log(`[Scheduler] 🏆 Month-end detected (${getISTDateKey()}) — dispatching automated Month-End Prize Distribution Report at 11:59 PM IST...`);
           const { sendMonthEndPrizeReportToGroup } = await import("../backend/services/whatsapp/whatsappService.js");
           await sendMonthEndPrizeReportToGroup();
         } else {

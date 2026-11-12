@@ -467,7 +467,9 @@ export async function generateAndInsertQuestions(totalCount = 14) {
   if (totalNeeded > totalCount) {
     const scale = totalCount / totalNeeded;
     for (const cat of CATEGORIES) {
-      neededByCategory[cat] = Math.max(1, Math.round(neededByCategory[cat] * scale));
+      if (neededByCategory[cat] > 0) {
+        neededByCategory[cat] = Math.max(1, Math.round(neededByCategory[cat] * scale));
+      }
     }
   }
 
@@ -556,7 +558,7 @@ export async function generateAndInsertQuestions(totalCount = 14) {
     if (stillNeeded === 0) break;
   }
 
-  let totalInDb = await Question.countDocuments();
+  let totalInDb = await Question.countDocuments({ isManualSetup: { $ne: true } });
 
   // If AI generation produced no questions and bank is low (< 7), seed from curated fallback pool
   if (allInserted.length === 0 && totalInDb < 7) {
@@ -569,7 +571,7 @@ export async function generateAndInsertQuestions(totalCount = 14) {
       if (seedCandidates.length > 0) {
         await Question.insertMany(seedCandidates, { ordered: false });
         allInserted.push(...seedCandidates);
-        totalInDb = await Question.countDocuments();
+        totalInDb = await Question.countDocuments({ isManualSetup: { $ne: true } });
         console.log(`[QuestionGen] 🛡️ Seeded ${seedCandidates.length} curated fallback questions into question bank. New total: ${totalInDb}`);
       }
     } catch (seedErr) {

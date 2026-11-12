@@ -3,7 +3,7 @@
  * Business logic for video upload, validation, and management
  */
 
-import VideoReport from "../../../models/videoReportSchema.js";
+import VideoReport, { normalizeVocabularyList } from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import { serializeStreakBadges } from "../../utils/streakBadges.js";
 import Status from "../../../models/statusSchema.js";
@@ -13,6 +13,8 @@ import mongoose from "mongoose";
 import { uploadToR2, uploadBufferToR2, deleteFromR2, getR2Key, getPresignedUploadUrl, getPresignedDownloadUrl } from "../../config/storage.js";
 import { enqueue, pushProgressById, pushPipelineStep, recordSecurityEvent, trackReportPhone } from "./videoQueue.js";
 import { getVideoDuration } from "../ai/videoProcessor.js";
+import { getISTDateKey } from "../../utils/dateUtils.js";
+import { normalizeIndianPhone, phoneInQuery, phoneVariants } from "../../utils/phoneVariants.js";
 import { scanFile } from "../ai/virusScanner.js";
 import { validateVideoCodecs } from "../ai/videoValidator.js";
 import { moderateVideo } from "../ai/contentModerator.js";
@@ -164,7 +166,12 @@ async function downloadFramesFromR2(frameKeys) {
 
   const results = await Promise.allSettled(
     frameKeys.map(async (key) => {
-      const url = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
+      let url;
+      try {
+        url = await getPresignedDownloadUrl(key, 300);
+      } catch {
+        url = `${process.env.R2_PUBLIC_URL?.replace(/\/$/, "")}/${key}`;
+      }
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const buffer = await response.arrayBuffer();
@@ -196,7 +203,7 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
       // Look up user name for the security event log
       let userName = displayName || "Unknown";
       try {
-        const userDoc = await User.findOne({ phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } }).lean();
+        const userDoc = phone ? await User.findOne({ phone: phoneInQuery(String(phone)) }).lean() : null;
         if (userDoc?.name) userName = userDoc.name;
       } catch {}
       recordSecurityEvent({ reportId, error: message, userName, phone, type: eventType });
@@ -243,12 +250,16 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
         }
         
         pushPipelineStep(reportId, "queue", "Queued for AI analysis…");
-        if (browserFrames?.length >= 8 && fs.existsSync(tempPath)) {
-          try { fs.unlinkSync(tempPath); } catch {}
+        let remoteVideoUrl = videoUrl;
+        if (browserFrames?.length >= 8) {
+          if (fs.existsSync(tempPath)) { try { fs.unlinkSync(tempPath); } catch {} }
+          if (videoKey) {
+            remoteVideoUrl = await getPresignedDownloadUrl(videoKey, 900).catch(() => videoUrl);
+          }
         }
         enqueue({
           reportId,
-          videoPath: browserFrames?.length >= 8 ? videoUrl : tempPath,
+          videoPath: browserFrames?.length >= 8 ? remoteVideoUrl : tempPath,
           phone,
           displayName,
           knownDuration: storedDuration,
@@ -369,12 +380,17 @@ async function downloadAndEnqueue(reportId, videoUrl, phone, displayName, videoH
     const report = await VideoReport.findById(reportId);
     const storedDuration = report?.videoDuration;
 
-    // With browser frames, stream audio from R2 URL — skip keeping large temp file on disk
+    // With browser frames, stream audio from signed R2 URL — skip keeping large temp file on disk
     const useRemotePath = browserFrames && browserFrames.length >= 8;
-    const queueVideoPath = useRemotePath ? videoUrl : tempPath;
-    if (useRemotePath && fs.existsSync(tempPath)) {
-      try { fs.unlinkSync(tempPath); } catch {}
-      console.log(`[VideoService] ⚡ Using R2 URL + ${browserFrames.length} frames (temp file removed)`);
+    let queueVideoPath = tempPath;
+    if (useRemotePath) {
+      queueVideoPath = videoKey
+        ? await getPresignedDownloadUrl(videoKey, 900).catch(() => videoUrl)
+        : videoUrl;
+      if (fs.existsSync(tempPath)) {
+        try { fs.unlinkSync(tempPath); } catch {}
+      }
+      console.log(`[VideoService] ⚡ Using signed R2 URL + ${browserFrames.length} frames (temp file removed)`);
     }
 
     enqueue({
@@ -473,8 +489,8 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
   }
 
   const authId = user.id; // JWT contains auth._id as 'id'
-  const phone = user.phone;
-  const strippedPhone = phone.replace(/^(\+91|91)/, "");
+  const phone = String(user.phone || "");
+  const strippedPhone = normalizeIndianPhone(phone);
 
   let baseType;
   try {
@@ -491,10 +507,11 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
   // Validate publicUrl is from our R2 bucket (prevent SSRF)
   const r2Endpoint = process.env.R2_ENDPOINT || "";
   const r2PublicUrl = process.env.R2_PUBLIC_URL || "";
-  const allowedR2Hosts = [
-    new URL(r2Endpoint).hostname,
-    new URL(r2PublicUrl).hostname,
-  ].filter(Boolean);
+  const parseHost = (raw) => {
+    if (!raw) return null;
+    try { return new URL(raw).hostname.toLowerCase(); } catch { return null; }
+  };
+  const allowedR2Hosts = [parseHost(r2Endpoint), parseHost(r2PublicUrl)].filter(Boolean);
 
   let parsedPublicUrl;
   try {
@@ -505,7 +522,8 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     throw error;
   }
 
-  if (!allowedR2Hosts.some(h => parsedPublicUrl.hostname.endsWith(h))) {
+  const hostLower = parsedPublicUrl.hostname.toLowerCase();
+  if (allowedR2Hosts.length === 0 || parsedPublicUrl.protocol !== "https:" || !allowedR2Hosts.some(h => hostLower === h)) {
     console.error(`[ConfirmUpload] SSRF attempt blocked — URL hostname: ${parsedPublicUrl.hostname}`);
     const error = new Error("Invalid upload URL");
     error.statusCode = 400;
@@ -521,24 +539,36 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     throw error;
   }
 
+  // Sign private R2 object before inspecting magic bytes / size / duration
+  const signedCheckUrl = await getPresignedDownloadUrl(key, 300).catch(() => publicUrl);
+
   // Renamed-file protection: inspect the uploaded object's magic bytes before
   // creating a report, so a script/image renamed to .webm/.mp4 is rejected.
   try {
-    const detected = await sniffRemoteVideo(publicUrl, baseType);
+    const detected = await sniffRemoteVideo(signedCheckUrl, baseType);
     console.log(`[ConfirmUpload] Magic bytes OK — declared=${baseType}, detected=${detected.mime}`);
   } catch (sniffErr) {
     try { await deleteFromR2(key); } catch {}
     throw sniffErr;
   }
 
+  // Inspect content-length and fallback duration if client did not provide one
+  let contentLength = 0;
+  try {
+    const headRes = await fetch(signedCheckUrl, { method: "HEAD" });
+    contentLength = parseInt(headRes.headers.get("content-length") || "0", 10);
+  } catch { /* non-fatal */ }
+
+  let probedDuration = recordedDuration ?? null;
+  if (probedDuration == null) {
+    try {
+      probedDuration = await getVideoDuration(signedCheckUrl);
+    } catch { /* fallback handled by worker ffprobe */ }
+  }
+
   // Submit gate (duration + size) before creating report
   try {
     const { evaluateSubmitGate } = await import("./submitGate.js");
-    let contentLength = 0;
-    try {
-      const headRes = await fetch(publicUrl, { method: "HEAD" });
-      contentLength = parseInt(headRes.headers.get("content-length") || "0", 10);
-    } catch { /* non-fatal */ }
 
     // Derive duration limits from question type (server-side, not client-trusted)
     const status = await Status.findOne().lean();
@@ -554,7 +584,7 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     };
 
     const gate = evaluateSubmitGate({
-      durationSeconds: recordedDuration ?? null,
+      durationSeconds: probedDuration,
       fileSizeBytes: contentLength > 0 ? contentLength : null,
       frameCount: Array.isArray(frames) ? frames.length : null,
       flags: gateFlags,
@@ -572,12 +602,9 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
     console.warn("[ConfirmUpload] Gate check skipped:", gateErr.message);
   }
 
-  // Check file size (redundant safety)
+  // Enforce MAX_ANALYSIS_MB safety limit (re-throw validation error after deleting R2 object)
   try {
-    const headRes = await fetch(publicUrl, { method: "HEAD" });
-    const contentLength = parseInt(headRes.headers.get("content-length") || "0", 10);
     const fileMB = contentLength / 1024 / 1024;
-    
     if (contentLength > 0 && fileMB > MAX_ANALYSIS_MB) {
       try { await deleteFromR2(key); } catch {}
       const error = new Error(
@@ -587,11 +614,12 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
       throw error;
     }
   } catch (headErr) {
+    if (headErr.statusCode) throw headErr;
     console.warn("[VideoService] Could not check file size:", headErr.message);
   }
 
   // Find user by phone (reports should link to User._id, not Auth._id)
-  const userDoc = await User.findOne({ phone: { $in: [phone, strippedPhone] } });
+  const userDoc = await User.findOne({ phone: phoneInQuery(phone) });
   
   if (!userDoc) {
     console.error("[ConfirmUpload] User not found by phone:", phone, "stripped:", strippedPhone);
@@ -601,12 +629,6 @@ export async function confirmDirectUpload(key, publicUrl, mimeType, isPublic, us
   }
   
   const userId = userDoc._id; // Use actual User._id for the report
-
-  // Mark user as submitted
-  await User.findOneAndUpdate(
-    { phone: { $in: [phone, strippedPhone] } },
-    { completed: true }
-  );
 
   // Create report with recorded duration if provided
   const reportStatus = await Status.findOne().lean();
@@ -884,7 +906,7 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
     }
 
     // Find user by phone (reports should link to User._id, not Auth._id)
-    const userDoc = await User.findOne({ phone: { $in: [phone, strippedPhone] } });
+    const userDoc = await User.findOne({ phone: phoneInQuery(phone) });
     
     if (!userDoc) {
       console.error("[UploadVideo] User not found by phone:", phone, "stripped:", strippedPhone);
@@ -899,13 +921,9 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
     
     const userId = userDoc._id; // Use actual User._id for the report
 
-    await User.findOneAndUpdate(
-      { phone: { $in: [phone, strippedPhone] } },
-      {
-        completed: true,
-        ...(user.name ? { $set: { name: user.name } } : {}),
-      }
-    );
+    if (user.name && user.name !== userDoc.name) {
+      await User.updateOne({ _id: userId }, { $set: { name: user.name } });
+    }
 
     const allowPrivateVideos = (await Status.findOne().lean())?.allowPrivateVideos ?? true;
     const report = await VideoReport.create({
@@ -914,6 +932,7 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
       videoFileName: safeFilename,
       challengeType: isShadowing ? "shadowing_video"
         : isMonthlyReflection ? "monthly_reflection"
+        : isWeeklyReflection ? "weekly_reflection"
         : isPictureDescription ? "picture_description"
         : isStorySummary ? "story_summary"
         : isMonthlyGoals ? "monthly_goals"
@@ -982,6 +1001,11 @@ export async function uploadVideo(file, user, isPublic, ipAddress, userAgent) {
  * Get video report
  */
 export async function getVideoReport(reportId, authId) {
+  if (!mongoose.Types.ObjectId.isValid(reportId)) {
+    const error = new Error("Invalid report ID");
+    error.statusCode = 400;
+    throw error;
+  }
   const report = await VideoReport.findById(reportId);
   
   if (!report) {
@@ -1002,8 +1026,8 @@ export async function getVideoReport(reportId, authId) {
   }
   
   // Find the user by phone to get the actual User._id
-  const stripped = auth.phone.replace(/^(\+91|91)/, "");
-  const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+  const userFilter = auth.phone ? { phone: phoneInQuery(auth.phone) } : (auth.userId ? { userId: auth.userId } : null);
+  const user = userFilter ? await User.findOne(userFilter) : null;
   
   if (!user) {
     const error = new Error("User not found");
@@ -1050,21 +1074,21 @@ export async function getVideoReport(reportId, authId) {
  * fields inside `analysis`, even though the report endpoint can reconstruct
  * them for the Video Analysis page.
  */
-function getISTDateKey(dateLike) {
+function toReportISTDateKey(dateLike) {
   if (!dateLike) return null;
   const d = new Date(dateLike);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  return getISTDateKey(d);
 }
 
 function isSamePublishedChallengeDay(report, status) {
   const refDate = report?.submittedAt || report?.createdAt || null;
   if (status?.questionPublishedDate) {
     if (!refDate) return false;
-    return getISTDateKey(refDate) === status.questionPublishedDate;
+    return toReportISTDateKey(refDate) === status.questionPublishedDate;
   }
   if (!refDate) return true;
-  return getISTDateKey(refDate) === getISTDateKey(Date.now());
+  return toReportISTDateKey(refDate) === getISTDateKey(Date.now());
 }
 
 function inferStoredChallengeType(report, analysis) {
@@ -1135,12 +1159,13 @@ async function resolveCategoryReference(report, analysis, status, isSamePublishe
   let targetStoryTranscript = analysis?.targetStoryTranscript || null;
   let targetSummaryGuide = analysis?.targetSummaryGuide || null;
   let targetImageScene = analysis?.targetImageScene || null;
-  const targetVocabulary =
+  const rawTargetVocabulary =
     Array.isArray(analysis?.targetVocabulary) && analysis.targetVocabulary.length > 0
       ? analysis.targetVocabulary
       : isSamePublishedDay && Array.isArray(status?.todayVocabulary) && status.todayVocabulary.length > 0
       ? status.todayVocabulary
       : [];
+  const targetVocabulary = normalizeVocabularyList(rawTargetVocabulary) || [];
 
   if (isSamePublishedDay && status) {
     if (!questionTopic && status.todayTopic) questionTopic = status.todayTopic;
@@ -1239,12 +1264,12 @@ function syncAnalysisOffTopicAndRef(target, breakdown, challengeType, refMeta = 
     if (challengeType === "picture_description" && refMeta.targetImageScene && !target.targetImageScene) {
       target.targetImageScene = refMeta.targetImageScene;
     }
+    const normalizedRefVocab = normalizeVocabularyList(refMeta.targetVocabulary) || [];
     if (
-      Array.isArray(refMeta.targetVocabulary) &&
-      refMeta.targetVocabulary.length > 0 &&
+      normalizedRefVocab.length > 0 &&
       (!Array.isArray(target.targetVocabulary) || target.targetVocabulary.length === 0)
     ) {
-      target.targetVocabulary = refMeta.targetVocabulary;
+      target.targetVocabulary = normalizedRefVocab;
     }
   }
 }
@@ -1266,9 +1291,10 @@ function buildPersistedRefUpdates(source, challengeType) {
     ...(challengeType === "picture_description" && source.targetImageScene
       ? { "analysis.targetImageScene": source.targetImageScene }
       : {}),
-    ...(Array.isArray(source.targetVocabulary) && source.targetVocabulary.length > 0
-      ? { "analysis.targetVocabulary": source.targetVocabulary }
-      : {}),
+    ...((() => {
+      const normalized = normalizeVocabularyList(source.targetVocabulary) || [];
+      return normalized.length > 0 ? { "analysis.targetVocabulary": normalized } : {};
+    })()),
   };
 }
 
@@ -1548,12 +1574,13 @@ async function prepareReportAnalysis(report) {
   }
 
   // Self-heal vocabulary matching using the report's saved vocabulary (or same-day vocabulary), never shadowing or cross-day vocab
-  const vocabSourceList =
+  const vocabSourceList = normalizeVocabularyList(
     Array.isArray(analysis?.targetVocabulary) && analysis.targetVocabulary.length > 0
       ? analysis.targetVocabulary
       : samePublishedDay && Array.isArray(status?.todayVocabulary)
       ? status.todayVocabulary
-      : [];
+      : []
+  ) || [];
   if (analysis && analysis.transcription && !isShadowTask && !analysis?.scoreBreakdown?.isShadowing && vocabSourceList.length > 0) {
     const rechecked = matchVocabularyInTranscript(analysis.transcription, vocabSourceList, analysis);
     const existingCount = Array.isArray(analysis.vocabularyUsed) ? analysis.vocabularyUsed.length : 0;
@@ -1760,6 +1787,11 @@ export async function getCommunityFeed(authIdOrPhone, myRole = "user") {
  * Toggle video visibility
  */
 export async function toggleVideoVisibility(reportId, authId) {
+  if (!mongoose.Types.ObjectId.isValid(reportId)) {
+    const error = new Error("Invalid report ID");
+    error.statusCode = 400;
+    throw error;
+  }
   const VISIBILITY_TOGGLE_COOLDOWN_MS = 10 * 1000;
   const report = await VideoReport.findById(reportId);
   
@@ -1781,8 +1813,8 @@ export async function toggleVideoVisibility(reportId, authId) {
   }
   
   // Find the user by phone to get the actual User._id
-  const stripped = auth.phone.replace(/^(\+91|91)/, "");
-  const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+  const userFilter = auth.phone ? { phone: phoneInQuery(auth.phone) } : (auth.userId ? { userId: auth.userId } : null);
+  const user = userFilter ? await User.findOne(userFilter) : null;
   
   if (!user) {
     const error = new Error("User not found");
@@ -1857,8 +1889,8 @@ export async function getUserReports(authId) {
   }
   
   // Find the user by phone to get the actual User._id
-  const stripped = auth.phone.replace(/^(\+91|91)/, "");
-  const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+  const userFilter = auth.phone ? { phone: phoneInQuery(auth.phone) } : (auth.userId ? { userId: auth.userId } : null);
+  const user = userFilter ? await User.findOne(userFilter) : null;
   
   if (!user) {
     return { reports: [] };
@@ -1899,6 +1931,11 @@ export async function getUserReports(authId) {
  * Delete video report
  */
 export async function deleteVideoReport(reportId, authId) {
+  if (!mongoose.Types.ObjectId.isValid(reportId)) {
+    const error = new Error("Invalid report ID");
+    error.statusCode = 400;
+    throw error;
+  }
   const report = await VideoReport.findById(reportId);
   
   if (!report) {
@@ -1962,7 +1999,11 @@ export async function deleteVideoReport(reportId, authId) {
  */
 export async function retryVideoAnalysis(reportId, authId) {
   console.log("[RetryVideoAnalysis] Starting - reportId:", reportId, "authId:", authId);
-  
+  if (!mongoose.Types.ObjectId.isValid(reportId)) {
+    const error = new Error("Invalid report ID");
+    error.statusCode = 400;
+    throw error;
+  }
   const report = await VideoReport.findById(reportId);
   
   if (!report) {
@@ -1990,8 +2031,8 @@ export async function retryVideoAnalysis(reportId, authId) {
   console.log("[RetryVideoAnalysis] Auth found - phone:", auth.phone, "name:", auth.name);
   
   // Find the user by phone (reports are linked by phone/userId, not authId)
-  const stripped = auth.phone.replace(/^(\+91|91)/, "");
-  const user = await User.findOne({ phone: { $in: [auth.phone, stripped] } });
+  const userFilter = auth.phone ? { phone: phoneInQuery(auth.phone) } : (auth.userId ? { userId: auth.userId } : null);
+  const user = userFilter ? await User.findOne(userFilter) : null;
   
   if (!user) {
     console.error("[RetryVideoAnalysis] User not found by phone:", auth.phone, "stripped:", stripped);
@@ -2017,29 +2058,34 @@ export async function retryVideoAnalysis(reportId, authId) {
     throw error;
   }
 
+  if (!report.videoUrl && !report.videoKey) {
+    const error = new Error("Cannot retry: no video uploaded for this report.");
+    error.statusCode = 400;
+    throw error;
+  }
+
   // Reset report status and clear error
   report.status = "processing";
   report.errorMessage = null;
   report.analysis = {};
   await report.save();
 
-  const retryPhone = user.phone || report.phone;
+  const retryPhone = String(user.phone || report.phone || "");
   trackReportPhone(reportId, retryPhone);
   pushPipelineStep(reportId, "download", "Restarting analysis…");
 
-  if (report.videoUrl) {
-    console.log("[RetryVideoAnalysis] Re-enqueuing video:", report.videoUrl);
-    // Pass the stored duration and frame keys for retry processing
-    await downloadAndEnqueue(
-      reportId, 
-      report.videoUrl, 
-      user.phone || user.userId || user._id, 
-      user.name || "User",
-      null, // videoHash - not available on retry
-      report.frameKeys || null, // Pass stored frame keys if available
-      report.videoKey || null   // Pass videoKey so presigned URL can be generated
-    );
-  }
+  console.log("[RetryVideoAnalysis] Re-enqueuing video:", report.videoUrl || report.videoKey);
+  downloadAndEnqueue(
+    reportId,
+    report.videoUrl,
+    retryPhone,
+    user.name || "User",
+    null,
+    report.frameKeys || null,
+    report.videoKey || null
+  ).catch((err) => {
+    console.error("[RetryVideoAnalysis] Background re-enqueue error:", err.message);
+  });
   
   return { 
     success: true, 
@@ -2053,6 +2099,11 @@ export async function retryVideoAnalysis(reportId, authId) {
  * Re-evaluate a report's vocabulary matching and composite score using the latest intelligent rules.
  */
 export async function reEvaluateReport(reportId, userId, userRole = "user", callerPhone = null) {
+  if (!mongoose.Types.ObjectId.isValid(reportId)) {
+    const error = new Error("Invalid report ID");
+    error.statusCode = 400;
+    throw error;
+  }
   const report = await VideoReport.findById(reportId);
   if (!report) {
     const error = new Error("Report not found");
@@ -2060,7 +2111,7 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
     throw error;
   }
 
-  const cleanPhone = (p) => (p || "").toString().replace(/^(\+91|91)/, "").replace(/\D/g, "");
+  const cleanPhone = (p) => normalizeIndianPhone((p || "").toString());
   const reportClean = cleanPhone(report.phone);
   const callerClean = cleanPhone(callerPhone);
 
@@ -2138,9 +2189,8 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   // 1. Re-match vocabulary with intelligent matcher (waived for shadowing & scoped to report's own day)
   // Preserve previously recognized target words so they are never lost if today's vocab is empty or changed
   const previousWords = Array.isArray(report.analysis?.vocabularyUsed) ? report.analysis.vocabularyUsed : [];
-  const savedTargetVocab = Array.isArray(report.analysis?.targetVocabulary) && report.analysis.targetVocabulary.length > 0
-    ? report.analysis.targetVocabulary
-    : null;
+  const savedTargetVocabList = normalizeVocabularyList(report.analysis?.targetVocabulary) || [];
+  const savedTargetVocab = savedTargetVocabList.length > 0 ? savedTargetVocabList : null;
   const effectiveStatusVocab = isSameDayReEval && Array.isArray(todayVocab) && todayVocab.length > 0
     ? todayVocab
     : null;
@@ -2299,29 +2349,51 @@ export async function reEvaluateReport(reportId, userId, userRole = "user", call
   report.markModified("analysis");
   await report.save();
 
-  // 7. Update User's todayScore, monthlyScore, and feedbackScores
-  if (report.phone) {
+  // 7. Update User's todayScore, monthlyScore, and feedbackScores cleanly
+  if (report.phone || report.userId) {
     try {
       const subTime = report.submittedAt ? new Date(report.submittedAt).getTime() : Date.now();
-      await User.findOneAndUpdate(
-        {
-          phone: report.phone,
-          "feedbackScores.date": {
-            $gte: new Date(subTime - 24 * 60 * 60 * 1000),
-            $lte: new Date(subTime + 24 * 60 * 60 * 1000),
-          }
-        },
+      const userMatch = report.phone ? { phone: phoneInQuery(report.phone) } : { _id: report.userId };
+      const exactUpdate = await User.findOneAndUpdate(
+        { ...userMatch, "feedbackScores.reportId": report._id },
         { $set: { "feedbackScores.$.points": effectiveScore, "feedbackScores.$.sundayBonus": isSunday } }
       );
-      const u = await User.findOne({ phone: report.phone });
+      if (!exactUpdate) {
+        await User.findOneAndUpdate(
+          {
+            ...userMatch,
+            "feedbackScores.date": {
+              $gte: new Date(subTime - 120 * 1000),
+              $lte: new Date(subTime + 120 * 1000),
+            }
+          },
+          { $set: { "feedbackScores.$.points": effectiveScore, "feedbackScores.$.sundayBonus": isSunday, "feedbackScores.$.reportId": report._id } }
+        );
+      }
+      const u = await User.findOne(userMatch);
       if (u) {
-        const reportISTDate = new Date(subTime).toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
-        const nowIST = new Date(reportISTDate);
-        const reportDayKey = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, "0")}-${String(nowIST.getDate()).padStart(2, "0")}`;
+        const reportDayKey = getISTDateKey(subTime);
         if (u.lastScoreDate === reportDayKey && u.todayScore != null) {
-          const diff = effectiveScore - u.todayScore;
+          const dayStart = new Date(`${reportDayKey}T00:00:00.000+05:30`);
+          const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+          const dayReports = await VideoReport.find({
+            status: "completed",
+            submittedAt: { $gte: dayStart, $lt: dayEnd },
+            $or: [
+              ...(u._id ? [{ userId: u._id }] : []),
+              ...(u.phone ? [{ phone: phoneInQuery(u.phone) }] : []),
+            ],
+          }).select("analysis.bonusScore analysis.compositeScore").lean();
+          const bestToday = dayReports.reduce((mx, r) => {
+            const val = r?.analysis?.bonusScore ?? r?.analysis?.compositeScore ?? 0;
+            return val > mx ? val : mx;
+          }, effectiveScore);
+          const diff = bestToday - u.todayScore;
           if (diff !== 0) {
-            await User.updateOne({ _id: u._id }, { $inc: { monthlyScore: diff }, $set: { todayScore: effectiveScore } });
+            await User.updateOne(
+              { _id: u._id },
+              { $set: { todayScore: bestToday, monthlyScore: Math.max(0, (u.monthlyScore || 0) + diff) } }
+            );
           }
         }
       }

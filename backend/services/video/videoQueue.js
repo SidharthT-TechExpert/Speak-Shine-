@@ -5,12 +5,26 @@
  * while staying within the 512 MB RAM budget (≈16 MB per video with optimisations).
  */
 
-import VideoReport from "../../../models/videoReportSchema.js";
+import VideoReport, { normalizeVocabularyList } from "../../../models/videoReportSchema.js";
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import StreakRecord from "../../../models/streakRecordSchema.js";
 import { processWebVideo } from "../ai/videoProcessor.js";
-import { phoneVariants } from "../../utils/phoneVariants.js";
+import { phoneVariants, phoneInQuery, normalizeIndianPhone } from "../../utils/phoneVariants.js";
+import { getISTDateKey } from "../../utils/dateUtils.js";
+
+const userScoreUpdateLocks = new Map();
+function withUserScoreLock(userKey, fn) {
+  const key = String(userKey);
+  const prev = userScoreUpdateLocks.get(key) || Promise.resolve();
+  const next = prev.then(fn, fn).finally(() => {
+    if (userScoreUpdateLocks.get(key) === next) {
+      userScoreUpdateLocks.delete(key);
+    }
+  });
+  userScoreUpdateLocks.set(key, next);
+  return next;
+}
 import { calculateCompositeScore, matchVocabularyInTranscript, getDurationLimits, resolveDayContentFlags } from "./submitGate.js";
 import { getNewStreakBadgeIds } from "../../utils/streakBadges.js";
 import fs from "fs";
@@ -138,13 +152,26 @@ function emitSocketProgress(reportId, payload) {
 
 export function registerSseClient(reportId, res) {
   const id = String(reportId);
-  sseClients.set(id, res);
+  let clients = sseClients.get(id);
+  if (!clients) {
+    clients = new Set();
+    sseClients.set(id, clients);
+  }
+  clients.add(res);
   const snap = progressSnapshots.get(id);
   if (snap) writeSseEvent(res, snap);
 }
 
-export function unregisterSseClient(reportId) {
-  sseClients.delete(String(reportId));
+export function unregisterSseClient(reportId, res = null) {
+  const id = String(reportId);
+  const clients = sseClients.get(id);
+  if (!clients) return;
+  if (res) {
+    clients.delete(res);
+    if (clients.size === 0) sseClients.delete(id);
+  } else {
+    sseClients.delete(id);
+  }
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -166,17 +193,23 @@ function pushProgress(reportId, data) {
   }
   progressSnapshots.set(id, merged);
 
-  const client = sseClients.get(id);
-  if (client) writeSseEvent(client, merged);
+  const clients = sseClients.get(id);
+  if (clients) {
+    for (const client of clients) {
+      try { writeSseEvent(client, merged); } catch {}
+    }
+  }
 
   emitSocketProgress(id, merged);
 }
 
 function closeSse(reportId) {
   const id = String(reportId);
-  const client = sseClients.get(id);
-  if (client) {
-    client.end();
+  const clients = sseClients.get(id);
+  if (clients) {
+    for (const client of clients) {
+      try { client.end(); } catch {}
+    }
     sseClients.delete(id);
   }
   setTimeout(() => {
@@ -260,14 +293,19 @@ async function processJob(job) {
     (browserFrames ? " ⚡ browser-frames" : "")
   );
 
-  // 10-minute hard timeout per job
+  // 10-minute hard timeout per job with timedOut fence
+  let timedOut = false;
   const processingTimeout = setTimeout(async () => {
+    timedOut = true;
     console.error(`[Queue] ⏱ TIMEOUT ${reportId}`);
     try {
-      await VideoReport.findByIdAndUpdate(reportId, {
-        status: "failed",
-        errorMessage: "Processing timeout. Please try again.",
-      });
+      await VideoReport.findOneAndUpdate(
+        { _id: reportId, status: "processing" },
+        {
+          status: "failed",
+          errorMessage: "Processing timeout. Please try again.",
+        }
+      );
       pushProgress(reportId, { status: "failed", error: "Processing timeout" });
       closeSse(reportId);
     } catch {}
@@ -341,11 +379,12 @@ async function processJob(job) {
     try {
       const [status, userDoc] = await Promise.all([
         Status.findOne().lean(),
-        User.findOne({ phone }).lean(),
+        phone ? User.findOne({ phone: phoneInQuery(String(phone)) }).lean() : Promise.resolve(null),
       ]);
       const dayFlags = resolveDayContentFlags(status);
       challengeType = challengeType || (
         status?.isMonthlyReflectionDay ? "monthly_reflection"
+        : status?.isWeeklyReflectionDay ? "weekly_reflection"
         : dayFlags.isShadowing ? "shadowing_video"
         : dayFlags.isPicture ? "picture_description"
         : dayFlags.isStory ? "story_summary"
@@ -359,9 +398,6 @@ async function processJob(job) {
       resolvedStoryTranscript = result.analysis?.targetStoryTranscript || status?.todayStoryTranscript || null;
       resolvedSummaryGuide = result.analysis?.targetSummaryGuide || status?.todaySummaryGuide || null;
       resolvedImageScene = result.analysis?.targetImageScene || status?.todayImageSearchQuery || null;
-      resolvedTargetVocabulary = challengeType !== "shadowing_video" && Array.isArray(status?.todayVocabulary) && status.todayVocabulary.length > 0
-        ? status.todayVocabulary
-        : null;
       gateFlags = {
         isMonthlyReflection: challengeType === "monthly_reflection",
         isWeeklyReflection:  challengeType === "weekly_reflection" || Boolean(status?.isWeeklyReflectionDay),
@@ -371,13 +407,17 @@ async function processJob(job) {
         isShadowing:          challengeType === "shadowing_video",
         targetVideoDuration: resolvedTargetDuration,
       };
-      const { fullScoreSeconds } = getDurationLimits(gateFlags, status || {});
-      const todayVocab = status?.todayVocabulary || [];
       const configuredWordCount = gateFlags.isPictureDescription
         ? (status?.vocabPictureWordCount ?? status?.vocabWordCount ?? 5)
         : gateFlags.isStorySummary
         ? (status?.vocabStoryWordCount ?? status?.vocabWordCount ?? 5)
         : (status?.vocabNormalWordCount ?? status?.vocabWordCount ?? 5);
+      const normalizedStatusVocab = challengeType !== "shadowing_video"
+        ? (normalizeVocabularyList(status?.todayVocabulary) || []).slice(0, configuredWordCount)
+        : [];
+      resolvedTargetVocabulary = normalizedStatusVocab.length > 0 ? normalizedStatusVocab : null;
+      const { fullScoreSeconds } = getDurationLimits(gateFlags, status || {});
+      const todayVocab = (status?.todayVocabulary || []).slice(0, configuredWordCount);
       const configuredRequiredCount = gateFlags.isPictureDescription
         ? (status?.vocabPictureRequiredCount ?? status?.vocabRequiredCount ?? 3)
         : gateFlags.isStorySummary
@@ -471,6 +511,7 @@ async function processJob(job) {
       : null;
     const resolvedChallengeType = gateFlags?.isShadowing ? "shadowing_video"
       : gateFlags?.isMonthlyReflection ? "monthly_reflection"
+      : gateFlags?.isWeeklyReflection ? "weekly_reflection"
       : gateFlags?.isPictureDescription ? "picture_description"
       : gateFlags?.isStorySummary ? "story_summary"
       : gateFlags?.isMonthlyGoals ? "monthly_goals"
@@ -492,45 +533,57 @@ async function processJob(job) {
       ? Math.min(typeof result.analysis?.topicRelevance === "number" ? result.analysis.topicRelevance : 1, 2)
       : result.analysis?.topicRelevance;
 
-    await VideoReport.findByIdAndUpdate(reportId, {
-      status: "completed",
-      challengeType: resolvedChallengeType,
-      analysis: {
-        ...result.analysis,
-        isOffTopic: finalOffTopic,
-        ...(savedTopicRel !== undefined ? { topicRelevance: savedTopicRel } : {}),
-        ...(savedTopicFeedback !== undefined ? { topicFeedback: savedTopicFeedback } : {}),
-        ...(savedOverallComment !== undefined ? { overallComment: savedOverallComment } : {}),
-        ...(resolvedQuestionTopic ? { questionTopic: resolvedQuestionTopic } : {}),
-        ...(resolvedTargetQuestion ? { targetQuestion: resolvedTargetQuestion } : {}),
-        ...(gateFlags?.isStorySummary && resolvedStoryTranscript ? { targetStoryTranscript: resolvedStoryTranscript } : {}),
-        ...(gateFlags?.isStorySummary && resolvedSummaryGuide ? { targetSummaryGuide: resolvedSummaryGuide } : {}),
-        ...(gateFlags?.isPictureDescription && resolvedImageScene ? { targetImageScene: resolvedImageScene } : {}),
-        ...(resolvedTargetVocabulary ? { targetVocabulary: resolvedTargetVocabulary } : {}),
-        ...(savedTargetDur != null ? { targetVideoDuration: savedTargetDur } : {}),
-        ...(savedTargetTranscript ? { targetVideoTranscript: savedTargetTranscript } : {}),
-        vocabularyUsed,
-        vocabularyScore,
-        compositeScore: result.analysis._compositeScore ?? null,
-        scoreBreakdown: result.analysis._scoreBreakdown ?? null,
-        sundayBonus: isSundayScore,
-        baseScore: compositeScore,
-        bonusScore: effectiveScore,
-        challengeType: gateFlags?.isShadowing ? "shadowing_video"
-          : gateFlags?.isMonthlyReflection ? "monthly_reflection"
-          : gateFlags?.isPictureDescription ? "picture_description"
-          : gateFlags?.isStorySummary ? "story_summary"
-          : gateFlags?.isMonthlyGoals ? "monthly_goals"
-          : "topic",
+    if (timedOut) {
+      console.warn(`[Queue] Skipping late completion write for timed-out job ${reportId}`);
+      return;
+    }
+
+    const completedDoc = await VideoReport.findOneAndUpdate(
+      { _id: reportId, status: "processing" },
+      {
+        status: "completed",
+        challengeType: resolvedChallengeType,
+        analysis: {
+          ...result.analysis,
+          isOffTopic: finalOffTopic,
+          ...(savedTopicRel !== undefined ? { topicRelevance: savedTopicRel } : {}),
+          ...(savedTopicFeedback !== undefined ? { topicFeedback: savedTopicFeedback } : {}),
+          ...(savedOverallComment !== undefined ? { overallComment: savedOverallComment } : {}),
+          ...(resolvedQuestionTopic ? { questionTopic: resolvedQuestionTopic } : {}),
+          ...(resolvedTargetQuestion ? { targetQuestion: resolvedTargetQuestion } : {}),
+          ...(gateFlags?.isStorySummary && resolvedStoryTranscript ? { targetStoryTranscript: resolvedStoryTranscript } : {}),
+          ...(gateFlags?.isStorySummary && resolvedSummaryGuide ? { targetSummaryGuide: resolvedSummaryGuide } : {}),
+          ...(gateFlags?.isPictureDescription && resolvedImageScene ? { targetImageScene: resolvedImageScene } : {}),
+          ...(resolvedTargetVocabulary?.length ? { targetVocabulary: resolvedTargetVocabulary } : {}),
+          ...(savedTargetDur != null ? { targetVideoDuration: savedTargetDur } : {}),
+          ...(savedTargetTranscript ? { targetVideoTranscript: savedTargetTranscript } : {}),
+          vocabularyUsed,
+          vocabularyScore,
+          compositeScore: result.analysis._compositeScore ?? null,
+          scoreBreakdown: result.analysis._scoreBreakdown ?? null,
+          sundayBonus: isSundayScore,
+          baseScore: compositeScore,
+          bonusScore: effectiveScore,
+          challengeType: resolvedChallengeType,
+        },
+        ...(durationToSave ? { videoDuration: durationToSave } : {}),
       },
-      ...(durationToSave ? { videoDuration: durationToSave } : {}),
-    });
+      { new: true }
+    );
+
+    if (!completedDoc) {
+      console.warn(`[Queue] Report ${reportId} no longer in processing state — skipping user credit.`);
+      return;
+    }
 
     const { fluency, grammar, confidence, vocabulary } = result.analysis;
 
     if (fluency != null || grammar != null) {
+      const userFilter = completedDoc.userId
+        ? { _id: completedDoc.userId }
+        : { phone: phoneInQuery(String(phone || "")) };
       await User.findOneAndUpdate(
-        { phone },
+        userFilter,
         {
           $inc: {
             totalSessions: 1,
@@ -539,6 +592,7 @@ async function processJob(job) {
           $push: {
             feedbackScores: {
               $each: [{
+                reportId: completedDoc._id,
                 fluency,
                 grammar,
                 confidence,
@@ -564,56 +618,53 @@ async function processJob(job) {
     let previousScore = null;
 
     if (compositeScore != null) {
-      const y  = nowIST.getFullYear();
-      const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-      const d  = String(nowIST.getDate()).padStart(2, "0");
-      const todayIST = `${y}-${mo}-${d}`;
+      const todayIST = getISTDateKey();
+      const lockKey = completedDoc?.userId || normalizeIndianPhone(String(phone || "")) || String(reportId);
 
-      // effectiveScore and isSundayScore already computed above — reuse them
+      const userDoc = await withUserScoreLock(lockKey, async () => {
+        const lookupFilter = completedDoc?.userId
+          ? { _id: completedDoc.userId }
+          : { phone: phoneInQuery(String(phone || "")) };
+        const freshUser = await User.findOne(lookupFilter).lean();
+        const targetFilter = freshUser?._id ? { _id: freshUser._id } : lookupFilter;
+        const alreadyScoredToday = freshUser?.lastScoreDate === todayIST;
+        const prevScore = alreadyScoredToday ? (freshUser?.todayScore ?? 0) : null;
 
-      // Fetch current user state
-      const userDoc = await User.findOne({
-        phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] },
-      }).lean();
-      const alreadyScoredToday = userDoc?.lastScoreDate === todayIST;
-      const prevScore = alreadyScoredToday ? (userDoc?.todayScore ?? 0) : null;
-
-      if (!alreadyScoredToday) {
-        // Case 1: first submission today — add score
-        await User.findOneAndUpdate(
-          { _id: userDoc?._id || { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } },
-          {
-            $inc: { monthlyScore: effectiveScore },
-            $set: { lastScoreDate: todayIST, todayScore: effectiveScore },
-          }
-        );
-        scoreOutcome = "new";
-        console.log(`[Queue] 📊 monthlyScore +${effectiveScore.toFixed(1)} for ${phone} (${todayIST}) [first submission]`);
-      } else if (effectiveScore > prevScore) {
-        // Case 2: better score — replace today's contribution
-        const improvement = effectiveScore - prevScore;
-        await User.findOneAndUpdate(
-          { _id: userDoc?._id || { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } },
-          {
-            $inc: { monthlyScore: improvement },
-            $set: { todayScore: effectiveScore },
-          }
-        );
-        scoreOutcome = "improved";
-        previousScore = prevScore;
-        console.log(`[Queue] 📈 monthlyScore improved +${improvement.toFixed(1)} for ${phone} (${todayIST}) [${prevScore.toFixed(1)} → ${effectiveScore.toFixed(1)}]`);
-      } else {
-        // Case 3: worse or equal score — drop it
-        scoreOutcome = "dropped";
-        previousScore = prevScore;
-        console.log(`[Queue] ℹ️  Re-submission score ${effectiveScore.toFixed(1)} ≤ today's best ${prevScore.toFixed(1)} for ${phone} — keeping existing score`);
-      }
+        if (!alreadyScoredToday) {
+          await User.findOneAndUpdate(
+            targetFilter,
+            {
+              $inc: { monthlyScore: effectiveScore },
+              $set: { lastScoreDate: todayIST, todayScore: effectiveScore },
+            }
+          );
+          scoreOutcome = "new";
+          console.log(`[Queue] 📊 monthlyScore +${effectiveScore.toFixed(1)} for ${phone} (${todayIST}) [first submission]`);
+        } else if (effectiveScore > prevScore) {
+          const improvement = effectiveScore - prevScore;
+          await User.findOneAndUpdate(
+            targetFilter,
+            {
+              $inc: { monthlyScore: improvement },
+              $set: { todayScore: effectiveScore },
+            }
+          );
+          scoreOutcome = "improved";
+          previousScore = prevScore;
+          console.log(`[Queue] 📈 monthlyScore improved +${improvement.toFixed(1)} for ${phone} (${todayIST}) [${prevScore.toFixed(1)} → ${effectiveScore.toFixed(1)}]`);
+        } else {
+          scoreOutcome = "dropped";
+          previousScore = prevScore;
+          console.log(`[Queue] ℹ️  Re-submission score ${effectiveScore.toFixed(1)} ≤ today's best ${prevScore.toFixed(1)} for ${phone} — keeping existing score`);
+        }
+        return freshUser;
+      });
 
       // ── Atomic Streak & Milestone Update (Option B: Real-Time at Video Analysis) ──
       // Atomically increment streak ONLY once per IST calendar day (prevents double-increment on re-submissions)
       const userFilter = userDoc?._id
         ? { _id: userDoc._id, lastStreakDate: { $ne: todayIST } }
-        : { phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] }, lastStreakDate: { $ne: todayIST } };
+        : { phone: phoneInQuery(String(phone || "")), lastStreakDate: { $ne: todayIST } };
 
       const streakUpdateResult = await User.updateOne(
         userFilter,
@@ -632,7 +683,7 @@ async function processJob(job) {
         const targetUserId = userDoc?._id;
         const updatedUser = targetUserId
           ? await User.findById(targetUserId).lean()
-          : await User.findOne({ phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] } }).lean();
+          : await User.findOne({ phone: phoneInQuery(String(phone || "")) }).lean();
 
         const currentStreak = updatedUser?.streak || (userDoc?.streak || 0) + 1;
         console.log(`[Queue] 🔥 Streak atomically incremented to ${currentStreak} for ${phone} (${todayIST})`);
@@ -720,16 +771,19 @@ async function processJob(job) {
     let userName = "Unknown";
     let userPhone = phone || "—";
     try {
-      const userDoc = await User.findOne({
-        phone: { $in: [phone, phone?.replace(/^(\+91|91)/, "")] },
-      }).lean();
+      const userDoc = phone
+        ? await User.findOne({ phone: phoneInQuery(String(phone)) }).lean()
+        : null;
       if (userDoc) userName = userDoc.name || userDoc.userId || phone;
     } catch {}
 
-    await VideoReport.findByIdAndUpdate(reportId, {
-      status: "failed",
-      errorMessage: err.message || "Analysis failed",
-    });
+    await VideoReport.findOneAndUpdate(
+      { _id: reportId, status: "processing" },
+      {
+        status: "failed",
+        errorMessage: err.message || "Analysis failed",
+      }
+    );
 
     pushProgress(reportId, { status: "failed", error: err.message });
     closeSse(reportId);

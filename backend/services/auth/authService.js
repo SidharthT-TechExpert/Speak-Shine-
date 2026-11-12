@@ -14,6 +14,68 @@ import { generateUniqueReferralCode, validateReferralCode } from "../referral/re
 import { getRedisClient, isRedisAvailable } from "../../config/redis.js";
 import { validatePassword } from "../../utils/validationUtils.js";
 import { findUserByPhone } from "../../utils/phoneUtils.js";
+import { getISTStartOfDay } from "../../utils/dateUtils.js";
+import { normalizeIndianPhone, phoneVariants } from "../../utils/phoneVariants.js";
+
+const inFlightApprovals = new Set();
+
+async function incrementOtpAttempts(phone, purpose, maxAttempts = 5) {
+  const key = `otp:attempts:${purpose}:${phone}`;
+  let attempts = 0;
+  if (isRedisAvailable()) {
+    const redis = getRedisClient();
+    attempts = await redis.incr(key);
+    if (attempts === 1) await redis.expire(key, OTP_TTL);
+  } else {
+    global._otpAttemptStore = global._otpAttemptStore || {};
+    const entry = global._otpAttemptStore[key];
+    if (!entry || entry.exp < Date.now()) {
+      global._otpAttemptStore[key] = { count: 1, exp: Date.now() + OTP_TTL * 1000 };
+      attempts = 1;
+    } else {
+      entry.count += 1;
+      attempts = entry.count;
+    }
+  }
+  if (attempts >= maxAttempts) {
+    await deleteOTP(phone, purpose).catch(() => {});
+    if (isRedisAvailable()) {
+      await getRedisClient().del(key).catch(() => {});
+    } else if (global._otpAttemptStore) {
+      delete global._otpAttemptStore[key];
+    }
+    const err = new Error("Too many incorrect attempts. Request a new OTP.");
+    err.statusCode = 429;
+    throw err;
+  }
+  return attempts;
+}
+
+async function resetOtpAttempts(phone, purpose) {
+  const key = `otp:attempts:${purpose}:${phone}`;
+  if (isRedisAvailable()) {
+    await getRedisClient().del(key).catch(() => {});
+  } else if (global._otpAttemptStore) {
+    delete global._otpAttemptStore[key];
+  }
+}
+
+async function consumeVerifyTokenJti(jti) {
+  if (!jti) return true; // legacy tokens without jti
+  const key = `reg:jti:${jti}`;
+  if (isRedisAvailable()) {
+    const res = await getRedisClient().set(key, "1", "EX", 600, "NX");
+    return res === "OK";
+  }
+  global._consumedRegJtis = global._consumedRegJtis || new Map();
+  const now = Date.now();
+  for (const [k, exp] of global._consumedRegJtis.entries()) {
+    if (exp <= now) global._consumedRegJtis.delete(k);
+  }
+  if (global._consumedRegJtis.has(jti)) return false;
+  global._consumedRegJtis.set(jti, now + 600_000);
+  return true;
+}
 
 const OTP_TTL = 300; // 5 minutes
 const TWO_FACTOR_KEY = process.env.TWO_FACTOR_API_KEY || null;
@@ -145,8 +207,8 @@ async function checkWhatsAppOtpLimits(phone) {
 }
 
 async function sendSmsOTP(phone, otp) {
-  // Always log OTP in dev/terminal for easy testing
-  if (process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY) {
+  // Log OTP only in non-production environments
+  if (process.env.NODE_ENV !== "production") {
     console.log("\n=======================================================");
     console.log(`📱 [OTP] AUTH / REGISTRATION OTP`);
     console.log(`📞 Phone: +91 ${phone}`);
@@ -180,11 +242,15 @@ async function sendSmsOTP(phone, otp) {
 
   // ── Fallback: 2Factor SMS ────────────────────────────────────────────────
   if (!TWO_FACTOR_KEY) {
-    return { sent: true, channel: "sms" }; // dev mode no key
+    if (process.env.NODE_ENV !== "production") {
+      return { sent: true, channel: "sms" };
+    }
+    console.error("[OTP] TWO_FACTOR_API_KEY not configured and WhatsApp delivery unavailable.");
+    return { sent: false, channel: "sms" };
   }
 
   try {
-    const stripped = phone.replace(/^(\+91|91)/, "");
+    const stripped = normalizeIndianPhone(String(phone));
     const { default: fetch } = await import("node-fetch");
     const url = `https://2factor.in/API/V1/${TWO_FACTOR_KEY}/SMS/${stripped}/${otp}/OTP1`;
     const res = await fetch(url);
@@ -569,7 +635,7 @@ export async function sendPasswordResetOTP(phone) {
     throw error;
   }
 
-  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+  const isLocal = process.env.NODE_ENV !== "production";
 
   // In local/dev mode: skip SMS and use master OTP 112233
   if (isLocal) {
@@ -599,7 +665,8 @@ export async function sendPasswordResetOTP(phone) {
   await storeOTP(stripped, otp, "forgot");
   const sent = await sendSmsOTP(stripped, otp);
 
-  if (!sent) {
+  if (!sent?.sent) {
+    await deleteOTP(stripped, "forgot").catch(() => {});
     throw new Error("Failed to send OTP. Please try again.");
   }
 
@@ -612,7 +679,7 @@ export async function sendPasswordResetOTP(phone) {
 export async function verifyPasswordResetOTP(phone, otp) {
   const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
   const trimmedOtp = String(otp).trim();
-  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+  const isLocal = process.env.NODE_ENV !== "production";
 
   // In local/dev mode, always allow master OTP 112233
   if (isLocal && trimmedOtp === "112233") {
@@ -735,7 +802,10 @@ const DAILY_REGISTRATION_LIMIT = parseInt(process.env.MAX_DAILY_REGISTRATIONS ||
  * Step 1 — Send OTP to phone for registration (SMS only, never voice)
  */
 export async function sendRegistrationOTP(phone) {
-  const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+  if (typeof phone !== "string") {
+    throw new Error("Enter a valid 10-digit Indian mobile number");
+  }
+  const stripped = normalizeIndianPhone(phone.trim());
 
   if (!/^[6-9]\d{9}$/.test(stripped)) {
     throw new Error("Enter a valid 10-digit Indian mobile number");
@@ -745,18 +815,16 @@ export async function sendRegistrationOTP(phone) {
   await checkPhoneOtpRateLimit(stripped);
 
   // Block if already a full account
-  const existing = await Auth.findOne({ phone: { $in: [stripped, `91${stripped}`] } });
+  const existing = await Auth.findOne({ phone: { $in: phoneVariants(stripped) } });
   if (existing) {
     throw new Error("An account with this number already exists. Please log in.");
   }
 
-  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+  const isLocal = process.env.NODE_ENV !== "production";
 
-  // Enforce daily registration limit (30 slots/day) in production only
+  // Enforce daily registration limit in production using true IST midnight
   if (!isLocal) {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const midnightIST = new Date(nowIST);
-    midnightIST.setHours(0, 0, 0, 0);
+    const midnightIST = getISTStartOfDay();
     const todayCount = await PendingRegistration.countDocuments({ createdAt: { $gte: midnightIST } });
     if (todayCount >= DAILY_REGISTRATION_LIMIT) {
       const error = new Error(`Registration is full for today (${DAILY_REGISTRATION_LIMIT} slots). New slots open at midnight. Try again tomorrow!`);
@@ -765,6 +833,8 @@ export async function sendRegistrationOTP(phone) {
       throw error;
     }
   }
+
+  await resetOtpAttempts(stripped, "register");
 
   // In local mode, skip SMS sending and store master OTP 112233
   if (isLocal) {
@@ -777,6 +847,7 @@ export async function sendRegistrationOTP(phone) {
       success: true,
       message: "Local mode: Use OTP 112233",
       devOtp: "112233",
+      channel: "sms",
     };
   }
 
@@ -784,26 +855,38 @@ export async function sendRegistrationOTP(phone) {
   await storeOTP(stripped, otp, "register");
   const sent = await sendSmsOTP(stripped, otp);
 
-  if (!sent) {
+  if (!sent?.sent) {
+    await deleteOTP(stripped, "register").catch(() => {});
     throw new Error("Failed to send OTP. Please try again.");
   }
 
-  return { success: true, message: `OTP sent to +91 ${stripped.slice(0, 5)}XXXXX` };
+  return {
+    success: true,
+    message: `OTP sent to +91 ${stripped.slice(0, 5)}XXXXX`,
+    channel: sent.channel || "sms",
+  };
 }
 
 /**
- * Step 2 — Verify OTP, return a short-lived verifyToken
+ * Step 2 — Verify OTP, return a short-lived single-use verifyToken
  */
 export async function verifyRegistrationOTP(phone, otp) {
-  const stripped = phone.replace(/^(\+91|91)/, "").replace(/\s+/g, "");
+  if (typeof phone !== "string" || (typeof otp !== "string" && typeof otp !== "number")) {
+    throw new Error("Phone and OTP are required");
+  }
+  const stripped = normalizeIndianPhone(phone.trim());
+  if (!/^[6-9]\d{9}$/.test(stripped)) {
+    throw new Error("Enter a valid 10-digit Indian mobile number");
+  }
   const trimmedOtp = String(otp).trim();
-  const isLocal = process.env.NODE_ENV !== "production" || !TWO_FACTOR_KEY;
+  const isLocal = process.env.NODE_ENV !== "production";
 
   // In local mode, allow 112233 unconditionally
   if (isLocal && trimmedOtp === "112233") {
     await deleteOTP(stripped, "register").catch(() => {});
+    await resetOtpAttempts(stripped, "register");
     const verifyToken = jwt.sign(
-      { phone: stripped, purpose: "register" },
+      { phone: stripped, purpose: "register", jti: randomUUID() },
       getJwtSecret(),
       { expiresIn: "10m" }
     );
@@ -816,13 +899,15 @@ export async function verifyRegistrationOTP(phone, otp) {
     throw new Error("OTP expired or not found. Request a new one.");
   }
   if (stored !== trimmedOtp) {
+    await incrementOtpAttempts(stripped, "register", 5);
     throw new Error("Incorrect OTP. Please try again.");
   }
 
   await deleteOTP(stripped, "register");
+  await resetOtpAttempts(stripped, "register");
 
   const verifyToken = jwt.sign(
-    { phone: stripped, purpose: "register" },
+    { phone: stripped, purpose: "register", jti: randomUUID() },
     getJwtSecret(),
     { expiresIn: "10m" }
   );
@@ -849,11 +934,14 @@ export async function submitRegistration(verifyToken, name, password, referralCo
   const phone = decoded.phone;
 
   // Validate inputs
-  if (!name || name.trim().length < 2) {
+  if (typeof name !== "string" || name.trim().length < 2) {
     throw new Error("Name must be at least 2 characters.");
   }
-  if (!password || password.length < 6) {
+  if (typeof password !== "string" || password.length < 6) {
     throw new Error("Password must be at least 6 characters.");
+  }
+  if (password.length > 128) {
+    throw new Error("Password too long (max 128 characters).");
   }
 
   const pwCheck = validatePassword(password);
@@ -861,25 +949,36 @@ export async function submitRegistration(verifyToken, name, password, referralCo
     throw new Error(pwCheck.errors.join(". "));
   }
 
-  // Validate referral code if provided
+  // Block duplicates before consuming token
+  const existing = await Auth.findOne({ phone: { $in: phoneVariants(phone) } });
+  if (existing) {
+    throw new Error("An account with this number already exists.");
+  }
+
+  // Validate referral code if provided & guard against self-referral
   let validReferralCode = null;
   let referrerName = null;
   if (referralCode && typeof referralCode === "string" && referralCode.trim()) {
     const cleanCode = referralCode.trim();
     const inviter = await User.findOne({
       referralCode: { $regex: new RegExp(`^${cleanCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-    }).select("name phone referralCode").lean();
+    }).select("_id name phone referralCode").lean();
     if (!inviter) {
       throw new Error("Invalid referral code. Please check the code or leave it blank.");
+    }
+    const existingWaUser = await User.findOne({ phone: { $in: phoneVariants(phone) } }).select("_id").lean();
+    const inviterNorm = normalizeIndianPhone(String(inviter.phone || ""));
+    if ((existingWaUser && String(existingWaUser._id) === String(inviter._id)) || (inviterNorm && inviterNorm === normalizeIndianPhone(String(phone)))) {
+      throw new Error("You cannot use your own referral code.");
     }
     validReferralCode = inviter.referralCode;
     referrerName = inviter.name || null;
   }
 
-  // Block duplicates
-  const existing = await Auth.findOne({ phone: { $in: [phone, `91${phone}`] } });
-  if (existing) {
-    throw new Error("An account with this number already exists.");
+  // Enforce single-use verifyToken
+  const freshToken = await consumeVerifyTokenJti(decoded.jti);
+  if (!freshToken) {
+    throw new Error("Verification session already used. Please request a new OTP.");
   }
 
   // Upsert pending registration (replace if they re-registered)
@@ -978,90 +1077,112 @@ export async function listPendingRegistrations() {
  * Admin — approve a pending registration → creates Auth + User records
  */
 export async function approvePendingRegistration(pendingId) {
-  const pending = await PendingRegistration.findById(pendingId);
-  if (!pending) {
-    throw new Error("Pending registration not found or already processed.");
+  const lockKey = String(pendingId);
+  if (inFlightApprovals.has(lockKey)) {
+    const err = new Error("Approval is already being processed for this registration.");
+    err.statusCode = 409;
+    throw err;
   }
+  inFlightApprovals.add(lockKey);
 
-  // Check not already approved
-  const existing = await Auth.findOne({ phone: { $in: [pending.phone, `91${pending.phone}`] } });
-  if (existing) {
-    await PendingRegistration.findByIdAndDelete(pendingId);
-    throw new Error("An account with this phone already exists.");
-  }
-
-  // Create the Auth record
-  await Auth.create({
-    phone: pending.phone,
-    name: pending.name,
-    password: pending.password,
-    role: "user",
-    isActive: true,
-  });
-
-  // Resolve referrer if pending had a valid referralCode
-  let referredBy = null;
-  let referredByCode = null;
-  if (pending.referralCode) {
-    const referrer = await User.findOne({ referralCode: pending.referralCode.trim().toUpperCase() });
-    if (referrer) {
-      referredBy = referrer._id;
-      referredByCode = referrer.referralCode;
-      referrer.referralCount = (Number(referrer.referralCount) || 0) + 1;
-      await referrer.save();
-      console.log(`[Referral] User ${pending.phone} linked to referrer ${referrer.phone} (${referrer.referralCode})`);
+  try {
+    const pending = await PendingRegistration.findById(pendingId);
+    if (!pending) {
+      const err = new Error("Pending registration not found or already processed.");
+      err.statusCode = 404;
+      throw err;
     }
-  }
 
-  // Generate unique referral code for the new user
-  const newUserReferralCode = await generateUniqueReferralCode(pending.name);
+    const stripped = normalizeIndianPhone(pending.phone);
+    // Check not already approved
+    const existing = await Auth.findOne({ phone: { $in: phoneVariants(stripped) } });
+    if (existing) {
+      await PendingRegistration.findByIdAndDelete(pendingId);
+      throw new Error("An account with this phone already exists.");
+    }
 
-  // Create the User tracking record (same as admin-create flow for role "user")
-  // Try to link to an existing WhatsApp user first
-  const stripped = pending.phone;
-  let waUser = await User.findOne({ phone: { $in: [stripped, `91${stripped}`] } });
-  if (!waUser) {
-    // Try matching by userId JID pattern
-    waUser = await User.findOne({ userId: new RegExp(stripped.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) });
-  }
+    // Locate any pre-existing WhatsApp User record before Auth.create so userId links cleanly
+    let waUser = await User.findOne({ phone: { $in: phoneVariants(stripped) } });
+    if (!waUser) {
+      waUser = await User.findOne({ userId: new RegExp(`^(91)?${stripped.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(@|:|$)`) });
+    }
 
-  if (!waUser) {
-    // No existing WhatsApp record — create a fresh User document
-    await User.create({
-      userId: `web:${stripped}`,
-      name: pending.name,
+    const targetUserId = waUser?.userId || `web:${stripped}`;
+
+    // Resolve referrer if pending had a valid referralCode (block self-referral)
+    let referrerDoc = null;
+    let referredBy = null;
+    let referredByCode = null;
+    if (pending.referralCode) {
+      const referrer = await User.findOne({ referralCode: pending.referralCode.trim().toUpperCase() });
+      const isSelfReferral = referrer && (
+        (waUser && String(waUser._id) === String(referrer._id)) ||
+        normalizeIndianPhone(String(referrer.phone || "")) === stripped
+      );
+      if (referrer && !isSelfReferral) {
+        referrerDoc = referrer;
+        referredBy = referrer._id;
+        referredByCode = referrer.referralCode;
+      }
+    }
+
+    const newUserReferralCode = await generateUniqueReferralCode(pending.name);
+    let newlyLinkedReferral = false;
+
+    if (!waUser) {
+      await User.create({
+        userId: targetUserId,
+        name: pending.name,
+        phone: stripped,
+        fine: 0,
+        completed: false,
+        streak: 0,
+        weeklySubmissions: 0,
+        weeklyFine: 0,
+        monthlySubmissions: 0,
+        feedbackScores: [],
+        referralCode: newUserReferralCode,
+        referredBy,
+        referredByCode,
+      });
+      newlyLinkedReferral = Boolean(referredBy);
+    } else {
+      const updates = {};
+      if (!waUser.name) updates.name = pending.name;
+      if (!waUser.phone) updates.phone = stripped;
+      if (!waUser.referralCode) updates.referralCode = newUserReferralCode;
+      if (!waUser.referredBy && referredBy) {
+        updates.referredBy = referredBy;
+        updates.referredByCode = referredByCode;
+        newlyLinkedReferral = true;
+      }
+      if (Object.keys(updates).length > 0) {
+        await User.updateOne({ _id: waUser._id }, { $set: updates });
+      }
+    }
+
+    await Auth.create({
       phone: stripped,
-      fine: 0,
-      completed: false,
-      streak: 0,
-      weeklySubmissions: 0,
-      weeklyFine: 0,
-      monthlySubmissions: 0,
-      feedbackScores: [],
-      referralCode: newUserReferralCode,
-      referredBy,
-      referredByCode,
+      name: pending.name,
+      password: pending.password,
+      userId: targetUserId,
+      role: "user",
+      isActive: true,
     });
-  } else {
-    // Sync name/phone to existing WhatsApp user if missing
-    const updates = {};
-    if (!waUser.name) updates.name = pending.name;
-    if (!waUser.phone) updates.phone = stripped;
-    if (!waUser.referralCode) updates.referralCode = newUserReferralCode;
-    if (!waUser.referredBy && referredBy) {
-      updates.referredBy = referredBy;
-      updates.referredByCode = referredByCode;
+
+    if (referrerDoc && newlyLinkedReferral) {
+      referrerDoc.referralCount = await User.countDocuments({ referredBy: referrerDoc._id });
+      await referrerDoc.save();
+      console.log(`[Referral] User ${stripped} linked to referrer ${referrerDoc.phone} (${referrerDoc.referralCode})`);
     }
-    if (Object.keys(updates).length > 0) {
-      await User.updateOne({ _id: waUser._id }, { $set: updates });
-    }
+
+    await PendingRegistration.findByIdAndDelete(pendingId);
+
+    console.log(`[Auth] Approved registration for ${pending.name} (${stripped})`);
+    return { success: true, message: `${pending.name} approved. They can now log in.` };
+  } finally {
+    inFlightApprovals.delete(lockKey);
   }
-
-  // Remove from pending
-  await PendingRegistration.findByIdAndDelete(pendingId);
-
-  console.log(`[Auth] Approved registration for ${pending.name} (${pending.phone})`);
-  return { success: true, message: `${pending.name} approved. They can now log in.` };
 }
 
 /**

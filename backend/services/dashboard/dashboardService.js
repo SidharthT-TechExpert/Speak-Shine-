@@ -6,13 +6,16 @@
 import User from "../../../models/userSchema.js";
 import Status from "../../../models/statusSchema.js";
 import DailyReport from "../../../models/dailyReportSchema.js";
+import { getISTDateKey } from "../../utils/dateUtils.js";
+import { normalizeVocabularyList } from "../../../models/videoReportSchema.js";
 
 let lastManualQuestionCheck = 0;
 async function maybePublishDueManualQuestion() {
   const now = Date.now();
   if (now - lastManualQuestionCheck < 60_000) return;
   lastManualQuestionCheck = now;
-  await maybePublishDueManualQuestion();
+  const { publishDueManualQuestion } = await import("../scheduler/questionSchedulerService.js");
+  await publishDueManualQuestion();
 }
 
 let cachedLeaderboardSummary = null;
@@ -201,12 +204,9 @@ function getPosterImage(status) {
  * Fast endpoint data for today question (avoids full user table scans)
  */
 export async function getTodayQuestionData() {
+  await maybePublishDueManualQuestion().catch(() => {});
   const status = await Status.findOne().lean();
-  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const y = nowIST.getFullYear();
-  const mo = String(nowIST.getMonth() + 1).padStart(2, "0");
-  const d = String(nowIST.getDate()).padStart(2, "0");
-  const todayIST = `${y}-${mo}-${d}`;
+  const todayIST = getISTDateKey();
 
   if (status && ((status.durationShadowingMax ?? 0) < 180 || (status.durationShadowingFull ?? 0) < 180)) {
     Status.updateOne({}, { $set: { durationShadowingMax: 180, durationShadowingFull: 180 } }).catch(() => {});
@@ -817,35 +817,63 @@ export async function setTodayQuestion(topic, question, category, extra = {}) {
     console.warn("[DashboardService] Matched question lookup failed:", err.message);
   }
 
+  const catLower = (category || "").trim().toLowerCase();
+  const matchedCatLower = (matched?.category || "").trim().toLowerCase();
+
   const isShadowing = Boolean(
     extra?.isShadowing ||
     extra?.contentType === "shadowing_video" ||
     matched?.contentType === "shadowing_video" ||
     matched?.setupType === "shadowing_video" ||
-    (category && category.toLowerCase().includes("shadowing")) ||
-    (matched?.category && matched.category.toLowerCase().includes("shadowing")) ||
-    (topic && topic.toLowerCase().includes("shadowing"))
+    catLower === "shadowing" ||
+    catLower === "shadowing practice" ||
+    matchedCatLower === "shadowing" ||
+    matchedCatLower === "shadowing practice"
   );
 
   const isStory = Boolean(
-    extra?.isStorySummary ||
-    extra?.contentType === "story_audio" ||
-    matched?.contentType === "story_audio" ||
-    matched?.setupType === "story_audio" ||
-    (category && category.toLowerCase().includes("story")) ||
-    (matched?.category && matched.category.toLowerCase().includes("story"))
+    !isShadowing && (
+      extra?.isStorySummary ||
+      extra?.contentType === "story_audio" ||
+      matched?.contentType === "story_audio" ||
+      matched?.setupType === "story_summary" ||
+      matched?.setupType === "story_audio" ||
+      catLower === "story" ||
+      catLower === "story summary" ||
+      matchedCatLower === "story" ||
+      matchedCatLower === "story summary"
+    )
   );
 
   const isPicture = Boolean(
-    extra?.isPictureDescription ||
-    extra?.contentType === "picture_description" ||
-    matched?.contentType === "picture_description" ||
-    matched?.setupType === "picture_description" ||
-    (category && category.toLowerCase().includes("picture")) ||
-    (matched?.category && matched.category.toLowerCase().includes("picture"))
+    !isShadowing && !isStory && (
+      extra?.isPictureDescription ||
+      extra?.contentType === "picture_description" ||
+      matched?.contentType === "picture_description" ||
+      matched?.setupType === "picture_description" ||
+      catLower === "picture" ||
+      catLower === "picture description" ||
+      matchedCatLower === "picture" ||
+      matchedCatLower === "picture description"
+    )
+  );
+
+  const isMonthlyReflection = Boolean(
+    !isShadowing && !isStory && !isPicture && (
+      extra?.isMonthlyReflectionDay ||
+      matched?.setupType === "monthly_reflection"
+    )
+  );
+
+  const isMonthlyGoals = Boolean(
+    !isShadowing && !isStory && !isPicture && !isMonthlyReflection && (
+      extra?.isMonthlyGoalsDay ||
+      matched?.setupType === "monthly_goals"
+    )
   );
 
   const resolvedContentType = isShadowing ? "shadowing_video" : isStory ? "story_audio" : isPicture ? "picture_description" : "question";
+  const normalizedVocab = isShadowing ? [] : normalizeVocabularyList(extra?.vocabulary || matched?.vocabulary || []);
 
   await Status.updateOne({}, {
     $set: {
@@ -855,12 +883,15 @@ export async function setTodayQuestion(topic, question, category, extra = {}) {
       todayContentType: resolvedContentType,
       todayAudioUrl: isShadowing
         ? (extra?.audioUrl || extra?.videoUrl || matched?.audioUrl || matched?.videoUrl || null)
-        : (isStory ? (extra?.audioUrl || matched?.audioUrl || null) : (extra?.audioUrl || matched?.audioUrl || null)),
+        : (isStory ? (extra?.audioUrl || matched?.audioUrl || null) : null),
       todayStoryTranscript: isStory ? (extra?.storyTranscript || matched?.storyTranscript || null) : null,
       todaySummaryGuide: isStory ? (extra?.summaryGuide || matched?.summaryGuide || null) : null,
       isStorySummaryDay: isStory,
       isPictureDescriptionDay: isPicture,
       isShadowingDay: isShadowing,
+      isMonthlyReflectionDay: isMonthlyReflection,
+      isMonthlyGoalsDay: isMonthlyGoals,
+      todayPosterImage: null,
       todayVideoUrl: isShadowing ? (extra?.videoUrl || extra?.audioUrl || matched?.videoUrl || matched?.audioUrl || null) : null,
       todayVideoDuration: isShadowing ? (extra?.videoDuration || matched?.videoDuration || matched?.speakingDuration || null) : null,
       todayVideoTranscript: isShadowing ? (extra?.videoTranscript || matched?.videoTranscript || matched?.storyTranscript || null) : null,
@@ -872,13 +903,22 @@ export async function setTodayQuestion(topic, question, category, extra = {}) {
       todayImagePhotographerUrl: isPicture ? (extra?.imagePhotographerUrl || matched?.imagePhotographerUrl || null) : null,
       todayImageSearchQuery: isPicture ? (extra?.imageSearchQuery || matched?.imageSearchQuery || null) : null,
       todayImageInstructions: isPicture ? (extra?.imageInstructions || matched?.imageInstructions || null) : null,
-      todayVocabulary: isShadowing ? [] : (extra?.vocabulary || matched?.vocabulary || []),
+      todayVocabulary: normalizedVocab,
       questionSentToday: true,
       questionPublishedDate: todayIST,
       lastPosterSentDate: todayIST,
     }
   }, { upsert: true });
-  
+
+  if (!isShadowing && normalizedVocab.length === 0) {
+    try {
+      const { ensureTodayVocabulary } = await import("../ai/vocabularyGenerator.js");
+      await ensureTodayVocabulary();
+    } catch (vocabErr) {
+      console.warn("[DashboardService] Vocabulary generation skipped:", vocabErr.message);
+    }
+  }
+
   return { success: true };
 }
 
@@ -1211,11 +1251,26 @@ export async function updateSettings(input, ...rest) {
       : typeof submissionReportTimes === "string"
       ? submissionReportTimes.split(",").map(t => t.trim())
       : [];
-    const validTimes = rawTimes.filter(t => timeRegex.test(t));
+    const validTimes = [...new Set(rawTimes.filter(t => timeRegex.test(t)))];
     if (validTimes.length > 0) {
       updates.submissionReportTimes = validTimes;
       updates.submissionReportTime1 = validTimes[0] || "18:00";
       updates.submissionReportTime2 = validTimes[1] || "21:00";
+      if (submissionReportSlots === undefined) {
+        const existingStatus = await Status.findOne().select("submissionReportSlots").lean();
+        const existingSlots = Array.isArray(existingStatus?.submissionReportSlots) ? existingStatus.submissionReportSlots : [];
+        updates.submissionReportSlots = validTimes.map((t, idx) => {
+          const matchedOld = existingSlots.find(old => old.time === t);
+          return matchedOld || {
+            time: t,
+            templateType: idx === 1 ? "urgent" : "comprehensive",
+            customTemplate: "",
+            lastSentDate: null,
+            lastStatus: "pending",
+            lastError: null,
+          };
+        });
+      }
     }
     updates.lastSubmissionReportTime = null;
     updates.lastSubmissionReportDate = null;
@@ -1359,7 +1414,7 @@ export async function updateSettings(input, ...rest) {
     }
     const uniqueDays = [...new Set(parsed)].sort((a, b) => a - b);
     updates.storyDays = uniqueDays;
-    updates.storyDay = uniqueDays.length > 0 ? uniqueDays[0] : 6;
+    updates.storyDay = uniqueDays.length > 0 ? uniqueDays[0] : -1;
   } else if (storyDay !== undefined) {
     const day = parseInt(storyDay, 10);
     if (isNaN(day) || day < 0 || day > 6) {
@@ -1411,7 +1466,7 @@ export async function updateSettings(input, ...rest) {
     }
     const uniqueDays = [...new Set(parsed)].sort((a, b) => a - b);
     updates.shadowingDays = uniqueDays;
-    updates.shadowingDay = uniqueDays.length > 0 ? uniqueDays[0] : 2;
+    updates.shadowingDay = uniqueDays.length > 0 ? uniqueDays[0] : -1;
   } else if (shadowingDay !== undefined) {
     const day = parseInt(shadowingDay, 10);
     if (isNaN(day) || day < -1 || day > 6) {

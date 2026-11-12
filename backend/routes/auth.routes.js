@@ -12,11 +12,8 @@ const router = express.Router();
 // ── Local Development Detection ──────────────────────────────────────────────
 function isLocalRequest(req) {
   if (process.env.NODE_ENV !== "production") return true;
-  if (!process.env.TWO_FACTOR_API_KEY) return true;
   const ip = req?.ip || req?.connection?.remoteAddress || "";
-  const host = req?.headers?.host || req?.hostname || "";
-  if (ip.includes("127.0.0.1") || ip === "::1" || ip.includes("::ffff:127.0.0.1")) return true;
-  if (host.includes("localhost") || host.includes("127.0.0.1")) return true;
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") return true;
   return false;
 }
 
@@ -34,9 +31,16 @@ const loginLimiter = rateLimit({
   skip: (req) => isLocalRequest(req),
 });
 
-const otpLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, max: 3, // 3 per IP per hour (per-phone handled in service)
+const sendOtpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 5, // 5 per IP per hour (per-phone 3/hr enforced in service)
   message: { error: "Too many OTP requests. Please try again in 1 hour." },
+  standardHeaders: true, legacyHeaders: false,
+  skip: (req) => isLocalRequest(req),
+});
+
+const verifyOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 15, // per-phone attempt cap also enforced in service
+  message: { error: "Too many OTP verification attempts. Please try again in 15 minutes." },
   standardHeaders: true, legacyHeaders: false,
   skip: (req) => isLocalRequest(req),
 });
@@ -54,13 +58,13 @@ router.post("/refresh", localBypass(refreshLimiter), authController.refresh);
 router.post("/logout",                               authController.logout);
 
 // ── Password Reset ────────────────────────────────────────────────────────────
-router.post("/forgot/send-otp",   localBypass(otpLimiter), authController.sendPasswordResetOTP);
-router.post("/forgot/verify-otp", localBypass(otpLimiter), authController.verifyPasswordResetOTP);
-router.post("/forgot/reset",                               authController.resetPassword);
+router.post("/forgot/send-otp",   localBypass(sendOtpLimiter),   authController.sendPasswordResetOTP);
+router.post("/forgot/verify-otp", localBypass(verifyOtpLimiter), authController.verifyPasswordResetOTP);
+router.post("/forgot/reset",                                     authController.resetPassword);
 
 // ── Registration (SMS OTP → pending approval) ─────────────────────────────────
-router.post("/send-otp",   localBypass(otpLimiter), authController.sendRegistrationOTP);
-router.post("/verify-otp", localBypass(otpLimiter), authController.verifyRegistrationOTP);
+router.post("/send-otp",   localBypass(sendOtpLimiter),   authController.sendRegistrationOTP);
+router.post("/verify-otp", localBypass(verifyOtpLimiter), authController.verifyRegistrationOTP);
 router.post("/register",                            authController.register);
 router.get("/validate-referral/:code",              authController.validateReferral);
 

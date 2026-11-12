@@ -459,12 +459,14 @@ export async function burnSubtitlesOntoVideo(videoUrl, transcript, durationSecon
  *  2. High-quality Curated Human Native Speaker speech bank (<180s)
  */
 export async function generateShadowingChallenge(options = {}) {
+  const { targetDuration = 75, topic = null, difficulty = "B1-B2" } = options || {};
+
   // Option 1: Fully automated native podcast ingestion & active speaking slicing
   try {
     console.log("[ShadowingGen] 🎙️ Starting fully automated native speaker podcast ingestion & slicing...");
-    const podcast = await fetchAutomatedNativePodcast();
+    const podcast = await fetchAutomatedNativePodcast({ topic, difficulty });
     if (podcast && podcast.audioUrl) {
-      const slicedChallenge = await processPodcastIntoShadowingChallenge(podcast);
+      const slicedChallenge = await processPodcastIntoShadowingChallenge(podcast, { targetDuration, topic, difficulty });
       if (slicedChallenge && slicedChallenge.audioUrl) {
         console.log(`[ShadowingGen] ✅ Automated Native Podcast speech successfully extracted: "${slicedChallenge.title}" (${slicedChallenge.videoDuration}s)`);
         return slicedChallenge;

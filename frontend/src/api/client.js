@@ -146,13 +146,13 @@ api.interceptors.response.use(
       }
     }
 
-    // Account disabled or access forbidden (403)
+    // Account disabled (403) — preserve session on locks, payment gates, pending approvals, or ownership errors
     if (err.response?.status === 403) {
       const code = err.response?.data?.code;
       const errMsg = String(err.response?.data?.error || err.message || "").toLowerCase();
-      const isReadonly = code === "VIEWER_READONLY" || errMsg.includes("read-only");
+      const isAccountDisabled = code === "ACCOUNT_DISABLED" || errMsg.includes("account disabled") || errMsg.includes("has been disabled");
 
-      if (!isReadonly) {
+      if (isAccountDisabled) {
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");

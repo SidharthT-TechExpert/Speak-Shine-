@@ -494,14 +494,14 @@ function startSelfPing() {
   const selfUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || `http://localhost:${PORT}`;
   const pingUrl = `${selfUrl}/api/health`;
 
-  function getISTHour() {
-    const now = new Date();
-    const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return ist.getHours() + ist.getMinutes() / 60; // e.g. 23.75 = 23:45
+  async function getISTHour() {
+    const { getISTParts } = await import("../backend/utils/dateUtils.js");
+    const { hour, minute } = getISTParts();
+    return hour + minute / 60; // e.g. 23.75 = 23:45
   }
 
-  function shouldPing() {
-    const h = getISTHour();
+  async function shouldPing() {
+    const h = await getISTHour();
     // Ping 05:45–00:20 IST (covers full day + warm-up buffer + midnight reset)
     // Sleep 00:20–05:45 IST — saves ~5.5 hrs/day (~165 hrs/month)
     if (h >= 5.75 || h <= 0.333) return true; // 5.75 = 05:45, 0.333 = 00:20
@@ -509,7 +509,7 @@ function startSelfPing() {
   }
 
   setInterval(async () => {
-    if (!shouldPing()) {
+    if (!(await shouldPing())) {
       console.log(`[SelfPing] 💤 Night hours — skipping ping to save free hours`);
       return;
     }
@@ -535,23 +535,13 @@ function startSelfPing() {
 // On every startup, check if today's reset was missed and run it immediately.
 async function checkMissedReset() {
   try {
-    // Wait 10s for DB to be fully ready
-    await new Promise(r => setTimeout(r, 10_000));
-
     const Status = (await import("../models/statusSchema.js")).default;
+    const { getISTDateKey, getISTParts } = await import("../backend/utils/dateUtils.js");
     const s = await Status.findOne().lean();
     if (!s) return;
 
-    // Build today's date string in IST
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const y = nowIST.getFullYear();
-    const m = String(nowIST.getMonth() + 1).padStart(2, "0");
-    const d = String(nowIST.getDate()).padStart(2, "0");
-    const todayIST = `${y}-${m}-${d}`;
-
-    // Only run catch-up if it's past midnight (00:05+) and reset hasn't run today
-    const hourIST = nowIST.getHours();
-    const minIST  = nowIST.getMinutes();
+    const todayIST = getISTDateKey();
+    const { hour: hourIST, minute: minIST } = getISTParts();
     const minuteOfDay = hourIST * 60 + minIST;
 
     if (s.lastResetDate !== todayIST && minuteOfDay >= 5) {
@@ -594,19 +584,19 @@ async function backfillFreezeStreakProgress() {
 
 // ── Start ───────────────────────────────────────────────────────────────────
 connectDB()
-  .then(() => {
+  .then(async () => {
     httpServer.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ Speak & Shine API running on port ${PORT} [${isProd ? "production" : "development"}]`);
       console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
     });
+    // Catch up on any reset that was missed BEFORE starting scheduler catch-up
+    await checkMissedReset();
     startScheduler();
     startDailyReset();
     // Recover any jobs that were processing when the server last shut down
     recoverStuckJobs();
     // Keep Render free tier awake so cron jobs fire reliably
     startSelfPing();
-    // Catch up on any reset that was missed while server was sleeping
-    checkMissedReset();
     // Backfill freezeStreakProgress for any existing users
     backfillFreezeStreakProgress();
     // Initialize WhatsApp multi-device client (triggers automated deployment notification once socket is open)

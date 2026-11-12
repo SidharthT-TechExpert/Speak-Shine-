@@ -19,7 +19,7 @@ import { Boom } from "@hapi/boom";
 import pino from "pino";
 import QRCode from "qrcode";
 import qrcodeTerminal from "qrcode-terminal";
-import { generatePNGPosterBuffer } from "../../../api/posterGenerator.js";
+import { generatePNGPosterBuffer, resolveVocabRequiredCount } from "../../../api/posterGenerator.js";
 import Status from "../../../models/statusSchema.js";
 import WhatsAppAuth from "../../../models/whatsAppAuthSchema.js";
 import User from "../../../models/userSchema.js";
@@ -29,7 +29,8 @@ import { serializeStreakBadges } from "../../utils/streakBadges.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const AUTH_DIR = path.resolve(process.cwd(), "auth");
+const PROJECT_ROOT = path.resolve(__dirname, "../../..");
+const AUTH_DIR = path.resolve(PROJECT_ROOT, "auth");
 
 const pinoLogger = pino({ level: "silent" });
 
@@ -665,10 +666,13 @@ async function sendAudioFileToGroup(targetGroup, audioUrl, topic, options = {}) 
         }
       } else {
         // Local file path resolution
+        const cleanRel = trimmed.replace(/^\//, "");
         const candidates = [
-          path.resolve(process.cwd(), "frontend", "public", trimmed.replace(/^\//, "")),
-          path.resolve(process.cwd(), trimmed.replace(/^\//, "")),
-          path.resolve(process.cwd(), "tmp", trimmed.replace(/^\//, ""))
+          path.resolve(PROJECT_ROOT, "frontend", "public", cleanRel),
+          path.resolve(PROJECT_ROOT, cleanRel),
+          path.resolve(PROJECT_ROOT, "tmp", cleanRel),
+          path.resolve(process.cwd(), "frontend", "public", cleanRel),
+          path.resolve(process.cwd(), cleanRel),
         ];
         for (const candidate of candidates) {
           if (fs.existsSync(candidate)) {
@@ -685,7 +689,7 @@ async function sendAudioFileToGroup(targetGroup, audioUrl, topic, options = {}) 
       console.log(`[WhatsApp] 🎵 Passing audio URL directly to Baileys: ${audioUrl}...`);
       await sock.sendMessage(targetGroup, {
         audio: { url: audioUrl },
-        mimetype: mimetype || "audio/mp4",
+        mimetype: mimetype || "audio/mpeg",
         ptt: false,
         fileName,
       });
@@ -741,7 +745,7 @@ export async function sendDailyPosterToGroup(options = {}) {
     let category = options.category || status?.todayCategory || "General";
     let contentType = options.contentType || status?.todayContentType || "question";
     const vocabulary = status?.todayVocabulary || [];
-    const frontendUrl = process.env.FRONTEND_URL || "https://speakandshine.com";
+    const frontendUrl = process.env.FRONTEND_URL || "https://speak-shine.sidhartht.online";
 
     if (!question && !topic) {
       throw new Error("No active daily challenge found in database.");
@@ -764,40 +768,45 @@ export async function sendDailyPosterToGroup(options = {}) {
 
     const resolvedCategory = options.category || status?.todayCategory || dbQuestion?.category || category;
     category = resolvedCategory;
-
-    const isPicture = contentType === "picture_description"
-      || Boolean(status?.isPictureDescriptionDay)
-      || status?.todayContentType === "picture_description"
-      || resolvedCategory?.toLowerCase().includes("picture")
-      || dbQuestion?.contentType === "picture_description"
-      || dbQuestion?.setupType === "picture_description";
-
-    const isStory = contentType === "story_audio"
-      || Boolean(status?.isStorySummaryDay)
-      || status?.todayContentType === "story_audio"
-      || resolvedCategory?.toLowerCase().includes("story")
-      || dbQuestion?.contentType === "story_audio"
-      || dbQuestion?.setupType === "story_audio";
+    const resolvedCatLower = String(resolvedCategory || "").trim().toLowerCase();
 
     const isShadowing = contentType === "shadowing_video"
       || Boolean(status?.isShadowingDay)
       || status?.todayContentType === "shadowing_video"
-      || resolvedCategory?.toLowerCase().includes("shadowing")
-      || topic?.toLowerCase().includes("shadowing")
+      || resolvedCatLower === "shadowing"
+      || resolvedCatLower === "shadowing practice"
       || dbQuestion?.contentType === "shadowing_video"
       || dbQuestion?.setupType === "shadowing_video";
 
+    const isPicture = !isShadowing && (
+      contentType === "picture_description"
+      || Boolean(status?.isPictureDescriptionDay)
+      || status?.todayContentType === "picture_description"
+      || resolvedCatLower === "picture"
+      || resolvedCatLower === "picture description"
+      || dbQuestion?.contentType === "picture_description"
+      || dbQuestion?.setupType === "picture_description"
+    );
+
+    const isStory = !isShadowing && !isPicture && (
+      contentType === "story_audio"
+      || Boolean(status?.isStorySummaryDay)
+      || status?.todayContentType === "story_audio"
+      || resolvedCatLower === "story"
+      || resolvedCatLower === "story summary"
+      || dbQuestion?.contentType === "story_audio"
+      || dbQuestion?.setupType === "story_summary"
+      || dbQuestion?.setupType === "story_audio"
+    );
+
     const resolvedAudioUrl = options.audioUrl
-      || status?.todayAudioUrl
-      || status?.todayVideoUrl
-      || dbQuestion?.audioUrl
-      || dbQuestion?.videoUrl
+      || (isShadowing
+        ? (status?.todayAudioUrl || status?.todayVideoUrl || dbQuestion?.audioUrl || dbQuestion?.videoUrl)
+        : isStory
+        ? (status?.todayAudioUrl || dbQuestion?.audioUrl)
+        : status?.todayAudioUrl)
       || null;
-    const vocabReq = isPicture
-      ? (status?.vocabPictureRequiredCount ?? 1)
-      : isStory
-      ? (status?.vocabStoryRequiredCount ?? 1)
-      : (status?.vocabNormalRequiredCount ?? 3);
+    const vocabReq = resolveVocabRequiredCount(status, { isPicture, isStory, isShadowing });
 
     // Helper to record successful delivery in Status
     const recordSuccess = async () => {
@@ -849,6 +858,7 @@ export async function sendDailyPosterToGroup(options = {}) {
         }
       }
 
+      let pictureMime = "image/jpeg";
       // If picture download failed or no URL, generate dedicated picture poster
       if (!imageBuffer) {
         try {
@@ -860,6 +870,7 @@ export async function sendDailyPosterToGroup(options = {}) {
             vocabulary,
             vocabRequiredCount: vocabReq,
           });
+          pictureMime = "image/png";
         } catch (posterGenErr) {
           console.warn("[WhatsApp] ⚠️ Picture poster generation failed, falling back to rich text dispatch:", posterGenErr.message);
         }
@@ -884,7 +895,7 @@ export async function sendDailyPosterToGroup(options = {}) {
         console.log(`[WhatsApp] 📤 Sending picture challenge to group: ${targetGroup}...`);
         await sock.sendMessage(targetGroup, {
           image: imageBuffer,
-          mimetype: "image/jpeg",
+          mimetype: pictureMime,
           caption,
         });
       } else {
@@ -1499,7 +1510,7 @@ export async function sendAdminDirectMessage(text, options = {}) {
   const Status = (await import("../../../models/statusSchema.js")).default;
   const Auth = (await import("../../../models/authSchema.js")).default;
   const status = await Status.findOne().lean().catch(() => null);
-  const adminAuth = await Auth.findOne({ role: { $in: ["admin", "admins"] } }).lean().catch(() => null);
+  const adminAuth = await Auth.findOne({ role: { $in: ["admin", "admins"] } }).sort({ createdAt: 1 }).lean().catch(() => null);
 
   const rawPhone = options.phone || status?.adminNotifyPhone || process.env.ADMIN_NOTIFY_PHONE || adminAuth?.phone || userPhone || getSavedPhone();
   if (!rawPhone) {
@@ -1522,13 +1533,18 @@ export async function sendAdminDirectMessage(text, options = {}) {
 
   // Look up exact JID using onWhatsApp to ensure delivery across devices
   let recipientJid = `${cleanPhone}@s.whatsapp.net`;
+  let onWaVerified = !options.phone;
   try {
     const lookup = await sock.onWhatsApp(cleanPhone).catch(() => []);
-    if (Array.isArray(lookup) && lookup.length > 0 && lookup[0]?.exists && lookup[0]?.jid) {
-      recipientJid = lookup[0].jid;
+    if (Array.isArray(lookup) && lookup.length > 0 && lookup[0]?.exists) {
+      if (lookup[0]?.jid) recipientJid = lookup[0].jid;
+      onWaVerified = true;
     }
   } catch (err) {
     console.warn("[WhatsApp] JID lookup failed, using standard format:", err.message);
+  }
+  if (!onWaVerified) {
+    return { success: false, message: "Phone number is not registered on WhatsApp." };
   }
 
   console.log(`[WhatsApp] 📲 Sending personal admin message to ${recipientJid} (${cleanPhone})...`);

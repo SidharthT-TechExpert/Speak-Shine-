@@ -40,19 +40,27 @@ async function downloadAudioSample(url, destinationPath, maxBytes = 25 * 1024 * 
   let totalBytes = 0;
 
   await new Promise((resolve, reject) => {
+    let settled = false;
+    const finishDone = () => {
+      if (!settled) { settled = true; resolve(); }
+    };
     res.body.on("data", (chunk) => {
       totalBytes += chunk.length;
       if (totalBytes > maxBytes) {
+        res.body.unpipe(fileStream);
         res.body.destroy(); // Stop download early once we have enough for 5-10 minutes of audio
-        resolve();
+        fileStream.end();
       }
     });
 
     res.body.pipe(fileStream);
-    res.body.on("end", resolve);
-    res.body.on("error", reject);
-    fileStream.on("error", reject);
-    fileStream.on("finish", resolve);
+    res.body.on("error", (err) => {
+      if (!settled) { settled = true; reject(err); }
+    });
+    fileStream.on("error", (err) => {
+      if (!settled) { settled = true; reject(err); }
+    });
+    fileStream.on("finish", finishDone);
   });
 
   return destinationPath;
@@ -104,8 +112,9 @@ async function transcribeAudioWithWhisper(audioFilePath) {
   });
 
   if (response.status === 429) {
-    const retryAfter = parseRetryAfter(response);
-    markKeyExhausted(groqKey, retryAfter);
+    const errText = await response.text().catch(() => "");
+    const retryAfter = parseRetryAfter(errText);
+    markKeyExhausted(groqKey, retryAfter || undefined);
     throw new Error("Groq Whisper rate limit reached");
   }
 
@@ -227,7 +236,7 @@ async function sliceAudioFile(sourcePath, startTime, endTime, outputPath) {
  * Master method: Takes a raw audio URL, slices the best native active speech,
  * transcribes it, uploads to Cloudflare R2, and returns structured shadowing challenge data.
  */
-export async function processPodcastIntoShadowingChallenge(podcastItem) {
+export async function processPodcastIntoShadowingChallenge(podcastItem, options = {}) {
   const tmpDir = os.tmpdir();
   const rawFile = path.join(tmpDir, `podcast-raw-${Date.now()}.mp3`);
   const whisperFile = path.join(tmpDir, `podcast-whisper-${Date.now()}.mp3`);
@@ -243,8 +252,11 @@ export async function processPodcastIntoShadowingChallenge(podcastItem) {
     console.log(`[SpeechSlicer] 🧠 Transcribing with Whisper Large v3...`);
     const transcription = await transcribeAudioWithWhisper(whisperFile);
 
-    console.log(`[SpeechSlicer] 🎯 Analyzing active speaking sections...`);
-    const window = findContinuousSpeechWindow(transcription.segments, 60, 150);
+    const requestedDur = Math.min(Math.max(Number(options?.targetDuration) || 90, 45), 180);
+    const minWindowDur = Math.max(45, Math.min(120, Math.round(requestedDur * 0.8)));
+    const maxWindowDur = Math.min(180, Math.max(minWindowDur + 15, Math.round(requestedDur * 1.25)));
+    console.log(`[SpeechSlicer] 🎯 Analyzing active speaking sections (${minWindowDur}-${maxWindowDur}s)...`);
+    const window = findContinuousSpeechWindow(transcription.segments, minWindowDur, maxWindowDur);
 
     console.log(`[SpeechSlicer] ✂️ Slicing speech window (${window.duration}s)...`);
     await sliceAudioFile(rawFile, window.startTime, window.endTime, slicedFile);
@@ -257,7 +269,9 @@ export async function processPodcastIntoShadowingChallenge(podcastItem) {
     let audioUrl = "";
     try {
       const uploadRes = await uploadBufferToR2(audioBuffer, r2Key, "audio/mpeg");
-      audioUrl = uploadRes.url || (process.env.R2_PUBLIC_URL ? `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}` : "");
+      audioUrl = (typeof uploadRes === "string" && uploadRes)
+        ? uploadRes
+        : (uploadRes?.url || (process.env.R2_PUBLIC_URL ? `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}` : ""));
     } catch (r2Err) {
       console.warn(`[SpeechSlicer] ⚠️ R2 upload notice:`, r2Err.message);
       // Fallback relative path or direct public storage

@@ -16,6 +16,9 @@
  */
 
 import fetch from "node-fetch";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { uploadBufferToR2 } from "../../config/storage.js";
 import {
   getKey,
@@ -320,18 +323,33 @@ export async function generateAndUploadStoryAudio(
   const mp3Buffer = await textToMp3Buffer(fullScript, selectedVoiceId, selectedSettings);
   console.log(`[StoryAudio] TTS done — ${(mp3Buffer.length / 1024).toFixed(1)} KB. Uploading to R2…`);
 
-  const slug = topic
+  const slug = (topic || "story")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-  const key = `story-audio/${slug}-${Date.now()}.mp3`;
+    .slice(0, 40) || "story";
+  const fileName = `${slug}-${Date.now()}.mp3`;
+  const key = `story-audio/${fileName}`;
 
-  const publicUrl = await uploadBufferToR2(mp3Buffer, key, "audio/mpeg");
-  console.log(`[StoryAudio] Uploaded: ${publicUrl}`);
+  let publicUrl = "";
+  try {
+    publicUrl = await uploadBufferToR2(mp3Buffer, key, "audio/mpeg");
+    console.log(`[StoryAudio] Uploaded: ${publicUrl}`);
+  } catch (r2Err) {
+    console.warn(`[StoryAudio] R2 upload unavailable (${r2Err.message}), writing local static fallback...`);
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    const localDir = path.resolve(currentDir, "../../../frontend/public/story-audio");
+    fs.mkdirSync(localDir, { recursive: true });
+    fs.writeFileSync(path.join(localDir, fileName), mp3Buffer);
+    publicUrl = `/story-audio/${fileName}`;
+  }
+
+  const wordCount = fullScript.trim().split(/\s+/).filter(Boolean).length;
+  const estimatedDuration = Math.max(30, Math.min(300, Math.round(mp3Buffer.length / (16 * 1024)) || Math.round((wordCount / 135) * 60)));
 
   return {
     audioUrl: publicUrl,
+    duration: estimatedDuration,
     voiceUsed: {
       id: selectedVoiceId,
       name: voiceName,

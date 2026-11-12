@@ -1011,7 +1011,7 @@ export function calculateCompositeScore({
     const usedTargetWords = Array.isArray(vocabularyUsed) ? vocabularyUsed.length : 0;
     const vocabularyScore = configuredTotalWords > 0
       ? Math.min(20, (usedTargetWords / requiredTargetWords) * 20)
-      : (vocabulary / 10) * 20;
+      : 20;
 
     // Check if off-topic:
     // A submission is off-topic ONLY if:
@@ -1450,7 +1450,11 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
   const rawLower = transcript.toLowerCase();
   const cleanTranscript = rawLower.replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ");
   const cleanSpaced = cleanTranscript.replace(/-/g, " ");
-  const normTranscript = normalizeContractions(cleanSpaced);
+  const normTranscript = normalizeContractions(rawLower)
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   const transcriptWords = cleanSpaced.split(/\s+/).filter((w) => w.length > 0);
 
   // Collect AI-detected strong vocabulary words if available
@@ -1462,21 +1466,26 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
 
   for (const item of vocabWords) {
     const rawTarget = typeof item === "string" ? item : (item?.expression || item?.word || item?.term || item?.name || "");
-    const cleanWord = (rawTarget || "")
-      .replace(/\.{2,}/g, "")
-      .replace(/…/g, "")
+    const withWildcards = (rawTarget || "")
+      .trim()
+      .replace(/^(?:\.{2,}|…)+\s*/g, "")
+      .replace(/\s*(?:\.{2,}|…)+$/g, "")
+      .replace(/\.{2,}|…/g, " xellipsisx ");
+    const normTargetRaw = normalizeContractions(withWildcards);
+    const cleanWord = normTargetRaw
       .replace(/[.,!?;:"'(){}\[\]]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .toLowerCase();
-    if (!cleanWord) continue;
+    const cleanWordNoWild = cleanWord.replace(/xellipsisx/g, " ").replace(/\s+/g, " ").trim();
+    if (!cleanWordNoWild) continue;
 
-    const displayWord = typeof item === "string" ? item.trim() : (item?.expression || item?.word || cleanWord).trim();
+    const displayWord = typeof item === "string" ? item.trim() : (item?.expression || item?.word || cleanWordNoWild).trim();
     let isFound = false;
 
     // Check if AI strong highlights explicitly caught this word/expression
     if (strongHighlights.length > 0) {
-      if (strongHighlights.some((h) => h === cleanWord || h.includes(cleanWord) || cleanWord.includes(h))) {
+      if (strongHighlights.some((h) => h === cleanWordNoWild || (cleanWordNoWild.length >= 5 && h.includes(cleanWordNoWild)))) {
         isFound = true;
       }
     }
@@ -1484,57 +1493,72 @@ export function matchVocabularyInTranscript(transcript, vocabWords, extraAnalysi
     if (!isFound) {
       // Expression / Multi-word phrase (e.g. "what i find interesting is", "time management", "self-discipline")
       if (cleanWord.includes(" ") || cleanWord.includes("-") || cleanWord.includes("/")) {
-        // Split on "/" if phrase offers choices like "in the foreground / background"
         const phraseVariants = cleanWord.includes("/")
           ? cleanWord.split("/").map(p => p.trim()).filter(Boolean)
           : [cleanWord];
 
         for (const variant of phraseVariants) {
           if (isFound) break;
-          const phraseSpaced = variant.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
-          const phraseHyphen = variant.replace(/[\s_]/g, "-").trim();
+          const hasMidWildcard = variant.includes("xellipsisx");
+          const variantNoWild = variant.replace(/xellipsisx/g, " ").replace(/\s+/g, " ").trim();
+          const phraseSpaced = variantNoWild.replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+          const phraseHyphen = variantNoWild.replace(/[\s_]/g, "-").trim();
           const normPhrase = normalizeContractions(phraseSpaced);
 
-          if (
+          if (!hasMidWildcard && (
             cleanTranscript.includes(phraseSpaced) ||
             cleanTranscript.includes(phraseHyphen) ||
             cleanSpaced.includes(phraseSpaced) ||
             normTranscript.includes(normPhrase) ||
             rawLower.includes(phraseSpaced)
-          ) {
+          )) {
             isFound = true;
             break;
           }
 
-          // Regex matching with flexible whitespace, pauses, conversational fillers, and hesitation sounds
-          // (e.g. "what I ... [really|um|uh] find interesting is")
-          const phraseWords = phraseSpaced.split(/\s+/).filter(Boolean);
+          // Regex matching with flexible whitespace, pauses, conversational fillers, and mid-phrase ellipsis wildcards
+          const rawPhraseTokens = variant.replace(/[-_]/g, " ").split(/\s+/).filter(Boolean);
+          const phraseWords = rawPhraseTokens.filter(t => t !== "xellipsisx");
           if (phraseWords.length >= 2) {
             const fillerGroup = "(?:\\s+(?:really|personally|honestly|actually|just|also|quite|very|um|uh|er|like|you know|sort of|kind of))?";
-            const regexParts = phraseWords.map((pw, pIdx) => {
-              const pwClean = pw.toLowerCase();
-              const homo = PHONETIC_HOMOPHONE_MAP[pwClean];
-              const stem = getWordStem(pwClean);
-              const stemPattern = homo || (stem && stem.length >= 3 ? `${stem}[a-z]*` : pwClean);
-              return pIdx === 0 ? `\\b${stemPattern}` : `${fillerGroup}\\s+${stemPattern}`;
-            });
+            const regexParts = [];
+            let pendingWildcard = false;
+            for (const tok of rawPhraseTokens) {
+              const tokLower = tok.toLowerCase();
+              if (tokLower === "xellipsisx") {
+                pendingWildcard = true;
+                continue;
+              }
+              const homo = PHONETIC_HOMOPHONE_MAP[tokLower];
+              const stem = getWordStem(tokLower);
+              const stemPattern = homo || (stem && stem.length >= 3 ? `${stem}[a-z]*` : tokLower);
+              if (regexParts.length === 0) {
+                regexParts.push(`\\b${stemPattern}`);
+              } else if (pendingWildcard) {
+                regexParts.push(`(?:\\s+[a-z0-9']+){0,6}\\s+${stemPattern}`);
+                pendingWildcard = false;
+              } else {
+                regexParts.push(`${fillerGroup}\\s+${stemPattern}`);
+              }
+            }
             const fullRegex = new RegExp(`${regexParts.join("")}\\b`, "i");
             if (fullRegex.test(cleanSpaced) || fullRegex.test(normTranscript)) {
               isFound = true;
               break;
             }
 
-            // For longer expressions (3+ words), check if the core sub-phrase (>= 3 words) was spoken
-            if (phraseWords.length >= 3) {
+            if (!hasMidWildcard && phraseWords.length >= 3) {
               const headSub = phraseWords.slice(0, Math.max(3, phraseWords.length - 1)).join(" ");
               if (cleanSpaced.includes(headSub) || normTranscript.includes(normalizeContractions(headSub))) {
                 isFound = true;
                 break;
               }
-              const tailSub = phraseWords.slice(1).join(" ");
-              if (cleanSpaced.includes(tailSub) || normTranscript.includes(normalizeContractions(tailSub))) {
-                isFound = true;
-                break;
+              if (phraseWords.length >= 4) {
+                const tailSub = phraseWords.slice(1).join(" ");
+                if (cleanSpaced.includes(tailSub) || normTranscript.includes(normalizeContractions(tailSub))) {
+                  isFound = true;
+                  break;
+                }
               }
             }
           }

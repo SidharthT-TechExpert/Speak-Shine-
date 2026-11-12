@@ -17,7 +17,7 @@ export function getDurationLimits({ isMonthlyReflection, isWeeklyReflection, isM
   const minSeconds = isShadow ? dynamicShadowMin : 60;
 
   const maxSeconds = isShadow
-    ? Math.min(180, Math.max(180, settings.durationShadowingMax ?? 180))
+    ? Math.min(180, Math.max(20, settings.durationShadowingMax ?? 180))
     : isMonthlyReflection
     ? (settings.durationMonthlyReflectionMax ?? 420)
     : isWeeklyReflection
@@ -85,7 +85,7 @@ export function evaluateSubmitGate({ durationSeconds, fileSizeBytes, frameCount,
     const UPLOAD_MAX = 110 * 1024 * 1024;
     const HARD_MAX = 500 * 1024 * 1024;
     if (fileSizeBytes > HARD_MAX) {
-      checks.push({ id: "size", label: "File size", status: "fail", message: `${mb} MB — too large (max 500 MB).` });
+      checks.push({ id: "size", label: "File size", status: "fail", message: `${mb} MB — too large (max 110 MB without compression).` });
     } else if (fileSizeBytes > UPLOAD_MAX) {
       // Over the upload limit, but the client re-encodes it down before sending,
       // so this is a warning (non-blocking) rather than a hard failure.
