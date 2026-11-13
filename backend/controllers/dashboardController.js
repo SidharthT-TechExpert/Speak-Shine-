@@ -56,6 +56,9 @@ export async function publishAndSendTodayQuestion(req, res) {
         topic: today.topic,
         question: today.question,
         category: today.category,
+        contentType: today.contentType,
+        audioUrl: today.audioUrl || today.videoUrl,
+        videoUrl: today.videoUrl,
       });
 
       return res.json({

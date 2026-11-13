@@ -439,7 +439,7 @@ export async function publishManualQuestion(q) {
       todayTopic: q.topic || (isStory ? STORY_SUMMARY_TOPIC : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isShadowing ? SHADOWING_CATEGORY : isReflection ? MONTHLY_REFLECTION_TOPIC : isGoals ? MONTHLY_GOALS_TOPIC : "Daily Practice"),
       todayQuestion: q.question,
       todayCategory: q.category || (isStory ? STORY_SUMMARY_CATEGORY : isPicture ? PICTURE_DESCRIPTION_CATEGORY : isShadowing ? SHADOWING_CATEGORY : isReflection ? MONTHLY_REFLECTION_CATEGORY : isGoals ? MONTHLY_GOALS_CATEGORY : "General"),
-      todayAudioUrl: isShadowing ? (q.audioUrl || q.videoUrl || null) : isStory ? (q.audioUrl || null) : null,
+      todayAudioUrl: isShadowing ? (q.audioUrl || q.videoUrl || null) : isStory ? (q.audioUrl || null) : (q.audioUrl || null),
       todayStoryTranscript: isStory ? (q.storyTranscript || null) : null,
       todaySummaryGuide: isStory ? (q.summaryGuide || null) : null,
       todayImageUrl: isPicture ? (q.imageUrl || null) : null,
@@ -470,6 +470,9 @@ export async function publishManualQuestion(q) {
     question: q.question,
     category: q.category,
     contentType: isShadowing ? "shadowing_video" : isStory ? "story_audio" : isPicture ? "picture_description" : "question",
+    audioUrl: q.audioUrl || (isShadowing ? q.videoUrl : null),
+    videoUrl: q.videoUrl || null,
+    questionId: q._id,
   });
 
   return {

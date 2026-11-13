@@ -74,8 +74,8 @@ export async function getWhatsAppStatus(req, res) {
 
 export async function sendPoster(req, res) {
   try {
-    const { topic, question, category, targetGroup } = req.body || {};
-    const result = await sendDailyPosterToGroup({ topic, question, category, targetGroup });
+    const { topic, question, category, targetGroup, audioUrl, contentType, videoUrl, questionId } = req.body || {};
+    const result = await sendDailyPosterToGroup({ topic, question, category, targetGroup, audioUrl, contentType, videoUrl, questionId });
     return res.json({ success: true, ...result });
   } catch (err) {
     console.error("[WhatsAppController] sendPoster error:", err.message);

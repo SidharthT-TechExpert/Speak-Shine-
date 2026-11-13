@@ -669,9 +669,11 @@ async function sendAudioFileToGroup(targetGroup, audioUrl, topic, options = {}) 
         const cleanRel = trimmed.replace(/^\//, "");
         const candidates = [
           path.resolve(PROJECT_ROOT, "frontend", "public", cleanRel),
+          path.resolve(PROJECT_ROOT, "frontend", "dist", cleanRel),
           path.resolve(PROJECT_ROOT, cleanRel),
           path.resolve(PROJECT_ROOT, "tmp", cleanRel),
           path.resolve(process.cwd(), "frontend", "public", cleanRel),
+          path.resolve(process.cwd(), "frontend", "dist", cleanRel),
           path.resolve(process.cwd(), cleanRel),
         ];
         for (const candidate of candidates) {
@@ -681,17 +683,48 @@ async function sendAudioFileToGroup(targetGroup, audioUrl, topic, options = {}) 
             break;
           }
         }
+
+        // If local disk resolution failed, try fetching via HTTP fallback
+        if (!audioBuffer) {
+          const baseUrl = (process.env.FRONTEND_URL || "https://speak-shine.sidhartht.online").replace(/\/$/, "");
+          const candidateUrls = [
+            `${baseUrl}/${cleanRel}`,
+            `http://localhost:${process.env.PORT || 5000}/${cleanRel}`,
+          ];
+          for (const remoteCandidate of candidateUrls) {
+            try {
+              console.log(`[WhatsApp] 🌐 Fetching relative audio via HTTP fallback: ${remoteCandidate}...`);
+              const res = await fetch(remoteCandidate, { headers: { "User-Agent": "SpeakShine-Bot/1.0" } });
+              if (res.ok) {
+                const arrBuf = await res.arrayBuffer();
+                audioBuffer = Buffer.from(arrBuf);
+                const ct = res.headers.get("content-type");
+                if (ct && ct.includes("audio")) {
+                  mimetype = ct.split(";")[0].trim();
+                }
+                console.log(`[WhatsApp] ✅ Fetched audio from HTTP fallback: ${remoteCandidate}`);
+                break;
+              }
+            } catch (httpFallbackErr) {
+              // ignore and try next
+            }
+          }
+        }
       }
     }
 
     if (!audioBuffer) {
-      // Fallback: pass URL directly to Baileys if buffer couldn't be loaded
-      console.log(`[WhatsApp] 🎵 Passing audio URL directly to Baileys: ${audioUrl}...`);
+      // Fallback: ensure URL is absolute HTTP/HTTPS before passing to Baileys
+      let validUrl = audioUrl;
+      if (typeof audioUrl === "string" && !audioUrl.startsWith("http://") && !audioUrl.startsWith("https://")) {
+        const baseUrl = (process.env.FRONTEND_URL || "https://speak-shine.sidhartht.online").replace(/\/$/, "");
+        validUrl = `${baseUrl}/${audioUrl.replace(/^\//, "")}`;
+      }
+      console.log(`[WhatsApp] 🎵 Passing audio URL directly to Baileys: ${validUrl}...`);
       await sock.sendMessage(targetGroup, {
-        audio: { url: audioUrl },
+        audio: { url: validUrl },
         mimetype: mimetype || "audio/mpeg",
         ptt: false,
-        fileName,
       });
       return { success: true };
     }
@@ -703,7 +736,6 @@ async function sendAudioFileToGroup(targetGroup, audioUrl, topic, options = {}) 
         audio: audioBuffer,
         mimetype: mimetype || "audio/mpeg",
         ptt: false,
-        fileName,
       });
       console.log(`[WhatsApp] ✅ Audio delivered to group!`);
       return { success: true };
@@ -804,7 +836,7 @@ export async function sendDailyPosterToGroup(options = {}) {
         ? (status?.todayAudioUrl || status?.todayVideoUrl || dbQuestion?.audioUrl || dbQuestion?.videoUrl)
         : isStory
         ? (status?.todayAudioUrl || dbQuestion?.audioUrl)
-        : status?.todayAudioUrl)
+        : (status?.todayAudioUrl || dbQuestion?.audioUrl))
       || null;
     const vocabReq = resolveVocabRequiredCount(status, { isPicture, isStory, isShadowing });
 
@@ -958,8 +990,10 @@ export async function sendDailyPosterToGroup(options = {}) {
       // Deliver story audio file to WhatsApp group reliably
       let audioSent = false;
       if (resolvedAudioUrl) {
+        await new Promise(r => setTimeout(r, 1200));
         const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic, {
-          fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Story_Audio.mp3`
+          fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Story_Audio.mp3`,
+          caption: `🎧 *Story Audio:* ${topic}`
         });
         if (audioRes.success) audioSent = true;
       }
@@ -1019,6 +1053,7 @@ export async function sendDailyPosterToGroup(options = {}) {
       // Deliver shadowing reference audio file directly to WhatsApp group
       let audioSent = false;
       if (resolvedAudioUrl) {
+        await new Promise(r => setTimeout(r, 1200));
         const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic, {
           fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Shadowing_Audio.mp3`,
           caption: `🎧 *Reference Speech Audio:* ${topic}`
@@ -1098,7 +1133,11 @@ export async function sendDailyPosterToGroup(options = {}) {
 
     let audioSent = false;
     if (resolvedAudioUrl) {
-      const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic);
+      await new Promise(r => setTimeout(r, 1200));
+      const audioRes = await sendAudioFileToGroup(targetGroup, resolvedAudioUrl, topic, {
+        fileName: `${topic.replace(/[^a-zA-Z0-9_-]/g, "_")}_Audio.mp3`,
+        caption: `🎧 *Reference Audio:* ${topic}`
+      });
       if (audioRes.success) audioSent = true;
     }
 

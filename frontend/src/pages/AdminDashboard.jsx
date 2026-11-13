@@ -1019,7 +1019,14 @@ export default function AdminDashboard() {
   const handleSendPosterToGroup = async () => {
     try {
       setWaSendingPoster(true);
-      const res = await api.post("/whatsapp/send-poster");
+      const res = await api.post("/whatsapp/send-poster", {
+        topic: dash?.today?.topic,
+        question: dash?.today?.question,
+        category: dash?.today?.category,
+        contentType: dash?.today?.contentType,
+        audioUrl: dash?.today?.audioUrl || dash?.today?.videoUrl,
+        videoUrl: dash?.today?.videoUrl,
+      });
       if (res.data?.success) {
         const audioDelivered = res.data?.audioSent ? " and reference audio file" : "";
         msg(`✅ Poster${audioDelivered} sent to WhatsApp group successfully!`, "success");
@@ -3000,8 +3007,10 @@ export default function AdminDashboard() {
               <input className="form-input" style={{marginBottom:"0.5rem"}} placeholder="Topic (e.g. Future Goals)"
                 value={publishCustom.topic} onChange={e=>{ setPublishQ(null); setPublishCustom(p=>({...p,topic:e.target.value})); }}/>
               <textarea className="form-input" rows={2} placeholder="Question text…"
-                style={{resize:"vertical"}}
+                style={{resize:"vertical",marginBottom:"0.5rem"}}
                 value={publishCustom.question} onChange={e=>{ setPublishQ(null); setPublishCustom(p=>({...p,question:e.target.value})); }}/>
+              <input className="form-input" style={{marginBottom:"0.5rem"}} placeholder="Audio/Video URL (optional, e.g. /shadowing/... or https://...)"
+                value={publishCustom.audioUrl || ""} onChange={e=>{ setPublishCustom(p=>({...p,audioUrl:e.target.value})); }}/>
             </div>
 
             {/* Preview */}
@@ -3012,32 +3021,77 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            <button className="btn-primary" onClick={async()=>{
-              if(!publishCustom.question.trim()){msg("Enter or select a question first","danger");return;}
-              try{
-                await api.patch("/dashboard/today-question",{
-                  topic:publishCustom.topic,
-                  question:publishCustom.question,
-                  category:publishCustom.category||"General",
-                  questionId: publishCustom.questionId || publishQ?._id,
-                  contentType: publishCustom.contentType || publishQ?.contentType,
-                  audioUrl: publishCustom.audioUrl || publishQ?.audioUrl,
-                  videoUrl: publishCustom.videoUrl || publishQ?.videoUrl,
-                  videoDuration: publishCustom.videoDuration || publishQ?.videoDuration,
-                  videoTranscript: publishCustom.videoTranscript || publishQ?.videoTranscript,
-                  videoTitle: publishCustom.videoTitle || publishQ?.videoTitle,
-                  imageUrl: publishCustom.imageUrl || publishQ?.imageUrl,
-                  imageInstructions: publishCustom.imageInstructions || publishQ?.imageInstructions,
-                  storyTranscript: publishCustom.storyTranscript || publishQ?.storyTranscript,
-                  summaryGuide: publishCustom.summaryGuide || publishQ?.summaryGuide,
-                  vocabulary: publishCustom.vocabulary || publishQ?.vocabulary
-                });
-                msg("✅ Question published! Users can now see it.");
-                setPublishQ(null);
-                setPublishCustom({topic:"",question:"",category:""});
-                reload(['dashboard']); // Reload dashboard to show new question
-              }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
-            }}>📢 Publish to Webapp</button>
+            <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}>
+              <button className="btn-primary" onClick={async()=>{
+                if(!publishCustom.question.trim()){msg("Enter or select a question first","danger");return;}
+                try{
+                  await api.patch("/dashboard/today-question",{
+                    topic:publishCustom.topic,
+                    question:publishCustom.question,
+                    category:publishCustom.category||"General",
+                    questionId: publishCustom.questionId || publishQ?._id,
+                    contentType: publishCustom.contentType || publishQ?.contentType,
+                    audioUrl: publishCustom.audioUrl || publishQ?.audioUrl,
+                    videoUrl: publishCustom.videoUrl || publishQ?.videoUrl,
+                    videoDuration: publishCustom.videoDuration || publishQ?.videoDuration,
+                    videoTranscript: publishCustom.videoTranscript || publishQ?.videoTranscript,
+                    videoTitle: publishCustom.videoTitle || publishQ?.videoTitle,
+                    imageUrl: publishCustom.imageUrl || publishQ?.imageUrl,
+                    imageInstructions: publishCustom.imageInstructions || publishQ?.imageInstructions,
+                    storyTranscript: publishCustom.storyTranscript || publishQ?.storyTranscript,
+                    summaryGuide: publishCustom.summaryGuide || publishQ?.summaryGuide,
+                    vocabulary: publishCustom.vocabulary || publishQ?.vocabulary
+                  });
+                  msg("✅ Question published! Users can now see it.");
+                  setPublishQ(null);
+                  setPublishCustom({topic:"",question:"",category:"",audioUrl:""});
+                  reload(['dashboard']); // Reload dashboard to show new question
+                }catch(e){msg(e?.response?.data?.error||"Failed","danger");}
+              }}>📢 Publish to Webapp</button>
+
+              <button className="btn-primary" style={{background:"linear-gradient(135deg, #10b981, #059669)",border:"none"}} onClick={async()=>{
+                if(!publishCustom.question.trim()){msg("Enter or select a question first","danger");return;}
+                try{
+                  const payload = {
+                    topic:publishCustom.topic,
+                    question:publishCustom.question,
+                    category:publishCustom.category||"General",
+                    questionId: publishCustom.questionId || publishQ?._id,
+                    contentType: publishCustom.contentType || publishQ?.contentType,
+                    audioUrl: publishCustom.audioUrl || publishQ?.audioUrl,
+                    videoUrl: publishCustom.videoUrl || publishQ?.videoUrl,
+                    videoDuration: publishCustom.videoDuration || publishQ?.videoDuration,
+                    videoTranscript: publishCustom.videoTranscript || publishQ?.videoTranscript,
+                    videoTitle: publishCustom.videoTitle || publishQ?.videoTitle,
+                    imageUrl: publishCustom.imageUrl || publishQ?.imageUrl,
+                    imageInstructions: publishCustom.imageInstructions || publishQ?.imageInstructions,
+                    storyTranscript: publishCustom.storyTranscript || publishQ?.storyTranscript,
+                    summaryGuide: publishCustom.summaryGuide || publishQ?.summaryGuide,
+                    vocabulary: publishCustom.vocabulary || publishQ?.vocabulary
+                  };
+                  await api.patch("/dashboard/today-question", payload);
+                  msg("✅ Question published! Sending poster and audio to WhatsApp group...");
+                  setPublishQ(null);
+                  setPublishCustom({topic:"",question:"",category:"",audioUrl:""});
+                  reload(['dashboard']);
+
+                  const waRes = await api.post("/whatsapp/send-poster", {
+                    topic: payload.topic,
+                    question: payload.question,
+                    category: payload.category,
+                    contentType: payload.contentType,
+                    audioUrl: payload.audioUrl || payload.videoUrl,
+                    videoUrl: payload.videoUrl,
+                    questionId: payload.questionId,
+                  });
+                  if (waRes.data?.success) {
+                    const audioDelivered = waRes.data?.audioSent ? " and reference audio file" : "";
+                    msg(`✅ Question published & poster${audioDelivered} sent to WhatsApp!`, "success");
+                  }
+                  await loadWhatsAppStatus();
+                }catch(e){msg(e?.response?.data?.error||e.message||"Failed","danger");}
+              }}>🚀 Publish & Send to WhatsApp Group</button>
+            </div>
           </div>
 
           <div className="card">

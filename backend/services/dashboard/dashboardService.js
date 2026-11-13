@@ -896,9 +896,9 @@ export async function setTodayQuestion(topic, question, category, extra = {}) {
       todayTopic: topic || null,
       todayCategory: category || null,
       todayContentType: resolvedContentType,
-      todayAudioUrl: isShadowing
-        ? (extra?.audioUrl || extra?.videoUrl || matched?.audioUrl || matched?.videoUrl || null)
-        : (isStory ? (extra?.audioUrl || matched?.audioUrl || null) : null),
+      todayAudioUrl: extra?.audioUrl || (isShadowing
+        ? (extra?.videoUrl || matched?.audioUrl || matched?.videoUrl || null)
+        : (isStory ? (matched?.audioUrl || null) : (matched?.audioUrl || null))),
       todayStoryTranscript: isStory ? (extra?.storyTranscript || matched?.storyTranscript || null) : null,
       todaySummaryGuide: isStory ? (extra?.summaryGuide || matched?.summaryGuide || null) : null,
       isStorySummaryDay: isStory,
