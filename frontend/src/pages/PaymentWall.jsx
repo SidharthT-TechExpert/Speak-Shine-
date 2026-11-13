@@ -401,6 +401,13 @@ export default function PaymentWall({ onSuccess }) {
             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             256-Bit SSL · Secured by Razorpay &amp; UPI
           </div>
+
+          <div style={{ textAlign: "center", marginTop: "0.75rem", fontSize: "0.68rem", color: "var(--muted)", lineHeight: 1.6 }}>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text2)", textDecoration: "underline", margin: "0 0.3rem" }}>Terms</a> ·
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text2)", textDecoration: "underline", margin: "0 0.3rem" }}>Privacy</a> ·
+            <a href="/refund" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text2)", textDecoration: "underline", margin: "0 0.3rem" }}>Refund Policy</a> ·
+            <a href="/contact" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text2)", textDecoration: "underline", margin: "0 0.3rem" }}>Contact Support</a>
+          </div>
         </div>
 
       </div>{/* pw-page */}

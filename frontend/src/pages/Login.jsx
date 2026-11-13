@@ -500,6 +500,22 @@ export default function Login({ loginFor = "user" }) {
           <span>Daily Streak &amp; Rewards</span>
         </div>
       </div>
+
+      {/* Trust & Legal Footer */}
+      <div style={{ textAlign: "center", marginTop: "1.25rem", paddingBottom: "1rem", fontSize: "0.76rem", color: "#8c87a2", lineHeight: 1.8 }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+          <Link to="/terms" style={{ color: "#a78bfa", textDecoration: "none" }}>Terms of Service</Link>
+          <span>•</span>
+          <Link to="/privacy" style={{ color: "#a78bfa", textDecoration: "none" }}>Privacy Policy</Link>
+          <span>•</span>
+          <Link to="/refund" style={{ color: "#a78bfa", textDecoration: "none" }}>Refund Policy</Link>
+          <span>•</span>
+          <Link to="/contact" style={{ color: "#a78bfa", textDecoration: "none" }}>Contact Us</Link>
+        </div>
+        <div style={{ marginTop: "0.25rem", opacity: 0.85 }}>
+          Speak &amp; Shine AI English Fluency Lab • Platform by <strong>Sidharth T</strong>
+        </div>
+      </div>
     </div>
   );
 }

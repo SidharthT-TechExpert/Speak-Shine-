@@ -484,6 +484,22 @@ export default function Register() {
         )}
 
         <p className="auth-link" style={{ marginTop: 16 }}>Already have an account? <Link to="/login">Sign in</Link></p>
+
+        {/* Trust & Legal Footer */}
+        <div style={{ textAlign: "center", marginTop: "1.25rem", fontSize: "0.74rem", color: "var(--muted)", lineHeight: 1.7 }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <Link to="/terms" style={{ color: "#a78bfa", textDecoration: "none" }}>Terms</Link>
+            <span>•</span>
+            <Link to="/privacy" style={{ color: "#a78bfa", textDecoration: "none" }}>Privacy</Link>
+            <span>•</span>
+            <Link to="/refund" style={{ color: "#a78bfa", textDecoration: "none" }}>Refunds</Link>
+            <span>•</span>
+            <Link to="/contact" style={{ color: "#a78bfa", textDecoration: "none" }}>Contact</Link>
+          </div>
+          <div style={{ marginTop: "0.2rem", opacity: 0.8 }}>
+            Speak &amp; Shine • Founded by <strong>Sidharth T</strong>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -41,6 +41,7 @@ const NotFound        = lazy(pageImports.NotFound);
 const PaymentWall     = lazy(pageImports.PaymentWall);
 const PaymentHistory  = lazy(pageImports.PaymentHistory);
 const Profile         = lazy(pageImports.Profile);
+const LegalPages      = lazy(() => import("./pages/LegalPages.jsx"));
 
 export const routePreloaders = {
   "/dashboard": pageImports.UserDashboard,
@@ -346,6 +347,13 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
         </Route>
+
+        {/* Public Trust, Compliance & Legal Pages */}
+        <Route path="/terms" element={<Suspense fallback={<PageLoader />}><LegalPages /></Suspense>} />
+        <Route path="/privacy" element={<Suspense fallback={<PageLoader />}><LegalPages /></Suspense>} />
+        <Route path="/refund" element={<Suspense fallback={<PageLoader />}><LegalPages /></Suspense>} />
+        <Route path="/cancellation" element={<Suspense fallback={<PageLoader />}><LegalPages /></Suspense>} />
+        <Route path="/contact" element={<Suspense fallback={<PageLoader />}><LegalPages /></Suspense>} />
 
         {/* Catch-all - 404 Page */}
         <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />

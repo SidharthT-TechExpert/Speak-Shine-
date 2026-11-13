@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /terms
+Allow: /privacy
+Allow: /refund
+Allow: /contact
+Disallow: /admin
+Disallow: /trainer
+Disallow: /api/
+
+Sitemap: https://speak-shine.sidhartht.online/sitemap.xml
