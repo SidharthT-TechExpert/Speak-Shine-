@@ -31,7 +31,21 @@ export function getISTParts(date = new Date()) {
   const seconds = shifted.getUTCSeconds();
   const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   const timeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  return { year, month, day, weekday, hours, minutes, seconds, dateStr, timeStr };
+  return {
+    year,
+    month,
+    day,
+    weekday,
+    dayOfWeek: weekday,
+    hours,
+    hour: hours,
+    minutes,
+    minute: minutes,
+    seconds,
+    second: seconds,
+    dateStr,
+    timeStr,
+  };
 }
 
 /**
@@ -71,6 +85,26 @@ export function getISTDayBounds(date = new Date()) {
   const start = getISTStartOfDay(date);
   const endExclusive = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   return { start, endExclusive };
+}
+
+/**
+ * Returns true if the given date is the last day of its month in IST.
+ * @param {Date|string|number} [date=new Date()]
+ * @returns {boolean}
+ */
+export function isISTLastDayOfMonth(date = new Date()) {
+  const { year, month, day } = getISTParts(date);
+  const lastDate = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return day === lastDate;
+}
+
+/**
+ * Returns true if the given date is the 1st of its month in IST.
+ * @param {Date|string|number} [date=new Date()]
+ * @returns {boolean}
+ */
+export function isISTFirstDayOfMonth(date = new Date()) {
+  return getISTParts(date).day === 1;
 }
 
 /**

@@ -117,7 +117,7 @@ export const CURATED_FALLBACK_QUESTIONS = [
  */
 function isLastDayOfMonth() {
   const { year, month, day } = getISTParts();
-  const lastDate = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lastDate = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   return day === lastDate;
 }
 

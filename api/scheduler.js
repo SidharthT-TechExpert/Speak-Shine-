@@ -43,7 +43,7 @@ export const MONTHLY_GOALS_CATEGORY = "Monthly Goals";
 /** Returns true if today is the last day of the month (IST) */
 function isLastDayOfMonth() {
   const { year, month, day } = getISTParts();
-  const lastDate = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lastDate = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   return day === lastDate;
 }
 
@@ -465,7 +465,7 @@ export function startDailyReset() {
   cron.schedule("59 23 * * *", async () => {
     try {
       const { year, month, day } = getISTParts();
-      const lastDateOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const lastDateOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
       // Check if today is the last day of the month in IST
       if (day === lastDateOfMonth) {

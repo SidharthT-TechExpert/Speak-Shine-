@@ -18,6 +18,19 @@ async function maybePublishDueManualQuestion() {
   await publishDueManualQuestion();
 }
 
+let lastDailyQuestionCheck = 0;
+async function maybePublishDailyQuestionIfDue() {
+  const now = Date.now();
+  if (now - lastDailyQuestionCheck < 30_000) return;
+  lastDailyQuestionCheck = now;
+  try {
+    const { catchUpPublishQuestion } = await import("../scheduler/questionSchedulerService.js");
+    await catchUpPublishQuestion();
+  } catch (err) {
+    console.warn("[DashboardService] Auto-publish on load failed (non-fatal):", err.message);
+  }
+}
+
 let cachedLeaderboardSummary = null;
 let cachedLeaderboardTime = 0;
 const LEADERBOARD_CACHE_TTL = 30 * 1000; // 30s cache
@@ -205,6 +218,7 @@ function getPosterImage(status) {
  */
 export async function getTodayQuestionData() {
   await maybePublishDueManualQuestion().catch(() => {});
+  await maybePublishDailyQuestionIfDue().catch(() => {});
   const status = await Status.findOne().lean();
   const todayIST = getISTDateKey();
 
@@ -288,8 +302,9 @@ export async function getTodayQuestionData() {
 
 export async function getTodayOverview() {
   try {
-    const { publishDueManualQuestion } = await import("../scheduler/questionSchedulerService.js");
+    const { publishDueManualQuestion, catchUpPublishQuestion } = await import("../scheduler/questionSchedulerService.js");
     await publishDueManualQuestion();
+    await catchUpPublishQuestion();
   } catch {
     // non-fatal
   }
