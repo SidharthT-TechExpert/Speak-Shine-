@@ -399,6 +399,11 @@ if (fs.existsSync(publicAudioDir)) {
   app.use("/story-audio", express.static(path.join(publicAudioDir, "story-audio")));
   app.use("/shadowing", express.static(path.join(publicAudioDir, "shadowing")));
 }
+const distAudioDir = path.join(__dirname, "../frontend/dist");
+if (fs.existsSync(distAudioDir)) {
+  app.use("/story-audio", express.static(path.join(distAudioDir, "story-audio")));
+  app.use("/shadowing", express.static(path.join(distAudioDir, "shadowing")));
+}
 
 app.use("/api", (_, res) => res.status(404).json({ error: "API route not found" }));
 

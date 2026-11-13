@@ -18,6 +18,10 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { getTextKey, getTextModel, markKeyExhausted, parseRetryAfter } from "./groqKeyManager.js";
 import { uploadBufferToR2 } from "../../config/storage.js";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const execFileAsync = promisify(execFile);
 
@@ -261,25 +265,42 @@ export async function processPodcastIntoShadowingChallenge(podcastItem, options 
     console.log(`[SpeechSlicer] ✂️ Slicing speech window (${window.duration}s)...`);
     await sliceAudioFile(rawFile, window.startTime, window.endTime, slicedFile);
 
-    // Read sliced MP3 buffer and upload to Cloudflare R2
-    const audioBuffer = await fs.promises.readFile(slicedFile);
-    const r2Key = `shadowing/native-${Date.now()}.mp3`;
+    // Save locally to frontend/public/shadowing/ so authentic native podcast audio is guaranteed playable
+    const publicAudioDir = path.resolve(__dirname, "../../../frontend/public/shadowing");
+    if (!fs.existsSync(publicAudioDir)) {
+      fs.mkdirSync(publicAudioDir, { recursive: true });
+    }
+    const localFileName = `podcast-${Date.now()}.mp3`;
+    const localFilePath = path.join(publicAudioDir, localFileName);
+    await fs.promises.copyFile(slicedFile, localFilePath);
 
-    console.log(`[SpeechSlicer] ☁️ Uploading sliced human native speech to Cloudflare R2 (${r2Key})...`);
-    let audioUrl = "";
-    try {
-      const uploadRes = await uploadBufferToR2(audioBuffer, r2Key, "audio/mpeg");
-      audioUrl = (typeof uploadRes === "string" && uploadRes)
-        ? uploadRes
-        : (uploadRes?.url || (process.env.R2_PUBLIC_URL ? `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}` : ""));
-    } catch (r2Err) {
-      console.warn(`[SpeechSlicer] ⚠️ R2 upload notice:`, r2Err.message);
-      // Fallback relative path or direct public storage
-      audioUrl = `/shadowing/stage-presence.mp3`;
+    // Also mirror to frontend/dist/shadowing/ if dist exists
+    const distAudioDir = path.resolve(__dirname, "../../../frontend/dist/shadowing");
+    if (fs.existsSync(distAudioDir)) {
+      try {
+        await fs.promises.copyFile(slicedFile, path.join(distAudioDir, localFileName));
+      } catch (_) {}
     }
 
-    if (!audioUrl) {
-      audioUrl = `https://pub-1c5ce667ea4445fb98d667349b649704.r2.dev/${r2Key}`;
+    let audioUrl = `/shadowing/${localFileName}`;
+
+    // Read sliced MP3 buffer and upload to Cloudflare R2 if configured
+    try {
+      const audioBuffer = await fs.promises.readFile(slicedFile);
+      const r2Key = `shadowing/native-${Date.now()}.mp3`;
+
+      console.log(`[SpeechSlicer] ☁️ Uploading sliced human native speech to Cloudflare R2 (${r2Key})...`);
+      const uploadRes = await uploadBufferToR2(audioBuffer, r2Key, "audio/mpeg");
+      if (typeof uploadRes === "string" && uploadRes) {
+        audioUrl = uploadRes;
+      } else if (uploadRes?.url) {
+        audioUrl = uploadRes.url;
+      } else if (process.env.R2_PUBLIC_URL) {
+        audioUrl = `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${r2Key}`;
+      }
+    } catch (r2Err) {
+      console.warn(`[SpeechSlicer] ⚠️ R2 upload notice (using local sliced native podcast audio):`, r2Err.message);
+      // Keep local audioUrl (/shadowing/${localFileName}) - NEVER fall back to robotic sounds!
     }
 
     const title = podcastItem.title ? podcastItem.title.replace(/[^\w\s-]/gi, "").substring(0, 70).trim() : "Native Speaker Monologue";

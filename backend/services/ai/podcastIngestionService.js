@@ -132,7 +132,7 @@ export async function fetchAutomatedNativePodcast() {
     sourceFeed: "Curated Native Speaker Archive",
     category: "Effective Communication & Presence",
     title: "Mastering Confident English Introductions & Stage Presence",
-    audioUrl: "https://pub-1c5ce667ea4445fb98d667349b649704.r2.dev/shadowing/speaking-habits.mp3",
+    audioUrl: "https://tracking.swap.fm/track/XvDEoI11TR00olTUO8US/prfx.byspotify.com/e/play.podtrac.com/npr-510338/npr.simplecastaudio.com/8ae5a040-e346-4b89-ba6b-625f91f1fbd4/episodes/4433f11c-95df-4e64-971c-f6802d3386b9/audio/128/default.mp3",
     description: "Authentic native English talk exploring vocal resonance and active speech habits.",
     approxDuration: "180s"
   };
